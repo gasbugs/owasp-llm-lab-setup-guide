@@ -28,7 +28,7 @@ flowchart TD
 - Internet Gateway와 route table
 - 학생별 security group
 - 학생별 IAM role과 instance profile
-- 학생별 EC2 GPU 인스턴스. 기본값은 비용 절감형 `g4dn.xlarge`, 안정 운영 옵션은 `g6.xlarge`
+- 학생별 EC2 GPU 인스턴스. 기본값은 `g6.xlarge`
 - AWS Budget 알람
 
 학생 수가 여러 명이면 `student_ids` 목록만큼 EC2가 생성됩니다.
@@ -79,7 +79,8 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Ollama와 실습 앱 컨테이너 실행
 - Ollama 모델 pull과 warm-up
 - Podman Quadlet 기반 systemd user unit 등록
-- 4시간 자동 stop 안전망 등록
+- 4시간 OS-level 자동 stop 안전망 등록
+- Terraform 기본 설정으로 매일 17:30 KST Lambda 기반 EC2 자동 중지 등록
 
 운영 편의상 자동 설치가 필요하면 `terraform.tfvars`에서 아래 값을 켭니다.
 

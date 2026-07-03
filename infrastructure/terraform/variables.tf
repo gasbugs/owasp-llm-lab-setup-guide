@@ -82,12 +82,12 @@ variable "ami_owner_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 인스턴스 타입. 비용 절감 기본값은 g4dn.xlarge(T4 16GB), 안정 운영 권장은 g6.xlarge(L4 24GB)."
+  description = "EC2 인스턴스 타입. 강의 표준은 g6.xlarge (L4 24GB)."
   type        = string
-  default     = "g4dn.xlarge"
+  default     = "g6.xlarge"
   validation {
-    condition     = contains(["g4dn.xlarge", "g6.xlarge"], var.instance_type)
-    error_message = "instance_type은 비용 절감형 g4dn.xlarge 또는 안정 운영형 g6.xlarge 중 하나로 설정하세요."
+    condition     = var.instance_type == "g6.xlarge"
+    error_message = "본 강의 표준 실습은 g6.xlarge 기준으로 검증되어 있습니다. 다른 타입은 강사 검증 후 변경하세요."
   }
 }
 
@@ -111,8 +111,27 @@ variable "allowed_ingress_cidr" {
   }
 }
 
-# 자동 시작/종료 스케줄 변수는 없다.
-# 학생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF한다.
+variable "enable_auto_stop" {
+  description = "true이면 EventBridge가 Lambda를 매일 호출해 Course 태그가 같은 실행 중 EC2를 자동 중지한다."
+  type        = bool
+  default     = true
+}
+
+variable "auto_stop_cron_utc" {
+  description = "자동 중지 EventBridge cron 표현식. 기본값 cron(30 8 * * ? *)은 17:30 KST."
+  type        = string
+  default     = "cron(30 8 * * ? *)"
+  validation {
+    condition     = can(regex("^cron\\(.+\\)$", var.auto_stop_cron_utc))
+    error_message = "auto_stop_cron_utc는 EventBridge cron(...) 표현식이어야 합니다."
+  }
+}
+
+variable "auto_stop_description" {
+  description = "자동 중지 스케줄 설명."
+  type        = string
+  default     = "Daily EC2 auto-stop at 17:30 KST"
+}
 
 variable "daily_budget_usd" {
   description = "일일 비용 알람 임계값(USD)"

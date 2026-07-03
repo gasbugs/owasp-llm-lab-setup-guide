@@ -23,7 +23,7 @@ aws sts get-caller-identity --profile owasp-llm
 
 ## 2. GPU quota 확인
 
-기본값 `g4dn.xlarge`와 안정 운영 옵션 `g6.xlarge`는 모두 4 vCPU를 사용합니다. 아래 quota가 4 이상이어야 합니다.
+기본값 `g6.xlarge`는 4 vCPU를 사용합니다. 아래 quota가 4 이상이어야 합니다.
 
 ```bash
 aws service-quotas get-service-quota \
@@ -81,8 +81,7 @@ daily_budget_usd  = 20
 course_budget_usd = 120
 alert_email       = "your@email.com"
 
-# 비용 절감 기본값은 g4dn.xlarge입니다.
-# 강사가 안정 운영형을 안내한 경우에만 g6.xlarge로 바꿉니다.
+# 기본 인스턴스 타입은 g6.xlarge입니다.
 # instance_type = "g6.xlarge"
 ```
 
@@ -132,6 +131,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - fake model registry 실행: `lab-fake-registry`, port `8002`
 - EC2 start 후 자동 재시작을 위한 Podman Quadlet systemd user unit 등록
 - 4시간 후 자동 stop 안전망 등록
+- Terraform 기본 설정으로 매일 17:30 KST Lambda 기반 EC2 자동 중지 등록
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
 

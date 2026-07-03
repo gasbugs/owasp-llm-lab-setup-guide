@@ -68,3 +68,8 @@ output "alert_topic_arn" {
   description = "비용 알람 SNS topic ARN"
   value       = aws_sns_topic.alerts.arn
 }
+
+output "auto_stop_schedule" {
+  description = "자동 EC2 중지 스케줄. 기본 cron(30 8 * * ? *)은 17:30 KST."
+  value       = var.enable_auto_stop ? var.auto_stop_cron_utc : null
+}

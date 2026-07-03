@@ -1,6 +1,6 @@
 # Infrastructure — 학생 1인 1계정 EC2 실습 환경
 
-본 디렉터리는 OWASP Top 10 for LLM 강의 실습 환경을 AWS에 만드는 Terraform과 운영 스크립트를 담고 있다. 현재 운영 모델은 **학생 본인 AWS 계정에 EC2 GPU 인스턴스 1대를 만들고, 학생이 직접 start/stop하는 방식**이다. 기본값은 비용 절감형 `g4dn.xlarge`이며, 더 안정적인 운영이 필요하면 `g6.xlarge`를 선택한다.
+본 디렉터리는 OWASP Top 10 for LLM 강의 실습 환경을 AWS에 만드는 Terraform과 운영 스크립트를 담고 있다. 현재 운영 모델은 **학생 본인 AWS 계정에 EC2 `g6.xlarge` 1대를 만들고, 학생이 직접 start/stop하는 방식**이다.
 
 ## 현재 운영 모델
 
@@ -8,6 +8,7 @@
 - 학생은 `terraform apply`로 본인 EC2, IAM instance profile, 보안 그룹, 비용 알람을 만든다.
 - 매일 아침 `infrastructure/scripts/student/start-lab.sh`로 인스턴스를 시작한다.
 - 매일 종료 시 `infrastructure/scripts/student/stop-lab.sh`로 EC2 시간당 요금을 멈춘다.
+- 기본 Terraform 설정은 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지한다.
 - 마지막 날에는 `terraform destroy -auto-approve`로 EC2, EBS, VPC, 비용 알람을 삭제한다.
 - 기본 웹 접속은 SSM 포트포워딩이다. public IP 직접 접속은 `allowed_ingress_cidr`를 본인 IP `/32`로 제한한 경우에만 사용한다.
 
@@ -62,7 +63,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 
 ## 비용 가드레일
 
-- GPU 인스턴스는 실행 중일 때 비용이 발생한다. 비용 절감 기본값은 `g4dn.xlarge`, 안정 운영 옵션은 `g6.xlarge`다.
+- `g6.xlarge`는 실행 중일 때 비용이 발생한다.
 - `stop` 상태에서는 EC2 시간당 요금은 멈추지만 EBS 보존 비용은 남는다.
 - `terraform.tfvars.example`의 Budget 금액은 예시다. 실제 일일/전체 예산은 강사가 공지한 최신 리전, 단가, 환율, VAT, 실습 시간 기준으로 조정한다.
 - Budget은 경보다. 알람이 오면 즉시 `stop-lab.sh` 또는 강사 호출로 확인한다.
