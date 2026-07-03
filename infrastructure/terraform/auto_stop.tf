@@ -1,12 +1,19 @@
 ################################################################################
-# Night auto-stop — EventBridge invokes Lambda from 17:30 KST to next-day 08:30 KST
+# Auto-stop — EventBridge invokes Lambda based on selected schedule mode
 ################################################################################
 
 locals {
   auto_stop_resource_prefix = substr("${local.name_prefix}-auto-stop", 0, 48)
-  auto_stop_schedules = var.auto_stop_cron_utc == null ? var.auto_stop_crons_utc : {
-    legacy = var.auto_stop_cron_utc
+  auto_stop_schedule_presets = {
+    daily_1730 = {
+      "daily-1730-kst" = "cron(30 8 * * ? *)"
+    }
+    night_1730_0830 = {
+      "night-minute-30" = "cron(30 8-23 * * ? *)"
+      "night-minute-00" = "cron(0 9-23 * * ? *)"
+    }
   }
+  auto_stop_schedules = var.auto_stop_schedule_mode == "custom" ? var.auto_stop_custom_crons_utc : local.auto_stop_schedule_presets[var.auto_stop_schedule_mode]
 }
 
 data "archive_file" "auto_stop_lambda" {
@@ -99,7 +106,7 @@ resource "aws_cloudwatch_event_rule" "auto_stop" {
   for_each = var.enable_auto_stop ? local.auto_stop_schedules : {}
 
   name                = "${local.auto_stop_resource_prefix}-${substr(md5(each.key), 0, 8)}"
-  description         = "${var.auto_stop_description}: ${each.value}"
+  description         = "${var.auto_stop_description} (${var.auto_stop_schedule_mode}): ${each.value}"
   schedule_expression = each.value
 }
 
@@ -114,7 +121,7 @@ resource "aws_cloudwatch_event_target" "auto_stop" {
 resource "aws_lambda_permission" "allow_eventbridge_auto_stop" {
   for_each = var.enable_auto_stop ? local.auto_stop_schedules : {}
 
-  statement_id  = "AllowExecutionFromEventBridgeAutoStop${replace(each.key, "-", "")}"
+  statement_id  = "AllowExecutionFromEventBridgeAutoStop${substr(md5(each.key), 0, 8)}"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.auto_stop[0].function_name
   principal     = "events.amazonaws.com"

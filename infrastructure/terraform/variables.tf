@@ -117,34 +117,30 @@ variable "enable_auto_stop" {
   default     = true
 }
 
-variable "auto_stop_cron_utc" {
-  description = "호환용 단일 자동 중지 cron. null이면 auto_stop_crons_utc 기본 야간 스케줄을 사용한다."
+variable "auto_stop_schedule_mode" {
+  description = "자동 중지 스케줄 모드. daily_1730은 매일 17:30 KST 1회, night_1730_0830은 17:30 KST부터 다음날 08:30 KST까지 30분마다 실행, custom은 auto_stop_custom_crons_utc를 사용한다."
   type        = string
-  default     = null
-  nullable    = true
+  default     = "daily_1730"
   validation {
-    condition     = var.auto_stop_cron_utc == null || can(regex("^cron\\(.+\\)$", var.auto_stop_cron_utc))
-    error_message = "auto_stop_cron_utc는 EventBridge cron(...) 표현식이어야 합니다."
+    condition     = contains(["daily_1730", "night_1730_0830", "custom"], var.auto_stop_schedule_mode)
+    error_message = "auto_stop_schedule_mode는 daily_1730, night_1730_0830, custom 중 하나여야 합니다."
   }
 }
 
-variable "auto_stop_crons_utc" {
-  description = "자동 중지 EventBridge cron map. 기본값은 17:30 KST부터 다음날 08:30 KST까지 30분마다 실행한다."
+variable "auto_stop_custom_crons_utc" {
+  description = "auto_stop_schedule_mode = custom 일 때 사용할 EventBridge cron map."
   type        = map(string)
-  default = {
-    "kst-1730-0830-minute-30" = "cron(30 8-23 * * ? *)"
-    "kst-1800-0830-minute-00" = "cron(0 9-23 * * ? *)"
-  }
+  default     = {}
   validation {
-    condition     = alltrue([for cron in values(var.auto_stop_crons_utc) : can(regex("^cron\\(.+\\)$", cron))])
-    error_message = "auto_stop_crons_utc의 모든 값은 EventBridge cron(...) 표현식이어야 합니다."
+    condition     = alltrue([for cron in values(var.auto_stop_custom_crons_utc) : can(regex("^cron\\(.+\\)$", cron))])
+    error_message = "auto_stop_custom_crons_utc의 모든 값은 EventBridge cron(...) 표현식이어야 합니다."
   }
 }
 
 variable "auto_stop_description" {
   description = "자동 중지 스케줄 설명."
   type        = string
-  default     = "EC2 auto-stop every 30 minutes from 17:30 KST to next-day 08:30 KST"
+  default     = "EC2 auto-stop schedule"
 }
 
 variable "daily_budget_usd" {
