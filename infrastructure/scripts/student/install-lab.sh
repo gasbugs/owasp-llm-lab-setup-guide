@@ -19,9 +19,10 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.0"
+SCRIPT_VERSION="0.2.0"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
 LLAMA_GUARD_MODEL="${LLAMA_GUARD_MODEL:-llama-guard3:8b}"
 LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
@@ -36,6 +37,7 @@ echo "=== owasp-llm-lab manual install start: $(date -Iseconds) ==="
 echo "SCRIPT_VERSION=$SCRIPT_VERSION"
 echo "RAW_URL=$RAW_URL"
 echo "IMAGE_NAMESPACE=$IMAGE_NAMESPACE IMAGE_TAG=$IMAGE_TAG"
+echo "REFRESH_IMAGES=$REFRESH_IMAGES"
 
 # 1) IMDSv2로 instance metadata와 tag 조회
 step "1/10" "EC2 메타데이터와 태그를 조회해 설치 대상 정보를 확인합니다"
@@ -127,11 +129,11 @@ step "7/10" "Ollama 모델 디렉터리를 준비합니다"
 install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/ollama-models
 
 # 6) 컨테이너 이미지 pull
-step "8/10" "실습 컨테이너 이미지를 확인하고 없는 이미지만 pull합니다"
+step "8/10" "실습 컨테이너 이미지를 확인하고 최신 이미지를 pull합니다"
 "${RUN_AS_UBUNTU[@]}" bash <<PULLSH
 set -euo pipefail
 for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-llmgoat owasp-llm-dvla; do
-  if podman image exists "docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
+  if [ "${REFRESH_IMAGES}" != "true" ] && podman image exists "docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
     echo "[install-lab] image already exists: docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"
     continue
   fi
@@ -150,16 +152,9 @@ for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-
 done
 PULLSH
 
-# 7) 시나리오 결정
-step "9/10" "오늘 요일 기준 실습 시나리오 프로필을 결정합니다"
-DAY=$(date +%u)
-PROFILE="day$DAY"
-[ "$DAY" -gt 5 ] && PROFILE="day1"
-echo "[install-lab] selected scenario profile: $PROFILE"
-
-# 8) Quadlet으로 컨테이너 systemd user unit 작성 및 실행
+# 7) Quadlet으로 컨테이너 systemd user unit 작성 및 실행
 # podman generate systemd는 deprecated라 새 설치에서는 Quadlet을 직접 사용한다.
-step "10/10" "Quadlet unit, 실습 컨테이너, 모델, 선택 도구를 준비합니다"
+step "9/10" "Quadlet unit, 모든 실습 컨테이너, 모델, 선택 도구를 준비합니다"
 mkdir -p /home/ubuntu/.LLMGoat/models /home/ubuntu/.LLMGoat/cache
 chown -R ubuntu:ubuntu /home/ubuntu/.LLMGoat
 if [ -f /home/ubuntu/.LLMGoat/models/gemma-2.gguf ]; then
@@ -225,7 +220,7 @@ Requires=lab-ollama.container
 ContainerName=lab-vuln-rag
 Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}
 Network=host
-Environment=SCENARIO=$PROFILE
+Environment=DEFAULT_SCENARIO=day1
 Environment=OLLAMA_URL=http://localhost:11434
 Environment=OLLAMA_MODEL=$OLLAMA_MODEL
 
@@ -342,7 +337,8 @@ for unit in "${units[@]}"; do
 done
 QUADLETSH
 
-# 9) Ollama 모델 pull 및 warm-up
+# 10) Ollama 모델 pull 및 warm-up
+step "10/10" "Ollama 모델 pull, warm-up, 선택 도구를 준비합니다"
 echo "[install-lab] checking Ollama readiness, model availability, and warm-up"
 "${RUN_AS_UBUNTU[@]}" bash <<OLLAMASH
 set -euo pipefail

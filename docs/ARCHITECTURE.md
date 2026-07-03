@@ -94,7 +94,7 @@ enable_user_data_bootstrap = true
 | 컨테이너 | 포트 | 역할 |
 |---|---:|---|
 | `lab-ollama` | 11434 | 로컬 LLM API |
-| `lab-vuln-rag` | 8000 | 의도적으로 취약한 RAG 챗봇 |
+| `lab-vuln-rag` | 8000 | 의도적으로 취약한 RAG 챗봇. Day 1~5 시나리오를 한 앱에서 선택 |
 | `lab-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
 | `lab-llmgoat` | 5000 | LLMGoat cross-platform 실습 |
 | `lab-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |

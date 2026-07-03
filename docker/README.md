@@ -19,7 +19,7 @@
 | (외부) `ghcr.io/open-webui/open-webui` | 웹 UI | 모든 Day |
 | (외부) `langfuse/langfuse` | 관찰성 데모 | Day 5 |
 
-`vuln-rag`는 `SCENARIO` 환경변수(`day1` ~ `day5`)에 따라 매일 다른 시스템 프롬프트·RAG 데이터·취약점을 노출합니다.
+`vuln-rag`는 하나의 앱에서 `day1` ~ `day5` 시나리오를 모두 제공합니다. UI의 Scenario 선택 메뉴나 `/api/chat` 요청 body의 `scenario` 값으로 시나리오를 선택합니다.
 
 ## 빌드·푸시 흐름 (강사)
 
@@ -48,7 +48,7 @@ DOCKERHUB_NAMESPACE=your-username ./build-and-push.sh
 # /etc/lab/env가 DOCKERHUB_NAMESPACE를 포함
 cd ~/owasp-top-10-for-llm/docker
 sudo -u ubuntu podman run -d --replace --name lab-vuln-rag \
-  --network host -e SCENARIO=day1 \
+  --network host -e DEFAULT_SCENARIO=day1 \
   -e OLLAMA_URL=http://localhost:11434 \
   -e OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
   docker.io/gasbugs/owasp-llm-vuln-rag:latest

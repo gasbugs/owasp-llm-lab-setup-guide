@@ -124,7 +124,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - NVIDIA CDI 설정
 - Ollama 컨테이너 실행
 - `llama3.1:8b-instruct-q4_K_M` 모델 pull 및 warm-up
-- 취약 RAG 앱 실행: `lab-vuln-rag`, port `8000`
+- 취약 RAG 앱 실행: `lab-vuln-rag`, port `8000` — Day 1~5 시나리오를 UI에서 모두 선택 가능
 - 취약 Agent 앱 실행: `lab-vuln-agent`, port `8001`
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
 - DVLA 실행: `lab-dvla`, port `8501`
@@ -148,6 +148,7 @@ SSM 세션 안에서 실행합니다.
 sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 curl -s http://localhost:11434/api/tags | head
 curl -s http://localhost:8000/healthz
+curl -s http://localhost:8000/api/scenarios | head
 curl -s http://localhost:8001/healthz
 curl -s http://localhost:8002/api/v1/models | head
 ```

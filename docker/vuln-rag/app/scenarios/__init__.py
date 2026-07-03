@@ -1,8 +1,10 @@
-"""SCENARIO 환경변수로 매일 다른 시나리오를 로드한다."""
+"""Load vulnerable RAG scenarios used throughout the course."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Callable, List
+
+SCENARIO_NAMES = ("day1", "day2", "day3", "day4", "day5")
 
 
 @dataclass
@@ -31,3 +33,7 @@ def load_scenario(name: str) -> Scenario:
     else:
         from app.scenarios.day1 import scenario
     return scenario
+
+
+def list_scenarios() -> List[Scenario]:
+    return [load_scenario(name) for name in SCENARIO_NAMES]

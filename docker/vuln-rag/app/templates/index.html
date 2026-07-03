@@ -18,6 +18,15 @@
 </head>
 <body>
   <h1>[VULN] {{ scenario_title }}</h1>
+  <form method="get">
+    <label for="scenario">Scenario:</label>
+    <select id="scenario" name="scenario" onchange="this.form.submit()">
+      {% for s in scenarios %}
+      <option value="{{ s.id }}" {% if s.id == scenario_id %}selected{% endif %}>{{ s.id }} — {{ s.title }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit">Change</button></noscript>
+  </form>
   <div class="warning">⚠️ {{ warning }}</div>
   <p>{{ scenario_intro }}</p>
 
@@ -34,6 +43,7 @@ const chat = document.getElementById('chat');
 const form = document.getElementById('form');
 const msg = document.getElementById('message');
 const renderHTML = document.getElementById('render-html');
+const scenarioSelect = document.getElementById('scenario');
 
 function add(role, text, html=false) {
   const d = document.createElement('div');
@@ -53,7 +63,7 @@ form.addEventListener('submit', async (e) => {
   const r = await fetch('/api/chat', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ message: text, session_id: 'default' }),
+    body: JSON.stringify({ message: text, session_id: 'default', scenario: scenarioSelect.value }),
   });
   const data = await r.json();
   add('bot', data.reply, renderHTML.checked);

@@ -1,6 +1,6 @@
 """OWASP LLM Lab — vuln-rag entry point.
 
-SCENARIO 환경변수에 따라 서로 다른 시스템 프롬프트·RAG 데이터·취약점을 노출한다.
+모든 강의 시나리오를 한 앱에서 선택해 실행한다.
 일부러 취약한 코드 — 교육 환경 외 배포 금지.
 """
 from __future__ import annotations
@@ -15,13 +15,16 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from app.llm import LLMClient
-from app.scenarios import load_scenario
+from app.scenarios import SCENARIO_NAMES, list_scenarios
 
-SCENARIO = os.environ.get("SCENARIO", "day1")
-scenario = load_scenario(SCENARIO)
+DEFAULT_SCENARIO = os.environ.get("DEFAULT_SCENARIO", os.environ.get("SCENARIO", "day1"))
+if DEFAULT_SCENARIO not in SCENARIO_NAMES:
+    DEFAULT_SCENARIO = "day1"
+
+SCENARIOS = {scenario.id: scenario for scenario in list_scenarios()}
 llm = LLMClient()
 
-app = FastAPI(title=f"vuln-rag [{SCENARIO}]")
+app = FastAPI(title="vuln-rag [all scenarios]")
 templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
 
@@ -29,25 +32,52 @@ templates = Jinja2Templates(directory=str(templates_dir))
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
+    scenario: str | None = None
+
+
+def get_scenario(name: str | None):
+    return SCENARIOS.get(name or DEFAULT_SCENARIO, SCENARIOS[DEFAULT_SCENARIO])
 
 
 @app.get("/healthz")
 async def health():
-    return {"ok": True, "scenario": SCENARIO}
+    return {
+        "ok": True,
+        "default_scenario": DEFAULT_SCENARIO,
+        "scenarios": list(SCENARIO_NAMES),
+    }
+
+
+@app.get("/api/scenarios")
+async def scenarios():
+    return {
+        "default": DEFAULT_SCENARIO,
+        "scenarios": [
+            {
+                "id": scenario.id,
+                "title": scenario.title,
+                "intro": scenario.intro,
+                "warning": scenario.warning,
+            }
+            for scenario in SCENARIOS.values()
+        ],
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+async def index(request: Request, scenario: str | None = None):
+    selected = get_scenario(scenario)
     # Starlette 4.x 시그니처 — (request, name, context). 이전 (name, context with "request") 호출은
     # context dict를 cache key 후보로 보고 `unhashable type: 'dict'` 발생.
     return templates.TemplateResponse(
         request,
         "index.html",
         {
-            "scenario_id": SCENARIO,
-            "scenario_title": scenario.title,
-            "scenario_intro": scenario.intro,
-            "warning": scenario.warning,
+            "scenario_id": selected.id,
+            "scenario_title": selected.title,
+            "scenario_intro": selected.intro,
+            "warning": selected.warning,
+            "scenarios": SCENARIOS.values(),
         },
     )
 
@@ -59,8 +89,9 @@ async def chat(req: ChatRequest):
     시나리오마다 가드 강도가 다르고 RAG 컨텍스트가 다름.
     OWASP LLM01/02/04/05/07/08 실습에 활용.
     """
-    context = scenario.retrieve(req.message)
-    system_prompt = scenario.build_system_prompt(context=context)
+    selected = get_scenario(req.scenario)
+    context = selected.retrieve(req.message)
+    system_prompt = selected.build_system_prompt(context=context)
 
     response = await llm.chat(
         system=system_prompt,
@@ -70,12 +101,12 @@ async def chat(req: ChatRequest):
     return JSONResponse(
         {
             "reply": response,
-            "scenario": SCENARIO,
+            "scenario": selected.id,
             # 학습 효과를 위해 일부러 RAG 컨텍스트를 같이 노출(debug 모드)
             # 실제 운영 환경에서는 절대 노출하면 안 됨
             "debug": {
                 "retrieved_chunks": context,
-                "rendered_system_prompt": system_prompt if scenario.expose_system_prompt else "(hidden)",
+                "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
             },
         }
     )
@@ -87,7 +118,8 @@ async def inject_doc(req: dict):
 
     실제로는 인증·검토 필수.
     """
+    selected = get_scenario(req.get("scenario"))
     text = req.get("text", "")
     title = req.get("title", "untitled")
-    scenario.add_doc(title=title, text=text)
-    return {"ok": True, "title": title, "size": len(text)}
+    selected.add_doc(title=title, text=text)
+    return {"ok": True, "scenario": selected.id, "title": title, "size": len(text)}

@@ -17,7 +17,7 @@ ENV PORT=8000 \
     OLLAMA_URL=http://ollama:11434 \
     OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
     CHROMA_URL=http://chroma:8001 \
-    SCENARIO=day1
+    DEFAULT_SCENARIO=day1
 
 EXPOSE 8000
 
