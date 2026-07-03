@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## Terraform apply에서 g6.xlarge quota 오류
+## Terraform apply에서 GPU quota 오류
 
 증상:
 

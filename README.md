@@ -12,7 +12,7 @@
 | `docs/ARCHITECTURE.md` | AWS VM, Terraform, user-data, 컨테이너 배포 구조 |
 | `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 Docker Hub에 push하는 절차 |
 | `docs/TROUBLESHOOTING.md` | quota, SSM, Terraform, Podman, Ollama 문제 해결 |
-| `infrastructure/terraform/` | VPC, 보안 그룹, EC2 g6.xlarge, IAM, Budget 알람 |
+| `infrastructure/terraform/` | VPC, 보안 그룹, EC2 GPU 인스턴스, IAM, Budget 알람 |
 | `infrastructure/terraform/user-data.sh.tpl` | 선택적 자동 설치용 user-data 래퍼. 기본값에서는 비활성화 |
 | `infrastructure/scripts/student/` | 학생용 preflight, 수동 설치/클린업, instance-id, start, stop, sync 헬퍼 |
 | `infrastructure/packer/` | 선택 사항: 강사용 Golden AMI 빌드 |
@@ -55,7 +55,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 ## 기본 배포 방식
 
 1. Terraform이 기존 검증 계열인 `Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)`의 최신 AMI를 조회합니다.
-2. Terraform이 학생별 EC2 `g6.xlarge` 1대를 만듭니다.
+2. Terraform이 학생별 EC2 GPU 인스턴스 1대를 만듭니다. 기본값은 비용 절감형 `g4dn.xlarge`이고, 안정 운영이 필요하면 `g6.xlarge`로 바꿀 수 있습니다.
 3. 기본값에서는 user-data 자동 설치가 실행되지 않습니다.
 4. 수강생이 SSM으로 EC2에 접속해 `install-lab.sh`를 직접 실행합니다.
 5. 설치 스크립트가 Podman을 설치하고 실습 컨테이너 이미지를 pull합니다.
@@ -72,7 +72,7 @@ enable_user_data_bootstrap = true
 
 ## 비용 안전 원칙
 
-- `g6.xlarge`는 실행 중일 때 비용이 발생합니다.
+- GPU 인스턴스는 실행 중일 때 비용이 발생합니다. 기본값 `g4dn.xlarge`는 비용 절감형이고, `g6.xlarge`는 더 여유 있는 안정 운영형입니다.
 - `stop` 상태에서는 EC2 시간당 요금이 멈추지만 EBS 비용은 남습니다.
 - 매일 실습 종료 후 반드시 `stop-lab.sh`를 실행하세요.
 - 강의 종료 후에는 보존할 작업물을 개인 GitHub repo에 push한 뒤 `terraform destroy`를 실행하세요.

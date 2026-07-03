@@ -23,7 +23,7 @@ aws sts get-caller-identity --profile owasp-llm
 
 ## 2. GPU quota 확인
 
-`g6.xlarge`는 4 vCPU를 사용합니다. 아래 quota가 4 이상이어야 합니다.
+기본값 `g4dn.xlarge`와 안정 운영 옵션 `g6.xlarge`는 모두 4 vCPU를 사용합니다. 아래 quota가 4 이상이어야 합니다.
 
 ```bash
 aws service-quotas get-service-quota \
@@ -80,6 +80,10 @@ enable_user_data_bootstrap = false
 daily_budget_usd  = 20
 course_budget_usd = 120
 alert_email       = "your@email.com"
+
+# 비용 절감 기본값은 g4dn.xlarge입니다.
+# 강사가 안정 운영형을 안내한 경우에만 g6.xlarge로 바꿉니다.
+# instance_type = "g6.xlarge"
 ```
 
 ## 5. VM 생성

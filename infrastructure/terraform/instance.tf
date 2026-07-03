@@ -2,7 +2,7 @@
 # 학생별 EC2 인스턴스 — for_each로 학생 수만큼 1대씩
 #
 # 설계 (1인 1계정 모델):
-#   - On-Demand g6.xlarge 1대/학생
+#   - On-Demand GPU 인스턴스 1대/학생
 #   - 학생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF
 #   - Stop 시 EC2 시간당 요금 0. EBS 디스크 비용만 발생 (gp3 100GB = ~$8/월)
 #   - terminate 안 하므로 EBS·작업물 그대로 보존. 다음 start 시 어제 상태 그대로

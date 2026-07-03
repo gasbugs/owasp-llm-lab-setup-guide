@@ -6,7 +6,7 @@
 flowchart TD
   A["Student laptop"] -->|"terraform apply"| B["AWS account"]
   B --> C["VPC + public subnet"]
-  C --> D["EC2 g6.xlarge"]
+  C --> D["EC2 GPU instance"]
   A -->|"SSM Session Manager"| D
   D -->|"manual install-lab.sh"| E["Podman runtime"]
   D -. "optional user-data bootstrap" .-> E
@@ -28,7 +28,7 @@ flowchart TD
 - Internet Gateway와 route table
 - 학생별 security group
 - 학생별 IAM role과 instance profile
-- 학생별 EC2 `g6.xlarge`
+- 학생별 EC2 GPU 인스턴스. 기본값은 비용 절감형 `g4dn.xlarge`, 안정 운영 옵션은 `g6.xlarge`
 - AWS Budget 알람
 
 학생 수가 여러 명이면 `student_ids` 목록만큼 EC2가 생성됩니다.

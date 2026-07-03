@@ -1,5 +1,5 @@
 variable "region" {
-  description = "AWS 리전. g6 인스턴스 가용성 확인 후 선택."
+  description = "AWS 리전. G 계열 GPU 인스턴스 가용성 확인 후 선택."
   type        = string
   default     = "us-east-1"
   validation {
@@ -82,12 +82,12 @@ variable "ami_owner_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 인스턴스 타입. 강의 표준은 g6.xlarge (L4 24GB)."
+  description = "EC2 인스턴스 타입. 비용 절감 기본값은 g4dn.xlarge(T4 16GB), 안정 운영 권장은 g6.xlarge(L4 24GB)."
   type        = string
-  default     = "g6.xlarge"
+  default     = "g4dn.xlarge"
   validation {
-    condition     = var.instance_type == "g6.xlarge"
-    error_message = "본 강의 표준 실습은 g6.xlarge 기준으로 검증되어 있습니다. 다른 타입은 강사 검증 후 변경하세요."
+    condition     = contains(["g4dn.xlarge", "g6.xlarge"], var.instance_type)
+    error_message = "instance_type은 비용 절감형 g4dn.xlarge 또는 안정 운영형 g6.xlarge 중 하나로 설정하세요."
   }
 }
 
