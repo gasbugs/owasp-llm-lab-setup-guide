@@ -1,6 +1,13 @@
 ################################################################################
-# Daily auto-stop — EventBridge invokes Lambda at 17:30 KST
+# Night auto-stop — EventBridge invokes Lambda from 17:30 KST to next-day 08:30 KST
 ################################################################################
+
+locals {
+  auto_stop_resource_prefix = substr("${local.name_prefix}-auto-stop", 0, 48)
+  auto_stop_schedules = var.auto_stop_cron_utc == null ? var.auto_stop_crons_utc : {
+    legacy = var.auto_stop_cron_utc
+  }
+}
 
 data "archive_file" "auto_stop_lambda" {
   count = var.enable_auto_stop ? 1 : 0
@@ -26,7 +33,7 @@ data "aws_iam_policy_document" "auto_stop_lambda_assume" {
 resource "aws_iam_role" "auto_stop_lambda" {
   count = var.enable_auto_stop ? 1 : 0
 
-  name               = "${local.name_prefix}-auto-stop-lambda"
+  name               = "${local.auto_stop_resource_prefix}-lambda"
   assume_role_policy = data.aws_iam_policy_document.auto_stop_lambda_assume[0].json
 }
 
@@ -66,7 +73,7 @@ resource "aws_iam_role_policy" "auto_stop_lambda_ec2" {
 resource "aws_lambda_function" "auto_stop" {
   count = var.enable_auto_stop ? 1 : 0
 
-  function_name    = "${local.name_prefix}-auto-stop"
+  function_name    = local.auto_stop_resource_prefix
   description      = "Stops running EC2 lab instances tagged Course=${var.course_id}"
   role             = aws_iam_role.auto_stop_lambda[0].arn
   handler          = "auto_stop.handler"
@@ -89,27 +96,27 @@ resource "aws_lambda_function" "auto_stop" {
 }
 
 resource "aws_cloudwatch_event_rule" "auto_stop" {
-  count = var.enable_auto_stop ? 1 : 0
+  for_each = var.enable_auto_stop ? local.auto_stop_schedules : {}
 
-  name                = "${local.name_prefix}-auto-stop-1730-kst"
-  description         = var.auto_stop_description
-  schedule_expression = var.auto_stop_cron_utc
+  name                = "${local.auto_stop_resource_prefix}-${substr(md5(each.key), 0, 8)}"
+  description         = "${var.auto_stop_description}: ${each.value}"
+  schedule_expression = each.value
 }
 
 resource "aws_cloudwatch_event_target" "auto_stop" {
-  count = var.enable_auto_stop ? 1 : 0
+  for_each = var.enable_auto_stop ? local.auto_stop_schedules : {}
 
-  rule      = aws_cloudwatch_event_rule.auto_stop[0].name
+  rule      = aws_cloudwatch_event_rule.auto_stop[each.key].name
   target_id = "auto-stop-lambda"
   arn       = aws_lambda_function.auto_stop[0].arn
 }
 
 resource "aws_lambda_permission" "allow_eventbridge_auto_stop" {
-  count = var.enable_auto_stop ? 1 : 0
+  for_each = var.enable_auto_stop ? local.auto_stop_schedules : {}
 
-  statement_id  = "AllowExecutionFromEventBridgeAutoStop"
+  statement_id  = "AllowExecutionFromEventBridgeAutoStop${replace(each.key, "-", "")}"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.auto_stop[0].function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.auto_stop[0].arn
+  source_arn    = aws_cloudwatch_event_rule.auto_stop[each.key].arn
 }

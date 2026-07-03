@@ -416,12 +416,28 @@ OWASP LLM Lab 설치가 완료되었습니다.
   - DVLA                  8501
     Damn Vulnerable LLM Agent. ReAct Agent prompt injection 실습 UI입니다.
 
-브라우저/터미널 검증:
+브라우저 접속 URL:
   export EC2_DOMAIN=${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}
 
-  # Ollama 모델 목록
-  echo http://\$EC2_DOMAIN:11434/api/tags
+  Ollama 모델 목록:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:11434/api/tags
 
+  Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8000/healthz
+
+  Vulnerable Agent health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8001/healthz
+
+  Fake Model Registry model list:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8002/api/v1/models
+
+  LLMGoat web UI:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:5000
+
+  DVLA web UI:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8501
+
+터미널 검증 명령:
   # Ollama generate API smoke test
   curl http://\$EC2_DOMAIN:11434/api/generate \\
     -d '{
@@ -433,24 +449,15 @@ OWASP LLM Lab 설치가 완료되었습니다.
       }
     }' | jq
 
-  # Vulnerable RAG health check
-  echo http://\$EC2_DOMAIN:8000/healthz
-
-  # Vulnerable Agent health check
-  echo http://\$EC2_DOMAIN:8001/healthz
-
-  # Fake Model Registry model list
-  echo http://\$EC2_DOMAIN:8002/api/v1/models
-
-  # LLMGoat web UI
-  echo http://\$EC2_DOMAIN:5000
-
-  # DVLA web UI
-  echo http://\$EC2_DOMAIN:8501
+  # API 응답 확인
+  curl -fsS http://\$EC2_DOMAIN:11434/api/tags | jq
+  curl -fsS http://\$EC2_DOMAIN:8000/healthz
+  curl -fsS http://\$EC2_DOMAIN:8001/healthz
+  curl -fsS http://\$EC2_DOMAIN:8002/api/v1/models | jq
 
 주의: public IP 직접 접속은 Terraform allowed_ingress_cidr가 본인 IP/32로 열려 있을 때만 동작합니다.
 
 비용 안전장치:
-  Terraform 기본 설정은 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다.
+  Terraform 기본 설정은 17:30 KST부터 다음날 08:30 KST까지 30분마다 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다.
 
 EOF

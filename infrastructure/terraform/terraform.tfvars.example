@@ -47,4 +47,8 @@ alert_email       = "ilsunchoi@cloudsecuritylab.co.kr"
 # instance_type    = "g6.xlarge"
 # root_volume_size = 100
 # enable_auto_stop = true
-# auto_stop_cron_utc = "cron(30 8 * * ? *)" # 17:30 KST
+# 기본 자동 중지: 17:30 KST부터 다음날 08:30 KST까지 30분마다 Lambda 실행
+# auto_stop_crons_utc = {
+#   "kst-1730-0830-minute-30" = "cron(30 8-23 * * ? *)"
+#   "kst-1800-0830-minute-00" = "cron(0 9-23 * * ? *)"
+# }

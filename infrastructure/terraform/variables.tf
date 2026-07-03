@@ -112,25 +112,39 @@ variable "allowed_ingress_cidr" {
 }
 
 variable "enable_auto_stop" {
-  description = "true이면 EventBridge가 Lambda를 매일 호출해 Course 태그가 같은 실행 중 EC2를 자동 중지한다."
+  description = "true이면 EventBridge가 Lambda를 호출해 Course 태그가 같은 실행 중 EC2를 자동 중지한다."
   type        = bool
   default     = true
 }
 
 variable "auto_stop_cron_utc" {
-  description = "자동 중지 EventBridge cron 표현식. 기본값 cron(30 8 * * ? *)은 17:30 KST."
+  description = "호환용 단일 자동 중지 cron. null이면 auto_stop_crons_utc 기본 야간 스케줄을 사용한다."
   type        = string
-  default     = "cron(30 8 * * ? *)"
+  default     = null
+  nullable    = true
   validation {
-    condition     = can(regex("^cron\\(.+\\)$", var.auto_stop_cron_utc))
+    condition     = var.auto_stop_cron_utc == null || can(regex("^cron\\(.+\\)$", var.auto_stop_cron_utc))
     error_message = "auto_stop_cron_utc는 EventBridge cron(...) 표현식이어야 합니다."
+  }
+}
+
+variable "auto_stop_crons_utc" {
+  description = "자동 중지 EventBridge cron map. 기본값은 17:30 KST부터 다음날 08:30 KST까지 30분마다 실행한다."
+  type        = map(string)
+  default = {
+    "kst-1730-0830-minute-30" = "cron(30 8-23 * * ? *)"
+    "kst-1800-0830-minute-00" = "cron(0 9-23 * * ? *)"
+  }
+  validation {
+    condition     = alltrue([for cron in values(var.auto_stop_crons_utc) : can(regex("^cron\\(.+\\)$", cron))])
+    error_message = "auto_stop_crons_utc의 모든 값은 EventBridge cron(...) 표현식이어야 합니다."
   }
 }
 
 variable "auto_stop_description" {
   description = "자동 중지 스케줄 설명."
   type        = string
-  default     = "Daily EC2 auto-stop at 17:30 KST"
+  default     = "EC2 auto-stop every 30 minutes from 17:30 KST to next-day 08:30 KST"
 }
 
 variable "daily_budget_usd" {

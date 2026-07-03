@@ -8,7 +8,7 @@
 - 학생은 `terraform apply`로 본인 EC2, IAM instance profile, 보안 그룹, 비용 알람을 만든다.
 - 매일 아침 `infrastructure/scripts/student/start-lab.sh`로 인스턴스를 시작한다.
 - 매일 종료 시 `infrastructure/scripts/student/stop-lab.sh`로 EC2 시간당 요금을 멈춘다.
-- 기본 Terraform 설정은 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지한다.
+- 기본 Terraform 설정은 17:30 KST부터 다음날 08:30 KST까지 30분마다 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지한다.
 - 마지막 날에는 `terraform destroy -auto-approve`로 EC2, EBS, VPC, 비용 알람을 삭제한다.
 - 기본 웹 접속은 SSM 포트포워딩이다. public IP 직접 접속은 `allowed_ingress_cidr`를 본인 IP `/32`로 제한한 경우에만 사용한다.
 

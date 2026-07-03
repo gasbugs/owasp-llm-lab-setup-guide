@@ -75,7 +75,7 @@ enable_user_data_bootstrap = true
 - `g6.xlarge`는 실행 중일 때 비용이 발생합니다.
 - `stop` 상태에서는 EC2 시간당 요금이 멈추지만 EBS 비용은 남습니다.
 - 매일 실습 종료 후 반드시 `stop-lab.sh`를 실행하세요.
-- 기본 Terraform 설정은 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다.
+- 기본 Terraform 설정은 17:30 KST부터 다음날 08:30 KST까지 30분마다 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다.
 - 강의 종료 후에는 보존할 작업물을 개인 GitHub repo에 push한 뒤 `terraform destroy`를 실행하세요.
 - Budget은 비용을 막아 주는 장치가 아니라 경보입니다. 알람이 오면 즉시 stop 상태를 확인하세요.
 
