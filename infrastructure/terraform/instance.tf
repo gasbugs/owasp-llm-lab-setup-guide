@@ -4,7 +4,7 @@
 # 설계 (1인 1계정 모델):
 #   - On-Demand GPU 인스턴스 1대/학생
 #   - 학생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF
-#   - Stop 시 EC2 시간당 요금 0. EBS 디스크 비용만 발생 (gp3 100GB = ~$8/월)
+#   - Stop 시 EC2 시간당 요금 0. EBS 디스크 비용만 발생 (gp3 100GB 기준)
 #   - terminate 안 하므로 EBS·작업물 그대로 보존. 다음 start 시 어제 상태 그대로
 #   - 기본값은 수동 설치. 필요 시 user-data 자동 설치를 명시적으로 켤 수 있음
 #   - 설치 후에는 컨테이너 systemd unit으로 다음 start 시 자동 시작

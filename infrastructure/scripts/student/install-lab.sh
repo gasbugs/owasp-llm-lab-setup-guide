@@ -24,6 +24,7 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
 LLAMA_GUARD_MODEL="${LLAMA_GUARD_MODEL:-llama-guard3:8b}"
 LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
+SKIP_EMBEDDING_VENV="${SKIP_EMBEDDING_VENV:-false}"
 INSTALL_START_EPOCH=$(date +%s)
 
 echo "=== owasp-llm-lab manual install start: $(date -Iseconds) ==="
@@ -51,6 +52,7 @@ IMAGE_NAMESPACE=$IMAGE_NAMESPACE
 IMAGE_TAG=$IMAGE_TAG
 OLLAMA_MODEL=$OLLAMA_MODEL
 LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
+SKIP_EMBEDDING_VENV=$SKIP_EMBEDDING_VENV
 EOF
 chmod 0644 /etc/lab/env
 
@@ -297,11 +299,26 @@ curl -s --max-time 120 http://localhost:11434/api/generate \
   -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}" >/dev/null 2>&1 || true
 echo "[install-lab] ollama warm-up done"
 
-rm -rf /home/ubuntu/work/embedding-venv
-python3 -m venv /home/ubuntu/work/embedding-venv
-/home/ubuntu/work/embedding-venv/bin/pip install -q sentence-transformers scikit-learn numpy
-chown -R ubuntu:ubuntu /home/ubuntu/work/embedding-venv 2>/dev/null || true
-echo "[install-lab] embedding-venv ready for Day 4 LLM08-A"
+if [ "$SKIP_EMBEDDING_VENV" = "true" ]; then
+  echo "[install-lab] embedding-venv skipped by SKIP_EMBEDDING_VENV=true"
+else
+  AVAILABLE_KB=\$(df --output=avail -k /home/ubuntu/work | tail -n 1 | tr -d ' ')
+  MIN_EMBEDDING_KB=\$((6 * 1024 * 1024))
+  if [ "\$AVAILABLE_KB" -lt "\$MIN_EMBEDDING_KB" ]; then
+    echo "[install-lab] embedding-venv skipped: only \$((AVAILABLE_KB / 1024)) MB free under /home/ubuntu/work"
+    echo "[install-lab] set SKIP_EMBEDDING_VENV=false and free at least 6 GB to install Day 4 embedding tools"
+  else
+    rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
+    python3 -m venv /home/ubuntu/work/embedding-venv
+    if /home/ubuntu/work/embedding-venv/bin/pip install --no-cache-dir -q sentence-transformers scikit-learn numpy; then
+      chown -R ubuntu:ubuntu /home/ubuntu/work/embedding-venv 2>/dev/null || true
+      echo "[install-lab] embedding-venv ready for Day 4 LLM08-A"
+    else
+      rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
+      echo "[install-lab] embedding-venv install failed; continuing without optional Day 4 embedding tools"
+    fi
+  fi
+fi
 OLLAMASH
 
 # 11) 비용 안전망: 설치 시점부터 240분 후 OS-level 자동 stop

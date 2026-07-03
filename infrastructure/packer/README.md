@@ -80,7 +80,7 @@ ami_name_pattern = "owasp-llm-lab-*"
 - 또는 Hub 사용자명을 변수로 받아 `podman pull <ns>/...`만 받도록 — 본 강의는 이 패턴.
 
 **AMI 용량 초과**
-- `root_volume_size = 60`까지 확인. 더 큰 모델 추가 시 80GB로 키우기.
+- `root_volume_size = 100`까지 확인. 더 큰 모델 추가 시 150GB 이상으로 키우기.
 - 강의 인스턴스 EBS 크기도 같이 늘려야 함 (`terraform.tfvars`의 `root_volume_size`).
 
 ## Linger 관련 주의

@@ -92,12 +92,12 @@ variable "instance_type" {
 }
 
 variable "root_volume_size" {
-  description = "EBS root 볼륨 크기(GB). 모델 weights·컨테이너 이미지 포함 약 40GB 사용 → 60GB 권장."
+  description = "EBS root 볼륨 크기(GB). 모델 weights·컨테이너 이미지·실습 패키지 포함 → 100GB 권장."
   type        = number
-  default     = 60
+  default     = 100
   validation {
-    condition     = var.root_volume_size >= 60 && var.root_volume_size <= 200
-    error_message = "root_volume_size는 60~200GB 범위로 설정하세요."
+    condition     = var.root_volume_size >= 100 && var.root_volume_size <= 200
+    error_message = "root_volume_size는 100~200GB 범위로 설정하세요."
   }
 }
 
