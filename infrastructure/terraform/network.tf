@@ -88,6 +88,14 @@ resource "aws_security_group" "student" {
   }
 
   ingress {
+    description = "lab-fake-registry (8002)"
+    from_port   = 8002
+    to_port     = 8002
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_ingress_cidr]
+  }
+
+  ingress {
     description = "lab-llmgoat (5000)"
     from_port   = 5000
     to_port     = 5000

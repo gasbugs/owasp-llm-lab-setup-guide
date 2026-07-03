@@ -146,6 +146,7 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 curl -s http://localhost:11434/api/tags | head
 curl -s http://localhost:8000/healthz
 curl -s http://localhost:8001/healthz
+curl -s http://localhost:8002/api/v1/models | head
 ```
 
 ## 9. 설치를 다시 해야 할 때

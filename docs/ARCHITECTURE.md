@@ -98,7 +98,7 @@ enable_user_data_bootstrap = true
 | `lab-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
 | `lab-llmgoat` | 5000 | LLMGoat cross-platform 실습 |
 | `lab-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
-| `lab-fake-registry` | 8002 | LLM03 공급망 실습용 fake registry |
+| `lab-fake-registry` | 8002 | LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
 
 ## 이미지 빌드
 

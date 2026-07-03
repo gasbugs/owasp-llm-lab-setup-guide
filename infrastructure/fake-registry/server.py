@@ -2,6 +2,8 @@
 """Day 2 LLM03 Supply Chain fake model-registry (port 8002).
 
 Endpoints:
+- GET /                             → service info
+- GET /healthz                      → health check
 - GET /api/v1/models               → 모델 목록 (A clean + B trojan)
 - GET /api/v1/models/{A,B}         → 모델 상세 (id, sha256, trusted)
 - GET /api/v1/models/B/mlbom       → MLBOM JSON (CWE-1395)
@@ -78,7 +80,23 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         p = self.path
-        if p == "/api/v1/models":
+        if p == "/":
+            self.respond_json({
+                "service": "owasp-llm-fake-model-registry",
+                "ok": True,
+                "endpoints": [
+                    "/healthz",
+                    "/api/v1/models",
+                    "/api/v1/models/A",
+                    "/api/v1/models/B",
+                    "/api/v1/models/B/mlbom",
+                    "/models/A.gguf",
+                    "/models/B.gguf",
+                ],
+            })
+        elif p == "/healthz":
+            self.respond_json({"ok": True, "service": "fake-model-registry"})
+        elif p == "/api/v1/models":
             self.respond_json({"models": list(MODELS.values())})
         elif p in ("/api/v1/models/A", "/api/v1/models/B"):
             self.respond_json(MODELS[p[-1]])
