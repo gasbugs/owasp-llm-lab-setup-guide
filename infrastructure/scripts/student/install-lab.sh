@@ -59,6 +59,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y --no-install-recommends \
   curl ca-certificates git \
+  python3-venv \
   podman podman-compose podman-docker crun fuse-overlayfs slirp4netns uidmap
 
 # rootless 설정
@@ -94,57 +95,158 @@ DAY=$(date +%u)
 PROFILE="day$DAY"
 [ "$DAY" -gt 5 ] && PROFILE="day1"
 
-# 8) 컨테이너 실행
-runuser -u ubuntu -- podman run -d --replace --name lab-ollama \
-  --device nvidia.com/gpu=all \
-  -p 11434:11434 \
-  -v /home/ubuntu/ollama-models:/root/.ollama:Z \
-  -e OLLAMA_HOST=0.0.0.0:11434 \
-  -e OLLAMA_KEEP_ALIVE=24h \
-  docker.io/ollama/ollama:latest
-
-runuser -u ubuntu -- podman run -d --replace --name lab-vuln-rag \
-  --network host \
-  -e SCENARIO="$PROFILE" \
-  -e OLLAMA_URL=http://localhost:11434 \
-  -e OLLAMA_MODEL="$OLLAMA_MODEL" \
-  "docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}"
-
-runuser -u ubuntu -- podman run -d --replace --name lab-vuln-agent \
-  --network host \
-  -e OLLAMA_URL=http://localhost:11434 \
-  -e OLLAMA_MODEL="$OLLAMA_MODEL" \
-  "docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-agent:${IMAGE_TAG}"
-
+# 8) Quadlet으로 컨테이너 systemd user unit 작성 및 실행
+# podman generate systemd는 deprecated라 새 설치에서는 Quadlet을 직접 사용한다.
 mkdir -p /home/ubuntu/.LLMGoat/models /home/ubuntu/.LLMGoat/cache
 chown -R ubuntu:ubuntu /home/ubuntu/.LLMGoat
-runuser -u ubuntu -- podman run -d --replace --name lab-llmgoat \
-  --device nvidia.com/gpu=all \
-  -p 5000:5000 \
-  -e LLMGOAT_SERVER_HOST=0.0.0.0 \
-  -e LLMGOAT_SERVER_PORT=5000 \
-  -e LLMGOAT_DEFAULT_MODEL=gemma-2.gguf \
-  -e LLMGOAT_N_GPU_LAYERS=20 \
-  -e LLMGOAT_N_THREADS=4 \
-  -v /home/ubuntu/.LLMGoat/models:/root/.LLMGoat/models:Z \
-  -v /home/ubuntu/.LLMGoat/cache:/root/.LLMGoat/cache:Z \
-  "docker.io/${IMAGE_NAMESPACE}/owasp-llm-llmgoat:${IMAGE_TAG}"
-
-runuser -u ubuntu -- podman run -d --replace --name lab-dvla \
-  --network host \
-  -e OLLAMA_HOST=http://localhost:11434 \
-  -e model_name=ollama-local-llama3 \
-  "docker.io/${IMAGE_NAMESPACE}/owasp-llm-dvla:${IMAGE_TAG}"
 
 # Day 2 LLM03 Supply Chain — fake model-registry (port 8002)
 mkdir -p /home/ubuntu/work/fake-registry
 curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py" -o /home/ubuntu/work/fake-registry/server.py
 chown -R ubuntu:ubuntu /home/ubuntu/work/fake-registry
-runuser -u ubuntu -- podman run -d --replace --name lab-fake-registry \
-  --network host \
-  -v /home/ubuntu/work/fake-registry:/app:Z \
-  docker.io/library/python:3.12-slim \
-  python /app/server.py
+
+QUADLET_DIR="/home/ubuntu/.config/containers/systemd"
+install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR"
+
+cat > "$QUADLET_DIR/lab-ollama.container" <<'EOF'
+[Unit]
+Description=OWASP LLM Lab - Ollama
+
+[Container]
+ContainerName=lab-ollama
+Image=docker.io/ollama/ollama:latest
+AddDevice=nvidia.com/gpu=all
+PublishPort=11434:11434
+Volume=/home/ubuntu/ollama-models:/root/.ollama:Z
+Environment=OLLAMA_HOST=0.0.0.0:11434
+Environment=OLLAMA_KEEP_ALIVE=24h
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
+cat > "$QUADLET_DIR/lab-vuln-rag.container" <<EOF
+[Unit]
+Description=OWASP LLM Lab - Vulnerable RAG
+After=lab-ollama.service
+Requires=lab-ollama.service
+
+[Container]
+ContainerName=lab-vuln-rag
+Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}
+Network=host
+Environment=SCENARIO=$PROFILE
+Environment=OLLAMA_URL=http://localhost:11434
+Environment=OLLAMA_MODEL=$OLLAMA_MODEL
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
+cat > "$QUADLET_DIR/lab-vuln-agent.container" <<EOF
+[Unit]
+Description=OWASP LLM Lab - Vulnerable Agent
+After=lab-ollama.service
+Requires=lab-ollama.service
+
+[Container]
+ContainerName=lab-vuln-agent
+Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-agent:${IMAGE_TAG}
+Network=host
+Environment=OLLAMA_URL=http://localhost:11434
+Environment=OLLAMA_MODEL=$OLLAMA_MODEL
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
+cat > "$QUADLET_DIR/lab-llmgoat.container" <<EOF
+[Unit]
+Description=OWASP LLM Lab - LLMGoat
+
+[Container]
+ContainerName=lab-llmgoat
+Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-llmgoat:${IMAGE_TAG}
+AddDevice=nvidia.com/gpu=all
+PublishPort=5000:5000
+Environment=LLMGOAT_SERVER_HOST=0.0.0.0
+Environment=LLMGOAT_SERVER_PORT=5000
+Environment=LLMGOAT_DEFAULT_MODEL=gemma-2.gguf
+Environment=LLMGOAT_N_GPU_LAYERS=20
+Environment=LLMGOAT_N_THREADS=4
+Volume=/home/ubuntu/.LLMGoat/models:/root/.LLMGoat/models:Z
+Volume=/home/ubuntu/.LLMGoat/cache:/root/.LLMGoat/cache:Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
+cat > "$QUADLET_DIR/lab-dvla.container" <<EOF
+[Unit]
+Description=OWASP LLM Lab - Damn Vulnerable LLM Agent
+After=lab-ollama.service
+Requires=lab-ollama.service
+
+[Container]
+ContainerName=lab-dvla
+Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-dvla:${IMAGE_TAG}
+Network=host
+Environment=OLLAMA_HOST=http://localhost:11434
+Environment=model_name=ollama-local-llama3
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
+cat > "$QUADLET_DIR/lab-fake-registry.container" <<'EOF'
+[Unit]
+Description=OWASP LLM Lab - Fake Model Registry
+
+[Container]
+ContainerName=lab-fake-registry
+Image=docker.io/library/python:3.12-slim
+Network=host
+Volume=/home/ubuntu/work/fake-registry:/app:Z
+Exec=python /app/server.py
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
+chown -R ubuntu:ubuntu "$QUADLET_DIR"
+
+runuser -u ubuntu -- env XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID" bash <<'QUADLETSH'
+set -euo pipefail
+units=(lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry)
+for unit in "${units[@]}"; do
+  systemctl --user disable --now "$unit.service" >/dev/null 2>&1 || true
+done
+for container in "${units[@]}"; do
+  podman rm -f "$container" >/dev/null 2>&1 || true
+done
+systemctl --user daemon-reload
+for unit in "${units[@]}"; do
+  systemctl --user enable --now "$unit.service"
+done
+QUADLETSH
 
 # 9) Ollama 모델 pull 및 warm-up
 runuser -u ubuntu -- bash <<OLLAMASH
@@ -163,26 +265,12 @@ curl -s --max-time 120 http://localhost:11434/api/generate \
   -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}" >/dev/null 2>&1 || true
 echo "[install-lab] ollama warm-up done"
 
-python3 -m venv /home/ubuntu/work/embedding-venv 2>/dev/null || true
-/home/ubuntu/work/embedding-venv/bin/pip install -q sentence-transformers scikit-learn numpy 2>&1 | tail -2 || true
+rm -rf /home/ubuntu/work/embedding-venv
+python3 -m venv /home/ubuntu/work/embedding-venv
+/home/ubuntu/work/embedding-venv/bin/pip install -q sentence-transformers scikit-learn numpy
 chown -R ubuntu:ubuntu /home/ubuntu/work/embedding-venv 2>/dev/null || true
 echo "[install-lab] embedding-venv ready for Day 4 LLM08-A"
 OLLAMASH
-
-# 10) systemd unit으로 컨테이너 자동 재시작 등록
-runuser -u ubuntu -- env XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID" bash <<'SYSDSH'
-set -euo pipefail
-mkdir -p /home/ubuntu/.config/systemd/user
-cd /home/ubuntu/.config/systemd/user
-for c in lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry; do
-  rm -f "container-$c.service"
-  podman generate systemd --name "$c" --files --restart-policy=always --new=false
-done
-systemctl --user daemon-reload
-for c in lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry; do
-  systemctl --user enable "container-$c.service"
-done
-SYSDSH
 
 # 11) 비용 안전망: 설치 시점부터 240분 후 OS-level 자동 stop
 shutdown -h +240 "[auto-stop] 4h cost safety net — sudo shutdown -c to cancel" || true

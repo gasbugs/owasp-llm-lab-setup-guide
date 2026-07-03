@@ -59,6 +59,14 @@ sudo -u ubuntu podman logs lab-vuln-rag --tail 100
 - 디스크 공간 부족
 - 아직 `install-lab.sh`를 실행하지 않음
 
+Quadlet unit 상태 확인:
+
+```bash
+UBUNTU_UID=$(id -u ubuntu)
+sudo -u ubuntu XDG_RUNTIME_DIR=/run/user/$UBUNTU_UID systemctl --user status lab-ollama.service
+sudo -u ubuntu XDG_RUNTIME_DIR=/run/user/$UBUNTU_UID systemctl --user status lab-vuln-rag.service
+```
+
 ## GPU 인식 실패
 
 ```bash

@@ -60,7 +60,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 4. 수강생이 SSM으로 EC2에 접속해 `install-lab.sh`를 직접 실행합니다.
 5. 설치 스크립트가 Podman을 설치하고 실습 컨테이너 이미지를 pull합니다.
 6. `lab-ollama`, `lab-vuln-rag`, `lab-vuln-agent`, `lab-llmgoat`, `lab-dvla`, `lab-fake-registry` 컨테이너를 실행합니다.
-7. systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
+7. Podman Quadlet 기반 systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
 
 강사가 운영 편의상 자동 설치를 원하면 `terraform.tfvars`에 아래 값을 추가합니다.
 
