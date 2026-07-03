@@ -1,0 +1,69 @@
+################################################################################
+# 학생별 EC2 인스턴스 — for_each로 학생 수만큼 1대씩
+#
+# 설계 (1인 1계정 모델):
+#   - On-Demand g6.xlarge 1대/학생
+#   - 학생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF
+#   - Stop 시 EC2 시간당 요금 0. EBS 디스크 비용만 발생 (gp3 100GB = ~$8/월)
+#   - terminate 안 하므로 EBS·작업물 그대로 보존. 다음 start 시 어제 상태 그대로
+#   - user-data는 *최초 부팅 1회만* 실행. 이후 start는 컨테이너 systemd로 자동 시작
+#
+# 작업물 추가 보존 (선택):
+#   학생이 개인 GitHub 작업 repo에 push로 강의 종료 후에도 보존.
+################################################################################
+
+locals {
+  user_data = base64encode(templatefile("${path.module}/user-data.sh.tpl", {
+    region                   = var.region
+    course_id                = var.course_id
+    fake_registry_server_b64 = filebase64("${path.module}/../fake-registry/server.py")
+  }))
+}
+
+resource "aws_instance" "student" {
+  for_each = toset(var.student_ids)
+
+  ami                    = var.golden_ami_id
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.lab.id
+  vpc_security_group_ids = [aws_security_group.student[each.key].id]
+  iam_instance_profile   = aws_iam_instance_profile.student[each.key].name
+
+  associate_public_ip_address = true # IGW 통한 인터넷 직접 (apt/podman/ollama pull)
+
+  root_block_device {
+    volume_size           = var.root_volume_size
+    volume_type           = "gp3"
+    delete_on_termination = true
+    encrypted             = true
+    tags = {
+      Student = each.key
+      Course  = var.course_id
+    }
+  }
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required" # IMDSv2 only
+    http_put_response_hop_limit = 2
+    instance_metadata_tags      = "enabled"
+  }
+
+  monitoring = true
+
+  user_data                   = local.user_data
+  user_data_replace_on_change = false # user-data 변경해도 인스턴스 재생성 X (학생 데이터 보존)
+
+  tags = {
+    Name    = "${local.name_prefix}-${each.key}"
+    Student = each.key
+    Course  = var.course_id
+  }
+
+  lifecycle {
+    # 인스턴스 stop/start로 state가 바뀌어도 terraform이 재생성하지 않도록
+    ignore_changes = [
+      ami, # AMI 갱신 시 새 인스턴스로 강제 교체 안 함 (학생 명시 동의 시 -replace로 진행)
+    ]
+  }
+}

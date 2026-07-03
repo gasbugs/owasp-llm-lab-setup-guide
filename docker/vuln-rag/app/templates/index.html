@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>vuln-rag — {{ scenario_id }}</title>
+  <style>
+    body { font-family: ui-monospace, monospace; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+    h1 { color: #b00; }
+    .warning { background: #fee; border-left: 4px solid #b00; padding: 0.5rem 1rem; margin: 1rem 0; }
+    .chat { border: 1px solid #ccc; padding: 1rem; height: 60vh; overflow-y: auto; background: #fafafa; }
+    .msg { margin: 0.5rem 0; }
+    .msg.user { color: #036; }
+    .msg.bot { color: #060; }
+    .msg.debug { color: #888; font-size: 0.85em; }
+    textarea { width: 100%; height: 4rem; font-family: inherit; }
+    button { padding: 0.5rem 1.5rem; }
+  </style>
+</head>
+<body>
+  <h1>[VULN] {{ scenario_title }}</h1>
+  <div class="warning">⚠️ {{ warning }}</div>
+  <p>{{ scenario_intro }}</p>
+
+  <div id="chat" class="chat"></div>
+
+  <form id="form">
+    <textarea id="message" placeholder="페이로드 또는 자연어 입력..." required></textarea>
+    <label><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 (Day 3 LLM05 시연용)</label>
+    <button type="submit">Send</button>
+  </form>
+
+<script>
+const chat = document.getElementById('chat');
+const form = document.getElementById('form');
+const msg = document.getElementById('message');
+const renderHTML = document.getElementById('render-html');
+
+function add(role, text, html=false) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + role;
+  if (html) d.innerHTML = `<strong>${role}:</strong> ` + text;
+  else d.textContent = `${role}: ${text}`;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = msg.value.trim();
+  if (!text) return;
+  add('user', text);
+  msg.value = '';
+  const r = await fetch('/api/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ message: text, session_id: 'default' }),
+  });
+  const data = await r.json();
+  add('bot', data.reply, renderHTML.checked);
+  if (data.debug?.retrieved_chunks?.length) {
+    add('debug', '[retrieved] ' + JSON.stringify(data.debug.retrieved_chunks));
+  }
+});
+</script>
+</body>
+</html>

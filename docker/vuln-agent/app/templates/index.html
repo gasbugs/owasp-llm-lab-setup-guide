@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>vuln-agent — Goat Farm Helper</title>
+  <style>
+    body { font-family: ui-monospace, monospace; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { color: #b00; }
+    .warning { background: #fee; border-left: 4px solid #b00; padding: 0.5rem 1rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .chat, .trace { border: 1px solid #ccc; padding: 1rem; height: 60vh; overflow-y: auto; background: #fafafa; }
+    .msg.user { color: #036; }
+    .msg.bot { color: #060; }
+    .msg.tool { color: #960; font-size: 0.9em; }
+    .tools li { font-family: monospace; }
+    textarea { width: 100%; height: 4rem; }
+  </style>
+</head>
+<body>
+  <h1>[VULN] Goat Farm Helper</h1>
+  <div class="warning">⚠️ 의도적 취약 — LLM06 Excessive Agency 실습용. tool들은 권한 검증을 하지 않음.</div>
+
+  <details><summary>사용 가능한 tool 목록 (의도된 노출)</summary>
+    <ul class="tools">
+      {% for name, fn in tools.items() %}
+        <li><code>{{ name }}</code> — {{ fn.__doc__ }}</li>
+      {% endfor %}
+    </ul>
+  </details>
+
+  <p>당신은 현재 <code>farmer1</code> (L1 권한)로 인증되어 있다. 다른 사용자의 정보·관리자 tool 호출을 유도해봐.</p>
+
+  <div class="grid">
+    <div>
+      <h3>대화</h3>
+      <div id="chat" class="chat"></div>
+      <form id="form">
+        <textarea id="message" placeholder="자연어 또는 인젝션 페이로드..." required></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <div>
+      <h3>실행 trace (LLM ↔ tool)</h3>
+      <pre id="trace" class="trace"></pre>
+    </div>
+  </div>
+
+<script>
+const chat = document.getElementById('chat');
+const trace = document.getElementById('trace');
+const form = document.getElementById('form');
+const msg = document.getElementById('message');
+
+function add(role, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + role;
+  d.textContent = role + ': ' + text;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = msg.value.trim();
+  if (!text) return;
+  add('user', text);
+  msg.value = '';
+  const r = await fetch('/api/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ message: text }),
+  });
+  const data = await r.json();
+  add('bot', data.reply);
+  trace.textContent = JSON.stringify(data.trace, null, 2);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+variable "region" {
+  description = "AWS 리전. g6 인스턴스 가용성 확인 후 선택."
+  type        = string
+  default     = "us-east-1"
+  validation {
+    condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9]+$", var.region))
+    error_message = "region은 us-east-1 같은 AWS 리전 형식이어야 합니다."
+  }
+}
+
+variable "aws_profile" {
+  description = "로컬 AWS CLI profile 이름"
+  type        = string
+  default     = "owasp-llm"
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.@-]+$", var.aws_profile))
+    error_message = "aws_profile은 AWS CLI profile 이름으로 사용할 수 있는 문자만 포함해야 합니다."
+  }
+}
+
+variable "course_id" {
+  description = "강의 식별자. 리소스 이름 prefix로 사용. 예: 2026-06-cohort-a"
+  type        = string
+  validation {
+    condition     = can(regex("^[a-z0-9-]{3,40}$", var.course_id))
+    error_message = "course_id는 소문자/숫자/하이픈만, 3~40자로 입력하세요."
+  }
+}
+
+variable "student_ids" {
+  description = "수강생 ID 목록. 영문/숫자/하이픈만 사용. 인스턴스 태그·IAM 이름에 그대로 들어감"
+  type        = list(string)
+  validation {
+    condition     = length(var.student_ids) > 0 && alltrue([for id in var.student_ids : can(regex("^[a-z0-9-]{2,30}$", id))])
+    error_message = "student_ids는 소문자/숫자/하이픈만, 2~30자."
+  }
+}
+
+variable "course_dates" {
+  description = "강의 일자(연속 5일 가정). 예: [\"2026-06-10\", \"2026-06-11\", ...]. 비용 산정·태그용."
+  type        = list(string)
+  validation {
+    condition     = length(var.course_dates) == 5 && alltrue([for d in var.course_dates : can(regex("^20[0-9]{2}-[0-9]{2}-[0-9]{2}$", d))])
+    error_message = "course_dates는 YYYY-MM-DD 형식의 5개 날짜여야 합니다."
+  }
+}
+
+variable "golden_ami_id" {
+  description = "Packer로 빌드한 AMI ID"
+  type        = string
+  validation {
+    condition     = can(regex("^ami-[0-9a-f]{8,17}$", var.golden_ami_id))
+    error_message = "ami-XXXX 형식이어야 합니다."
+  }
+}
+
+variable "instance_type" {
+  description = "EC2 인스턴스 타입. 강의 표준은 g6.xlarge (L4 24GB)."
+  type        = string
+  default     = "g6.xlarge"
+  validation {
+    condition     = var.instance_type == "g6.xlarge"
+    error_message = "본 강의 표준 실습은 g6.xlarge 기준으로 검증되어 있습니다. 다른 타입은 강사 검증 후 변경하세요."
+  }
+}
+
+variable "root_volume_size" {
+  description = "EBS root 볼륨 크기(GB). 모델 weights·컨테이너 이미지 포함 약 40GB 사용 → 60GB 권장."
+  type        = number
+  default     = 60
+  validation {
+    condition     = var.root_volume_size >= 60 && var.root_volume_size <= 200
+    error_message = "root_volume_size는 60~200GB 범위로 설정하세요."
+  }
+}
+
+variable "allowed_ingress_cidr" {
+  description = "실습 웹 포트 직접 접근 허용 CIDR. 기본값은 외부 직접 접속을 사실상 닫고 SSM 포트포워딩을 사용한다. 직접 접속이 필요할 때만 본인 IP/32로 변경."
+  type        = string
+  default     = "127.0.0.1/32"
+  validation {
+    condition     = can(cidrhost(var.allowed_ingress_cidr, 0)) && var.allowed_ingress_cidr != "0.0.0.0/0" && var.allowed_ingress_cidr != "::/0"
+    error_message = "allowed_ingress_cidr는 127.0.0.1/32 또는 본인 공인 IP/32처럼 제한된 CIDR이어야 하며 전체 공개 CIDR은 금지합니다."
+  }
+}
+
+# 자동 시작/종료 스케줄 변수는 없다.
+# 학생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF한다.
+
+variable "daily_budget_usd" {
+  description = "일일 비용 알람 임계값(USD)"
+  type        = number
+  default     = 200
+  validation {
+    condition     = var.daily_budget_usd > 0 && var.daily_budget_usd <= 10000
+    error_message = "daily_budget_usd는 0보다 크고 10000 이하로 설정하세요."
+  }
+}
+
+variable "course_budget_usd" {
+  description = "강의 전체 비용 알람 임계값(USD)"
+  type        = number
+  default     = 1500
+  validation {
+    condition     = var.course_budget_usd > 0 && var.course_budget_usd <= 100000
+    error_message = "course_budget_usd는 0보다 크고 100000 이하로 설정하세요."
+  }
+}
+
+variable "alert_email" {
+  description = "비용 알람·운영 알람을 받을 이메일"
+  type        = string
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
+    error_message = "alert_email은 알림을 받을 이메일 주소 형식이어야 합니다."
+  }
+}
+
+# backup_retention_days 변수 제거 — S3 백업 자체를 안 씀

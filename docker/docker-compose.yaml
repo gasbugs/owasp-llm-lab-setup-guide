@@ -1,0 +1,123 @@
+# OWASP Top 10 for LLM — 실습 컨테이너 compose (Podman rootless)
+#
+# 사용 (학생 인스턴스 안에서, ubuntu 사용자):
+#   LAB_SCENARIO=day1 podman compose --profile day1 up -d
+#
+# 환경변수 DOCKERHUB_NAMESPACE는 /etc/lab/env에서 로드됨 (강사 Docker Hub 계정)
+
+name: owasp-llm-lab
+
+x-common-env: &common-env
+  LAB_SCENARIO: ${LAB_SCENARIO:-day1}
+
+services:
+
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: lab-ollama
+    profiles: [day1, day2, day3, day4, day5]
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - /home/ubuntu/ollama-models:/root/.ollama:Z
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: 24h
+    # Podman rootless에서 GPU 사용 (CDI mode)
+    devices:
+      - nvidia.com/gpu=all
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  vuln-rag:
+    image: docker.io/${DOCKERHUB_NAMESPACE:-gasbugs}/owasp-llm-vuln-rag:latest
+    container_name: lab-vuln-rag
+    profiles: [day1, day2, day4, day5]
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *common-env
+      SCENARIO: ${LAB_SCENARIO:-day1}
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  vuln-agent:
+    image: docker.io/${DOCKERHUB_NAMESPACE:-gasbugs}/owasp-llm-vuln-agent:latest
+    container_name: lab-vuln-agent
+    profiles: [day3]
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      <<: *common-env
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: lab-webui
+    profiles: [day1, day2, day3, day4, day5]
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      WEBUI_AUTH: "false"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - open-webui-data:/app/backend/data:Z
+
+  chroma:
+    image: docker.io/chromadb/chroma:latest
+    container_name: lab-chroma
+    profiles: [day2, day4]
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    volumes:
+      - chroma-data:/chroma/.chroma:Z
+
+  langfuse:
+    image: docker.io/langfuse/langfuse:2
+    container_name: lab-langfuse
+    profiles: [day5]
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgres://lf:lf@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: "lab-only-not-secure"
+      NEXTAUTH_URL: http://localhost:3001
+      SALT: "lab-salt"
+    depends_on:
+      - langfuse-db
+
+  langfuse-db:
+    image: docker.io/library/postgres:16
+    container_name: lab-langfuse-db
+    profiles: [day5]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lf
+      POSTGRES_PASSWORD: lf
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data:Z
+
+volumes:
+  open-webui-data:
+  chroma-data:
+  langfuse-db-data:
