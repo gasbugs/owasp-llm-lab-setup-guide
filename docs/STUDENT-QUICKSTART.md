@@ -130,7 +130,6 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - DVLA 실행: `lab-dvla`, port `8501`
 - fake model registry 실행: `lab-fake-registry`, port `8002`
 - EC2 start 후 자동 재시작을 위한 Podman Quadlet systemd user unit 등록
-- 4시간 후 자동 stop 안전망 등록
 - Terraform 기본 설정으로 매일 17:30 KST Lambda 기반 EC2 자동 중지 등록
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.

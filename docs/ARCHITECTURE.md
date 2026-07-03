@@ -79,7 +79,6 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Ollama와 실습 앱 컨테이너 실행
 - Ollama 모델 pull과 warm-up
 - Podman Quadlet 기반 systemd user unit 등록
-- 4시간 OS-level 자동 stop 안전망 등록
 - Terraform 기본 설정으로 매일 17:30 KST Lambda 기반 EC2 자동 중지 등록
 
 운영 편의상 자동 설치가 필요하면 `terraform.tfvars`에서 아래 값을 켭니다.

@@ -63,11 +63,22 @@ install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/work
 
 # 4) Podman 설치
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y --no-install-recommends \
-  curl ca-certificates git \
-  python3-venv \
-  podman podman-compose podman-docker crun fuse-overlayfs slirp4netns uidmap
+if command -v podman >/dev/null 2>&1 && \
+  command -v podman-compose >/dev/null 2>&1 && \
+  command -v crun >/dev/null 2>&1 && \
+  command -v fuse-overlayfs >/dev/null 2>&1 && \
+  command -v slirp4netns >/dev/null 2>&1 && \
+  command -v newuidmap >/dev/null 2>&1 && \
+  command -v jq >/dev/null 2>&1 && \
+  dpkg -s python3-venv >/dev/null 2>&1; then
+  echo "[install-lab] Podman/rootless prerequisites already installed"
+else
+  apt-get update -y
+  apt-get install -y --no-install-recommends \
+    curl ca-certificates git jq \
+    python3-venv \
+    podman podman-compose podman-docker crun fuse-overlayfs slirp4netns uidmap
+fi
 
 # rootless 설정
 touch /etc/containers/nodocker
@@ -91,8 +102,12 @@ UBUNTU_USER_ENV=(
 RUN_AS_UBUNTU=(runuser -u ubuntu -- env "${UBUNTU_USER_ENV[@]}")
 
 # CDI 모드 nvidia
-nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml || \
-  echo "(nvidia-ctk 미설치 — apt install nvidia-container-toolkit 필요)"
+if [ -s /etc/cdi/nvidia.yaml ]; then
+  echo "[install-lab] NVIDIA CDI config already exists: /etc/cdi/nvidia.yaml"
+else
+  nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml || \
+    echo "(nvidia-ctk 미설치 — apt install nvidia-container-toolkit 필요)"
+fi
 
 # 5) Ollama 모델 디렉터리
 install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/ollama-models
@@ -101,6 +116,10 @@ install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/ollama-models
 "${RUN_AS_UBUNTU[@]}" bash <<PULLSH
 set -euo pipefail
 for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-llmgoat owasp-llm-dvla; do
+  if podman image exists "docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
+    echo "[install-lab] image already exists: docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"
+    continue
+  fi
   pulled=false
   for i in \$(seq 1 3); do
     if podman pull "docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
@@ -135,7 +154,11 @@ fi
 
 # Day 2 LLM03 Supply Chain — fake model-registry (port 8002)
 mkdir -p /home/ubuntu/work/fake-registry
-curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py" -o /home/ubuntu/work/fake-registry/server.py
+if [ -s /home/ubuntu/work/fake-registry/server.py ]; then
+  echo "[install-lab] fake-registry server.py already exists"
+else
+  curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py" -o /home/ubuntu/work/fake-registry/server.py
+fi
 chown -R ubuntu:ubuntu /home/ubuntu/work/fake-registry
 
 QUADLET_DIR="/home/ubuntu/.config/containers/systemd"
@@ -271,16 +294,15 @@ chown -R ubuntu:ubuntu "$QUADLET_DIR"
 "${RUN_AS_UBUNTU[@]}" bash <<'QUADLETSH'
 set -euo pipefail
 units=(lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry)
-for unit in "${units[@]}"; do
-  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
-done
-for container in "${units[@]}"; do
-  podman rm -f "$container" >/dev/null 2>&1 || true
-done
 systemctl --user daemon-reload
 for unit in "${units[@]}"; do
   systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
-  systemctl --user start "$unit.service"
+  if systemctl --user is-active --quiet "$unit.service"; then
+    echo "[install-lab] $unit.service already running"
+  else
+    podman rm -f "$unit" >/dev/null 2>&1 || true
+    systemctl --user start "$unit.service"
+  fi
 done
 QUADLETSH
 
@@ -293,9 +315,17 @@ for i in \$(seq 1 60); do
   fi
   sleep 5
 done
-podman exec lab-ollama ollama pull "$OLLAMA_MODEL"
-podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL" 2>&1 | tail -3 || true
-echo "[install-lab] $LLAMA_GUARD_MODEL pulled (Day 5 Defense demo)"
+if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_MODEL"; then
+  echo "[install-lab] $OLLAMA_MODEL already pulled"
+else
+  podman exec lab-ollama ollama pull "$OLLAMA_MODEL"
+fi
+if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$LLAMA_GUARD_MODEL"; then
+  echo "[install-lab] $LLAMA_GUARD_MODEL already pulled"
+else
+  podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL" 2>&1 | tail -3 || true
+  echo "[install-lab] $LLAMA_GUARD_MODEL pulled (Day 5 Defense demo)"
+fi
 
 curl -s --max-time 120 http://localhost:11434/api/generate \
   -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}" >/dev/null 2>&1 || true
@@ -310,21 +340,23 @@ else
     echo "[install-lab] embedding-venv skipped: only \$((AVAILABLE_KB / 1024)) MB free under /home/ubuntu/work"
     echo "[install-lab] set SKIP_EMBEDDING_VENV=false and free at least 6 GB to install Day 4 embedding tools"
   else
-    rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
-    python3 -m venv /home/ubuntu/work/embedding-venv
-    if /home/ubuntu/work/embedding-venv/bin/pip install --no-cache-dir -q sentence-transformers scikit-learn numpy; then
-      chown -R ubuntu:ubuntu /home/ubuntu/work/embedding-venv 2>/dev/null || true
-      echo "[install-lab] embedding-venv ready for Day 4 LLM08-A"
+    if [ -x /home/ubuntu/work/embedding-venv/bin/pip ] && \
+      /home/ubuntu/work/embedding-venv/bin/pip show sentence-transformers scikit-learn numpy >/dev/null 2>&1; then
+      echo "[install-lab] embedding-venv already ready for Day 4 LLM08-A"
     else
       rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
-      echo "[install-lab] embedding-venv install failed; continuing without optional Day 4 embedding tools"
+      python3 -m venv /home/ubuntu/work/embedding-venv
+      if /home/ubuntu/work/embedding-venv/bin/pip install --no-cache-dir -q sentence-transformers scikit-learn numpy; then
+        chown -R ubuntu:ubuntu /home/ubuntu/work/embedding-venv 2>/dev/null || true
+        echo "[install-lab] embedding-venv ready for Day 4 LLM08-A"
+      else
+        rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
+        echo "[install-lab] embedding-venv install failed; continuing without optional Day 4 embedding tools"
+      fi
     fi
   fi
 fi
 OLLAMASH
-
-# 11) 비용 안전망: 설치 시점부터 240분 후 OS-level 자동 stop
-shutdown -h +240 "[auto-stop] 4h cost safety net — sudo shutdown -c to cancel" || true
 
 INSTALL_END_EPOCH=$(date +%s)
 INSTALL_DURATION=$((INSTALL_END_EPOCH - INSTALL_START_EPOCH))
@@ -397,8 +429,7 @@ OWASP LLM Lab 설치가 완료되었습니다.
 
 주의: public IP 직접 접속은 Terraform allowed_ingress_cidr가 본인 IP/32로 열려 있을 때만 동작합니다.
 
-비용 안전장치로 이 인스턴스는 약 4시간 후 자동 종료 예약되었습니다.
-자동 종료를 취소하려면 다음 명령을 실행하세요.
-  sudo shutdown -c
+비용 안전장치:
+  Terraform 기본 설정은 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다.
 
 EOF
