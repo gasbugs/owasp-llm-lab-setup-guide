@@ -37,10 +37,11 @@ HDR="X-aws-ec2-metadata-token: $TOKEN"
 INSTANCE_ID=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/instance-id)
 IDENTITY_DOCUMENT=$(curl -fsSH "$HDR" http://169.254.169.254/latest/dynamic/instance-identity/document)
 REGION=$(printf '%s' "$IDENTITY_DOCUMENT" | python3 -c 'import json,sys; print(json.load(sys.stdin)["region"])')
+PUBLIC_IPV4=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
 STUDENT=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/tags/instance/Student 2>/dev/null || echo "student")
 COURSE_ID=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/tags/instance/Course 2>/dev/null || echo "owasp-llm")
 
-echo "INSTANCE_ID=$INSTANCE_ID REGION=$REGION STUDENT=$STUDENT COURSE_ID=$COURSE_ID"
+echo "INSTANCE_ID=$INSTANCE_ID REGION=$REGION PUBLIC_IPV4=${PUBLIC_IPV4:-none} STUDENT=$STUDENT COURSE_ID=$COURSE_ID"
 
 # 2) /etc/lab/env
 install -d -m 0755 /etc/lab
@@ -48,6 +49,7 @@ cat > /etc/lab/env <<EOF
 STUDENT=$STUDENT
 COURSE_ID=$COURSE_ID
 AWS_DEFAULT_REGION=$REGION
+EC2_DOMAIN=$PUBLIC_IPV4
 IMAGE_NAMESPACE=$IMAGE_NAMESPACE
 IMAGE_TAG=$IMAGE_TAG
 OLLAMA_MODEL=$OLLAMA_MODEL
@@ -342,13 +344,58 @@ OWASP LLM Lab 설치가 완료되었습니다.
 다음 명령으로 실행 중인 실습 컨테이너를 확인하세요.
   sudo -u ubuntu podman ps
 
-주요 서비스 포트:
-  - Vulnerable RAG:        8000
-  - Vulnerable Agent:      8001
-  - Fake Model Registry:   8002
-  - LLMGoat:               5000
-  - DVLA:                  8501
-  - Ollama API:            11434
+주요 서비스:
+  - Ollama API            11434
+    로컬 LLM 모델 목록 확인과 generate API 호출에 사용합니다.
+
+  - Vulnerable RAG        8000
+    프롬프트 인젝션, 민감정보 노출, RAG/임베딩 취약점 실습 앱입니다.
+
+  - Vulnerable Agent      8001
+    도구 호출형 LLM Agent의 excessive agency, tool misuse 실습 앱입니다.
+
+  - Fake Model Registry   8002
+    모델 공급망/무결성 검증 실습용 가짜 모델 레지스트리 API입니다.
+
+  - LLMGoat               5000
+    OWASP Top 10 for LLM 항목별 웹 챌린지 실습 UI입니다.
+
+  - DVLA                  8501
+    Damn Vulnerable LLM Agent. ReAct Agent prompt injection 실습 UI입니다.
+
+브라우저/터미널 검증:
+  export EC2_DOMAIN=${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}
+
+  # Ollama 모델 목록
+  echo http://\$EC2_DOMAIN:11434/api/tags
+
+  # Ollama generate API smoke test
+  curl http://\$EC2_DOMAIN:11434/api/generate \\
+    -d '{
+      "model": "$OLLAMA_MODEL",
+      "prompt": "ready",
+      "stream": false,
+      "options": {
+        "num_predict": 5
+      }
+    }' | jq
+
+  # Vulnerable RAG health check
+  echo http://\$EC2_DOMAIN:8000/healthz
+
+  # Vulnerable Agent health check
+  echo http://\$EC2_DOMAIN:8001/healthz
+
+  # Fake Model Registry model list
+  echo http://\$EC2_DOMAIN:8002/api/v1/models
+
+  # LLMGoat web UI
+  echo http://\$EC2_DOMAIN:5000
+
+  # DVLA web UI
+  echo http://\$EC2_DOMAIN:8501
+
+주의: public IP 직접 접속은 Terraform allowed_ingress_cidr가 본인 IP/32로 열려 있을 때만 동작합니다.
 
 비용 안전장치로 이 인스턴스는 약 4시간 후 자동 종료 예약되었습니다.
 자동 종료를 취소하려면 다음 명령을 실행하세요.
