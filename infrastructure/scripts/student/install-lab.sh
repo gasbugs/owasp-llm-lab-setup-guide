@@ -23,6 +23,7 @@ IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
 LLAMA_GUARD_MODEL="${LLAMA_GUARD_MODEL:-llama-guard3:8b}"
+INSTALL_START_EPOCH=$(date +%s)
 
 echo "=== owasp-llm-lab manual install start: $(date -Iseconds) ==="
 echo "RAW_URL=$RAW_URL"
@@ -295,6 +296,34 @@ OLLAMASH
 # 11) 비용 안전망: 설치 시점부터 240분 후 OS-level 자동 stop
 shutdown -h +240 "[auto-stop] 4h cost safety net — sudo shutdown -c to cancel" || true
 
-echo "=== owasp-llm-lab manual install done: $(date -Iseconds) ==="
-echo "설치 로그: $LOG_FILE"
-echo "컨테이너 확인: sudo -u ubuntu podman ps"
+INSTALL_END_EPOCH=$(date +%s)
+INSTALL_DURATION=$((INSTALL_END_EPOCH - INSTALL_START_EPOCH))
+INSTALL_DURATION_MIN=$((INSTALL_DURATION / 60))
+INSTALL_DURATION_SEC=$((INSTALL_DURATION % 60))
+
+cat <<EOF
+
+============================================================
+OWASP LLM Lab 설치가 완료되었습니다.
+============================================================
+
+완료 시각: $(date -Iseconds)
+총 설치 시간: ${INSTALL_DURATION_MIN}분 ${INSTALL_DURATION_SEC}초
+설치 로그: $LOG_FILE
+
+다음 명령으로 실행 중인 실습 컨테이너를 확인하세요.
+  sudo -u ubuntu podman ps
+
+주요 서비스 포트:
+  - Vulnerable RAG:        8000
+  - Vulnerable Agent:      8001
+  - Fake Model Registry:   8002
+  - LLMGoat:               5000
+  - DVLA:                  8501
+  - Ollama API:            11434
+
+비용 안전장치로 이 인스턴스는 약 4시간 후 자동 종료 예약되었습니다.
+자동 종료를 취소하려면 다음 명령을 실행하세요.
+  sudo shutdown -c
+
+EOF
