@@ -8,12 +8,14 @@
 # 실행 (본 강의 인프라):
 #   docker run -d --name lab-dvla --network host \
 #     -e OLLAMA_HOST=http://localhost:11434 \
+#     -e OLLAMA_API_BASE=http://localhost:11434 \
 #     -e model_name=ollama-local-llama3 \
 #     docker.io/gasbugs/owasp-llm-dvla:latest
 #
 # 로컬 검증 (Mac native Ollama):
 #   docker run -d --name lab-dvla -p 8501:8501 \
 #     -e OLLAMA_HOST=http://host.docker.internal:11434 \
+#     -e OLLAMA_API_BASE=http://host.docker.internal:11434 \
 #     -e model_name=ollama-local-llama3 \
 #     docker.io/gasbugs/owasp-llm-dvla:latest
 
@@ -43,10 +45,14 @@ RUN pip install --no-cache-dir python-dotenv \
 # Streamlit config + env defaults (Ollama backend)
 COPY --from=clone /src/config.toml /root/.streamlit/config.toml
 RUN cp /app/.env.ollama.template /app/.env
-RUN sed -i 's#ollama/llama3#ollama/llama3.1:8b-instruct-q4_K_M#' /app/llm-config.yaml
+RUN sed -i \
+    -e 's#default_model: gpt-4-1106-preview#default_model: ollama_chat/llama3.1:8b-instruct-q4_K_M#' \
+    -e 's#ollama/llama3#ollama_chat/llama3.1:8b-instruct-q4_K_M#' \
+    /app/llm-config.yaml
 
 # 학생 강의 인프라용 기본값 — 실행 시 -e로 override 가능
 ENV OLLAMA_HOST=http://localhost:11434 \
+    OLLAMA_API_BASE=http://localhost:11434 \
     model_name=ollama-local-llama3
 
 EXPOSE 8501

@@ -23,6 +23,7 @@ IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
 LLAMA_GUARD_MODEL="${LLAMA_GUARD_MODEL:-llama-guard3:8b}"
+LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
 INSTALL_START_EPOCH=$(date +%s)
 
 echo "=== owasp-llm-lab manual install start: $(date -Iseconds) ==="
@@ -49,6 +50,7 @@ AWS_DEFAULT_REGION=$REGION
 IMAGE_NAMESPACE=$IMAGE_NAMESPACE
 IMAGE_TAG=$IMAGE_TAG
 OLLAMA_MODEL=$OLLAMA_MODEL
+LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
 EOF
 chmod 0644 /etc/lab/env
 
@@ -119,6 +121,13 @@ PROFILE="day$DAY"
 # podman generate systemd는 deprecated라 새 설치에서는 Quadlet을 직접 사용한다.
 mkdir -p /home/ubuntu/.LLMGoat/models /home/ubuntu/.LLMGoat/cache
 chown -R ubuntu:ubuntu /home/ubuntu/.LLMGoat
+if [ -f /home/ubuntu/.LLMGoat/models/gemma-2.gguf ]; then
+  MODEL_BYTES=$(stat -c '%s' /home/ubuntu/.LLMGoat/models/gemma-2.gguf)
+  if [ "$MODEL_BYTES" -lt 1000000000 ]; then
+    echo "[install-lab] removing incomplete LLMGoat model: /home/ubuntu/.LLMGoat/models/gemma-2.gguf (${MODEL_BYTES} bytes)"
+    rm -f /home/ubuntu/.LLMGoat/models/gemma-2.gguf
+  fi
+fi
 
 # Day 2 LLM03 Supply Chain — fake model-registry (port 8002)
 mkdir -p /home/ubuntu/work/fake-registry
@@ -201,8 +210,9 @@ PublishPort=5000:5000
 Environment=LLMGOAT_SERVER_HOST=0.0.0.0
 Environment=LLMGOAT_SERVER_PORT=5000
 Environment=LLMGOAT_DEFAULT_MODEL=gemma-2.gguf
-Environment=LLMGOAT_N_GPU_LAYERS=20
+Environment=LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
 Environment=LLMGOAT_N_THREADS=4
+Environment=LLMGOAT_VERBOSE=1
 Volume=/home/ubuntu/.LLMGoat/models:/root/.LLMGoat/models:Z
 Volume=/home/ubuntu/.LLMGoat/cache:/root/.LLMGoat/cache:Z
 
@@ -224,6 +234,7 @@ ContainerName=lab-dvla
 Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-dvla:${IMAGE_TAG}
 Network=host
 Environment=OLLAMA_HOST=http://localhost:11434
+Environment=OLLAMA_API_BASE=http://localhost:11434
 Environment=model_name=ollama-local-llama3
 
 [Service]
