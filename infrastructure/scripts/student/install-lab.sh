@@ -19,6 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
+SCRIPT_VERSION="0.1.0"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
@@ -32,6 +33,7 @@ step() {
 }
 
 echo "=== owasp-llm-lab manual install start: $(date -Iseconds) ==="
+echo "SCRIPT_VERSION=$SCRIPT_VERSION"
 echo "RAW_URL=$RAW_URL"
 echo "IMAGE_NAMESPACE=$IMAGE_NAMESPACE IMAGE_TAG=$IMAGE_TAG"
 
@@ -52,6 +54,7 @@ echo "INSTANCE_ID=$INSTANCE_ID REGION=$REGION PUBLIC_IPV4=${PUBLIC_IPV4:-none} S
 step "2/10" "/etc/lab/env에 실습 환경 변수를 기록합니다"
 install -d -m 0755 /etc/lab
 cat > /etc/lab/env <<EOF
+SCRIPT_VERSION=$SCRIPT_VERSION
 STUDENT=$STUDENT
 COURSE_ID=$COURSE_ID
 AWS_DEFAULT_REGION=$REGION
@@ -406,6 +409,7 @@ OWASP LLM Lab 설치가 완료되었습니다.
 ============================================================
 
 완료 시각: $(date -Iseconds)
+스크립트 버전: $SCRIPT_VERSION
 총 설치 시간: ${INSTALL_DURATION_MIN}분 ${INSTALL_DURATION_SEC}초
 설치 로그: $LOG_FILE
 
