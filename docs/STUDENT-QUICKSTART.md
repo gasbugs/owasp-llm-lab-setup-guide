@@ -148,14 +148,29 @@ curl -s http://localhost:8000/healthz
 curl -s http://localhost:8001/healthz
 ```
 
-## 9. 매일 시작
+## 9. 설치를 다시 해야 할 때
+
+설치가 중간에 실패했거나 깨끗하게 다시 올리고 싶으면 SSM 세션 안에서 클린업 후 설치를 다시 실행합니다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/cleanup-lab.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/install-lab.sh | sudo bash
+```
+
+모델 캐시와 생성 파일까지 지우려면 `--purge`를 사용합니다. 이 경우 다음 설치에서 모델을 다시 받아 시간이 더 걸립니다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/cleanup-lab.sh | sudo bash -s -- --purge
+```
+
+## 10. 매일 시작
 
 ```bash
 AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
   bash infrastructure/scripts/student/start-lab.sh
 ```
 
-## 10. 매일 종료
+## 11. 매일 종료
 
 ```bash
 AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
@@ -164,7 +179,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 
 이 명령을 실행하면 EC2 시간당 요금이 멈춥니다. EBS 비용은 남습니다.
 
-## 11. 강의 종료 후 삭제
+## 12. 강의 종료 후 삭제
 
 보존할 작업물을 먼저 개인 GitHub repo에 push하세요.
 
@@ -173,7 +188,7 @@ cd infrastructure/terraform
 terraform destroy
 ```
 
-## 12. 절대 하지 말 것
+## 13. 절대 하지 말 것
 
 - `allowed_ingress_cidr = "0.0.0.0/0"`로 바꾸지 마세요.
 - Access Key와 Secret을 GitHub에 올리지 마세요.

@@ -14,7 +14,7 @@
 | `docs/TROUBLESHOOTING.md` | quota, SSM, Terraform, Podman, Ollama 문제 해결 |
 | `infrastructure/terraform/` | VPC, 보안 그룹, EC2 g6.xlarge, IAM, Budget 알람 |
 | `infrastructure/terraform/user-data.sh.tpl` | 선택적 자동 설치용 user-data 래퍼. 기본값에서는 비활성화 |
-| `infrastructure/scripts/student/` | 학생용 preflight, 수동 설치, instance-id, start, stop, sync 헬퍼 |
+| `infrastructure/scripts/student/` | 학생용 preflight, 수동 설치/클린업, instance-id, start, stop, sync 헬퍼 |
 | `infrastructure/packer/` | 선택 사항: 강사용 Golden AMI 빌드 |
 | `docker/` | 실습 컨테이너 Dockerfile, compose, 취약 RAG/Agent 앱 코드 |
 

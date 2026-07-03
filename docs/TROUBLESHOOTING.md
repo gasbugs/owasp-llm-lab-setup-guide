@@ -69,6 +69,21 @@ sudo -u ubuntu XDG_RUNTIME_DIR=/run/user/$UBUNTU_UID systemctl --user status lab
 
 `Failed to enable unit: ... is transient or generated`가 보이면 오래된 설치 스크립트가 Quadlet generated unit에 `enable`을 시도한 것입니다. 최신 `install-lab.sh`를 다시 실행하세요. Quadlet은 `.container` 파일의 `[Install]` 설정을 generator가 처리하므로, generated `.service`에 직접 `enable`을 실행하지 않습니다.
 
+## 설치를 깨끗하게 다시 하고 싶을 때
+
+SSM 세션 안에서 실행합니다. 기본 클린업은 컨테이너와 Quadlet unit만 제거하고 작업물과 모델 캐시는 보존합니다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/cleanup-lab.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/install-lab.sh | sudo bash
+```
+
+모델 캐시까지 모두 지우는 완전 정리는 아래처럼 실행합니다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/cleanup-lab.sh | sudo bash -s -- --purge
+```
+
 ## GPU 인식 실패
 
 ```bash
