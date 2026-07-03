@@ -1,3 +1,13 @@
+output "ami_id" {
+  description = "Terraform이 선택한 base AMI ID"
+  value       = data.aws_ami.lab_base.id
+}
+
+output "ami_name" {
+  description = "Terraform이 선택한 base AMI name"
+  value       = data.aws_ami.lab_base.name
+}
+
 output "student_role_arns" {
   description = "학생별 IAM Role ARN"
   value       = { for id in var.student_ids : id => aws_iam_role.student[id].arn }

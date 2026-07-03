@@ -25,8 +25,13 @@ course_dates = [
   "2026-09-11",
 ]
 
-# 강사가 공지한 AMI ID
-golden_ami_id = "ami-00000000000000000" # 예시 형식. 실제 값은 강사 공지 AMI ID로 교체
+# AMI는 기존 검증 계열의 최신 DLAMI를 자동 조회한다.
+# 기본값:
+#   ami_owner_id     = "898082745236"
+#   ami_name_pattern = "Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)*"
+# 강사가 Packer로 만든 골든 AMI를 쓰라고 안내한 경우에만 아래처럼 override한다.
+#   ami_owner_id     = "self"
+#   ami_name_pattern = "owasp-llm-lab-*"
 
 # 실습 웹 포트 직접 접속 허용 CIDR.
 # 기본 권장: SSM 포트포워딩만 사용하려면 127.0.0.1/32 그대로 둔다.

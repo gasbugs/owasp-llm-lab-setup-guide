@@ -45,12 +45,23 @@ variable "course_dates" {
   }
 }
 
-variable "golden_ami_id" {
-  description = "Packer로 빌드한 AMI ID"
+variable "ami_name_pattern" {
+  description = "EC2 base AMI name pattern. 기본값은 기존 검증 계열인 Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 Ubuntu 24.04 최신 이미지를 조회한다."
   type        = string
+  default     = "Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)*"
   validation {
-    condition     = can(regex("^ami-[0-9a-f]{8,17}$", var.golden_ami_id))
-    error_message = "ami-XXXX 형식이어야 합니다."
+    condition     = length(trimspace(var.ami_name_pattern)) >= 3
+    error_message = "ami_name_pattern은 최소 3자 이상이어야 합니다."
+  }
+}
+
+variable "ami_owner_id" {
+  description = "AMI owner ID. AWS Deep Learning AMI owner 기본값은 898082745236. 본인 계정 Packer AMI를 쓰려면 self를 입력한다."
+  type        = string
+  default     = "898082745236"
+  validation {
+    condition     = var.ami_owner_id == "self" || can(regex("^[0-9]{12}$", var.ami_owner_id))
+    error_message = "ami_owner_id는 12자리 AWS account ID 또는 self여야 합니다."
   }
 }
 

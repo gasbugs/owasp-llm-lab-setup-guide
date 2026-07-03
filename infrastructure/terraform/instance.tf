@@ -13,17 +13,42 @@
 ################################################################################
 
 locals {
-  user_data = base64encode(templatefile("${path.module}/user-data.sh.tpl", {
+  user_data = templatefile("${path.module}/user-data.sh.tpl", {
     region                   = var.region
     course_id                = var.course_id
     fake_registry_server_b64 = filebase64("${path.module}/../fake-registry/server.py")
-  }))
+  })
+}
+
+data "aws_ami" "lab_base" {
+  most_recent = true
+  owners      = [var.ami_owner_id]
+
+  filter {
+    name   = "name"
+    values = [var.ami_name_pattern]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+
+  filter {
+    name   = "root-device-type"
+    values = ["ebs"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
 }
 
 resource "aws_instance" "student" {
   for_each = toset(var.student_ids)
 
-  ami                    = var.golden_ami_id
+  ami                    = data.aws_ami.lab_base.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.lab.id
   vpc_security_group_ids = [aws_security_group.student[each.key].id]
@@ -63,7 +88,7 @@ resource "aws_instance" "student" {
   lifecycle {
     # 인스턴스 stop/start로 state가 바뀌어도 terraform이 재생성하지 않도록
     ignore_changes = [
-      ami, # AMI 갱신 시 새 인스턴스로 강제 교체 안 함 (학생 명시 동의 시 -replace로 진행)
+      ami, # 최신 AMI가 갱신되어도 기존 학생 인스턴스를 자동 교체하지 않음
     ]
   }
 }

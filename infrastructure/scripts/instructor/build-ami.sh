@@ -21,5 +21,9 @@ echo "=========================================="
 echo "AMI 빌드 완료: $AMI_ID"
 echo
 echo "다음 단계:"
-echo "  echo 'golden_ami_id = \"$AMI_ID\"' >> ../terraform/terraform.tfvars"
+echo "  echo 'ami_owner_id = \"self\"' >> ../terraform/terraform.tfvars"
+echo "  echo 'ami_name_pattern = \"owasp-llm-lab-*\"' >> ../terraform/terraform.tfvars"
+echo
+echo "방금 생성된 AMI ID 참고값:"
+echo "  $AMI_ID"
 echo "=========================================="

@@ -23,7 +23,8 @@
 ```bash
 cd infrastructure/terraform
 cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars에서 student_ids, region, golden_ami_id, alert_email을 강사 공지 기준으로 수정
+# terraform.tfvars에서 student_ids, region, alert_email을 강사 공지 기준으로 수정
+# AMI는 기존 검증 계열의 최신 DLAMI를 data source로 자동 조회
 # allowed_ingress_cidr는 기본 127.0.0.1/32 유지. 직접 접속이 필요할 때만 본인 IP/32로 변경
 terraform init
 terraform plan

@@ -35,7 +35,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 
 cd infrastructure/terraform
 cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars에서 region, golden_ami_id, student_ids, alert_email 수정
+# terraform.tfvars에서 region, student_ids, alert_email 수정
 
 terraform init
 terraform plan
@@ -54,11 +54,12 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 
 ## 기본 배포 방식
 
-1. Terraform이 학생별 EC2 `g6.xlarge` 1대를 만듭니다.
-2. EC2 최초 부팅 시 `user-data.sh.tpl`이 실행됩니다.
-3. user-data가 Podman을 설치하고 실습 컨테이너 이미지를 pull합니다.
-4. `lab-ollama`, `lab-vuln-rag`, `lab-vuln-agent`, `lab-llmgoat`, `lab-dvla`, `lab-fake-registry` 컨테이너를 실행합니다.
-5. systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
+1. Terraform이 기존 검증 계열인 `Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)`의 최신 AMI를 조회합니다.
+2. Terraform이 학생별 EC2 `g6.xlarge` 1대를 만듭니다.
+3. EC2 최초 부팅 시 `user-data.sh.tpl`이 실행됩니다.
+4. user-data가 Podman을 설치하고 실습 컨테이너 이미지를 pull합니다.
+5. `lab-ollama`, `lab-vuln-rag`, `lab-vuln-agent`, `lab-llmgoat`, `lab-dvla`, `lab-fake-registry` 컨테이너를 실행합니다.
+6. systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
 
 ## 비용 안전 원칙
 
@@ -78,4 +79,3 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 ## 라이선스와 주의
 
 이 저장소 자체는 MIT License로 배포됩니다. 단, `docker/llmgoat`와 `docker/dvla`는 각각 원본 오픈소스 프로젝트를 컨테이너화한 wrapper이며, 해당 원본 프로젝트의 라이선스와 고지 사항을 함께 따릅니다.
-

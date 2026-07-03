@@ -2,11 +2,10 @@
 .terraform/
 *.tfstate
 *.tfstate.*
-tfplan
+tfplan*
 terraform.tfvars
 *.pem
 *.key
 *.log
 __pycache__/
 .venv/
-

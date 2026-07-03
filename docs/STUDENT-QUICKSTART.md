@@ -9,7 +9,7 @@
 - Session Manager Plugin
 - Terraform 1.x
 - Git
-- 강사가 공지한 AWS 리전과 AMI ID
+- 강사가 공지한 AWS 리전
 - 비용 알람을 받을 이메일
 
 ## 1. AWS CLI 설정
@@ -69,7 +69,8 @@ course_dates = [
   "2026-09-11",
 ]
 
-golden_ami_id = "ami-xxxxxxxxxxxxxxxxx"
+# AMI ID는 직접 입력하지 않습니다.
+# Terraform이 기존 검증 계열의 최신 DLAMI를 자동 조회합니다.
 
 allowed_ingress_cidr = "127.0.0.1/32"
 
@@ -86,7 +87,7 @@ terraform plan
 terraform apply -auto-approve
 ```
 
-성공하면 `instance_ids`, `public_ips`, `start_commands`, `stop_commands`, `ssm_session_commands`가 출력됩니다.
+성공하면 `ami_id`, `ami_name`, `instance_ids`, `public_ips`, `start_commands`, `stop_commands`, `ssm_session_commands`가 출력됩니다.
 
 ## 6. 앱 배포는 언제 되나요?
 
@@ -161,4 +162,3 @@ terraform destroy
 - Access Key와 Secret을 GitHub에 올리지 마세요.
 - `terraform.tfvars`, `.tfstate`, `.pem` 파일을 commit하지 마세요.
 - 취약 컨테이너를 회사/고객사/공개 서비스 환경에 배포하지 마세요.
-

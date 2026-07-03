@@ -21,6 +21,7 @@ flowchart TD
 
 `infrastructure/terraform`이 생성하는 리소스입니다.
 
+- 기존 검증 계열의 최신 AWS DLAMI 조회
 - VPC `10.42.0.0/16`
 - Public subnet `10.42.10.0/24`
 - Internet Gateway와 route table
@@ -30,6 +31,20 @@ flowchart TD
 - AWS Budget 알람
 
 학생 수가 여러 명이면 `student_ids` 목록만큼 EC2가 생성됩니다.
+
+기본 AMI 조회 기준은 우리가 기존 실습에서 사용한 계열과 같습니다.
+
+```hcl
+ami_owner_id     = "898082745236"
+ami_name_pattern = "Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)*"
+```
+
+강사가 Packer로 만든 커스텀 골든 AMI를 사용할 때만 예를 들어 아래처럼 override합니다.
+
+```hcl
+ami_owner_id     = "self"
+ami_name_pattern = "owasp-llm-lab-*"
+```
 
 ## Security group
 
@@ -79,4 +94,3 @@ DOCKERHUB_NAMESPACE=your-dockerhub-id ./build-and-push.sh
 ```
 
 기본 Terraform user-data는 `docker.io/gasbugs/...` 이미지를 pull합니다. 별도 namespace를 쓰려면 user-data의 image URL 또는 Terraform 변수를 프로젝트 정책에 맞게 조정하세요.
-

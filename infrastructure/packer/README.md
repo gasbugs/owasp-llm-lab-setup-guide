@@ -39,7 +39,12 @@ packer build \
   ami.pkr.hcl
 ```
 
-결과는 `manifest.json`에 AMI ID 기록 → Terraform `terraform.tfvars`의 `golden_ami_id`에 복사.
+결과는 `manifest.json`에 AMI ID가 기록된다. Terraform에서 이 Packer AMI 계열을 자동 선택하려면 `terraform.tfvars`에 아래처럼 설정한다.
+
+```hcl
+ami_owner_id     = "self"
+ami_name_pattern = "owasp-llm-lab-*"
+```
 
 ## 빌드 시간 / 비용
 
