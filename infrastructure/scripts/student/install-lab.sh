@@ -27,11 +27,16 @@ LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
 SKIP_EMBEDDING_VENV="${SKIP_EMBEDDING_VENV:-false}"
 INSTALL_START_EPOCH=$(date +%s)
 
+step() {
+  printf '\n[install-lab] STEP %s - %s\n' "$1" "$2"
+}
+
 echo "=== owasp-llm-lab manual install start: $(date -Iseconds) ==="
 echo "RAW_URL=$RAW_URL"
 echo "IMAGE_NAMESPACE=$IMAGE_NAMESPACE IMAGE_TAG=$IMAGE_TAG"
 
 # 1) IMDSv2로 instance metadata와 tag 조회
+step "1/10" "EC2 메타데이터와 태그를 조회해 설치 대상 정보를 확인합니다"
 TOKEN=$(curl -fsS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 HDR="X-aws-ec2-metadata-token: $TOKEN"
 INSTANCE_ID=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/instance-id)
@@ -44,6 +49,7 @@ COURSE_ID=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/tags/insta
 echo "INSTANCE_ID=$INSTANCE_ID REGION=$REGION PUBLIC_IPV4=${PUBLIC_IPV4:-none} STUDENT=$STUDENT COURSE_ID=$COURSE_ID"
 
 # 2) /etc/lab/env
+step "2/10" "/etc/lab/env에 실습 환경 변수를 기록합니다"
 install -d -m 0755 /etc/lab
 cat > /etc/lab/env <<EOF
 STUDENT=$STUDENT
@@ -59,9 +65,11 @@ EOF
 chmod 0644 /etc/lab/env
 
 # 3) 작업 디렉터리 생성
+step "3/10" "ubuntu 사용자 작업 디렉터리를 준비합니다"
 install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/work
 
 # 4) Podman 설치
+step "4/10" "Podman rootless 실행에 필요한 패키지를 확인하고 부족하면 설치합니다"
 export DEBIAN_FRONTEND=noninteractive
 if command -v podman >/dev/null 2>&1 && \
   command -v podman-compose >/dev/null 2>&1 && \
@@ -81,6 +89,7 @@ else
 fi
 
 # rootless 설정
+step "5/10" "ubuntu 사용자 rootless Podman과 systemd user session을 설정합니다"
 touch /etc/containers/nodocker
 grep -q '^ubuntu:' /etc/subuid || echo "ubuntu:100000:65536" >> /etc/subuid
 grep -q '^ubuntu:' /etc/subgid || echo "ubuntu:100000:65536" >> /etc/subgid
@@ -102,6 +111,7 @@ UBUNTU_USER_ENV=(
 RUN_AS_UBUNTU=(runuser -u ubuntu -- env "${UBUNTU_USER_ENV[@]}")
 
 # CDI 모드 nvidia
+step "6/10" "NVIDIA GPU를 Podman 컨테이너에서 사용할 CDI 설정을 확인합니다"
 if [ -s /etc/cdi/nvidia.yaml ]; then
   echo "[install-lab] NVIDIA CDI config already exists: /etc/cdi/nvidia.yaml"
 else
@@ -110,9 +120,11 @@ else
 fi
 
 # 5) Ollama 모델 디렉터리
+step "7/10" "Ollama 모델 디렉터리를 준비합니다"
 install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/ollama-models
 
 # 6) 컨테이너 이미지 pull
+step "8/10" "실습 컨테이너 이미지를 확인하고 없는 이미지만 pull합니다"
 "${RUN_AS_UBUNTU[@]}" bash <<PULLSH
 set -euo pipefail
 for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-llmgoat owasp-llm-dvla; do
@@ -136,12 +148,15 @@ done
 PULLSH
 
 # 7) 시나리오 결정
+step "9/10" "오늘 요일 기준 실습 시나리오 프로필을 결정합니다"
 DAY=$(date +%u)
 PROFILE="day$DAY"
 [ "$DAY" -gt 5 ] && PROFILE="day1"
+echo "[install-lab] selected scenario profile: $PROFILE"
 
 # 8) Quadlet으로 컨테이너 systemd user unit 작성 및 실행
 # podman generate systemd는 deprecated라 새 설치에서는 Quadlet을 직접 사용한다.
+step "10/10" "Quadlet unit, 실습 컨테이너, 모델, 선택 도구를 준비합니다"
 mkdir -p /home/ubuntu/.LLMGoat/models /home/ubuntu/.LLMGoat/cache
 chown -R ubuntu:ubuntu /home/ubuntu/.LLMGoat
 if [ -f /home/ubuntu/.LLMGoat/models/gemma-2.gguf ]; then
@@ -153,6 +168,7 @@ if [ -f /home/ubuntu/.LLMGoat/models/gemma-2.gguf ]; then
 fi
 
 # Day 2 LLM03 Supply Chain — fake model-registry (port 8002)
+echo "[install-lab] preparing fake model registry files"
 mkdir -p /home/ubuntu/work/fake-registry
 if [ -s /home/ubuntu/work/fake-registry/server.py ]; then
   echo "[install-lab] fake-registry server.py already exists"
@@ -164,6 +180,7 @@ chown -R ubuntu:ubuntu /home/ubuntu/work/fake-registry
 QUADLET_DIR="/home/ubuntu/.config/containers/systemd"
 install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR"
 
+echo "[install-lab] writing Quadlet unit files under $QUADLET_DIR"
 cat > "$QUADLET_DIR/lab-ollama.container" <<'EOF'
 [Unit]
 Description=OWASP LLM Lab - Ollama
@@ -293,6 +310,7 @@ chown -R ubuntu:ubuntu "$QUADLET_DIR"
 
 "${RUN_AS_UBUNTU[@]}" bash <<'QUADLETSH'
 set -euo pipefail
+echo "[install-lab] reloading systemd user units and starting missing lab services"
 units=(lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry)
 systemctl --user daemon-reload
 for unit in "${units[@]}"; do
@@ -307,8 +325,10 @@ done
 QUADLETSH
 
 # 9) Ollama 모델 pull 및 warm-up
+echo "[install-lab] checking Ollama readiness, model availability, and warm-up"
 "${RUN_AS_UBUNTU[@]}" bash <<OLLAMASH
 set -euo pipefail
+echo "[install-lab] waiting for lab-ollama API on localhost:11434"
 for i in \$(seq 1 60); do
   if curl -fs http://localhost:11434/api/tags >/dev/null 2>&1; then
     break
@@ -331,6 +351,7 @@ curl -s --max-time 120 http://localhost:11434/api/generate \
   -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}" >/dev/null 2>&1 || true
 echo "[install-lab] ollama warm-up done"
 
+echo "[install-lab] checking optional Day 4 embedding Python environment"
 if [ "$SKIP_EMBEDDING_VENV" = "true" ]; then
   echo "[install-lab] embedding-venv skipped by SKIP_EMBEDDING_VENV=true"
 else
