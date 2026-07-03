@@ -68,7 +68,20 @@ grep -q '^ubuntu:' /etc/subuid || echo "ubuntu:100000:65536" >> /etc/subuid
 grep -q '^ubuntu:' /etc/subgid || echo "ubuntu:100000:65536" >> /etc/subgid
 loginctl enable-linger ubuntu
 UBUNTU_UID=$(id -u ubuntu)
-systemctl start "user@$UBUNTU_UID.service" || true
+systemctl start "user@$UBUNTU_UID.service"
+for _ in $(seq 1 20); do
+  [ -S "/run/user/$UBUNTU_UID/bus" ] && break
+  sleep 1
+done
+[ -S "/run/user/$UBUNTU_UID/bus" ] || {
+  echo "ERROR: ubuntu systemd user bus is not ready at /run/user/$UBUNTU_UID/bus" >&2
+  exit 1
+}
+UBUNTU_USER_ENV=(
+  XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID"
+  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$UBUNTU_UID/bus"
+)
+RUN_AS_UBUNTU=(runuser -u ubuntu -- env "${UBUNTU_USER_ENV[@]}")
 
 # CDI 모드 nvidia
 nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml || \
@@ -78,15 +91,21 @@ nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml || \
 install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/ollama-models
 
 # 6) 컨테이너 이미지 pull
-runuser -u ubuntu -- bash <<PULLSH
+"${RUN_AS_UBUNTU[@]}" bash <<PULLSH
 set -euo pipefail
 for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-llmgoat owasp-llm-dvla; do
+  pulled=false
   for i in \$(seq 1 3); do
     if podman pull "docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
+      pulled=true
       break
     fi
     echo "  retry \$i/3..."; sleep 5
   done
+  if [ "\$pulled" != true ]; then
+    echo "ERROR: failed to pull docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}" >&2
+    exit 1
+  fi
 done
 PULLSH
 
@@ -131,8 +150,8 @@ EOF
 cat > "$QUADLET_DIR/lab-vuln-rag.container" <<EOF
 [Unit]
 Description=OWASP LLM Lab - Vulnerable RAG
-After=lab-ollama.service
-Requires=lab-ollama.service
+After=lab-ollama.container
+Requires=lab-ollama.container
 
 [Container]
 ContainerName=lab-vuln-rag
@@ -152,8 +171,8 @@ EOF
 cat > "$QUADLET_DIR/lab-vuln-agent.container" <<EOF
 [Unit]
 Description=OWASP LLM Lab - Vulnerable Agent
-After=lab-ollama.service
-Requires=lab-ollama.service
+After=lab-ollama.container
+Requires=lab-ollama.container
 
 [Container]
 ContainerName=lab-vuln-agent
@@ -196,8 +215,8 @@ EOF
 cat > "$QUADLET_DIR/lab-dvla.container" <<EOF
 [Unit]
 Description=OWASP LLM Lab - Damn Vulnerable LLM Agent
-After=lab-ollama.service
-Requires=lab-ollama.service
+After=lab-ollama.container
+Requires=lab-ollama.container
 
 [Container]
 ContainerName=lab-dvla
@@ -233,7 +252,7 @@ EOF
 
 chown -R ubuntu:ubuntu "$QUADLET_DIR"
 
-runuser -u ubuntu -- env XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID" bash <<'QUADLETSH'
+"${RUN_AS_UBUNTU[@]}" bash <<'QUADLETSH'
 set -euo pipefail
 units=(lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry)
 for unit in "${units[@]}"; do
@@ -250,7 +269,7 @@ done
 QUADLETSH
 
 # 9) Ollama 모델 pull 및 warm-up
-runuser -u ubuntu -- bash <<OLLAMASH
+"${RUN_AS_UBUNTU[@]}" bash <<OLLAMASH
 set -euo pipefail
 for i in \$(seq 1 60); do
   if curl -fs http://localhost:11434/api/tags >/dev/null 2>&1; then
