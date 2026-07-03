@@ -177,6 +177,17 @@ else
 fi
 chown -R ubuntu:ubuntu /home/ubuntu/work/fake-registry
 
+# Day 3 LLM06 — DVLA must use the same Ollama model pulled by this lab.
+echo "[install-lab] preparing DVLA LiteLLM model config"
+mkdir -p /home/ubuntu/work/dvla
+cat > /home/ubuntu/work/dvla/llm-config.yaml <<EOF
+default_model: ollama-local-llama3
+models:
+  - model_name: ollama-local-llama3
+    model: "ollama/$OLLAMA_MODEL"
+EOF
+chown -R ubuntu:ubuntu /home/ubuntu/work/dvla
+
 QUADLET_DIR="/home/ubuntu/.config/containers/systemd"
 install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR"
 
@@ -280,6 +291,7 @@ Network=host
 Environment=OLLAMA_HOST=http://localhost:11434
 Environment=OLLAMA_API_BASE=http://localhost:11434
 Environment=model_name=ollama-local-llama3
+Volume=/home/ubuntu/work/dvla/llm-config.yaml:/app/llm-config.yaml:Z
 
 [Service]
 Restart=always
@@ -315,7 +327,10 @@ units=(lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-regi
 systemctl --user daemon-reload
 for unit in "${units[@]}"; do
   systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
-  if systemctl --user is-active --quiet "$unit.service"; then
+  if [ "$unit" = "lab-dvla" ] && systemctl --user is-active --quiet "$unit.service"; then
+    echo "[install-lab] restarting $unit.service to apply DVLA model config"
+    systemctl --user restart "$unit.service"
+  elif systemctl --user is-active --quiet "$unit.service"; then
     echo "[install-lab] $unit.service already running"
   else
     podman rm -f "$unit" >/dev/null 2>&1 || true
