@@ -16,7 +16,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
-exec > >(tee -a "$LOG_FILE" >(logger -t owasp-llm-install)) 2>&1
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
