@@ -13,7 +13,7 @@ course_id = "owasp-llm-2026"
 # 수강생 ID 목록 (소문자/숫자/하이픈만, 2~30자)
 # 학생 개인 계정에서는 본인 ID 하나만 둔다.
 student_ids = [
-  "yourname",
+  "cslab00",
 ]
 
 # 강의 일자 (연속 5일 가정)
@@ -33,22 +33,15 @@ course_dates = [
 #   ami_owner_id     = "self"
 #   ami_name_pattern = "owasp-llm-lab-*"
 
-# 기본값은 수강생이 SSM 접속 후 직접 설치하는 방식이다.
-# 자동 설치가 필요한 운영에서는 true로 변경한다.
-enable_user_data_bootstrap = false
-
-# fork/브랜치 실습을 운영할 때만 변경한다.
-# lab_setup_repo_raw_url = "https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main"
-
 # 실습 웹 포트 직접 접속 허용 CIDR.
 # 기본 권장: SSM 포트포워딩만 사용하려면 127.0.0.1/32 그대로 둔다.
 # 브라우저 직접 접속이 꼭 필요할 때만 본인 공인 IP/32로 바꾼다.
-allowed_ingress_cidr = "127.0.0.1/32"
+allowed_ingress_cidr = "59.17.6.188/32"
 
 # 비용 알람. 금액은 강사가 공지한 최신 비용 기준으로 조정한다.
 daily_budget_usd  = 20
 course_budget_usd = 120
-alert_email       = "student@example.com"
+alert_email       = "ilsunchoi@cloudsecuritylab.co.kr"
 
 # 기본값 사용 가능 (필요시만 override)
 # instance_type    = "g6.xlarge"
