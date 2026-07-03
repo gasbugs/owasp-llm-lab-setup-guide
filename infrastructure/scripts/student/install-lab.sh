@@ -237,14 +237,15 @@ runuser -u ubuntu -- env XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID" bash <<'QUADLET
 set -euo pipefail
 units=(lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry)
 for unit in "${units[@]}"; do
-  systemctl --user disable --now "$unit.service" >/dev/null 2>&1 || true
+  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
 done
 for container in "${units[@]}"; do
   podman rm -f "$container" >/dev/null 2>&1 || true
 done
 systemctl --user daemon-reload
 for unit in "${units[@]}"; do
-  systemctl --user enable --now "$unit.service"
+  systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
+  systemctl --user start "$unit.service"
 done
 QUADLETSH
 
