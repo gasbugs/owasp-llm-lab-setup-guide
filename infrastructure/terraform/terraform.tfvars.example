@@ -33,6 +33,13 @@ course_dates = [
 #   ami_owner_id     = "self"
 #   ami_name_pattern = "owasp-llm-lab-*"
 
+# 기본값은 수강생이 SSM 접속 후 직접 설치하는 방식이다.
+# 자동 설치가 필요한 운영에서는 true로 변경한다.
+enable_user_data_bootstrap = false
+
+# fork/브랜치 실습을 운영할 때만 변경한다.
+# lab_setup_repo_raw_url = "https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main"
+
 # 실습 웹 포트 직접 접속 허용 CIDR.
 # 기본 권장: SSM 포트포워딩만 사용하려면 127.0.0.1/32 그대로 둔다.
 # 브라우저 직접 접속이 꼭 필요할 때만 본인 공인 IP/32로 바꾼다.

@@ -37,7 +37,7 @@ resource "aws_iam_role_policy_attachment" "student_ssm" {
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# CloudWatch Logs — user_data 출력 로깅용
+# CloudWatch Logs — SSM Agent와 선택적 bootstrap 로그용
 resource "aws_iam_role_policy" "student_logs" {
   for_each = toset(var.student_ids)
   name     = "cloudwatch-logs"

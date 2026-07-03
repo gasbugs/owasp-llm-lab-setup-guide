@@ -74,6 +74,9 @@ course_dates = [
 
 allowed_ingress_cidr = "127.0.0.1/32"
 
+# 기본값은 수동 설치입니다.
+enable_user_data_bootstrap = false
+
 daily_budget_usd  = 20
 course_budget_usd = 120
 alert_email       = "your@email.com"
@@ -87,13 +90,32 @@ terraform plan
 terraform apply -auto-approve
 ```
 
-성공하면 `ami_id`, `ami_name`, `instance_ids`, `public_ips`, `start_commands`, `stop_commands`, `ssm_session_commands`가 출력됩니다.
+성공하면 `ami_id`, `ami_name`, `instance_ids`, `public_ips`, `manual_install_commands`, `start_commands`, `stop_commands`, `ssm_session_commands`가 출력됩니다.
 
-## 6. 앱 배포는 언제 되나요?
+## 6. SSM 접속
 
-EC2 최초 부팅 시 Terraform의 `user_data`가 자동 실행됩니다.
+기본값에서는 EC2만 생성되고 실습 앱은 아직 설치되지 않습니다. 먼저 SSM으로 인스턴스에 접속합니다.
 
-자동으로 수행되는 작업은 다음과 같습니다.
+저장소 루트에서 실행합니다.
+
+```bash
+export STUDENT=yourname
+export INSTANCE_ID=$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT="$STUDENT" \
+  bash infrastructure/scripts/student/instance-id.sh)
+
+aws ssm start-session --profile owasp-llm --region us-east-1 \
+  --target "$INSTANCE_ID"
+```
+
+## 7. 실습 앱 직접 설치
+
+SSM 세션 안에서 아래 명령을 실행합니다. Terraform output의 `manual_install_commands`에 같은 명령이 표시됩니다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/install-lab.sh | sudo bash
+```
+
+설치 중 수행되는 작업은 다음과 같습니다.
 
 - Podman 설치
 - NVIDIA CDI 설정
@@ -107,17 +129,12 @@ EC2 최초 부팅 시 Terraform의 `user_data`가 자동 실행됩니다.
 - EC2 start 후 자동 재시작을 위한 systemd user unit 등록
 - 4시간 후 자동 stop 안전망 등록
 
-## 7. SSM 접속
+설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
 
-저장소 루트에서 실행합니다.
+자동 설치가 필요한 경우에는 `terraform.tfvars`에 아래 값을 넣은 뒤 새 인스턴스를 만들면 됩니다.
 
-```bash
-export STUDENT=yourname
-export INSTANCE_ID=$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT="$STUDENT" \
-  bash infrastructure/scripts/student/instance-id.sh)
-
-aws ssm start-session --profile owasp-llm --region us-east-1 \
-  --target "$INSTANCE_ID"
+```hcl
+enable_user_data_bootstrap = true
 ```
 
 ## 8. 컨테이너 상태 확인

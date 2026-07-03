@@ -45,7 +45,7 @@ aws ssm describe-instance-information \
 SSM 접속 후:
 
 ```bash
-sudo tail -n 200 /var/log/user-data.log
+sudo tail -n 200 /var/log/owasp-llm-lab-install.log
 sudo -u ubuntu podman ps -a
 sudo -u ubuntu podman logs lab-ollama --tail 100
 sudo -u ubuntu podman logs lab-vuln-rag --tail 100
@@ -57,6 +57,7 @@ sudo -u ubuntu podman logs lab-vuln-rag --tail 100
 - Ollama 모델 pull이 오래 걸림
 - GPU CDI 파일 누락
 - 디스크 공간 부족
+- 아직 `install-lab.sh`를 실행하지 않음
 
 ## GPU 인식 실패
 
@@ -96,4 +97,3 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 cd infrastructure/terraform
 terraform destroy
 ```
-

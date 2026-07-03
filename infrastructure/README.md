@@ -16,7 +16,7 @@
 | 경로 | 용도 |
 |---|---|
 | `terraform/` | VPC, 보안 그룹, EC2, IAM instance profile, Budget 알람 |
-| `scripts/student/` | 학생용 preflight, instance-id, start/stop 및 작업물 보존 안내 헬퍼 |
+| `scripts/student/` | 학생용 preflight, 수동 설치, instance-id, start/stop 및 작업물 보존 안내 헬퍼 |
 
 ## 학생 기본 절차
 
@@ -25,10 +25,23 @@ cd infrastructure/terraform
 cp terraform.tfvars.example terraform.tfvars
 # terraform.tfvars에서 student_ids, region, alert_email을 강사 공지 기준으로 수정
 # AMI는 기존 검증 계열의 최신 DLAMI를 data source로 자동 조회
+# 기본값은 user-data 자동 설치 비활성화. SSM 접속 후 install-lab.sh를 직접 실행
 # allowed_ingress_cidr는 기본 127.0.0.1/32 유지. 직접 접속이 필요할 때만 본인 IP/32로 변경
 terraform init
 terraform plan
 terraform apply -auto-approve
+```
+
+Terraform 적용 후 EC2 안에서 설치를 직접 수행한다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/install-lab.sh | sudo bash
+```
+
+강사 운영상 자동 설치가 필요할 때만 `terraform.tfvars`에 아래 값을 추가한다.
+
+```hcl
+enable_user_data_bootstrap = true
 ```
 
 이후 매일 시작/종료는 저장소 루트에서 실행한다.

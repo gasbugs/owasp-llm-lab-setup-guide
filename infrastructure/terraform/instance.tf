@@ -6,7 +6,8 @@
 #   - 학생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF
 #   - Stop 시 EC2 시간당 요금 0. EBS 디스크 비용만 발생 (gp3 100GB = ~$8/월)
 #   - terminate 안 하므로 EBS·작업물 그대로 보존. 다음 start 시 어제 상태 그대로
-#   - user-data는 *최초 부팅 1회만* 실행. 이후 start는 컨테이너 systemd로 자동 시작
+#   - 기본값은 수동 설치. 필요 시 user-data 자동 설치를 명시적으로 켤 수 있음
+#   - 설치 후에는 컨테이너 systemd unit으로 다음 start 시 자동 시작
 #
 # 작업물 추가 보존 (선택):
 #   학생이 개인 GitHub 작업 repo에 push로 강의 종료 후에도 보존.
@@ -14,9 +15,7 @@
 
 locals {
   user_data = templatefile("${path.module}/user-data.sh.tpl", {
-    region                   = var.region
-    course_id                = var.course_id
-    fake_registry_server_b64 = filebase64("${path.module}/../fake-registry/server.py")
+    lab_setup_repo_raw_url = var.lab_setup_repo_raw_url
   })
 }
 
@@ -76,7 +75,7 @@ resource "aws_instance" "student" {
 
   monitoring = true
 
-  user_data                   = local.user_data
+  user_data                   = var.enable_user_data_bootstrap ? local.user_data : null
   user_data_replace_on_change = false # user-data 변경해도 인스턴스 재생성 X (학생 데이터 보존)
 
   tags = {

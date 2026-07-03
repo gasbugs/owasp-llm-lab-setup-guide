@@ -36,6 +36,13 @@ output "lab_urls" {
   }
 }
 
+output "manual_install_commands" {
+  description = "SSM 접속 후 EC2 안에서 실행하는 수동 실습 환경 설치 명령"
+  value = {
+    for id in var.student_ids : id => "curl -fsSL ${var.lab_setup_repo_raw_url}/infrastructure/scripts/student/install-lab.sh | sudo bash"
+  }
+}
+
 output "start_commands" {
   description = "학생이 본인 인스턴스 시작하는 명령"
   value = {

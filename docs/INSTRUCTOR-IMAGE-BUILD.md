@@ -39,5 +39,4 @@ sudo -u ubuntu podman images | grep owasp-llm
 
 - 이미지는 의도적으로 취약한 실습 앱입니다.
 - public registry에 올릴 경우 이미지 설명에 교육용 취약 앱임을 명시하세요.
-- 강의 중 사용하는 namespace와 `user-data.sh.tpl`의 image URL이 일치해야 합니다.
-
+- 강의 중 사용하는 namespace와 `install-lab.sh` 실행 시의 `IMAGE_NAMESPACE` 값이 일치해야 합니다.

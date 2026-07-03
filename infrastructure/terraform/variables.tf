@@ -45,6 +45,22 @@ variable "course_dates" {
   }
 }
 
+variable "enable_user_data_bootstrap" {
+  description = "true이면 EC2 최초 부팅 시 install-lab.sh를 user-data로 자동 실행한다. 기본값 false는 수강생이 SSM 접속 후 직접 설치 절차를 수행하는 방식이다."
+  type        = bool
+  default     = false
+}
+
+variable "lab_setup_repo_raw_url" {
+  description = "install-lab.sh와 fake-registry/server.py를 내려받을 GitHub raw URL prefix. fork나 특정 브랜치를 쓰는 경우 override한다."
+  type        = string
+  default     = "https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main"
+  validation {
+    condition     = can(regex("^https://", var.lab_setup_repo_raw_url))
+    error_message = "lab_setup_repo_raw_url은 https:// 로 시작해야 합니다."
+  }
+}
+
 variable "ami_name_pattern" {
   description = "EC2 base AMI name pattern. 기본값은 기존 검증 계열인 Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 Ubuntu 24.04 최신 이미지를 조회한다."
   type        = string
