@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.3"
+SCRIPT_VERSION="0.1.4"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -427,7 +427,9 @@ if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" 
   if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_COMPAT_MODEL"; then
     echo "[install-lab] $OLLAMA_COMPAT_MODEL compatibility alias already available"
   else
-    printf 'FROM %s\n' "$OLLAMA_MODEL" | podman exec -i lab-ollama ollama create "$OLLAMA_COMPAT_MODEL" -f -
+    printf 'FROM %s\n' "$OLLAMA_MODEL" | podman exec -i lab-ollama sh -c 'cat > /tmp/Modelfile.compat'
+    podman exec lab-ollama ollama create "$OLLAMA_COMPAT_MODEL" -f /tmp/Modelfile.compat
+    podman exec lab-ollama rm -f /tmp/Modelfile.compat
     echo "[install-lab] created $OLLAMA_COMPAT_MODEL compatibility alias for DVLA"
   fi
 fi
