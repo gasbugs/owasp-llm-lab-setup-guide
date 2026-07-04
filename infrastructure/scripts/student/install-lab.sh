@@ -153,7 +153,6 @@ done
 PULLSH
 
 # 7) 시나리오 결정
-step "9/10" "요일과 무관하게 모든 실습 시나리오를 동시에 실행하도록 준비합니다"
 echo "[install-lab] enabled scenarios: day1 day2 day3 day4 day5"
 
 # 8) Quadlet으로 컨테이너 systemd user unit 작성 및 실행

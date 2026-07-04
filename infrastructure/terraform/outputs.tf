@@ -27,8 +27,13 @@ output "lab_urls" {
   description = "선택적 public IP 직접 접속 URL. 기본 allowed_ingress_cidr=127.0.0.1/32 상태에서는 열리지 않으며, 본인 IP/32로 제한했을 때만 사용."
   value = {
     for id in var.student_ids : id => {
-      vuln_rag      = "http://${aws_instance.student[id].public_ip}:8000"
+      day1_vuln_rag = "http://${aws_instance.student[id].public_ip}:8000"
+      day2_vuln_rag = "http://${aws_instance.student[id].public_ip}:8010"
+      day3_vuln_rag = "http://${aws_instance.student[id].public_ip}:8011"
+      day4_vuln_rag = "http://${aws_instance.student[id].public_ip}:8012"
+      day5_vuln_rag = "http://${aws_instance.student[id].public_ip}:8013"
       vuln_agent    = "http://${aws_instance.student[id].public_ip}:8001"
+      fake_registry = "http://${aws_instance.student[id].public_ip}:8002/api/v1/models"
       llmgoat       = "http://${aws_instance.student[id].public_ip}:5000"
       dvla          = "http://${aws_instance.student[id].public_ip}:8501"
       ollama_models = "http://${aws_instance.student[id].public_ip}:11434/api/tags"
