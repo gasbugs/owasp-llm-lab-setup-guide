@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.0"
+SCRIPT_VERSION="0.1.1"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -152,7 +152,11 @@ for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-
 done
 PULLSH
 
-# 7) Quadlet으로 컨테이너 systemd user unit 작성 및 실행
+# 7) 시나리오 결정
+step "9/10" "요일과 무관하게 모든 실습 시나리오를 동시에 실행하도록 준비합니다"
+echo "[install-lab] enabled scenarios: day1 day2 day3 day4 day5"
+
+# 8) Quadlet으로 컨테이너 systemd user unit 작성 및 실행
 # podman generate systemd는 deprecated라 새 설치에서는 Quadlet을 직접 사용한다.
 step "9/10" "Quadlet unit, 모든 실습 컨테이너, 모델, 선택 도구를 준비합니다"
 mkdir -p /home/ubuntu/.LLMGoat/models /home/ubuntu/.LLMGoat/cache
@@ -190,6 +194,21 @@ QUADLET_DIR="/home/ubuntu/.config/containers/systemd"
 install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR"
 
 echo "[install-lab] writing Quadlet unit files under $QUADLET_DIR"
+
+echo "[install-lab] removing legacy single-day unit files and containers if they exist"
+rm -f "$QUADLET_DIR/lab-vuln-rag.container"
+rm -f "$QUADLET_DIR/lab-vuln-agent.container"
+rm -f "$QUADLET_DIR/lab-dvla.container"
+rm -f "$QUADLET_DIR/lab-fake-registry.container"
+"${RUN_AS_UBUNTU[@]}" bash <<'LEGACYSH'
+set -euo pipefail
+for unit in lab-vuln-rag lab-vuln-agent lab-dvla lab-fake-registry; do
+  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
+  systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
+  podman rm -f "$unit" >/dev/null 2>&1 || true
+done
+LEGACYSH
+
 cat > "$QUADLET_DIR/lab-ollama.container" <<'EOF'
 [Unit]
 Description=OWASP LLM Lab - Ollama
@@ -210,19 +229,31 @@ Restart=always
 WantedBy=default.target
 EOF
 
-cat > "$QUADLET_DIR/lab-vuln-rag.container" <<EOF
+declare -A RAG_PORTS=(
+  [day1]=8000
+  [day2]=8010
+  [day3]=8011
+  [day4]=8012
+  [day5]=8013
+)
+
+for scenario in day1 day2 day3 day4 day5; do
+  rag_port="${RAG_PORTS[$scenario]}"
+  cat > "$QUADLET_DIR/lab-${scenario}-vuln-rag.container" <<EOF
 [Unit]
-Description=OWASP LLM Lab - Vulnerable RAG
+Description=OWASP LLM Lab - ${scenario} Vulnerable RAG
 After=lab-ollama.container
 Requires=lab-ollama.container
 
 [Container]
-ContainerName=lab-vuln-rag
+ContainerName=lab-${scenario}-vuln-rag
 Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}
 Network=host
-Environment=DEFAULT_SCENARIO=day1
+Environment=DEFAULT_SCENARIO=${scenario}
+Environment=SCENARIO=${scenario}
 Environment=OLLAMA_URL=http://localhost:11434
 Environment=OLLAMA_MODEL=$OLLAMA_MODEL
+Exec=uv run uvicorn app.main:app --host 0.0.0.0 --port ${rag_port}
 
 [Service]
 Restart=always
@@ -230,15 +261,16 @@ Restart=always
 [Install]
 WantedBy=default.target
 EOF
+done
 
-cat > "$QUADLET_DIR/lab-vuln-agent.container" <<EOF
+cat > "$QUADLET_DIR/lab-day3-vuln-agent.container" <<EOF
 [Unit]
-Description=OWASP LLM Lab - Vulnerable Agent
+Description=OWASP LLM Lab - day3 Vulnerable Agent
 After=lab-ollama.container
 Requires=lab-ollama.container
 
 [Container]
-ContainerName=lab-vuln-agent
+ContainerName=lab-day3-vuln-agent
 Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-agent:${IMAGE_TAG}
 Network=host
 Environment=OLLAMA_URL=http://localhost:11434
@@ -276,14 +308,14 @@ Restart=always
 WantedBy=default.target
 EOF
 
-cat > "$QUADLET_DIR/lab-dvla.container" <<EOF
+cat > "$QUADLET_DIR/lab-day3-dvla.container" <<EOF
 [Unit]
-Description=OWASP LLM Lab - Damn Vulnerable LLM Agent
+Description=OWASP LLM Lab - day3 Damn Vulnerable LLM Agent
 After=lab-ollama.container
 Requires=lab-ollama.container
 
 [Container]
-ContainerName=lab-dvla
+ContainerName=lab-day3-dvla
 Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-dvla:${IMAGE_TAG}
 Network=host
 Environment=OLLAMA_HOST=http://localhost:11434
@@ -298,12 +330,12 @@ Restart=always
 WantedBy=default.target
 EOF
 
-cat > "$QUADLET_DIR/lab-fake-registry.container" <<'EOF'
+cat > "$QUADLET_DIR/lab-day2-fake-registry.container" <<'EOF'
 [Unit]
-Description=OWASP LLM Lab - Fake Model Registry
+Description=OWASP LLM Lab - day2 Fake Model Registry
 
 [Container]
-ContainerName=lab-fake-registry
+ContainerName=lab-day2-fake-registry
 Image=docker.io/library/python:3.12-slim
 Network=host
 Volume=/home/ubuntu/work/fake-registry:/app:Z
@@ -321,11 +353,22 @@ chown -R ubuntu:ubuntu "$QUADLET_DIR"
 "${RUN_AS_UBUNTU[@]}" bash <<'QUADLETSH'
 set -euo pipefail
 echo "[install-lab] reloading systemd user units and starting missing lab services"
-units=(lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry)
+units=(
+  lab-ollama
+  lab-day1-vuln-rag
+  lab-day2-vuln-rag
+  lab-day3-vuln-rag
+  lab-day4-vuln-rag
+  lab-day5-vuln-rag
+  lab-day3-vuln-agent
+  lab-llmgoat
+  lab-day3-dvla
+  lab-day2-fake-registry
+)
 systemctl --user daemon-reload
 for unit in "${units[@]}"; do
   systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
-  if [ "$unit" = "lab-dvla" ] && systemctl --user is-active --quiet "$unit.service"; then
+  if [ "$unit" = "lab-day3-dvla" ] && systemctl --user is-active --quiet "$unit.service"; then
     echo "[install-lab] restarting $unit.service to apply DVLA model config"
     systemctl --user restart "$unit.service"
   elif systemctl --user is-active --quiet "$unit.service"; then
@@ -416,19 +459,31 @@ OWASP LLM Lab 설치가 완료되었습니다.
   - Ollama API            11434
     로컬 LLM 모델 목록 확인과 generate API 호출에 사용합니다.
 
-  - Vulnerable RAG        8000
-    프롬프트 인젝션, 민감정보 노출, RAG/임베딩 취약점 실습 앱입니다.
+  - Day 1 Vulnerable RAG  8000
+    LLM01/LLM02 계열 프롬프트 인젝션과 민감정보 노출 실습 앱입니다.
 
-  - Vulnerable Agent      8001
+  - Day 2 Vulnerable RAG  8010
+    LLM03 공급망/모델 무결성 시나리오와 연결되는 RAG 실습 앱입니다.
+
+  - Day 3 Vulnerable RAG  8011
+    Agent/도구 호출 취약점과 비교하기 위한 RAG 실습 앱입니다.
+
+  - Day 4 Vulnerable RAG  8012
+    LLM08 벡터/임베딩과 RAG 데이터 오염 실습 앱입니다.
+
+  - Day 5 Vulnerable RAG  8013
+    방어/가드레일 우회와 로깅/모니터링 실습 앱입니다.
+
+  - Day 3 Vulnerable Agent 8001
     도구 호출형 LLM Agent의 excessive agency, tool misuse 실습 앱입니다.
 
-  - Fake Model Registry   8002
+  - Day 2 Fake Model Registry 8002
     모델 공급망/무결성 검증 실습용 가짜 모델 레지스트리 API입니다.
 
   - LLMGoat               5000
     OWASP Top 10 for LLM 항목별 웹 챌린지 실습 UI입니다.
 
-  - DVLA                  8501
+  - Day 3 DVLA            8501
     Damn Vulnerable LLM Agent. ReAct Agent prompt injection 실습 UI입니다.
 
 브라우저 접속 URL:
@@ -437,19 +492,31 @@ OWASP LLM Lab 설치가 완료되었습니다.
   Ollama 모델 목록:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:11434/api/tags
 
-  Vulnerable RAG health check:
+  Day 1 Vulnerable RAG health check:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8000/healthz
 
-  Vulnerable Agent health check:
+  Day 2 Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8010/healthz
+
+  Day 3 Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8011/healthz
+
+  Day 4 Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8012/healthz
+
+  Day 5 Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8013/healthz
+
+  Day 3 Vulnerable Agent health check:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8001/healthz
 
-  Fake Model Registry model list:
+  Day 2 Fake Model Registry model list:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8002/api/v1/models
 
   LLMGoat web UI:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:5000
 
-  DVLA web UI:
+  Day 3 DVLA web UI:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8501
 
 터미널 검증 명령:
@@ -467,6 +534,10 @@ OWASP LLM Lab 설치가 완료되었습니다.
   # API 응답 확인
   curl -fsS http://\$EC2_DOMAIN:11434/api/tags | jq
   curl -fsS http://\$EC2_DOMAIN:8000/healthz
+  curl -fsS http://\$EC2_DOMAIN:8010/healthz
+  curl -fsS http://\$EC2_DOMAIN:8011/healthz
+  curl -fsS http://\$EC2_DOMAIN:8012/healthz
+  curl -fsS http://\$EC2_DOMAIN:8013/healthz
   curl -fsS http://\$EC2_DOMAIN:8001/healthz
   curl -fsS http://\$EC2_DOMAIN:8002/api/v1/models | jq
 

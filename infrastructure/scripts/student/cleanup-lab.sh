@@ -39,7 +39,22 @@ if id ubuntu >/dev/null 2>&1; then
 
   runuser -u ubuntu -- env XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID" bash <<'CLEANSH'
 set -euo pipefail
-units=(lab-ollama lab-vuln-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry)
+units=(
+  lab-ollama
+  lab-day1-vuln-rag
+  lab-day2-vuln-rag
+  lab-day3-vuln-rag
+  lab-day4-vuln-rag
+  lab-day5-vuln-rag
+  lab-day3-vuln-agent
+  lab-llmgoat
+  lab-day3-dvla
+  lab-day2-fake-registry
+  lab-vuln-rag
+  lab-vuln-agent
+  lab-dvla
+  lab-fake-registry
+)
 for unit in "${units[@]}"; do
   systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
   systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
@@ -51,6 +66,14 @@ systemctl --user daemon-reload || true
 CLEANSH
 
   rm -f /home/ubuntu/.config/containers/systemd/lab-ollama.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-day1-vuln-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-day2-vuln-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-day3-vuln-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-day4-vuln-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-day5-vuln-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-day3-vuln-agent.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-day3-dvla.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-day2-fake-registry.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-vuln-rag.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-vuln-agent.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-llmgoat.container

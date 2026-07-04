@@ -72,25 +72,9 @@ resource "aws_security_group" "student" {
   # 의도적으로 취약한 챗봇이므로 전체 인터넷에 열지 않는다.
   # 홍보 캡처·검증 시 운영자 현재 IP/32만 허용한다.
   ingress {
-    description = "lab-vuln-rag (8000)"
+    description = "lab day apps (8000-8013)"
     from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ingress_cidr]
-  }
-
-  ingress {
-    description = "lab-vuln-agent (8001)"
-    from_port   = 8001
-    to_port     = 8001
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ingress_cidr]
-  }
-
-  ingress {
-    description = "lab-fake-registry (8002)"
-    from_port   = 8002
-    to_port     = 8002
+    to_port     = 8013
     protocol    = "tcp"
     cidr_blocks = [var.allowed_ingress_cidr]
   }
