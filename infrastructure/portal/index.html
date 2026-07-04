@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OWASP LLM Lab Portal</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6fa;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #5d6878;
+      --line: #d9e0ea;
+      --accent: #0f766e;
+      --accent-dark: #0b5f58;
+      --accent-soft: #e3f3ef;
+      --warn: #9a3412;
+      --warn-soft: #fff0e5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    header {
+      background: #111827;
+      color: #ffffff;
+      border-bottom: 1px solid #273244;
+    }
+
+    .header-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 5px 10px;
+      border: 1px solid #3b475d;
+      border-radius: 6px;
+      color: #dce6f5;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 22px 24px 40px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .tab {
+      min-height: 38px;
+      padding: 8px 13px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .tab[aria-selected="true"] {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: #064e47;
+      font-weight: 680;
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      min-height: 196px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      min-height: 24px;
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: #eef2f7;
+      color: #394454;
+      font-size: 12px;
+    }
+
+    .tag.port {
+      background: var(--warn-soft);
+      color: var(--warn);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .desc {
+      flex: 1;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    a.button {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 11px;
+      border: 1px solid var(--accent-dark);
+      border-radius: 6px;
+      background: var(--accent);
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 620;
+    }
+
+    a.button.secondary {
+      background: #ffffff;
+      color: var(--accent);
+    }
+
+    @media (max-width: 920px) {
+      .header-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .badges {
+        justify-content: flex-start;
+      }
+
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 620px) {
+      .header-inner,
+      main {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tab {
+        flex: 1 1 calc(50% - 8px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div>
+        <h1>OWASP LLM Lab Portal</h1>
+        <p class="subtitle">Day별 실습과 보조 도구를 한 화면에서 엽니다.</p>
+      </div>
+      <div class="badges">
+        <span class="badge" id="host-badge">host</span>
+        <span class="badge">portal :8080</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <nav class="tabs" aria-label="Lab sections">
+      <button class="tab" type="button" data-tab="days" aria-selected="true">Day Labs</button>
+      <button class="tab" type="button" data-tab="tools" aria-selected="false">Tools</button>
+      <button class="tab" type="button" data-tab="checks" aria-selected="false">Checks</button>
+    </nav>
+
+    <section class="panel active" id="days">
+      <div class="grid" id="day-grid"></div>
+    </section>
+
+    <section class="panel" id="tools">
+      <div class="grid" id="tool-grid"></div>
+    </section>
+
+    <section class="panel" id="checks">
+      <div class="grid" id="check-grid"></div>
+    </section>
+  </main>
+
+  <script>
+    const host = window.location.hostname || "localhost";
+    document.getElementById("host-badge").textContent = host;
+
+    const url = (port, path = "/") => `${window.location.protocol}//${host}:${port}${path}`;
+
+    const dayLabs = [
+      {
+        title: "Day 1 Vulnerable RAG",
+        port: 8000,
+        href: url(8000),
+        health: url(8000, "/healthz"),
+        tags: ["LLM01", "LLM02", "RAG"],
+        desc: "프롬프트 인젝션과 민감정보 노출을 RAG 챗봇에서 확인합니다."
+      },
+      {
+        title: "Day 2 Vulnerable RAG",
+        port: 8010,
+        href: url(8010),
+        health: url(8010, "/healthz"),
+        tags: ["LLM03", "Supply Chain", "RAG"],
+        desc: "모델 공급망과 무결성 검증 시나리오를 RAG 흐름과 함께 다룹니다."
+      },
+      {
+        title: "Day 3 Vulnerable RAG",
+        port: 8011,
+        href: url(8011),
+        health: url(8011, "/healthz"),
+        tags: ["Agent", "Tools", "RAG"],
+        desc: "Agent 취약점 실습 전후로 비교할 수 있는 RAG 시나리오입니다."
+      },
+      {
+        title: "Day 4 Vulnerable RAG",
+        port: 8012,
+        href: url(8012),
+        health: url(8012, "/healthz"),
+        tags: ["LLM08", "Embedding", "Data"],
+        desc: "벡터/임베딩 기반 검색과 RAG 데이터 오염을 실습합니다."
+      },
+      {
+        title: "Day 5 Vulnerable RAG",
+        port: 8013,
+        href: url(8013),
+        health: url(8013, "/healthz"),
+        tags: ["Defense", "Guardrail", "Logging"],
+        desc: "방어, 가드레일 우회, 로깅/모니터링 흐름을 확인합니다."
+      }
+    ];
+
+    const tools = [
+      {
+        title: "Day 3 Vulnerable Agent",
+        port: 8001,
+        href: url(8001),
+        health: url(8001, "/healthz"),
+        tags: ["LLM06", "Agent", "Tool misuse"],
+        desc: "도구 호출형 Agent의 excessive agency와 tool misuse를 실습합니다."
+      },
+      {
+        title: "Day 2 Fake Model Registry",
+        port: 8002,
+        href: url(8002, "/api/v1/models"),
+        health: url(8002, "/api/v1/models"),
+        tags: ["LLM03", "Registry", "API"],
+        desc: "모델 공급망/무결성 검증용 가짜 모델 레지스트리 API입니다."
+      },
+      {
+        title: "LLMGoat",
+        port: 5000,
+        href: url(5000),
+        tags: ["Challenges", "Web UI"],
+        desc: "OWASP Top 10 for LLM 항목별 웹 챌린지 UI입니다."
+      },
+      {
+        title: "Day 3 DVLA",
+        port: 8501,
+        href: url(8501),
+        tags: ["ReAct", "Prompt Injection"],
+        desc: "Damn Vulnerable LLM Agent 기반 ReAct Agent prompt injection 실습 UI입니다."
+      },
+      {
+        title: "Ollama API",
+        port: 11434,
+        href: url(11434, "/api/tags"),
+        health: url(11434, "/api/tags"),
+        tags: ["Models", "API"],
+        desc: "로컬 LLM 모델 목록과 generate API 상태를 확인합니다."
+      }
+    ];
+
+    function renderCard(item) {
+      const tags = item.tags.map((tag) => `<span class="tag">${tag}</span>`).join("");
+      const health = item.health
+        ? `<a class="button secondary" href="${item.health}" target="_blank" rel="noreferrer">Health</a>`
+        : "";
+      return `
+        <article class="card">
+          <div>
+            <h2>${item.title}</h2>
+            <div class="tags">
+              <span class="tag port">:${item.port}</span>
+              ${tags}
+            </div>
+          </div>
+          <p class="desc">${item.desc}</p>
+          <div class="actions">
+            <a class="button" href="${item.href}" target="_blank" rel="noreferrer">Open</a>
+            ${health}
+          </div>
+        </article>
+      `;
+    }
+
+    document.getElementById("day-grid").innerHTML = dayLabs.map(renderCard).join("");
+    document.getElementById("tool-grid").innerHTML = tools.map(renderCard).join("");
+    document.getElementById("check-grid").innerHTML = [...dayLabs, ...tools]
+      .filter((item) => item.health)
+      .map(renderCard)
+      .join("");
+
+    for (const tab of document.querySelectorAll(".tab")) {
+      tab.addEventListener("click", () => {
+        const target = tab.dataset.tab;
+        for (const other of document.querySelectorAll(".tab")) {
+          other.setAttribute("aria-selected", String(other === tab));
+        }
+        for (const panel of document.querySelectorAll(".panel")) {
+          panel.classList.toggle("active", panel.id === target);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

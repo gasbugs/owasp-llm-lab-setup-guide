@@ -27,6 +27,7 @@ output "lab_urls" {
   description = "선택적 public IP 직접 접속 URL. 기본 allowed_ingress_cidr=127.0.0.1/32 상태에서는 열리지 않으며, 본인 IP/32로 제한했을 때만 사용."
   value = {
     for id in var.student_ids : id => {
+      portal        = "http://${aws_instance.student[id].public_ip}:8080"
       day1_vuln_rag = "http://${aws_instance.student[id].public_ip}:8000"
       day2_vuln_rag = "http://${aws_instance.student[id].public_ip}:8010"
       day3_vuln_rag = "http://${aws_instance.student[id].public_ip}:8011"

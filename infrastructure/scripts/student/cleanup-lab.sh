@@ -50,6 +50,7 @@ units=(
   lab-llmgoat
   lab-day3-dvla
   lab-day2-fake-registry
+  lab-portal
   lab-vuln-rag
   lab-vuln-agent
   lab-dvla
@@ -74,6 +75,7 @@ CLEANSH
   rm -f /home/ubuntu/.config/containers/systemd/lab-day3-vuln-agent.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-day3-dvla.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-day2-fake-registry.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-portal.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-vuln-rag.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-vuln-agent.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-llmgoat.container
@@ -87,6 +89,7 @@ CLEANSH
     rm -rf /home/ubuntu/ollama-models
     rm -rf /home/ubuntu/.LLMGoat
     rm -rf /home/ubuntu/work/fake-registry
+    rm -rf /home/ubuntu/work/portal
     rm -rf /home/ubuntu/work/embedding-venv
     install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/work
   else

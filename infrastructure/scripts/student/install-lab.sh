@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.1"
+SCRIPT_VERSION="0.1.2"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -178,6 +178,11 @@ else
 fi
 chown -R ubuntu:ubuntu /home/ubuntu/work/fake-registry
 
+echo "[install-lab] preparing lab portal files"
+mkdir -p /home/ubuntu/work/portal
+curl -fsSL "$RAW_URL/infrastructure/portal/index.html" -o /home/ubuntu/work/portal/index.html
+chown -R ubuntu:ubuntu /home/ubuntu/work/portal
+
 # Day 3 LLM06 — DVLA must use the same Ollama model pulled by this lab.
 echo "[install-lab] preparing DVLA LiteLLM model config"
 mkdir -p /home/ubuntu/work/dvla
@@ -199,9 +204,10 @@ rm -f "$QUADLET_DIR/lab-vuln-rag.container"
 rm -f "$QUADLET_DIR/lab-vuln-agent.container"
 rm -f "$QUADLET_DIR/lab-dvla.container"
 rm -f "$QUADLET_DIR/lab-fake-registry.container"
+rm -f "$QUADLET_DIR/lab-portal.container"
 "${RUN_AS_UBUNTU[@]}" bash <<'LEGACYSH'
 set -euo pipefail
-for unit in lab-vuln-rag lab-vuln-agent lab-dvla lab-fake-registry; do
+for unit in lab-vuln-rag lab-vuln-agent lab-dvla lab-fake-registry lab-portal; do
   systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
   systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
   podman rm -f "$unit" >/dev/null 2>&1 || true
@@ -347,6 +353,24 @@ Restart=always
 WantedBy=default.target
 EOF
 
+cat > "$QUADLET_DIR/lab-portal.container" <<'EOF'
+[Unit]
+Description=OWASP LLM Lab - Portal
+
+[Container]
+ContainerName=lab-portal
+Image=docker.io/library/python:3.12-slim
+Network=host
+Volume=/home/ubuntu/work/portal:/app:Z
+Exec=python -m http.server 8080 --directory /app
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
 chown -R ubuntu:ubuntu "$QUADLET_DIR"
 
 "${RUN_AS_UBUNTU[@]}" bash <<'QUADLETSH'
@@ -363,6 +387,7 @@ units=(
   lab-llmgoat
   lab-day3-dvla
   lab-day2-fake-registry
+  lab-portal
 )
 systemctl --user daemon-reload
 for unit in "${units[@]}"; do
@@ -455,6 +480,9 @@ OWASP LLM Lab 설치가 완료되었습니다.
   sudo -u ubuntu podman ps
 
 주요 서비스:
+  - Lab Portal            8080
+    모든 실습 앱으로 이동하는 단일 진입점입니다.
+
   - Ollama API            11434
     로컬 LLM 모델 목록 확인과 generate API 호출에 사용합니다.
 
@@ -487,6 +515,9 @@ OWASP LLM Lab 설치가 완료되었습니다.
 
 브라우저 접속 URL:
   export EC2_DOMAIN=${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}
+
+  Lab Portal:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8080
 
   Ollama 모델 목록:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:11434/api/tags
@@ -531,6 +562,7 @@ OWASP LLM Lab 설치가 완료되었습니다.
     }' | jq
 
   # API 응답 확인
+  curl -fsS http://\$EC2_DOMAIN:8080/ >/dev/null
   curl -fsS http://\$EC2_DOMAIN:11434/api/tags | jq
   curl -fsS http://\$EC2_DOMAIN:8000/healthz
   curl -fsS http://\$EC2_DOMAIN:8010/healthz
