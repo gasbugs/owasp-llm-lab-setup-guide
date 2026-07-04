@@ -7,16 +7,22 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f6fa;
+      --bg: #f5f7fb;
       --panel: #ffffff;
-      --text: #172033;
-      --muted: #5d6878;
-      --line: #d9e0ea;
+      --text: #182235;
+      --muted: #5b6678;
+      --line: #d8e0ea;
+      --head: #101827;
       --accent: #0f766e;
       --accent-dark: #0b5f58;
-      --accent-soft: #e3f3ef;
-      --warn: #9a3412;
-      --warn-soft: #fff0e5;
+      --accent-soft: #e2f3ef;
+      --ok: #15803d;
+      --ok-soft: #e8f7ee;
+      --bad: #b42318;
+      --bad-soft: #feeceb;
+      --wait: #8a5a00;
+      --wait-soft: #fff5d6;
+      --chip: #eef2f7;
     }
 
     * {
@@ -32,18 +38,18 @@
     }
 
     header {
-      background: #111827;
+      background: var(--head);
       color: #ffffff;
-      border-bottom: 1px solid #273244;
+      border-bottom: 1px solid #293346;
     }
 
     .header-inner {
-      max-width: 1180px;
+      max-width: 1220px;
       margin: 0 auto;
       padding: 24px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
       gap: 20px;
     }
 
@@ -60,17 +66,23 @@
       font-size: 14px;
     }
 
-    .badges {
+    .badges,
+    .status-row,
+    .tags,
+    .actions {
       display: flex;
-      gap: 8px;
       flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .badges {
       justify-content: flex-end;
     }
 
     .badge {
+      min-height: 30px;
       display: inline-flex;
       align-items: center;
-      min-height: 30px;
       padding: 5px 10px;
       border: 1px solid #3b475d;
       border-radius: 6px;
@@ -80,103 +92,56 @@
     }
 
     main {
-      max-width: 1180px;
+      max-width: 1220px;
       margin: 0 auto;
-      padding: 22px 24px 40px;
+      padding: 22px 24px 42px;
     }
 
-    .tabs {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
       margin-bottom: 18px;
     }
 
-    .tab {
-      min-height: 38px;
-      padding: 8px 13px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: var(--panel);
-      color: var(--text);
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    .tab[aria-selected="true"] {
-      border-color: var(--accent);
-      background: var(--accent-soft);
-      color: #064e47;
-      font-weight: 680;
-    }
-
-    .panel {
-      display: none;
-    }
-
-    .panel.active {
-      display: block;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .card {
-      min-height: 196px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    .metric {
+      min-height: 88px;
+      padding: 15px;
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
     }
 
-    .card h2 {
-      margin: 0 0 8px;
-      font-size: 17px;
-      letter-spacing: 0;
+    .metric strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 24px;
+      line-height: 1.1;
     }
 
-    .tags {
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .toolbar {
+      margin-bottom: 18px;
+      padding: 12px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .tag {
-      min-height: 24px;
-      display: inline-flex;
+      justify-content: space-between;
+      gap: 12px;
       align-items: center;
-      padding: 3px 8px;
-      border-radius: 5px;
-      background: #eef2f7;
-      color: #394454;
-      font-size: 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
     }
 
-    .tag.port {
-      background: var(--warn-soft);
-      color: var(--warn);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
-
-    .desc {
-      flex: 1;
-      margin: 0;
+    .toolbar-text {
       color: var(--muted);
       font-size: 14px;
     }
 
-    .actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
+    button,
     a.button {
       min-height: 36px;
       display: inline-flex;
@@ -190,6 +155,7 @@
       text-decoration: none;
       font-size: 14px;
       font-weight: 620;
+      cursor: pointer;
     }
 
     a.button.secondary {
@@ -197,14 +163,144 @@
       color: var(--accent);
     }
 
-    @media (max-width: 920px) {
+    button:disabled {
+      cursor: wait;
+      opacity: 0.72;
+    }
+
+    section {
+      margin-top: 22px;
+    }
+
+    .section-head {
+      margin-bottom: 10px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+
+    .section-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      min-height: 216px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .tag {
+      min-height: 24px;
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: var(--chip);
+      color: #394454;
+      font-size: 12px;
+    }
+
+    .tag.port {
+      background: #fff0e5;
+      color: #9a3412;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .status {
+      min-height: 26px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 680;
+      white-space: nowrap;
+    }
+
+    .status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status.checking {
+      background: var(--wait-soft);
+      color: var(--wait);
+    }
+
+    .status.online {
+      background: var(--ok-soft);
+      color: var(--ok);
+    }
+
+    .status.offline {
+      background: var(--bad-soft);
+      color: var(--bad);
+    }
+
+    .desc {
+      flex: 1;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .url {
+      margin: 0;
+      overflow-wrap: anywhere;
+      color: #415066;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    @media (max-width: 980px) {
       .header-inner {
-        align-items: flex-start;
-        flex-direction: column;
+        grid-template-columns: 1fr;
+        align-items: start;
       }
 
       .badges {
         justify-content: flex-start;
+      }
+
+      .summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .grid {
@@ -212,19 +308,27 @@
       }
     }
 
-    @media (max-width: 620px) {
+    @media (max-width: 660px) {
       .header-inner,
       main {
         padding-left: 16px;
         padding-right: 16px;
       }
 
+      .summary,
       .grid {
         grid-template-columns: 1fr;
       }
 
-      .tab {
-        flex: 1 1 calc(50% - 8px);
+      .toolbar,
+      .section-head {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      button,
+      a.button {
+        width: 100%;
       }
     }
   </style>
@@ -234,7 +338,7 @@
     <div class="header-inner">
       <div>
         <h1>OWASP LLM Lab Portal</h1>
-        <p class="subtitle">Day별 실습과 보조 도구를 한 화면에서 엽니다.</p>
+        <p class="subtitle">실습 앱, 보조 도구, 상태 확인을 한 화면에서 관리합니다.</p>
       </div>
       <div class="badges">
         <span class="badge" id="host-badge">host</span>
@@ -244,156 +348,246 @@
   </header>
 
   <main>
-    <nav class="tabs" aria-label="Lab sections">
-      <button class="tab" type="button" data-tab="days" aria-selected="true">Day Labs</button>
-      <button class="tab" type="button" data-tab="tools" aria-selected="false">Tools</button>
-      <button class="tab" type="button" data-tab="checks" aria-selected="false">Checks</button>
-    </nav>
+    <div class="summary" aria-label="Service status summary">
+      <div class="metric">
+        <strong id="metric-online">0</strong>
+        <span>접속 가능</span>
+      </div>
+      <div class="metric">
+        <strong id="metric-checking">0</strong>
+        <span>확인 중</span>
+      </div>
+      <div class="metric">
+        <strong id="metric-offline">0</strong>
+        <span>확인 필요</span>
+      </div>
+      <div class="metric">
+        <strong id="metric-total">0</strong>
+        <span>전체 서비스</span>
+      </div>
+    </div>
 
-    <section class="panel active" id="days">
+    <div class="toolbar">
+      <div class="toolbar-text" id="last-check">페이지 로드 후 자동으로 상태를 확인합니다.</div>
+      <button type="button" id="refresh">상태 다시 확인</button>
+    </div>
+
+    <section aria-labelledby="labs-heading">
+      <div class="section-head">
+        <div>
+          <h2 id="labs-heading">Day Labs</h2>
+          <p class="section-note">강의 Day별 핵심 실습 앱입니다.</p>
+        </div>
+      </div>
       <div class="grid" id="day-grid"></div>
     </section>
 
-    <section class="panel" id="tools">
+    <section aria-labelledby="tools-heading">
+      <div class="section-head">
+        <div>
+          <h2 id="tools-heading">Tools</h2>
+          <p class="section-note">Agent, 모델 레지스트리, 챌린지 UI, 모델 API 같은 보조 실습 도구입니다.</p>
+        </div>
+      </div>
       <div class="grid" id="tool-grid"></div>
-    </section>
-
-    <section class="panel" id="checks">
-      <div class="grid" id="check-grid"></div>
     </section>
   </main>
 
   <script>
     const host = window.location.hostname || "localhost";
+    const protocol = window.location.protocol || "http:";
     document.getElementById("host-badge").textContent = host;
 
-    const url = (port, path = "/") => `${window.location.protocol}//${host}:${port}${path}`;
+    const url = (port, path = "/") => `${protocol}//${host}:${port}${path}`;
 
-    const dayLabs = [
+    const services = [
       {
+        group: "day",
         title: "Day 1 Vulnerable RAG",
         port: 8000,
         href: url(8000),
-        health: url(8000, "/healthz"),
+        check: url(8000, "/healthz"),
+        checkLabel: "Health",
         tags: ["LLM01", "LLM02", "RAG"],
         desc: "프롬프트 인젝션과 민감정보 노출을 RAG 챗봇에서 확인합니다."
       },
       {
+        group: "day",
         title: "Day 2 Vulnerable RAG",
         port: 8010,
         href: url(8010),
-        health: url(8010, "/healthz"),
+        check: url(8010, "/healthz"),
+        checkLabel: "Health",
         tags: ["LLM03", "Supply Chain", "RAG"],
         desc: "모델 공급망과 무결성 검증 시나리오를 RAG 흐름과 함께 다룹니다."
       },
       {
+        group: "day",
         title: "Day 3 Vulnerable RAG",
         port: 8011,
         href: url(8011),
-        health: url(8011, "/healthz"),
+        check: url(8011, "/healthz"),
+        checkLabel: "Health",
         tags: ["Agent", "Tools", "RAG"],
         desc: "Agent 취약점 실습 전후로 비교할 수 있는 RAG 시나리오입니다."
       },
       {
+        group: "day",
         title: "Day 4 Vulnerable RAG",
         port: 8012,
         href: url(8012),
-        health: url(8012, "/healthz"),
+        check: url(8012, "/healthz"),
+        checkLabel: "Health",
         tags: ["LLM08", "Embedding", "Data"],
         desc: "벡터/임베딩 기반 검색과 RAG 데이터 오염을 실습합니다."
       },
       {
+        group: "day",
         title: "Day 5 Vulnerable RAG",
         port: 8013,
         href: url(8013),
-        health: url(8013, "/healthz"),
+        check: url(8013, "/healthz"),
+        checkLabel: "Health",
         tags: ["Defense", "Guardrail", "Logging"],
         desc: "방어, 가드레일 우회, 로깅/모니터링 흐름을 확인합니다."
-      }
-    ];
-
-    const tools = [
+      },
       {
+        group: "tool",
         title: "Day 3 Vulnerable Agent",
         port: 8001,
         href: url(8001),
-        health: url(8001, "/healthz"),
+        check: url(8001, "/healthz"),
+        checkLabel: "Health",
         tags: ["LLM06", "Agent", "Tool misuse"],
         desc: "도구 호출형 Agent의 excessive agency와 tool misuse를 실습합니다."
       },
       {
+        group: "tool",
         title: "Day 2 Fake Model Registry",
         port: 8002,
         href: url(8002, "/api/v1/models"),
-        health: url(8002, "/api/v1/models"),
+        check: url(8002, "/api/v1/models"),
+        checkLabel: "Models API",
         tags: ["LLM03", "Registry", "API"],
         desc: "모델 공급망/무결성 검증용 가짜 모델 레지스트리 API입니다."
       },
       {
+        group: "tool",
         title: "LLMGoat",
         port: 5000,
         href: url(5000),
+        check: url(5000),
+        checkLabel: "Open",
         tags: ["Challenges", "Web UI"],
         desc: "OWASP Top 10 for LLM 항목별 웹 챌린지 UI입니다."
       },
       {
+        group: "tool",
         title: "Day 3 DVLA",
         port: 8501,
         href: url(8501),
+        check: url(8501),
+        checkLabel: "Open",
         tags: ["ReAct", "Prompt Injection"],
         desc: "Damn Vulnerable LLM Agent 기반 ReAct Agent prompt injection 실습 UI입니다."
       },
       {
+        group: "tool",
         title: "Ollama API",
         port: 11434,
         href: url(11434, "/api/tags"),
-        health: url(11434, "/api/tags"),
+        check: url(11434, "/api/tags"),
+        checkLabel: "Models",
         tags: ["Models", "API"],
         desc: "로컬 LLM 모델 목록과 generate API 상태를 확인합니다."
       }
     ];
 
-    function renderCard(item) {
-      const tags = item.tags.map((tag) => `<span class="tag">${tag}</span>`).join("");
-      const health = item.health
-        ? `<a class="button secondary" href="${item.health}" target="_blank" rel="noreferrer">Health</a>`
-        : "";
+    const state = new Map(services.map((service) => [service.title, "checking"]));
+
+    function renderCard(service) {
+      const tags = service.tags.map((tag) => `<span class="tag">${tag}</span>`).join("");
       return `
-        <article class="card">
-          <div>
-            <h2>${item.title}</h2>
-            <div class="tags">
-              <span class="tag port">:${item.port}</span>
-              ${tags}
+        <article class="card" data-service="${service.title}">
+          <div class="card-top">
+            <div>
+              <h3>${service.title}</h3>
+              <div class="tags">
+                <span class="tag port">:${service.port}</span>
+                ${tags}
+              </div>
             </div>
+            <span class="status checking" data-status-for="${service.title}">확인 중</span>
           </div>
-          <p class="desc">${item.desc}</p>
+          <p class="desc">${service.desc}</p>
+          <p class="url">${service.href}</p>
           <div class="actions">
-            <a class="button" href="${item.href}" target="_blank" rel="noreferrer">Open</a>
-            ${health}
+            <a class="button" href="${service.href}" target="_blank" rel="noreferrer">열기</a>
+            <a class="button secondary" href="${service.check}" target="_blank" rel="noreferrer">${service.checkLabel}</a>
           </div>
         </article>
       `;
     }
 
-    document.getElementById("day-grid").innerHTML = dayLabs.map(renderCard).join("");
-    document.getElementById("tool-grid").innerHTML = tools.map(renderCard).join("");
-    document.getElementById("check-grid").innerHTML = [...dayLabs, ...tools]
-      .filter((item) => item.health)
-      .map(renderCard)
-      .join("");
+    function updateMetrics() {
+      const values = [...state.values()];
+      document.getElementById("metric-online").textContent = values.filter((value) => value === "online").length;
+      document.getElementById("metric-checking").textContent = values.filter((value) => value === "checking").length;
+      document.getElementById("metric-offline").textContent = values.filter((value) => value === "offline").length;
+      document.getElementById("metric-total").textContent = values.length;
+    }
 
-    for (const tab of document.querySelectorAll(".tab")) {
-      tab.addEventListener("click", () => {
-        const target = tab.dataset.tab;
-        for (const other of document.querySelectorAll(".tab")) {
-          other.setAttribute("aria-selected", String(other === tab));
-        }
-        for (const panel of document.querySelectorAll(".panel")) {
-          panel.classList.toggle("active", panel.id === target);
-        }
+    function setStatus(service, next) {
+      state.set(service.title, next);
+      const badge = document.querySelector(`[data-status-for="${service.title}"]`);
+      if (!badge) return;
+      badge.classList.remove("checking", "online", "offline");
+      badge.classList.add(next);
+      badge.textContent = next === "online" ? "접속 가능" : next === "offline" ? "확인 필요" : "확인 중";
+      updateMetrics();
+    }
+
+    function probe(service) {
+      setStatus(service, "checking");
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 4500);
+      return fetch(service.check, {
+        method: "GET",
+        mode: "no-cors",
+        cache: "no-store",
+        signal: controller.signal
+      })
+        .then(() => setStatus(service, "online"))
+        .catch(() => setStatus(service, "offline"))
+        .finally(() => window.clearTimeout(timer));
+    }
+
+    function runChecks() {
+      const button = document.getElementById("refresh");
+      button.disabled = true;
+      button.textContent = "확인 중";
+      document.getElementById("last-check").textContent = "서비스 상태를 확인하는 중입니다.";
+      for (const service of services) setStatus(service, "checking");
+      Promise.allSettled(services.map(probe)).finally(() => {
+        const now = new Date();
+        document.getElementById("last-check").textContent = `마지막 확인: ${now.toLocaleString()}`;
+        button.disabled = false;
+        button.textContent = "상태 다시 확인";
       });
     }
+
+    document.getElementById("day-grid").innerHTML = services
+      .filter((service) => service.group === "day")
+      .map(renderCard)
+      .join("");
+    document.getElementById("tool-grid").innerHTML = services
+      .filter((service) => service.group === "tool")
+      .map(renderCard)
+      .join("");
+    document.getElementById("refresh").addEventListener("click", runChecks);
+
+    updateMetrics();
+    runChecks();
   </script>
 </body>
 </html>
