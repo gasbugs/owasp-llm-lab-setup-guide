@@ -27,7 +27,7 @@ OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
 OLLAMA_COMPAT_MODEL="${OLLAMA_COMPAT_MODEL:-llama3}"
 LLAMA_GUARD_MODEL="${LLAMA_GUARD_MODEL:-llama-guard3:8b}"
 LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
-SKIP_EMBEDDING_VENV="${SKIP_EMBEDDING_VENV:-false}"
+SKIP_EMBEDDING_VENV="${SKIP_EMBEDDING_VENV:-true}"
 INSTALL_START_EPOCH=$(date +%s)
 
 step() {
@@ -460,12 +460,12 @@ else
     else
       rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
       python3 -m venv /home/ubuntu/work/embedding-venv
-      if /home/ubuntu/work/embedding-venv/bin/pip install --no-cache-dir -q sentence-transformers scikit-learn numpy; then
+      if timeout 600 /home/ubuntu/work/embedding-venv/bin/pip install --no-cache-dir -q sentence-transformers scikit-learn numpy; then
         chown -R ubuntu:ubuntu /home/ubuntu/work/embedding-venv 2>/dev/null || true
         echo "[install-lab] embedding-venv ready for Day 4 LLM08-A"
       else
         rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
-        echo "[install-lab] embedding-venv install failed; continuing without optional Day 4 embedding tools"
+        echo "[install-lab] embedding-venv install failed or timed out; continuing without optional Day 4 embedding tools"
       fi
     fi
   fi
