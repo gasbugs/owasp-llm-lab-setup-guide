@@ -36,6 +36,7 @@ output "lab_urls" {
       vuln_agent    = "http://${aws_instance.student[id].public_ip}:8001"
       fake_registry = "http://${aws_instance.student[id].public_ip}:8002/api/v1/models"
       llmgoat       = "http://${aws_instance.student[id].public_ip}:5000"
+      cve_analyst   = "http://${aws_instance.student[id].public_ip}:5050"
       dvla          = "http://${aws_instance.student[id].public_ip}:8501"
       ollama_models = "http://${aws_instance.student[id].public_ip}:11434/api/tags"
     }

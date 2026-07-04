@@ -96,6 +96,14 @@ resource "aws_security_group" "student" {
   }
 
   ingress {
+    description = "local-cve-analyst app (5050)"
+    from_port   = 5050
+    to_port     = 5050
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_ingress_cidr]
+  }
+
+  ingress {
     description = "lab-dvla (8501)"
     from_port   = 8501
     to_port     = 8501
