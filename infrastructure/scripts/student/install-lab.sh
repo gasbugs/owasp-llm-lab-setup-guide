@@ -19,11 +19,12 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.2"
+SCRIPT_VERSION="0.1.3"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
+OLLAMA_COMPAT_MODEL="${OLLAMA_COMPAT_MODEL:-llama3}"
 LLAMA_GUARD_MODEL="${LLAMA_GUARD_MODEL:-llama-guard3:8b}"
 LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
 SKIP_EMBEDDING_VENV="${SKIP_EMBEDDING_VENV:-false}"
@@ -64,6 +65,7 @@ EC2_DOMAIN=$PUBLIC_IPV4
 IMAGE_NAMESPACE=$IMAGE_NAMESPACE
 IMAGE_TAG=$IMAGE_TAG
 OLLAMA_MODEL=$OLLAMA_MODEL
+OLLAMA_COMPAT_MODEL=$OLLAMA_COMPAT_MODEL
 LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
 SKIP_EMBEDDING_VENV=$SKIP_EMBEDDING_VENV
 EOF
@@ -420,6 +422,14 @@ if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$
   echo "[install-lab] $OLLAMA_MODEL already pulled"
 else
   podman exec lab-ollama ollama pull "$OLLAMA_MODEL"
+fi
+if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" ]; then
+  if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_COMPAT_MODEL"; then
+    echo "[install-lab] $OLLAMA_COMPAT_MODEL compatibility alias already available"
+  else
+    printf 'FROM %s\n' "$OLLAMA_MODEL" | podman exec -i lab-ollama ollama create "$OLLAMA_COMPAT_MODEL" -f -
+    echo "[install-lab] created $OLLAMA_COMPAT_MODEL compatibility alias for DVLA"
+  fi
 fi
 if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$LLAMA_GUARD_MODEL"; then
   echo "[install-lab] $LLAMA_GUARD_MODEL already pulled"
