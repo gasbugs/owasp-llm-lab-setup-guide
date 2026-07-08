@@ -48,6 +48,16 @@ def add_doc(title: str = "untitled", text: str = "") -> None:
     _corpus.append(f"[{title}] {text}")
 
 
+def list_docs() -> List[str]:
+    return list(_corpus)
+
+
+def delete_doc(index: int) -> str | None:
+    if index < 0 or index >= len(_corpus):
+        return None
+    return _corpus.pop(index)
+
+
 scenario = Scenario(
     id="day1",
     title="번역기 봇 (LLM01 — Prompt Injection)",
@@ -56,5 +66,7 @@ scenario = Scenario(
     build_system_prompt=build_system_prompt,
     retrieve=retrieve,
     add_doc=add_doc,
+    list_docs=list_docs,
+    delete_doc=delete_doc,
     expose_system_prompt=False,
 )

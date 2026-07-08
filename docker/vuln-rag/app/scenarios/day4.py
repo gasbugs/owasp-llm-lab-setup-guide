@@ -56,6 +56,22 @@ def add_doc(title: str = "untitled", text: str = "") -> None:
     _tenants.setdefault(tenant, []).append(f"[{tenant}/{title}] {text}")
 
 
+def list_docs() -> List[str]:
+    return [doc for docs in _tenants.values() for doc in docs]
+
+
+def delete_doc(index: int) -> str | None:
+    docs = list_docs()
+    if index < 0 or index >= len(docs):
+        return None
+    target = docs[index]
+    for tenant_docs in _tenants.values():
+        if target in tenant_docs:
+            tenant_docs.remove(target)
+            return target
+    return None
+
+
 scenario = Scenario(
     id="day4",
     title="PrivateGPT-Lite (LLM07/08/09)",
@@ -64,5 +80,7 @@ scenario = Scenario(
     build_system_prompt=build_system_prompt,
     retrieve=retrieve,
     add_doc=add_doc,
+    list_docs=list_docs,
+    delete_doc=delete_doc,
     expose_system_prompt=False,
 )

@@ -16,6 +16,8 @@ class Scenario:
     build_system_prompt: Callable[..., str]
     retrieve: Callable[[str], List[str]] = field(default=lambda _q: [])
     add_doc: Callable[..., None] = field(default=lambda **_: None)
+    list_docs: Callable[[], List[str]] = field(default=lambda: [])
+    delete_doc: Callable[[int], str | None] = field(default=lambda _index: None)
     expose_system_prompt: bool = False
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -123,3 +123,25 @@ async def inject_doc(req: dict):
     title = req.get("title", "untitled")
     selected.add_doc(title=title, text=text)
     return {"ok": True, "scenario": selected.id, "title": title, "size": len(text)}
+
+
+@app.get("/api/admin/docs")
+async def list_docs(scenario: str | None = None):
+    selected = get_scenario(scenario)
+    return {
+        "ok": True,
+        "scenario": selected.id,
+        "docs": [
+            {"index": index, "text": text}
+            for index, text in enumerate(selected.list_docs())
+        ],
+    }
+
+
+@app.delete("/api/admin/docs/{index}")
+async def delete_doc(index: int, scenario: str | None = None):
+    selected = get_scenario(scenario)
+    deleted = selected.delete_doc(index)
+    if deleted is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    return {"ok": True, "scenario": selected.id, "index": index, "deleted": deleted}
