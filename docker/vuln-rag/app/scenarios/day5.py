@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List
 
-from app.scenarios import Scenario
+from app.scenarios import Scenario, query_tokens
 
 SYSTEM_PROMPT_TEMPLATE = """너는 '회사 IT 헬프데스크 봇'이야. 직원의 문의에 답한다.
 
@@ -28,7 +28,7 @@ _corpus: List[str] = [
 
 
 def retrieve(query: str) -> List[str]:
-    tokens = {t.lower() for t in query.split() if len(t) > 1}
+    tokens = query_tokens(query)
     return [doc for doc in _corpus if any(t in doc.lower() for t in tokens)][:5]
 
 

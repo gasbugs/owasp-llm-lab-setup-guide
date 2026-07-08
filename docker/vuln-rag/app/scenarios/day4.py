@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import List
 
-from app.scenarios import Scenario
+from app.scenarios import Scenario, query_tokens
 
 INTERNAL_PROMPT = """너는 'PrivateGPT-Lite' 라는 사내 문서 검색 봇이야.
 
@@ -39,7 +39,7 @@ _tenants = {
 
 def retrieve(query: str) -> List[str]:
     # 의도된 취약: tenant 검증 없이 모든 문서에서 검색
-    tokens = {t.lower() for t in query.split() if len(t) > 1}
+    tokens = query_tokens(query)
     all_docs = [d for docs in _tenants.values() for d in docs]
     return [d for d in all_docs if any(t in d.lower() for t in tokens)][:5]
 

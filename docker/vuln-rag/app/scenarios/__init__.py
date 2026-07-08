@@ -6,6 +6,51 @@ from typing import Callable, List
 
 SCENARIO_NAMES = ("day1", "day2", "day3", "day4", "day5")
 
+KOREAN_PARTICLES = (
+    "으로부터",
+    "로부터",
+    "에게서",
+    "한테서",
+    "에서는",
+    "에게",
+    "한테",
+    "으로",
+    "라고",
+    "까지",
+    "부터",
+    "처럼",
+    "보다",
+    "에서",
+    "에는",
+    "은",
+    "는",
+    "이",
+    "가",
+    "을",
+    "를",
+    "의",
+    "에",
+    "로",
+    "와",
+    "과",
+    "도",
+    "만",
+)
+
+
+def query_tokens(query: str) -> set[str]:
+    tokens: set[str] = set()
+    for raw in query.split():
+        token = raw.strip(" \t\r\n.,!?;:\"'`()[]{}<>").lower()
+        if len(token) <= 1:
+            continue
+        tokens.add(token)
+        for particle in KOREAN_PARTICLES:
+            if token.endswith(particle) and len(token) > len(particle) + 1:
+                tokens.add(token[: -len(particle)])
+                break
+    return tokens
+
 
 @dataclass
 class Scenario:

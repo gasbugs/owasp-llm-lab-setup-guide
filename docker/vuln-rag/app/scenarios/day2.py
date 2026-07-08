@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import List
 
-from app.scenarios import Scenario
+from app.scenarios import Scenario, query_tokens
 
 CUSTOMER_DB = [
     {"id": "C-1001", "name": "박지영", "balance": 4_320_000, "level": "Gold"},
@@ -42,7 +42,7 @@ _corpus: List[str] = [
 
 
 def retrieve(query: str) -> List[str]:
-    tokens = {t.lower() for t in query.split() if len(t) > 1}
+    tokens = query_tokens(query)
     return [doc for doc in _corpus if any(t in doc.lower() for t in tokens)][:5]
 
 
