@@ -23,7 +23,7 @@ resource "aws_budgets_budget" "daily" {
   cost_filter {
     name = "TagKeyValue"
     values = [
-      "user:Course$${var.course_id}",
+      format("user:Course$%s", var.course_id),
     ]
   }
 
@@ -56,7 +56,7 @@ resource "aws_budgets_budget" "course_total" {
   cost_filter {
     name = "TagKeyValue"
     values = [
-      "user:Course$${var.course_id}",
+      format("user:Course$%s", var.course_id),
     ]
   }
 
