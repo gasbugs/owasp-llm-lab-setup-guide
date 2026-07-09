@@ -48,7 +48,8 @@ SSM 접속 후:
 sudo tail -n 200 /var/log/owasp-llm-lab-install.log
 sudo -u ubuntu podman ps -a
 sudo -u ubuntu podman logs lab-ollama --tail 100
-sudo -u ubuntu podman logs lab-vuln-rag --tail 100
+sudo -u ubuntu podman logs lab-day1-vuln-rag --tail 100
+sudo -u ubuntu podman logs lab-day2-vuln-rag --tail 100
 ```
 
 흔한 원인:
@@ -63,8 +64,14 @@ Quadlet unit 상태 확인:
 
 ```bash
 UBUNTU_UID=$(id -u ubuntu)
-sudo -u ubuntu XDG_RUNTIME_DIR=/run/user/$UBUNTU_UID systemctl --user status lab-ollama.service
-sudo -u ubuntu XDG_RUNTIME_DIR=/run/user/$UBUNTU_UID systemctl --user status lab-vuln-rag.service
+sudo -u ubuntu \
+  XDG_RUNTIME_DIR=/run/user/$UBUNTU_UID \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UBUNTU_UID/bus \
+  systemctl --user status lab-ollama.service
+sudo -u ubuntu \
+  XDG_RUNTIME_DIR=/run/user/$UBUNTU_UID \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UBUNTU_UID/bus \
+  systemctl --user status lab-day1-vuln-rag.service
 ```
 
 `Failed to enable unit: ... is transient or generated`가 보이면 오래된 설치 스크립트가 Quadlet generated unit에 `enable`을 시도한 것입니다. 최신 `install-lab.sh`를 다시 실행하세요. Quadlet은 `.container` 파일의 `[Install]` 설정을 generator가 처리하므로, generated `.service`에 직접 `enable`을 실행하지 않습니다.

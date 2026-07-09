@@ -5,7 +5,7 @@
 #   - 검증 단계엔 외부 인터넷 허용 (Ubuntu repo, Docker Hub, Ollama 등 pull)
 #   - 강의 정식 운영 시 골든 AMI(Packer)로 변경하면 인터넷 차단으로 회귀 가능
 #   - VPC endpoint는 사용하지 않는다. SSM과 이미지 pull은 public egress 사용.
-#   - 학생별 보안 그룹으로 실습 포트 접근 범위를 제한
+#   - 수강생별 보안 그룹으로 실습 포트 접근 범위를 제한
 ################################################################################
 
 resource "aws_vpc" "main" {
@@ -60,7 +60,7 @@ resource "aws_route_table_association" "lab" {
 }
 
 ################################################################################
-# Security Groups — 학생별 1개, 옆 학생 인스턴스 접근 불가
+# Security Groups — 수강생별 1개, 옆 수강생 인스턴스 접근 불가
 ################################################################################
 
 resource "aws_security_group" "student" {
@@ -104,7 +104,7 @@ resource "aws_security_group" "student" {
   }
 
   ingress {
-    description = "lab-dvla (8501)"
+    description = "lab-day3-dvla (8501)"
     from_port   = 8501
     to_port     = 8501
     protocol    = "tcp"

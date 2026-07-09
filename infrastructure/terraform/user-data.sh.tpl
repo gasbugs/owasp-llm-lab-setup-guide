@@ -3,7 +3,7 @@
 #
 # 기본 Terraform 설정에서는 실행되지 않는다.
 # `enable_user_data_bootstrap = true`로 명시한 경우에만 최초 부팅 시
-# 학생용 수동 설치 스크립트와 동일한 install-lab.sh를 내려받아 실행한다.
+# 수강생용 수동 설치 스크립트와 동일한 install-lab.sh를 내려받아 실행한다.
 
 set -euo pipefail
 exec > >(tee /var/log/user-data.log | logger -t user-data) 2>&1

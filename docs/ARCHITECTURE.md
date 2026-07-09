@@ -11,11 +11,16 @@ flowchart TD
   D -->|"manual install-lab.sh"| E["Podman runtime"]
   D -. "optional user-data bootstrap" .-> E
   E --> F["lab-ollama :11434"]
-  E --> G["lab-vuln-rag :8000"]
-  E --> H["lab-vuln-agent :8001"]
+  E --> P["lab-portal :8080"]
+  E --> G1["lab-day1-vuln-rag :8000"]
+  E --> G2["lab-day2-vuln-rag :8010"]
+  E --> G3["lab-day3-vuln-rag :8011"]
+  E --> G4["lab-day4-vuln-rag :8012"]
+  E --> G5["lab-day5-vuln-rag :8013"]
+  E --> H["lab-day3-vuln-agent :8001"]
   E --> I["lab-llmgoat :5000"]
-  E --> J["lab-dvla :8501"]
-  E --> K["lab-fake-registry :8002"]
+  E --> J["lab-day3-dvla :8501"]
+  E --> K["lab-day2-fake-registry :8002"]
 ```
 
 ## Terraform
@@ -26,12 +31,12 @@ flowchart TD
 - VPC `10.42.0.0/16`
 - Public subnet `10.42.10.0/24`
 - Internet Gateway와 route table
-- 학생별 security group
-- 학생별 IAM role과 instance profile
-- 학생별 EC2 GPU 인스턴스. 기본값은 `g6.xlarge`
+- 수강생별 security group
+- 수강생별 IAM role과 instance profile
+- 수강생별 EC2 GPU 인스턴스. 기본값은 `g6.xlarge`
 - AWS Budget 알람
 
-학생 수가 여러 명이면 `student_ids` 목록만큼 EC2가 생성됩니다.
+수강생 수가 여러 명이면 `student_ids` 목록만큼 EC2가 생성됩니다.
 
 기본 AMI 조회 기준은 우리가 기존 실습에서 사용한 계열과 같습니다.
 
@@ -94,11 +99,16 @@ enable_user_data_bootstrap = true
 | 컨테이너 | 포트 | 역할 |
 |---|---:|---|
 | `lab-ollama` | 11434 | 로컬 LLM API |
-| `lab-vuln-rag` | 8000 | 의도적으로 취약한 RAG 챗봇. Day 1~5 시나리오를 한 앱에서 선택 |
-| `lab-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
+| `lab-portal` | 8080 | 실습 앱 링크와 health check 진입점 |
+| `lab-day1-vuln-rag` | 8000 | Day 1 직접·간접 프롬프트 인젝션 RAG 챗봇 |
+| `lab-day2-vuln-rag` | 8010 | Day 2 CloudSecurityLab Bank 챗봇·RAG poisoning |
+| `lab-day3-vuln-rag` | 8011 | Day 3 output handling 비교용 RAG 챗봇 |
+| `lab-day4-vuln-rag` | 8012 | Day 4 PrivateGPT-Lite·벡터 격리 확인 |
+| `lab-day5-vuln-rag` | 8013 | Day 5 resource consumption·defense RAG 챗봇 |
+| `lab-day3-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
 | `lab-llmgoat` | 5000 | LLMGoat cross-platform 실습 |
-| `lab-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
-| `lab-fake-registry` | 8002 | LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
+| `lab-day3-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
+| `lab-day2-fake-registry` | 8002 | LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
 
 ## 이미지 빌드
 

@@ -1,11 +1,11 @@
-# Infrastructure — 학생 1인 1계정 EC2 실습 환경
+# Infrastructure — 수강생 1인 1계정 EC2 실습 환경
 
-본 디렉터리는 OWASP Top 10 for LLM 강의 실습 환경을 AWS에 만드는 Terraform과 운영 스크립트를 담고 있다. 현재 운영 모델은 **학생 본인 AWS 계정에 EC2 `g6.xlarge` 1대를 만들고, 학생이 직접 start/stop하는 방식**이다.
+본 디렉터리는 OWASP Top 10 for LLM 강의 실습 환경을 AWS에 만드는 Terraform과 운영 스크립트를 담고 있다. 현재 운영 모델은 **수강생 본인 AWS 계정에 EC2 `g6.xlarge` 1대를 만들고, 수강생이 직접 start/stop하는 방식**이다.
 
 ## 현재 운영 모델
 
 - 매일 새 환경을 자동 재배포하지 않는다. 같은 EC2와 EBS를 `stop/start`로 이어서 사용한다.
-- 학생은 `terraform apply`로 본인 EC2, IAM instance profile, 보안 그룹, 비용 알람을 만든다.
+- 수강생은 `terraform apply`로 본인 EC2, IAM instance profile, 보안 그룹, 비용 알람을 만든다.
 - 매일 아침 `infrastructure/scripts/student/start-lab.sh`로 인스턴스를 시작한다.
 - 매일 종료 시 `infrastructure/scripts/student/stop-lab.sh`로 EC2 시간당 요금을 멈춘다.
 - 기본 Terraform 설정은 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지한다. `auto_stop_schedule_mode`로 야간 반복 모드나 custom cron으로 바꿀 수 있다.
@@ -17,9 +17,9 @@
 | 경로 | 용도 |
 |---|---|
 | `terraform/` | VPC, 보안 그룹, EC2, IAM instance profile, Budget 알람 |
-| `scripts/student/` | 학생용 preflight, 수동 설치, instance-id, start/stop 및 작업물 보존 안내 헬퍼 |
+| `scripts/student/` | 수강생용 preflight, 수동 설치, instance-id, start/stop 및 작업물 보존 안내 헬퍼 |
 
-## 학생 기본 절차
+## 수강생 기본 절차
 
 ```bash
 cd infrastructure/terraform

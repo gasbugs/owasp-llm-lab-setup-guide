@@ -43,17 +43,17 @@ DOCKERHUB_NAMESPACE=your-username ./build-and-push.sh
 
 ## 강의 EC2 (Podman rootless) — 한눈에
 
-학생 인스턴스 안에서:
+수강생 인스턴스 안에서:
 ```bash
 # /etc/lab/env가 DOCKERHUB_NAMESPACE를 포함
 cd ~/owasp-top-10-for-llm/docker
-sudo -u ubuntu podman run -d --replace --name lab-vuln-rag \
+sudo -u ubuntu podman run -d --replace --name lab-day1-vuln-rag \
   --network host -e DEFAULT_SCENARIO=day1 \
   -e OLLAMA_URL=http://localhost:11434 \
   -e OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
   docker.io/gasbugs/owasp-llm-vuln-rag:latest
 podman compose ps
-podman compose logs -f vuln-rag
+sudo -u ubuntu podman logs -f lab-day1-vuln-rag
 ```
 
 핵심 차이점 (docker → podman rootless):
@@ -83,7 +83,7 @@ LABEL org.opencontainers.image.title="owasp-llm-vuln-..."
 LABEL owasp.llm.lab.warning="INTENTIONALLY VULNERABLE — DO NOT DEPLOY OUTSIDE TRAINING"
 ```
 
-학생용 안내: `podman ps`에 `lab-vuln-*`이 보이면 의도적 취약 컨테이너임을 항상 인지.
+수강생용 안내: `podman ps`에 `lab-day*-vuln-*`이 보이면 의도적 취약 컨테이너임을 항상 인지.
 
 ## 트러블슈팅
 
@@ -91,6 +91,6 @@ LABEL owasp.llm.lab.warning="INTENTIONALLY VULNERABLE — DO NOT DEPLOY OUTSIDE 
 
 **GPU 접근 실패**: `/etc/cdi/nvidia.yaml`이 존재해야. `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml` 재실행.
 
-**rootless에서 11434 포트 바인딩 실패**: 기본적으로 < 1024는 안 됨. 본 강의는 11434/8000/8001/3000/3001/8002로 1024+. 문제 없음.
+**rootless에서 11434 포트 바인딩 실패**: 기본적으로 < 1024는 안 됨. 본 강의는 11434/8080/8000~8013/5000/8501로 1024+. 문제 없음.
 
 **push 거부**: `podman login docker.io` 다시. `~/.config/containers/auth.json`에 토큰 저장됨.

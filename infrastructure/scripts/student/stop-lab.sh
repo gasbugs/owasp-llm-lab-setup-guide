@@ -1,5 +1,5 @@
 #!/bin/bash
-# 학생용 — 매일 종료 시 본인 인스턴스 stop (노트북에서 실행)
+# 수강생용 — 매일 종료 시 본인 인스턴스 stop (노트북에서 실행)
 # EBS·EIP는 유지 → 내일 start-lab.sh로 어제 상태 그대로 복원
 set -euo pipefail
 

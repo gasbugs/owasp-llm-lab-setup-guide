@@ -1,10 +1,10 @@
 #!/bin/bash
 # 강사용 — 데모/dry-run 후 본인 인프라 destroy.
 #
-# ⚠️ 2026-05-20 운영 모델 재설계 이후: 학생 자원은 *학생 본인 AWS 계정*에 있어
+# ⚠️ 2026-05-20 운영 모델 재설계 이후: 수강생 자원은 *수강생 본인 AWS 계정*에 있어
 # 강사가 destroy할 수 없습니다. 본 스크립트는 *강사 본인 dry-run* 자원 정리용.
 #
-# 학생용 destroy는 STUDENT_SETUP.md 12단계 참고:
+# 수강생용 destroy는 STUDENT_SETUP.md 12단계 참고:
 #   cd infrastructure/terraform && terraform destroy -auto-approve
 
 set -euo pipefail

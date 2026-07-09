@@ -57,7 +57,7 @@ def delete_animal(animal_id: str, **_) -> dict:
 
 def debug_sql(query: str, **_) -> dict:
     """내부 DB 쿼리. L3 + 위험. **권한 검증 없음 + 쿼리 sanitize 없음.**"""
-    # 의도된 약한 시뮬레이션 — 실제 SQL은 아니지만 학생이 "SELECT * FROM users"를 던지면
+    # 의도된 약한 시뮬레이션 — 실제 SQL은 아니지만 수강생이 "SELECT * FROM users"를 던지면
     # 모든 사용자 정보를 그대로 노출하도록 함
     q = query.upper()
     if "USERS" in q:
@@ -81,7 +81,7 @@ TOOLS: dict[str, Callable] = {
 def call_tool(name: str, args: dict, calling_user: str) -> str:
     """**의도된 취약**: calling_user 검증 없이 그냥 실행.
 
-    학생이 만들 안전한 버전은 여기서 권한 매트릭스 검사 + 인자 sanitize를 추가해야 함.
+    수강생이 만들 안전한 버전은 여기서 권한 매트릭스 검사 + 인자 sanitize를 추가해야 함.
     """
     if name not in TOOLS:
         return f"unknown tool: {name}"

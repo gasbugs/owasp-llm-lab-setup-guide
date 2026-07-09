@@ -9,17 +9,17 @@ output "ami_name" {
 }
 
 output "student_role_arns" {
-  description = "학생별 IAM Role ARN"
+  description = "수강생별 IAM Role ARN"
   value       = { for id in var.student_ids : id => aws_iam_role.student[id].arn }
 }
 
 output "instance_ids" {
-  description = "학생별 EC2 인스턴스 ID"
+  description = "수강생별 EC2 인스턴스 ID"
   value       = { for id in var.student_ids : id => aws_instance.student[id].id }
 }
 
 output "public_ips" {
-  description = "학생별 EC2 public IP"
+  description = "수강생별 EC2 public IP"
   value       = { for id in var.student_ids : id => aws_instance.student[id].public_ip }
 }
 
@@ -51,21 +51,21 @@ output "manual_install_commands" {
 }
 
 output "start_commands" {
-  description = "학생이 본인 인스턴스 시작하는 명령"
+  description = "수강생이 본인 인스턴스 시작하는 명령"
   value = {
     for id in var.student_ids : id => "aws ec2 start-instances --profile ${var.aws_profile} --region ${var.region} --instance-ids ${aws_instance.student[id].id}"
   }
 }
 
 output "stop_commands" {
-  description = "학생이 본인 인스턴스 중지하는 명령 (강의 끝나면 매일)"
+  description = "수강생이 본인 인스턴스 중지하는 명령 (강의 끝나면 매일)"
   value = {
     for id in var.student_ids : id => "aws ec2 stop-instances --profile ${var.aws_profile} --region ${var.region} --instance-ids ${aws_instance.student[id].id}"
   }
 }
 
 output "ssm_session_commands" {
-  description = "학생이 본인 인스턴스에 SSM 접속하기 위한 명령"
+  description = "수강생이 본인 인스턴스에 SSM 접속하기 위한 명령"
   value = {
     for id in var.student_ids : id => "aws ssm start-session --profile ${var.aws_profile} --region ${var.region} --target ${aws_instance.student[id].id}"
   }

@@ -1,9 +1,9 @@
 #!/bin/bash
 # 강사용 — D-1 dry-run 본인 환경 apply.
 #
-# ⚠️ 2026-05-20 운영 모델 재설계 이후: 학생 자원은 *학생 본인 AWS 계정*에 있어
+# ⚠️ 2026-05-20 운영 모델 재설계 이후: 수강생 자원은 *수강생 본인 AWS 계정*에 있어
 # 강사가 apply할 수 없습니다. 본 스크립트는 *강사 dry-run/검증* 자원 생성용.
-# 학생용 apply 경로는 STUDENT_SETUP.md 8단계 참고.
+# 수강생용 apply 경로는 STUDENT_SETUP.md 8단계 참고.
 set -euo pipefail
 
 cd "$(dirname "$0")/../../terraform"

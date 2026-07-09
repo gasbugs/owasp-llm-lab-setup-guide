@@ -9,7 +9,7 @@ Endpoints:
 - GET /api/v1/models/B/mlbom       → MLBOM JSON (CWE-1395)
 - GET /models/{A,B}.gguf           → 모델 파일 (binary)
 
-학생 검증 패턴:
+수강생 검증 패턴:
 - A: registry CLAIMS sha256 == 실제 file sha256sum → 일치 (clean)
 - B: registry CLAIMS clean A의 sha256 == 실제 B file sha256sum → mismatch (trojan)
 """
@@ -37,7 +37,7 @@ def sha(path):
 ACTUAL_A = sha(f"{DATA_DIR}/A.gguf")
 ACTUAL_B = sha(f"{DATA_DIR}/B.gguf")
 
-# B의 registry 등록 sha256: A의 clean sha256으로 등록 (학생이 검출해야 할 mismatch)
+# B의 registry 등록 sha256: A의 clean sha256으로 등록 (수강생이 검출해야 할 mismatch)
 FAKE_CLEAN_B = hashlib.sha256(b"CLEAN_MODEL_WEIGHTS_v1\n" * 200).hexdigest()
 
 MODELS = {

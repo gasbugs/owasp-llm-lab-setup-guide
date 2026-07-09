@@ -1,6 +1,6 @@
 # OWASP Top 10 for LLM — 실습 컨테이너 compose (Podman rootless)
 #
-# 사용 (학생 인스턴스 안에서, ubuntu 사용자):
+# 사용 (수강생 인스턴스 안에서, ubuntu 사용자):
 #   LAB_SCENARIO=day1 podman compose --profile day1 up -d
 #
 # 환경변수 DOCKERHUB_NAMESPACE는 /etc/lab/env에서 로드됨 (강사 Docker Hub 계정)
@@ -35,7 +35,7 @@ services:
 
   vuln-rag:
     image: docker.io/${DOCKERHUB_NAMESPACE:-gasbugs}/owasp-llm-vuln-rag:latest
-    container_name: lab-vuln-rag
+    container_name: lab-${LAB_SCENARIO:-day1}-vuln-rag
     profiles: [day1, day2, day4, day5]
     restart: unless-stopped
     ports:
@@ -51,7 +51,7 @@ services:
 
   vuln-agent:
     image: docker.io/${DOCKERHUB_NAMESPACE:-gasbugs}/owasp-llm-vuln-agent:latest
-    container_name: lab-vuln-agent
+    container_name: lab-day3-vuln-agent
     profiles: [day3]
     restart: unless-stopped
     ports:

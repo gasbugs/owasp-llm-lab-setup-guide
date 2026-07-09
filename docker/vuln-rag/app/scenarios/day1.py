@@ -1,6 +1,6 @@
 """Day 1 — LLM01 Prompt Injection 시나리오.
 
-목표: 학생이 시스템 프롬프트 안의 비밀(SECRET_FLAG)을 추출하도록 유도.
+목표: 수강생이 시스템 프롬프트 안의 비밀(SECRET_FLAG)을 추출하도록 유도.
 가드: 약함(키워드 필터 정도). 실제 LLM 응답은 가드를 쉽게 우회.
 """
 from __future__ import annotations

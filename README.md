@@ -14,7 +14,7 @@
 | `docs/TROUBLESHOOTING.md` | quota, SSM, Terraform, Podman, Ollama 문제 해결 |
 | `infrastructure/terraform/` | VPC, 보안 그룹, EC2 GPU 인스턴스, IAM, Budget 알람 |
 | `infrastructure/terraform/user-data.sh.tpl` | 선택적 자동 설치용 user-data 래퍼. 기본값에서는 비활성화 |
-| `infrastructure/scripts/student/` | 학생용 preflight, 수동 설치/클린업, instance-id, start, stop, sync 헬퍼 |
+| `infrastructure/scripts/student/` | 수강생용 preflight, 수동 설치/클린업, instance-id, start, stop, sync 헬퍼 |
 | `infrastructure/packer/` | 선택 사항: 강사용 Golden AMI 빌드 |
 | `docker/` | 실습 컨테이너 Dockerfile, compose, 취약 RAG/Agent 앱 코드 |
 
@@ -55,11 +55,11 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 ## 기본 배포 방식
 
 1. Terraform이 기존 검증 계열인 `Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)`의 최신 AMI를 조회합니다.
-2. Terraform이 학생별 EC2 `g6.xlarge` 1대를 만듭니다.
+2. Terraform이 수강생별 EC2 `g6.xlarge` 1대를 만듭니다.
 3. 기본값에서는 user-data 자동 설치가 실행되지 않습니다.
 4. 수강생이 SSM으로 EC2에 접속해 `install-lab.sh`를 직접 실행합니다.
 5. 설치 스크립트가 Podman을 설치하고 실습 컨테이너 이미지를 pull합니다.
-6. `lab-ollama`, `lab-vuln-rag`, `lab-vuln-agent`, `lab-llmgoat`, `lab-dvla`, `lab-fake-registry` 컨테이너를 실행합니다.
+6. `lab-ollama`, `lab-portal`, `lab-day1-vuln-rag`~`lab-day5-vuln-rag`, `lab-day3-vuln-agent`, `lab-llmgoat`, `lab-day3-dvla`, `lab-day2-fake-registry` 컨테이너를 실행합니다.
 7. Podman Quadlet 기반 systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
 
 강사가 운영 편의상 자동 설치를 원하면 `terraform.tfvars`에 아래 값을 추가합니다.

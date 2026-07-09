@@ -124,11 +124,12 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - NVIDIA CDI 설정
 - Ollama 컨테이너 실행
 - `llama3.1:8b-instruct-q4_K_M` 모델 pull 및 warm-up
-- 취약 RAG 앱 실행: `lab-vuln-rag`, port `8000` — Day 1~5 시나리오를 UI에서 모두 선택 가능
-- 취약 Agent 앱 실행: `lab-vuln-agent`, port `8001`
+- 실습 포털 실행: `lab-portal`, port `8080`
+- Day별 취약 RAG 앱 실행: `lab-day1-vuln-rag`~`lab-day5-vuln-rag`, ports `8000`, `8010`, `8011`, `8012`, `8013`
+- 취약 Agent 앱 실행: `lab-day3-vuln-agent`, port `8001`
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
-- DVLA 실행: `lab-dvla`, port `8501`
-- fake model registry 실행: `lab-fake-registry`, port `8002`
+- DVLA 실행: `lab-day3-dvla`, port `8501`
+- fake model registry 실행: `lab-day2-fake-registry`, port `8002`
 - EC2 start 후 자동 재시작을 위한 Podman Quadlet systemd user unit 등록
 - Terraform 기본 설정으로 매일 17:30 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 야간 반복 모드 또는 custom cron 선택 가능
 
@@ -146,9 +147,13 @@ SSM 세션 안에서 실행합니다.
 
 ```bash
 sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+curl -s http://localhost:8080/ | head
 curl -s http://localhost:11434/api/tags | head
 curl -s http://localhost:8000/healthz
-curl -s http://localhost:8000/api/scenarios | head
+curl -s http://localhost:8010/healthz
+curl -s http://localhost:8011/healthz
+curl -s http://localhost:8012/healthz
+curl -s http://localhost:8013/healthz
 curl -s http://localhost:8001/healthz
 curl -s http://localhost:8002/api/v1/models | head
 ```

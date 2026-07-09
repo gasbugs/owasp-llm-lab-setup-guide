@@ -1,16 +1,16 @@
 ################################################################################
-# 학생별 EC2 인스턴스 — for_each로 학생 수만큼 1대씩
+# 수강생별 EC2 인스턴스 — for_each로 수강생 수만큼 1대씩
 #
 # 설계 (1인 1계정 모델):
-#   - On-Demand GPU 인스턴스 1대/학생
-#   - 학생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF
+#   - On-Demand GPU 인스턴스 1대/수강생
+#   - 수강생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF
 #   - Stop 시 EC2 시간당 요금 0. EBS 디스크 비용만 발생 (gp3 100GB 기준)
 #   - terminate 안 하므로 EBS·작업물 그대로 보존. 다음 start 시 어제 상태 그대로
 #   - 기본값은 수동 설치. 필요 시 user-data 자동 설치를 명시적으로 켤 수 있음
 #   - 설치 후에는 컨테이너 systemd unit으로 다음 start 시 자동 시작
 #
 # 작업물 추가 보존 (선택):
-#   학생이 개인 GitHub 작업 repo에 push로 강의 종료 후에도 보존.
+#   수강생이 개인 GitHub 작업 repo에 push로 강의 종료 후에도 보존.
 ################################################################################
 
 locals {
@@ -76,7 +76,7 @@ resource "aws_instance" "student" {
   monitoring = true
 
   user_data                   = var.enable_user_data_bootstrap ? local.user_data : null
-  user_data_replace_on_change = false # user-data 변경해도 인스턴스 재생성 X (학생 데이터 보존)
+  user_data_replace_on_change = false # user-data 변경해도 인스턴스 재생성 X (수강생 데이터 보존)
 
   tags = {
     Name    = "${local.name_prefix}-${each.key}"
@@ -87,7 +87,7 @@ resource "aws_instance" "student" {
   lifecycle {
     # 인스턴스 stop/start로 state가 바뀌어도 terraform이 재생성하지 않도록
     ignore_changes = [
-      ami, # 최신 AMI가 갱신되어도 기존 학생 인스턴스를 자동 교체하지 않음
+      ami, # 최신 AMI가 갱신되어도 기존 수강생 인스턴스를 자동 교체하지 않음
     ]
   }
 }
