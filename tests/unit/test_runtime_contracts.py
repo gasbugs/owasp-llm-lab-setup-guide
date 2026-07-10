@@ -97,6 +97,47 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('^sha-[0-9a-f]{40}$', packer)
         self.assertIn("owasp-llm-${image}:${IMAGE_TAG}", provisioner)
 
+    def test_user_data_propagates_the_selected_runtime_image_set(self) -> None:
+        variables = read("infrastructure/terraform/variables.tf")
+        instance = read("infrastructure/terraform/instance.tf")
+        user_data = read("infrastructure/terraform/user-data.sh.tpl")
+        example = read("infrastructure/terraform/terraform.tfvars.example")
+
+        namespace = variables.split('variable "lab_image_namespace"', 1)[1].split(
+            'variable "lab_image_tag"', 1
+        )[0]
+        image_tag = variables.split('variable "lab_image_tag"', 1)[1].split(
+            'variable "ami_name_pattern"', 1
+        )[0]
+        self.assertIn('default     = "gasbugs"', namespace)
+        self.assertIn('default     = "latest"', image_tag)
+        self.assertIn('^sha-[0-9a-f]{40}$', image_tag)
+        self.assertIn("lab_image_namespace    = var.lab_image_namespace", instance)
+        self.assertIn("lab_image_tag          = var.lab_image_tag", instance)
+        self.assertIn('IMAGE_NAMESPACE="${lab_image_namespace}"', user_data)
+        self.assertIn('IMAGE_TAG="${lab_image_tag}"', user_data)
+        self.assertIn('IMAGE_NAMESPACE="$IMAGE_NAMESPACE"', user_data)
+        self.assertIn('IMAGE_TAG="$IMAGE_TAG"', user_data)
+        self.assertIn("lab_setup_repo_raw_url", example)
+        self.assertIn("lab_image_tag", example)
+        self.assertIn("user_data_replace_on_change=false", example)
+        self.assertIn("lab_setup_source_revision", instance)
+        self.assertIn('trimprefix(var.lab_image_tag, "sha-")', instance)
+        self.assertIn("commit-pinned bootstrap", instance)
+
+    def test_teardown_lists_and_verifies_the_complete_state(self) -> None:
+        teardown = read("infrastructure/scripts/instructor/teardown-day.sh")
+        stop = read("infrastructure/scripts/student/stop-lab.sh")
+
+        self.assertNotIn("head -20", teardown)
+        self.assertNotIn("state list 2>/dev/null", teardown)
+        self.assertIn("CURRENT_STATE=$(terraform state list)", teardown)
+        self.assertIn("REMAINING_STATE=$(terraform state list)", teardown)
+        self.assertIn('if [ -n "$REMAINING_STATE" ]', teardown)
+        self.assertNotIn("비용 0/h", teardown)
+        self.assertIn("이 구성은 EIP를 만들지 않아 public IP는 바뀔 수 있음", stop)
+        self.assertIn("이 구성은 EIP를 만들지 않으므로 stop/start 후 public IP는 바뀔 수 있습니다", stop)
+
     def test_local_build_helper_rejects_implicit_moving_tags(self) -> None:
         script = ROOT / "docker" / "build-and-push.sh"
         env = os.environ.copy()
@@ -130,6 +171,16 @@ class RuntimeContractTest(unittest.TestCase):
         llm09 = read("tests/e2e/llm09/test_llm09_misinfo.sh")
         self.assertIn("is_allowed_aws_reference", llm09)
         self.assertIn("https://docs.aws.amazon.com", llm09)
+        self.assertIn('missing_url_trials: $missing', llm09)
+        self.assertIn("head -5 || true", llm09)
+        self.assertIn("head -10 || true", llm09)
+
+        llm10 = read("tests/e2e/llm10/test_llm10_consumption.sh")
+        self.assertIn("transport_timeouts: $transport", llm10)
+        self.assertIn('if [ "$observed" -ne 100 ]', llm10)
+        self.assertIn("restart_ollama_after_overload", llm10)
+        self.assertIn("overload queue cleanup: Ollama READY", llm10)
+        self.assertGreaterEqual(llm10.count("warmup_model"), 3)
 
     def test_mutating_e2e_is_repeatable_and_infra_fails_closed(self) -> None:
         common = read("tests/e2e/lib/common.sh")
@@ -151,6 +202,11 @@ class RuntimeContractTest(unittest.TestCase):
 
         full_cycle = read("tests/e2e/run-full-cycle.sh")
         self.assertIn("reset_mutable_state", full_cycle)
+        self.assertIn("BASELINE_DOC_COUNTS", full_cycle)
+        self.assertIn("E2E_RESET_SENTINEL_", full_cycle)
+        self.assertIn('(.docs | length == $expected)', full_cycle)
+        self.assertIn("contains($sentinel)", full_cycle)
+        self.assertNotIn(".docs | length == 0", full_cycle)
         self.assertLess(full_cycle.index("run_agent\n"), full_cycle.index("run_items day5"))
 
 

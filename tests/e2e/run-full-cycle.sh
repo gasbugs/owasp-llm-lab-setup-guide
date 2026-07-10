@@ -49,6 +49,13 @@ declare -A SCENARIO_URLS=(
   ["day4"]="http://localhost:8012"
   ["day5"]="http://localhost:8013"
 )
+declare -A BASELINE_DOC_COUNTS=(
+  ["day1"]=2
+  ["day2"]=2
+  ["day3"]=2
+  ["day4"]=4
+  ["day5"]=3
+)
 
 require_day_ready() {
   local scenario="$1"
@@ -67,6 +74,7 @@ require_day_ready() {
 
 reset_mutable_state() {
   log "▶ mutable runtime 기준선 복원"
+  local sentinel="E2E_RESET_SENTINEL_${TS}"
   local containers=(
     lab-day1-vuln-rag
     lab-day2-vuln-rag
@@ -78,25 +86,48 @@ reset_mutable_state() {
     log "  ✗ podman 없음: shared corpus를 재현 가능한 기준선으로 복원할 수 없음"
     return 1
   fi
+
+  # restart가 실제로 메모리 내 오염 문서를 버리는지 sentinel로 검증한다.
+  local scenario url
+  for scenario in day1 day2 day3 day4 day5; do
+    url="${SCENARIO_URLS[$scenario]}"
+    if ! curl -fsS --max-time 10 -X POST "$url/api/admin/inject-doc" \
+      -H 'Content-Type: application/json' \
+      -d "$(jq -n --arg title "$sentinel" --arg text "$sentinel" \
+        '{title: $title, text: $text}')" \
+      | jq -e '.ok == true' >/dev/null; then
+      log "  ✗ $scenario reset sentinel 주입 실패"
+      return 1
+    fi
+  done
   if ! podman restart "${containers[@]}" >/dev/null; then
     log "  ✗ RAG 컨테이너 restart 실패"
     return 1
   fi
 
-  local scenario url clean
+  local clean baseline count expected
   for scenario in day1 day2 day3 day4 day5; do
     url="${SCENARIO_URLS[$scenario]}"
+    expected="${BASELINE_DOC_COUNTS[$scenario]}"
     clean=false
     for _ in $(seq 1 30); do
-      if curl -fsS --max-time 5 "$url/api/admin/docs" 2>/dev/null \
-        | jq -e '.docs | length == 0' >/dev/null; then
+      if baseline=$(curl -fsS --max-time 5 "$url/api/admin/docs" 2>/dev/null) \
+        && printf '%s' "$baseline" \
+          | jq -e --argjson expected "$expected" --arg sentinel "$sentinel" '
+              .ok == true
+              and (.docs | type == "array")
+              and (.docs | length == $expected)
+              and ([.docs[].text | contains($sentinel)] | any | not)
+            ' >/dev/null; then
+        count=$(printf '%s' "$baseline" | jq -r '.docs | length')
+        log "  ✓ $scenario clean restart baseline docs=$count"
         clean=true
         break
       fi
       sleep 2
     done
     if [ "$clean" != "true" ]; then
-      log "  ✗ $scenario shared corpus baseline 확인 실패"
+      log "  ✗ $scenario clean baseline 확인 실패 (expected docs=$expected, sentinel must be absent)"
       return 1
     fi
   done

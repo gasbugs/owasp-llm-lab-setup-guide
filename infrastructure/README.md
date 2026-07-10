@@ -47,6 +47,8 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 enable_user_data_bootstrap = true
 ```
 
+재현 가능한 실측 검증에서는 `lab_setup_repo_raw_url`과 `lab_image_tag`를 같은 40자리 main commit으로 고정한다. `user_data_replace_on_change = false`이므로 이 값은 최초 apply 전에 확정해야 하며, 기존 인스턴스의 변수만 변경해도 bootstrap은 재실행되지 않는다.
+
 이후 매일 시작/종료는 저장소 루트에서 실행한다.
 
 ```bash

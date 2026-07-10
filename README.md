@@ -90,6 +90,9 @@ enable_user_data_bootstrap = true
 ```
 
 자동 설치를 켜도 내부적으로는 수강생용 `infrastructure/scripts/student/install-lab.sh`와 같은 설치 절차를 실행합니다.
+강사용 실측에서는 `lab_setup_repo_raw_url`과 `lab_image_tag`를 같은 40자리 main commit으로 고정해야 합니다. 예시는 `terraform.tfvars.example`과 [docs/LIVE-VALIDATION.md](docs/LIVE-VALIDATION.md)에 있습니다.
+
+`user_data_replace_on_change = false`이므로 이 pin은 최초 `terraform apply` 전에 설정하세요. 기존 인스턴스에서 URL이나 이미지 태그만 바꿔도 user-data가 다시 실행되거나 인스턴스가 자동 교체되지는 않습니다.
 
 ## 비용 안전 원칙
 

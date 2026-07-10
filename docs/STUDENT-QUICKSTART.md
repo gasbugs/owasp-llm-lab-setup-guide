@@ -141,6 +141,8 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 enable_user_data_bootstrap = true
 ```
 
+강사가 commit 고정값을 공지한 경우에는 `lab_setup_repo_raw_url`, `lab_image_namespace`, `lab_image_tag`도 공지값을 그대로 사용합니다. 이 값들은 최초 `terraform apply` 전에 설정해야 합니다. 기존 인스턴스에서 값을 바꿔도 `user_data_replace_on_change = false` 설정 때문에 자동 설치가 다시 실행되지는 않습니다.
+
 ## 8. 컨테이너 상태 확인
 
 SSM 세션 안에서 실행합니다.

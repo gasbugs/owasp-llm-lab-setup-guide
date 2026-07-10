@@ -61,6 +61,26 @@ variable "lab_setup_repo_raw_url" {
   }
 }
 
+variable "lab_image_namespace" {
+  description = "user-data bootstrap이 pull할 Docker Hub 이미지 namespace. 수동 설치의 IMAGE_NAMESPACE와 같은 값이다."
+  type        = string
+  default     = "gasbugs"
+  validation {
+    condition     = can(regex("^[a-z0-9]+([._-][a-z0-9]+)*$", var.lab_image_namespace)) && length(var.lab_image_namespace) <= 255
+    error_message = "lab_image_namespace는 소문자/숫자로 시작하고 소문자/숫자/점/밑줄/하이픈만 포함해야 합니다."
+  }
+}
+
+variable "lab_image_tag" {
+  description = "user-data bootstrap이 pull할 런타임 이미지 태그. 기본값 latest이며 실측 검증은 sha-<40자리 commit>을 사용한다."
+  type        = string
+  default     = "latest"
+  validation {
+    condition     = var.lab_image_tag == "latest" || can(regex("^sha-[0-9a-f]{40}$", var.lab_image_tag))
+    error_message = "lab_image_tag는 latest 또는 sha-<40자리 lowercase Git commit>이어야 합니다."
+  }
+}
+
 variable "ami_name_pattern" {
   description = "EC2 base AMI name pattern. 기본값은 기존 검증 계열인 Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 Ubuntu 24.04 최신 이미지를 조회한다."
   type        = string

@@ -1,6 +1,6 @@
 #!/bin/bash
 # 수강생용 — 매일 종료 시 본인 인스턴스 stop (노트북에서 실행)
-# EBS·EIP는 유지 → 내일 start-lab.sh로 어제 상태 그대로 복원
+# EBS는 유지 → 내일 start-lab.sh로 작업 상태 복원. 이 구성은 EIP를 만들지 않아 public IP는 바뀔 수 있음
 set -euo pipefail
 
 : "${AWS_PROFILE:?usage: AWS_PROFILE=<profile> AWS_REGION=<region> STUDENT=<id> bash stop-lab.sh}"
@@ -61,3 +61,4 @@ case "$STATE" in
 esac
 echo "stopped. EC2 시간당 요금은 멈췄습니다."
 echo "주의: EBS 보존 비용은 계속 발생합니다. 강의 마지막 날에는 작업물을 백업한 뒤 terraform destroy -auto-approve로 EC2/EBS/VPC를 삭제하세요."
+echo "참고: 이 구성은 EIP를 만들지 않으므로 stop/start 후 public IP는 바뀔 수 있습니다. SSM 접속은 Student 태그로 instance ID를 다시 조회하세요."

@@ -14,8 +14,14 @@
 ################################################################################
 
 locals {
+  lab_setup_source_revision = element(
+    reverse(split("/", trimsuffix(var.lab_setup_repo_raw_url, "/"))),
+    0,
+  )
   user_data = templatefile("${path.module}/user-data.sh.tpl", {
     lab_setup_repo_raw_url = var.lab_setup_repo_raw_url
+    lab_image_namespace    = var.lab_image_namespace
+    lab_image_tag          = var.lab_image_tag
   })
 }
 
@@ -75,8 +81,10 @@ resource "aws_instance" "student" {
 
   monitoring = true
 
-  user_data                   = var.enable_user_data_bootstrap ? local.user_data : null
-  user_data_replace_on_change = false # user-data 변경해도 인스턴스 재생성 X (수강생 데이터 보존)
+  user_data = var.enable_user_data_bootstrap ? local.user_data : null
+  # user-data 입력 변경은 기존 인스턴스를 다시 bootstrap하거나 교체하지 않는다.
+  # commit/image pin은 최초 apply 전에 확정하고, 기존 환경은 수동 재설치하거나 명시적으로 교체한다.
+  user_data_replace_on_change = false
 
   tags = {
     Name    = "${local.name_prefix}-${each.key}"
@@ -85,6 +93,15 @@ resource "aws_instance" "student" {
   }
 
   lifecycle {
+    precondition {
+      condition = (
+        !var.enable_user_data_bootstrap ||
+        var.lab_image_tag == "latest" ||
+        local.lab_setup_source_revision == trimprefix(var.lab_image_tag, "sha-")
+      )
+      error_message = "commit-pinned bootstrap은 lab_setup_repo_raw_url의 마지막 경로 commit과 lab_image_tag의 sha- commit이 같아야 합니다."
+    }
+
     # 인스턴스 stop/start로 state가 바뀌어도 terraform이 재생성하지 않도록
     ignore_changes = [
       ami, # 최신 AMI가 갱신되어도 기존 수강생 인스턴스를 자동 교체하지 않음

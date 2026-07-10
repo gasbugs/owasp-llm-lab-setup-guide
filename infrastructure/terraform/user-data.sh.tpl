@@ -9,14 +9,21 @@ set -euo pipefail
 exec > >(tee /var/log/user-data.log | logger -t user-data) 2>&1
 
 RAW_URL="${lab_setup_repo_raw_url}"
+IMAGE_NAMESPACE="${lab_image_namespace}"
+IMAGE_TAG="${lab_image_tag}"
 INSTALL_SCRIPT="/tmp/owasp-llm-install-lab.sh"
 
 echo "=== optional user-data bootstrap start: $(date -Iseconds) ==="
 echo "Install script source: $RAW_URL/infrastructure/scripts/student/install-lab.sh"
+echo "Runtime image set: docker.io/$IMAGE_NAMESPACE/owasp-llm-*:$IMAGE_TAG"
 
 curl -fsSL "$RAW_URL/infrastructure/scripts/student/install-lab.sh" -o "$INSTALL_SCRIPT"
 chmod 0755 "$INSTALL_SCRIPT"
 
-LAB_SETUP_REPO_RAW_URL="$RAW_URL" bash "$INSTALL_SCRIPT"
+env \
+  IMAGE_NAMESPACE="$IMAGE_NAMESPACE" \
+  IMAGE_TAG="$IMAGE_TAG" \
+  LAB_SETUP_REPO_RAW_URL="$RAW_URL" \
+  bash "$INSTALL_SCRIPT"
 
 echo "=== optional user-data bootstrap done: $(date -Iseconds) ==="

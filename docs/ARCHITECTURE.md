@@ -93,6 +93,9 @@ enable_user_data_bootstrap = true
 ```
 
 이때 `infrastructure/terraform/user-data.sh.tpl`은 최초 부팅 시 `install-lab.sh`를 내려받아 실행하는 얇은 래퍼로 동작합니다. 자동 설치와 수동 설치가 같은 스크립트를 공유하므로 설치 내용은 동일합니다.
+Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스크립트에 전달하며, 설치 로그와 `/etc/lab/env`에 실제 선택값이 남습니다. 강사용 검증은 설치 스크립트 URL과 이미지 태그를 같은 main commit에 고정합니다.
+
+인스턴스는 수강생 데이터를 보존하기 위해 `user_data_replace_on_change = false`를 사용합니다. 따라서 user-data 관련 변수를 바꿔도 이미 생성된 인스턴스에서 bootstrap이 재실행되거나 인스턴스가 자동 교체되지 않습니다. pin은 최초 apply 전에 설정하고, 기존 인스턴스는 수동 재설치 또는 명시적인 교체 절차를 사용합니다.
 
 ## 컨테이너
 
