@@ -20,7 +20,7 @@
 #     docker.io/gasbugs/owasp-llm-dvla:sha-<commit>
 
 # ---------- stage 1: clone ----------
-FROM alpine/git:latest AS clone
+FROM docker.io/alpine/git:latest AS clone
 
 ARG REPO_URL=https://github.com/ReversecLabs/damn-vulnerable-llm-agent.git
 ARG REPO_REF=c0cf9a14adad76e9d6a53c41741f625334bd9971
@@ -32,7 +32,7 @@ RUN git init . \
     && git checkout --detach FETCH_HEAD
 
 # ---------- stage 2: runtime (DVLA 원본 Dockerfile 그대로 + ollama env) ----------
-FROM python:3.11-slim
+FROM docker.io/library/python:3.11-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

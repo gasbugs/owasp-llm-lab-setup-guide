@@ -20,6 +20,11 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('http://localhost:${PORT}/healthz', dockerfile)
         self.assertIn('--port \\"$PORT\\"', dockerfile)
 
+    def test_dvla_base_images_are_fully_qualified_for_podman(self) -> None:
+        dockerfile = read("docker/dvla/Dockerfile")
+        self.assertIn("FROM docker.io/alpine/git:latest AS clone", dockerfile)
+        self.assertIn("FROM docker.io/library/python:3.11-slim", dockerfile)
+
     def test_quadlet_sets_same_port_for_each_rag_process(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         self.assertIn("Environment=PORT=${rag_port}", installer)
