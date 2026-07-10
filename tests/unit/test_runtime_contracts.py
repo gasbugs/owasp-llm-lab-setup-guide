@@ -40,6 +40,12 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("WARMUP_RESPONSE=", installer)
         self.assertIn(".done == true", installer)
 
+        fingerprint_before = installer.split(
+            "QUADLET_FINGERPRINT_BEFORE=$(", 1
+        )[1].split("\n)", 1)[0]
+        self.assertIn('if [ -f "$file" ]; then', fingerprint_before)
+        self.assertNotIn('[ -f "$file" ] &&', fingerprint_before)
+
     def test_legacy_compose_is_absent(self) -> None:
         self.assertFalse((ROOT / "docker" / "docker-compose.yaml").exists())
 

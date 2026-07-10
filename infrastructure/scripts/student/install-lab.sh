@@ -208,7 +208,9 @@ install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR"
 
 QUADLET_FINGERPRINT_BEFORE=$(
   for file in "$QUADLET_DIR"/lab-*.container; do
-    [ -f "$file" ] && sha256sum "$file"
+    if [ -f "$file" ]; then
+      sha256sum "$file"
+    fi
   done | sort | sha256sum | awk '{print $1}'
 )
 
