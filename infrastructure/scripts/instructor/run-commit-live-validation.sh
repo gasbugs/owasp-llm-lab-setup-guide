@@ -424,21 +424,26 @@ REMOTE_PARTIAL
 
 stop_port_forwards() {
   local pid cleanup_ok=1
-  for pid in "${PORT_FORWARD_PIDS[@]}"; do
-    [ -n "$pid" ] || continue
-    if kill -0 "$pid" >/dev/null 2>&1; then
-      kill -TERM "$pid" >/dev/null 2>&1 || true
-    fi
-  done
-  for pid in "${PORT_FORWARD_PIDS[@]}"; do
-    [ -n "$pid" ] || continue
-    wait "$pid" >/dev/null 2>&1 || true
-    if kill -0 "$pid" >/dev/null 2>&1; then
-      cleanup_ok=0
-      kill -KILL "$pid" >/dev/null 2>&1 || true
+  # macOS still ships Bash 3.2, where expanding an empty array under `set -u`
+  # aborts the shell.  Cleanup calls this function before forwards exist and
+  # again after the normal path has cleared them, so guard both expansions.
+  if [ "${#PORT_FORWARD_PIDS[@]}" -gt 0 ]; then
+    for pid in "${PORT_FORWARD_PIDS[@]}"; do
+      [ -n "$pid" ] || continue
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        kill -TERM "$pid" >/dev/null 2>&1 || true
+      fi
+    done
+    for pid in "${PORT_FORWARD_PIDS[@]}"; do
+      [ -n "$pid" ] || continue
       wait "$pid" >/dev/null 2>&1 || true
-    fi
-  done
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        cleanup_ok=0
+        kill -KILL "$pid" >/dev/null 2>&1 || true
+        wait "$pid" >/dev/null 2>&1 || true
+      fi
+    done
+  fi
   PORT_FORWARD_PIDS=()
   if ! python3 - <<'PY'
 import socket
@@ -507,9 +512,13 @@ terminate_instances_direct() {
 
   if [ -n "$INSTANCE_ID" ]; then
     seen=0
-    for existing in "${instance_ids[@]}"; do
-      [ "$existing" = "$INSTANCE_ID" ] && seen=1
-    done
+    # The tag query legitimately returns an empty array after termination.
+    # Bash 3.2 + nounset cannot expand that empty array without this guard.
+    if [ "${#instance_ids[@]}" -gt 0 ]; then
+      for existing in "${instance_ids[@]}"; do
+        [ "$existing" = "$INSTANCE_ID" ] && seen=1
+      done
+    fi
     if [ "$seen" -ne 1 ]; then
       captured_state="$WORK_DIR/captured-instance-state.txt"
       captured_error="$WORK_DIR/captured-instance-state.err"

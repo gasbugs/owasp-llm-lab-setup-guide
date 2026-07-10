@@ -313,6 +313,37 @@ class LiveControllerContractTest(unittest.TestCase):
         self.assertNotIn('exit "$REMOTE_RC"', early_exit)
         self.assertIn("remote_reported_rc:$remote_reported_rc", source)
 
+    def test_empty_port_forward_array_is_safe_on_macos_bash(self) -> None:
+        source = read("run-commit-live-validation.sh")
+        cleanup = source.split("stop_port_forwards() {", 1)[1].split("\n}", 1)[0]
+        guard = cleanup.index('if [ "${#PORT_FORWARD_PIDS[@]}" -gt 0 ]; then')
+        first_expansion = cleanup.index('for pid in "${PORT_FORWARD_PIDS[@]}"', guard)
+        self.assertLess(guard, first_expansion)
+
+        result = subprocess.run(
+            [
+                "/bin/bash",
+                "-uc",
+                'pids=(); if [ "${#pids[@]}" -gt 0 ]; then '
+                'for pid in "${pids[@]}"; do :; done; fi',
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        termination = source.split("terminate_instances_direct() {", 1)[1].split(
+            "\n}", 1
+        )[0]
+        instance_guard = termination.index(
+            'if [ "${#instance_ids[@]}" -gt 0 ]; then'
+        )
+        instance_expansion = termination.index(
+            'for existing in "${instance_ids[@]}"', instance_guard
+        )
+        self.assertLess(instance_guard, instance_expansion)
+
     def test_controller_result_binds_course_provenance_fields(self) -> None:
         source = read("run-commit-live-validation.sh")
         cleanup = source.split("cleanup() {", 1)[1]
