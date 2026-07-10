@@ -15,6 +15,9 @@ locals {
   }
 
   name_prefix = "owasp-llm-${var.course_id}"
+
+  # 실제로 설치되는 앱만 허용한다. 8003~8009 같은 미사용 포트는 열지 않는다.
+  lab_app_ports = toset([8000, 8001, 8002, 8010, 8011, 8012, 8013])
 }
 
 data "aws_caller_identity" "current" {}

@@ -106,8 +106,11 @@ variable "allowed_ingress_cidr" {
   type        = string
   default     = "127.0.0.1/32"
   validation {
-    condition     = can(cidrhost(var.allowed_ingress_cidr, 0)) && var.allowed_ingress_cidr != "0.0.0.0/0" && var.allowed_ingress_cidr != "::/0"
-    error_message = "allowed_ingress_cidr는 127.0.0.1/32 또는 본인 공인 IP/32처럼 제한된 CIDR이어야 하며 전체 공개 CIDR은 금지합니다."
+    condition = (
+      can(cidrhost(var.allowed_ingress_cidr, 0)) &&
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/32$", var.allowed_ingress_cidr))
+    )
+    error_message = "allowed_ingress_cidr는 127.0.0.1/32 또는 본인 공인 IPv4/32만 허용합니다."
   }
 }
 

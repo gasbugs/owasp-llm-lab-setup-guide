@@ -79,26 +79,21 @@ resource "aws_security_group" "student" {
     cidr_blocks = [var.allowed_ingress_cidr]
   }
 
-  ingress {
-    description = "lab day apps (8000-8013)"
-    from_port   = 8000
-    to_port     = 8013
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ingress_cidr]
+  dynamic "ingress" {
+    for_each = local.lab_app_ports
+    content {
+      description = "lab app (${ingress.value})"
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = [var.allowed_ingress_cidr]
+    }
   }
 
   ingress {
     description = "lab-llmgoat (5000)"
     from_port   = 5000
     to_port     = 5000
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ingress_cidr]
-  }
-
-  ingress {
-    description = "local-cve-analyst app (5050)"
-    from_port   = 5050
-    to_port     = 5050
     protocol    = "tcp"
     cidr_blocks = [var.allowed_ingress_cidr]
   }

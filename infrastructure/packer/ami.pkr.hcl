@@ -1,7 +1,7 @@
 ################################################################################
 # 골든 AMI — owasp-llm-lab (Podman rootless)
 #
-# Ubuntu 24.04 + NVIDIA Driver + CUDA 12.5 + Podman + nvidia-container-toolkit(CDI)
+# Ubuntu 24.04 + NVIDIA Driver + CUDA 12.8 + Podman + nvidia-container-toolkit(CDI)
 # + 강의용 컨테이너 이미지 사전 pull(Docker Hub) + 모델 weights 사전 다운로드
 #
 # 빌드:
@@ -10,6 +10,7 @@
 #     -var "aws_profile=owasp-llm" \
 #     -var "region=ap-northeast-2" \
 #     -var "dockerhub_namespace=<your-dockerhub-username-or-org>" \
+#     -var "image_tag=sha-<40-character-main-commit>" \
 #     ami.pkr.hcl
 ################################################################################
 
@@ -59,6 +60,15 @@ variable "dockerhub_namespace" {
   type        = string
 }
 
+variable "image_tag" {
+  description = "사전 pull할 불변 런타임 이미지 태그. sha-<40자리 lowercase Git commit> 필수"
+  type        = string
+  validation {
+    condition     = can(regex("^sha-[0-9a-f]{40}$", var.image_tag))
+    error_message = "Image tag는 sha-<40자리 lowercase Git commit> 형식이어야 합니다."
+  }
+}
+
 locals {
   timestamp = formatdate("YYYYMMDDhhmmss", timestamp())
 }
@@ -76,13 +86,13 @@ data "amazon-ami" "ubuntu" {
 }
 
 source "amazon-ebs" "lab" {
-  ami_name      = "${var.ami_name_prefix}-${local.timestamp}"
+  ami_name        = "${var.ami_name_prefix}-${local.timestamp}"
   ami_description = "OWASP Top 10 for LLM — Lab Golden AMI (Podman rootless + CUDA + models)"
-  instance_type = var.instance_type
-  region        = var.region
-  profile       = var.aws_profile
-  source_ami    = data.amazon-ami.ubuntu.id
-  ssh_username  = var.ssh_username
+  instance_type   = var.instance_type
+  region          = var.region
+  profile         = var.aws_profile
+  source_ami      = data.amazon-ami.ubuntu.id
+  ssh_username    = var.ssh_username
 
   launch_block_device_mappings {
     device_name           = "/dev/sda1"
@@ -108,7 +118,7 @@ build {
   }
 
   provisioner "shell" {
-    script          = "${path.root}/provisioners/20-nvidia.sh"
+    script            = "${path.root}/provisioners/20-nvidia.sh"
     expect_disconnect = true
   }
 
@@ -122,6 +132,7 @@ build {
     environment_vars = [
       "DEFAULT_MODEL=${var.default_model}",
       "DOCKERHUB_NAMESPACE=${var.dockerhub_namespace}",
+      "IMAGE_TAG=${var.image_tag}",
     ]
   }
 

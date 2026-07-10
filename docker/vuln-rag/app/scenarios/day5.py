@@ -1,8 +1,4 @@
-"""Day 5 — Capstone 시작점.
-
-수강생이 개인 작업 디렉터리로 복사해 가드레일·검증을 직접 채우는 보일러플레이트.
-강사 정답에는 입력 sanitize, 시스템 프롬프트 분리, 출력 검증, rate limit이 들어감.
-"""
+"""Day 5 — LLM10 Unbounded Consumption and guardrail observation."""
 from __future__ import annotations
 
 from typing import List
@@ -53,9 +49,9 @@ def delete_doc(index: int) -> str | None:
 
 scenario = Scenario(
     id="day5",
-    title="IT 헬프데스크 봇 (Capstone)",
-    intro="이 보일러플레이트를 개인 작업 디렉터리로 복사해 가드레일을 직접 채워. 강사가 공격 8개 자동 실행 후 채점.",
-    warning="기본 상태는 취약. 수강생이 방어를 추가해야 함.",
+    title="IT 헬프데스크 봇 (LLM10 — Unbounded Consumption)",
+    intro="rate limit과 입력 크기 제한이 없는 상태에서 동시 요청과 큰 입력의 영향을 관찰합니다.",
+    warning="의도적 취약 — 요청 제한과 비용 가드가 없음.",
     build_system_prompt=build_system_prompt,
     retrieve=retrieve,
     add_doc=add_doc,

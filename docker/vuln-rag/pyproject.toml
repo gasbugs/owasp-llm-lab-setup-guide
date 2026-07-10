@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "OWASP LLM Lab — intentionally vulnerable RAG chatbot"
 requires-python = ">=3.12"
 # 슬림 deps — vuln-rag 코드가 실제 사용하는 것만.
-# chromadb / sentence-transformers / langchain은 Day 2/4 별도 데모 (chroma 컨테이너 + jupyter)에서 사용.
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",

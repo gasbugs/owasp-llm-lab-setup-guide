@@ -10,13 +10,25 @@ USERS = {
     "admin":   {"name": "관리자",     "role": "L3"},
 }
 
-ANIMALS = {
+INITIAL_ANIMALS = {
     "g-001": {"name": "황금", "owner": "farmer1", "feed": "08:00"},
     "g-002": {"name": "은빛", "owner": "farmer1", "feed": "16:00"},
     "g-003": {"name": "검둥", "owner": "farmer2", "feed": "10:00"},
 }
 
+ANIMALS = {animal_id: data.copy() for animal_id, data in INITIAL_ANIMALS.items()}
+
 DELETED_LOG: list[str] = []
+
+
+def reset_lab_state() -> dict:
+    """E2E 전후에 의도된 in-memory 취약 상태를 기준선으로 복원."""
+    ANIMALS.clear()
+    ANIMALS.update(
+        {animal_id: data.copy() for animal_id, data in INITIAL_ANIMALS.items()}
+    )
+    DELETED_LOG.clear()
+    return {"ok": True, "animals": sorted(ANIMALS), "deleted_log": []}
 
 
 def get_user_info(user_id: str, **_) -> dict:
@@ -78,7 +90,7 @@ TOOLS: dict[str, Callable] = {
 }
 
 
-def call_tool(name: str, args: dict, calling_user: str) -> str:
+def call_tool(name: str, args: dict, calling_user: str) -> object:
     """**의도된 취약**: calling_user 검증 없이 그냥 실행.
 
     수강생이 만들 안전한 버전은 여기서 권한 매트릭스 검사 + 인자 sanitize를 추가해야 함.

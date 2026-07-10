@@ -1,5 +1,5 @@
 #!/bin/bash
-# NVIDIA Driver + CUDA Toolkit 12.5
+# NVIDIA Driver + CUDA Toolkit 12.8
 # 설치 후 재부팅 필요 (Packer가 expect_disconnect으로 처리)
 set -euo pipefail
 

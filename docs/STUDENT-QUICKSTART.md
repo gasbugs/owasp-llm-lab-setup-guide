@@ -79,7 +79,7 @@ enable_user_data_bootstrap = false
 
 daily_budget_usd  = 20
 course_budget_usd = 120
-alert_email       = "your@email.com"
+alert_email       = "student@example.com"
 
 # 기본 인스턴스 타입은 g6.xlarge입니다.
 # instance_type = "g6.xlarge"
@@ -129,7 +129,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - 취약 Agent 앱 실행: `lab-day3-vuln-agent`, port `8001`
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
 - DVLA 실행: `lab-day3-dvla`, port `8501`
-- fake model registry 실행: `lab-day2-fake-registry`, port `8002`
+- Day 4 LLM03 fake model registry 실행: `lab-day2-fake-registry`, port `8002` (unit 이름은 호환성을 위해 유지)
 - EC2 start 후 자동 재시작을 위한 Podman Quadlet systemd user unit 등록
 - Terraform 기본 설정으로 매일 17:30 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 야간 반복 모드 또는 custom cron 선택 가능
 

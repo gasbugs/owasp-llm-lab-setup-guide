@@ -1,0 +1,230 @@
+name: Test, Build & Push Runtime Images
+
+on:
+  pull_request:
+    paths:
+      - "README.md"
+      - "docker/**"
+      - "infrastructure/**"
+      - "tests/**"
+      - "docs/**"
+      - ".github/workflows/build-and-push.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "README.md"
+      - "docker/**"
+      - "infrastructure/**"
+      - "tests/**"
+      - "docs/**"
+      - ".github/workflows/build-and-push.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: runtime-images-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKERHUB_NAMESPACE: gasbugs
+  SHA_TAG: sha-${{ github.sha }}
+
+jobs:
+  test:
+    name: Runtime quality gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.6"
+
+      - name: Set up Packer
+        uses: hashicorp/setup-packer@v3.2.0
+        with:
+          version: "1.15.3"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run unit and repository-hygiene tests
+        run: python -m unittest discover -s tests/unit -p 'test_*.py' -v
+
+      - name: Run shared-corpus source regression
+        run: python tests/e2e/llm04/test_llm04_shared_corpus.py
+
+      - name: Compile Python sources
+        run: python -m compileall -q docker tests
+
+      - name: Check shell syntax
+        run: |
+          find infrastructure tests docker -type f -name '*.sh' -print0 \
+            | xargs -0 -n1 bash -n
+
+      - name: Check and validate Terraform
+        run: |
+          terraform fmt -check -recursive infrastructure/terraform
+          terraform -chdir=infrastructure/terraform init -backend=false -input=false
+          terraform -chdir=infrastructure/terraform validate
+
+      - name: Check and initialize Packer
+        run: |
+          packer fmt -check infrastructure/packer/ami.pkr.hcl
+          packer init infrastructure/packer/ami.pkr.hcl
+          packer validate -syntax-only infrastructure/packer/ami.pkr.hcl
+
+      - name: Check base-gpu Docker build configuration
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/base-gpu
+          call: check
+
+      - name: Check vuln-rag Docker build configuration
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/vuln-rag
+          call: check
+
+      - name: Check vuln-agent Docker build configuration
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/vuln-agent
+          call: check
+
+      - name: Check llmgoat Docker build configuration
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/llmgoat
+          call: check
+
+      - name: Check DVLA Docker build configuration
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/dvla
+          call: check
+
+  build:
+    name: Build and publish immutable runtime images
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Refuse to overwrite an existing commit tag
+        run: |
+          set -euo pipefail
+          for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+            target="docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-${image}:${SHA_TAG}"
+            if docker buildx imagetools inspect "$target" >/dev/null 2>&1; then
+              echo "ERROR: immutable commit tag already exists: $target" >&2
+              echo "Create a new commit instead of rebuilding or overwriting this tag." >&2
+              exit 1
+            fi
+          done
+
+      # base-gpu is the immutable parent for vuln-rag and vuln-agent.
+      - name: Build & push base-gpu
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/base-gpu
+          platforms: linux/amd64
+          push: true
+          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
+          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:buildcache
+          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:buildcache,mode=max
+
+      - name: Build & push vuln-rag
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/vuln-rag
+          platforms: linux/amd64
+          push: true
+          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-rag:${{ env.SHA_TAG }}
+          build-args: |
+            BASE_IMAGE=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
+          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-rag:buildcache
+          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-rag:buildcache,mode=max
+
+      - name: Build & push vuln-agent
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/vuln-agent
+          platforms: linux/amd64
+          push: true
+          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-agent:${{ env.SHA_TAG }}
+          build-args: |
+            BASE_IMAGE=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
+          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-agent:buildcache
+          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-agent:buildcache,mode=max
+
+      # LLMGoat (SECFORCE/LLMGoat, Apache 2.0): cross-platform comparison app.
+      - name: Build & push llmgoat
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/llmgoat
+          platforms: linux/amd64
+          push: true
+          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-llmgoat:${{ env.SHA_TAG }}
+          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-llmgoat:buildcache
+          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-llmgoat:buildcache,mode=max
+
+      # DVLA (ReversecLabs/damn-vulnerable-llm-agent, Apache 2.0): Day 3 comparison app.
+      - name: Build & push dvla
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/dvla
+          platforms: linux/amd64
+          push: true
+          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-dvla:${{ env.SHA_TAG }}
+          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-dvla:buildcache
+          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-dvla:buildcache,mode=max
+
+  promote-latest:
+    name: Promote complete SHA image set to latest
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Promote immutable manifests
+        run: |
+          set -euo pipefail
+          for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+            source="docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-${image}:${SHA_TAG}"
+            target="docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-${image}:latest"
+            docker buildx imagetools create --tag "$target" "$source"
+          done

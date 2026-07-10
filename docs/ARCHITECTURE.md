@@ -78,7 +78,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 - EC2 metadata와 tag를 읽어 `/etc/lab/env` 작성
 - `/home/ubuntu/work` 생성
-- Podman, podman-compose, rootless 실행 환경 설치
+- Podman rootless와 Quadlet 실행 환경 설치
 - NVIDIA CDI 파일 생성
 - Docker Hub에서 실습 이미지 pull
 - Ollama와 실습 앱 컨테이너 실행
@@ -100,15 +100,15 @@ enable_user_data_bootstrap = true
 |---|---:|---|
 | `lab-ollama` | 11434 | 로컬 LLM API |
 | `lab-portal` | 8080 | 실습 앱 링크와 health check 진입점 |
-| `lab-day1-vuln-rag` | 8000 | Day 1 직접·간접 프롬프트 인젝션 RAG 챗봇 |
-| `lab-day2-vuln-rag` | 8010 | Day 2 CloudSecurityLab Bank 챗봇·RAG poisoning |
-| `lab-day3-vuln-rag` | 8011 | Day 3 output handling 비교용 RAG 챗봇 |
-| `lab-day4-vuln-rag` | 8012 | Day 4 PrivateGPT-Lite·벡터 격리 확인 |
-| `lab-day5-vuln-rag` | 8013 | Day 5 resource consumption·defense RAG 챗봇 |
+| `lab-day1-vuln-rag` | 8000 | Day 1 LLM01 프롬프트 인젝션 RAG 챗봇 |
+| `lab-day2-vuln-rag` | 8010 | Day 2 LLM02·LLM04 Bank/RAG 챗봇 |
+| `lab-day3-vuln-rag` | 8011 | Day 3 LLM05 output handling RAG 챗봇 |
+| `lab-day4-vuln-rag` | 8012 | Day 2 LLM08과 Day 4 LLM07·LLM09가 공유하는 PrivateGPT-Lite |
+| `lab-day5-vuln-rag` | 8013 | Day 5 LLM10 resource consumption RAG 챗봇 |
 | `lab-day3-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
 | `lab-llmgoat` | 5000 | LLMGoat cross-platform 실습 |
 | `lab-day3-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
-| `lab-day2-fake-registry` | 8002 | LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
+| `lab-day2-fake-registry` | 8002 | Day 4 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
 
 ## 이미지 빌드
 

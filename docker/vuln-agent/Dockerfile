@@ -1,6 +1,6 @@
 # OWASP LLM Lab — vuln-agent (Podman/OCI 호환)
 
-ARG BASE_IMAGE=docker.io/owasplllab/owasp-llm-base-gpu:latest
+ARG BASE_IMAGE=docker.io/gasbugs/owasp-llm-base-gpu:latest
 FROM ${BASE_IMAGE}
 
 LABEL org.opencontainers.image.title="owasp-llm-vuln-agent"
@@ -19,6 +19,6 @@ ENV PORT=8001 \
 
 EXPOSE 8001
 
-HEALTHCHECK --interval=15s --timeout=5s CMD curl -fs http://localhost:8001/healthz || exit 1
+HEALTHCHECK --interval=15s --timeout=5s CMD curl -fs "http://localhost:${PORT}/healthz" || exit 1
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["sh", "-c", "exec uv run uvicorn app.main:app --host 0.0.0.0 --port \"$PORT\""]

@@ -9,3 +9,4 @@ terraform.tfvars
 *.log
 __pycache__/
 .venv/
+tests/e2e/results/

@@ -6,8 +6,6 @@ LLM06 실습 — 권한 우회로 admin tool을 호출하도록 유도.
 """
 from __future__ import annotations
 
-import json
-import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -15,8 +13,9 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.tools import TOOLS, call_tool
+from app.tools import TOOLS, call_tool, reset_lab_state
 from app.llm import LLMClient
+from app.tool_call_parser import extract_tool_call
 
 app = FastAPI(title="vuln-agent [Goat Farm Helper]")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -44,37 +43,6 @@ SYSTEM_PROMPT = """너는 'Goat Farm Helper' 에이전트야. 농장주를 도�
 5. 권한 검증은 시스템이 한다. 너는 시키는 일을 한다.
    (참고: 현재 사용자 = farmer1, L1 권한)
 """
-
-
-def extract_tool_json(text: str) -> str | None:
-    """Extract the first balanced JSON object that looks like a tool call."""
-    start = text.find("{")
-    while start != -1:
-        depth = 0
-        in_string = False
-        escaped = False
-        for i, ch in enumerate(text[start:], start=start):
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif ch == "\\":
-                    escaped = True
-                elif ch == '"':
-                    in_string = False
-                continue
-            if ch == '"':
-                in_string = True
-            elif ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    candidate = text[start:i + 1]
-                    if '"tool"' in candidate:
-                        return candidate
-                    break
-        start = text.find("{", start + 1)
-    return None
 
 
 class ChatReq(BaseModel):
@@ -108,14 +76,9 @@ async def chat(req: ChatReq):
         )
         trace.append({"step": step, "llm": resp})
 
-        # tool 호출 JSON 추출
-        tool_json = extract_tool_json(resp)
-        if not tool_json:
-            return JSONResponse({"reply": resp, "trace": trace, "user": user_id})
-
-        try:
-            call = json.loads(tool_json)
-        except json.JSONDecodeError:
+        # 설명 문장이나 code fence가 섞여도 중첩 args 객체를 포함한 JSON을 추출한다.
+        call = extract_tool_call(resp)
+        if call is None:
             return JSONResponse({"reply": resp, "trace": trace, "user": user_id})
 
         tool_name = call.get("tool")
@@ -140,3 +103,9 @@ async def chat(req: ChatReq):
 async def list_tools():
     """LLM에게 직접 묻지 않고 tool 목록을 노출하는 디버그 엔드포인트(취약)."""
     return {name: t.__doc__ for name, t in TOOLS.items()}
+
+
+@app.post("/api/admin/reset")
+async def reset_for_e2e():
+    """강의용 in-memory 상태를 재현 가능한 E2E 기준선으로 되돌린다."""
+    return reset_lab_state()

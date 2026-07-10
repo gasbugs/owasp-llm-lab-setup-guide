@@ -3,14 +3,14 @@
 #
 # 원본: https://github.com/SECFORCE/LLMGoat (Apache 2.0)
 # 빌드:
-#   docker build -t docker.io/gasbugs/owasp-llm-llmgoat:latest .
+#   docker build -t docker.io/gasbugs/owasp-llm-llmgoat:sha-<commit> .
 # 실행 (본 강의 인프라):
 #   docker run -d --name lab-llmgoat --device nvidia.com/gpu=all -p 5000:5000 \
 #     -e LLMGOAT_SERVER_HOST=0.0.0.0 -e LLMGOAT_DEFAULT_MODEL=gemma-2.gguf \
 #     -e LLMGOAT_N_GPU_LAYERS=20 \
 #     -v ~/.LLMGoat/models:/root/.LLMGoat/models:Z \
 #     -v ~/.LLMGoat/cache:/root/.LLMGoat/cache:Z \
-#     docker.io/gasbugs/owasp-llm-llmgoat:latest
+#     docker.io/gasbugs/owasp-llm-llmgoat:sha-<commit>
 #
 # 첫 부팅 시 gemma-2-9b-it-Q4_K_M GGUF (~5GB)를 Hugging Face에서 자동 다운로드.
 

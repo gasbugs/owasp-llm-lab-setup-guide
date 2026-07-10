@@ -1,4 +1,4 @@
-"""Day 2 — LLM02/03/04 시나리오.
+"""Day 2 — LLM02/LLM04 시나리오.
 
 은행 챗봇 + 의도된 RBAC 우회 + 누구나 RAG 코퍼스에 문서를 주입 가능.
 """
@@ -69,7 +69,7 @@ def delete_doc(index: int) -> str | None:
 
 scenario = Scenario(
     id="day2",
-    title="한빛은행 고객 서비스 (LLM02/03/04)",
+    title="한빛은행 고객 서비스 (LLM02/LLM04)",
     intro="은행 챗봇이야. 권한 우회로 다른 고객 정보 얻기, RAG poisoning 등.",
     warning="의도적 취약 — 실제 은행 시스템 아님.",
     build_system_prompt=build_system_prompt,

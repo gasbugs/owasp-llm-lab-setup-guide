@@ -47,6 +47,7 @@
     <textarea id="message" placeholder="페이로드 또는 자연어 입력..." required></textarea>
     <label><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 (Day 3 LLM05 시연용)</label>
     <button type="submit">Send</button>
+    <button id="replay-last" type="button" disabled>마지막 응답 다시 렌더링</button>
   </form>
 
   <section class="panel">
@@ -73,6 +74,7 @@ const chat = document.getElementById('chat');
 const form = document.getElementById('form');
 const msg = document.getElementById('message');
 const renderHTML = document.getElementById('render-html');
+const replayLast = document.getElementById('replay-last');
 const scenarioSelect = document.getElementById('scenario');
 const injectForm = document.getElementById('inject-form');
 const docTitle = document.getElementById('doc-title');
@@ -80,6 +82,7 @@ const docText = document.getElementById('doc-text');
 const injectStatus = document.getElementById('inject-status');
 const refreshDocs = document.getElementById('refresh-docs');
 const docList = document.getElementById('doc-list');
+let lastBotReply = null;
 
 function add(role, text, html=false) {
   const d = document.createElement('div');
@@ -102,10 +105,17 @@ form.addEventListener('submit', async (e) => {
     body: JSON.stringify({ message: text, session_id: 'default', scenario: scenarioSelect.value }),
   });
   const data = await r.json();
+  lastBotReply = data.reply;
+  replayLast.disabled = false;
   add('bot', data.reply, renderHTML.checked);
   if (data.debug?.retrieved_chunks?.length) {
     add('debug', '[retrieved] ' + JSON.stringify(data.debug.retrieved_chunks));
   }
+});
+
+replayLast.addEventListener('click', () => {
+  if (lastBotReply === null) return;
+  add('bot-replay', lastBotReply, renderHTML.checked);
 });
 
 async function loadDocs() {

@@ -5,16 +5,17 @@
 ## AMI에 포함되는 것
 
 - Ubuntu 24.04 LTS + 최신 보안 패치
-- NVIDIA Driver + CUDA Toolkit 12.5
+- NVIDIA Driver + CUDA Toolkit 12.8
 - nvidia-container-toolkit (CDI 모드, `/etc/cdi/nvidia.yaml` 사전 생성)
-- **Podman (rootless) + podman-compose + podman-docker** (Docker daemon 없음)
+- **Podman rootless + Quadlet** (Docker daemon과 Compose 없음)
 - AWS CLI v2 + SSM 에이전트
 - 강의용 컨테이너 이미지 (Docker Hub에서 사전 podman pull)
 - LLM 모델 weights (`llama3.1:8b-instruct-q4_K_M`, 약 5GB)
 
 포함하지 않는 것:
 
-- 강의 원본 저장소 clone. 수강생 자료는 별도 ZIP으로 배포하고, 강사용 live 검증 코드는 `LIVE-VALIDATION-RUNBOOK.md` 절차로 임시 업로드한다.
+- 수강생 작업물, 정답, 이전 실행의 검증 증거
+- `tests/e2e/` checkout. 강사용 검증 도구는 AMI에 굽지 않고 검증할 저장소 커밋에서 실행한다.
 
 ## 사전 준비 — 강사 측
 
@@ -22,7 +23,10 @@
 
 ```bash
 cd ../../docker
-DOCKERHUB_NAMESPACE=your-username ./build-and-push.sh
+SETUP_COMMIT=$(git rev-parse HEAD)
+DOCKERHUB_NAMESPACE=your-username \
+TAG="sha-$SETUP_COMMIT" \
+  ./build-and-push.sh
 ```
 
 이후 Packer가 그 이미지를 podman pull로 캐시.
@@ -31,11 +35,13 @@ DOCKERHUB_NAMESPACE=your-username ./build-and-push.sh
 
 ```bash
 cd infrastructure/packer
+SETUP_COMMIT=$(git rev-parse HEAD)
 packer init ami.pkr.hcl
 packer build \
   -var "aws_profile=owasp-llm" \
   -var "region=us-east-1" \
-  -var "dockerhub_namespace=<your-username>" \
+  -var "dockerhub_namespace=your-username" \
+  -var "image_tag=sha-$SETUP_COMMIT" \
   ami.pkr.hcl
 ```
 
@@ -69,7 +75,7 @@ ami_name_pattern = "owasp-llm-lab-*"
 **rootless podman에서 GPU 안 보임**
 - `/etc/cdi/nvidia.yaml`이 생성되어야 함. `30-podman.sh`가 자동 생성.
 - 안 되면 인스턴스 안에서 `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`.
-- 확인: `sudo -u ubuntu podman run --rm --device nvidia.com/gpu=all docker.io/nvidia/cuda:12.5.0-base-ubuntu24.04 nvidia-smi`
+- 확인: `sudo -u ubuntu podman run --rm --device nvidia.com/gpu=all docker.io/nvidia/cuda:12.8.2-base-ubuntu24.04 nvidia-smi`
 
 **모델 weights 다운로드 실패**
 - Ollama 컨테이너가 들어오는 동안 listen하지 않은 경우. `sleep` 늘리기.

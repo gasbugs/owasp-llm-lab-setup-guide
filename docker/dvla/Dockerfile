@@ -1,32 +1,35 @@
 # docker/dvla/Dockerfile
-# WithSecureLabs/damn-vulnerable-llm-agent (Apache 2.0)
+# ReversecLabs/damn-vulnerable-llm-agent (Apache 2.0)
 # Day 3 LLM06 cross-platform 학습용. ReAct Agent 취약 — 본 강의 lab-ollama 공유.
 #
 # 빌드:
-#   docker build -t docker.io/gasbugs/owasp-llm-dvla:latest .
+#   docker build -t docker.io/gasbugs/owasp-llm-dvla:sha-<commit> .
 #
 # 실행 (본 강의 인프라):
 #   docker run -d --name lab-day3-dvla --network host \
 #     -e OLLAMA_HOST=http://localhost:11434 \
 #     -e OLLAMA_API_BASE=http://localhost:11434 \
 #     -e model_name=ollama-local-llama3 \
-#     docker.io/gasbugs/owasp-llm-dvla:latest
+#     docker.io/gasbugs/owasp-llm-dvla:sha-<commit>
 #
 # 로컬 검증 (Mac native Ollama):
 #   docker run -d --name lab-day3-dvla -p 8501:8501 \
 #     -e OLLAMA_HOST=http://host.docker.internal:11434 \
 #     -e OLLAMA_API_BASE=http://host.docker.internal:11434 \
 #     -e model_name=ollama-local-llama3 \
-#     docker.io/gasbugs/owasp-llm-dvla:latest
+#     docker.io/gasbugs/owasp-llm-dvla:sha-<commit>
 
 # ---------- stage 1: clone ----------
 FROM alpine/git:latest AS clone
 
-ARG REPO_REF=main
+ARG REPO_URL=https://github.com/ReversecLabs/damn-vulnerable-llm-agent.git
+ARG REPO_REF=c0cf9a14adad76e9d6a53c41741f625334bd9971
 WORKDIR /src
 
-RUN git clone --depth=1 --branch=${REPO_REF} \
-    https://github.com/WithSecureLabs/damn-vulnerable-llm-agent.git .
+RUN git init . \
+    && git remote add origin "${REPO_URL}" \
+    && git fetch --depth=1 origin "${REPO_REF}" \
+    && git checkout --detach FETCH_HEAD
 
 # ---------- stage 2: runtime (DVLA 원본 Dockerfile 그대로 + ollama env) ----------
 FROM python:3.11-slim

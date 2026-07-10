@@ -4,7 +4,7 @@
 # ⚠️ 2026-05-20 운영 모델 재설계 이후: 수강생 자원은 *수강생 본인 AWS 계정*에 있어
 # 강사가 destroy할 수 없습니다. 본 스크립트는 *강사 본인 dry-run* 자원 정리용.
 #
-# 수강생용 destroy는 STUDENT_SETUP.md 12단계 참고:
+# 수강생용 destroy는 docs/STUDENT-QUICKSTART.md 참고:
 #   cd infrastructure/terraform && terraform destroy -auto-approve
 
 set -euo pipefail

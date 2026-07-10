@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Day 2 LLM03 Supply Chain fake model-registry (port 8002).
+"""LLM03 Supply Chain fake model-registry (port 8002).
 
 Endpoints:
 - GET /                             → service info

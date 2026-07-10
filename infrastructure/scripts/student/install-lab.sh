@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.4"
+SCRIPT_VERSION="0.1.5"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -53,10 +53,13 @@ COURSE_ID=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/tags/insta
 
 echo "INSTANCE_ID=$INSTANCE_ID REGION=$REGION PUBLIC_IPV4=${PUBLIC_IPV4:-none} STUDENT=$STUDENT COURSE_ID=$COURSE_ID"
 
-# 2) /etc/lab/env
-step "2/10" "/etc/lab/env에 실습 환경 변수를 기록합니다"
+# 2) /etc/lab/env 후보
+# 설치가 끝나기 전에 새 태그를 확정 기록하면 실패한 재설치가 새 런타임처럼 보일 수 있다.
+# 먼저 후보 파일을 만들고, 서비스 reconcile과 warm-up이 끝난 뒤 원자적으로 승격한다.
+step "2/10" "/etc/lab/env 후보에 요청한 실습 환경 변수를 기록합니다"
 install -d -m 0755 /etc/lab
-cat > /etc/lab/env <<EOF
+LAB_ENV_CANDIDATE=/etc/lab/env.pending
+cat > "$LAB_ENV_CANDIDATE" <<EOF
 SCRIPT_VERSION=$SCRIPT_VERSION
 STUDENT=$STUDENT
 COURSE_ID=$COURSE_ID
@@ -69,7 +72,7 @@ OLLAMA_COMPAT_MODEL=$OLLAMA_COMPAT_MODEL
 LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
 SKIP_EMBEDDING_VENV=$SKIP_EMBEDDING_VENV
 EOF
-chmod 0644 /etc/lab/env
+chmod 0644 "$LAB_ENV_CANDIDATE"
 
 # 3) 작업 디렉터리 생성
 step "3/10" "ubuntu 사용자 작업 디렉터리를 준비합니다"
@@ -79,7 +82,6 @@ install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/work
 step "4/10" "Podman rootless 실행에 필요한 패키지를 확인하고 부족하면 설치합니다"
 export DEBIAN_FRONTEND=noninteractive
 if command -v podman >/dev/null 2>&1 && \
-  command -v podman-compose >/dev/null 2>&1 && \
   command -v crun >/dev/null 2>&1 && \
   command -v fuse-overlayfs >/dev/null 2>&1 && \
   command -v slirp4netns >/dev/null 2>&1 && \
@@ -92,7 +94,7 @@ else
   apt-get install -y --no-install-recommends \
     curl ca-certificates git jq \
     python3-venv \
-    podman podman-compose podman-docker crun fuse-overlayfs slirp4netns uidmap
+    podman crun fuse-overlayfs slirp4netns uidmap
 fi
 
 # rootless 설정
@@ -170,14 +172,19 @@ if [ -f /home/ubuntu/.LLMGoat/models/gemma-2.gguf ]; then
   fi
 fi
 
-# Day 2 LLM03 Supply Chain — fake model-registry (port 8002)
+# LLM03 Supply Chain — fake model-registry (port 8002)
 echo "[install-lab] preparing fake model registry files"
 mkdir -p /home/ubuntu/work/fake-registry
-if [ -s /home/ubuntu/work/fake-registry/server.py ]; then
-  echo "[install-lab] fake-registry server.py already exists"
-else
-  curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py" -o /home/ubuntu/work/fake-registry/server.py
+FAKE_REGISTRY_TMP=/home/ubuntu/work/fake-registry/server.py.next
+curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py" -o "$FAKE_REGISTRY_TMP"
+FAKE_REGISTRY_CHANGED=true
+if [ -s /home/ubuntu/work/fake-registry/server.py ] && \
+  cmp -s "$FAKE_REGISTRY_TMP" /home/ubuntu/work/fake-registry/server.py; then
+  FAKE_REGISTRY_CHANGED=false
 fi
+install -m 0644 -o ubuntu -g ubuntu \
+  "$FAKE_REGISTRY_TMP" /home/ubuntu/work/fake-registry/server.py
+rm -f "$FAKE_REGISTRY_TMP"
 chown -R ubuntu:ubuntu /home/ubuntu/work/fake-registry
 
 echo "[install-lab] preparing lab portal files"
@@ -198,6 +205,12 @@ chown -R ubuntu:ubuntu /home/ubuntu/work/dvla
 
 QUADLET_DIR="/home/ubuntu/.config/containers/systemd"
 install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR"
+
+QUADLET_FINGERPRINT_BEFORE=$(
+  for file in "$QUADLET_DIR"/lab-*.container; do
+    [ -f "$file" ] && sha256sum "$file"
+  done | sort | sha256sum | awk '{print $1}'
+)
 
 echo "[install-lab] writing Quadlet unit files under $QUADLET_DIR"
 
@@ -258,6 +271,7 @@ Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}
 Network=host
 Environment=DEFAULT_SCENARIO=${scenario}
 Environment=SCENARIO=${scenario}
+Environment=PORT=${rag_port}
 Environment=OLLAMA_URL=http://localhost:11434
 Environment=OLLAMA_MODEL=$OLLAMA_MODEL
 Exec=uv run uvicorn app.main:app --host 0.0.0.0 --port ${rag_port}
@@ -375,9 +389,23 @@ EOF
 
 chown -R ubuntu:ubuntu "$QUADLET_DIR"
 
-"${RUN_AS_UBUNTU[@]}" bash <<'QUADLETSH'
+QUADLET_FINGERPRINT_AFTER=$(
+  for file in "$QUADLET_DIR"/lab-*.container; do
+    [ -f "$file" ] && sha256sum "$file"
+  done | sort | sha256sum | awk '{print $1}'
+)
+QUADLET_CHANGED=false
+if [ "$QUADLET_FINGERPRINT_BEFORE" != "$QUADLET_FINGERPRINT_AFTER" ]; then
+  QUADLET_CHANGED=true
+fi
+
+"${RUN_AS_UBUNTU[@]}" \
+  REFRESH_IMAGES="$REFRESH_IMAGES" \
+  QUADLET_CHANGED="$QUADLET_CHANGED" \
+  FAKE_REGISTRY_CHANGED="$FAKE_REGISTRY_CHANGED" \
+  bash <<'QUADLETSH'
 set -euo pipefail
-echo "[install-lab] reloading systemd user units and starting missing lab services"
+echo "[install-lab] reloading systemd user units and reconciling lab services"
 units=(
   lab-ollama
   lab-day1-vuln-rag
@@ -394,14 +422,36 @@ units=(
 systemctl --user daemon-reload
 for unit in "${units[@]}"; do
   systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
-  if [ "$unit" = "lab-day3-dvla" ] && systemctl --user is-active --quiet "$unit.service"; then
-    echo "[install-lab] restarting $unit.service to apply DVLA model config"
-    systemctl --user restart "$unit.service"
-  elif systemctl --user is-active --quiet "$unit.service"; then
-    echo "[install-lab] $unit.service already running"
-  else
+  if ! systemctl --user is-active --quiet "$unit.service"; then
     podman rm -f "$unit" >/dev/null 2>&1 || true
     systemctl --user start "$unit.service"
+    continue
+  fi
+
+  image_backed=false
+  case "$unit" in
+    lab-day?-vuln-rag|lab-day3-vuln-agent|lab-llmgoat|lab-day3-dvla)
+      image_backed=true
+      ;;
+  esac
+
+  restart_reason=""
+  if [ "$QUADLET_CHANGED" = "true" ]; then
+    restart_reason="Quadlet configuration changed"
+  elif [ "$REFRESH_IMAGES" = "true" ] && [ "$image_backed" = "true" ]; then
+    restart_reason="requested image refresh"
+  elif [ "$unit" = "lab-day3-dvla" ]; then
+    restart_reason="DVLA model configuration refreshed"
+  elif [ "$unit" = "lab-day2-fake-registry" ] && \
+    [ "$FAKE_REGISTRY_CHANGED" = "true" ]; then
+    restart_reason="fake-registry source refreshed"
+  fi
+
+  if [ -n "$restart_reason" ]; then
+    echo "[install-lab] restarting $unit.service: $restart_reason"
+    systemctl --user restart "$unit.service"
+  else
+    echo "[install-lab] $unit.service already matches requested configuration"
   fi
 done
 QUADLETSH
@@ -440,11 +490,13 @@ else
   echo "[install-lab] $LLAMA_GUARD_MODEL pulled (Day 5 Defense demo)"
 fi
 
-curl -s --max-time 120 http://localhost:11434/api/generate \
-  -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}" >/dev/null 2>&1 || true
+WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost:11434/api/generate \
+  -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}")
+printf '%s' "\$WARMUP_RESPONSE" \
+  | jq -e '.done == true and (.response | type == "string")' >/dev/null
 echo "[install-lab] ollama warm-up done"
 
-echo "[install-lab] checking optional Day 4 embedding Python environment"
+echo "[install-lab] checking optional Day 2 LLM08 embedding Python environment"
 if [ "$SKIP_EMBEDDING_VENV" = "true" ]; then
   echo "[install-lab] embedding-venv skipped by SKIP_EMBEDDING_VENV=true"
 else
@@ -452,25 +504,87 @@ else
   MIN_EMBEDDING_KB=\$((6 * 1024 * 1024))
   if [ "\$AVAILABLE_KB" -lt "\$MIN_EMBEDDING_KB" ]; then
     echo "[install-lab] embedding-venv skipped: only \$((AVAILABLE_KB / 1024)) MB free under /home/ubuntu/work"
-    echo "[install-lab] set SKIP_EMBEDDING_VENV=false and free at least 6 GB to install Day 4 embedding tools"
+    echo "[install-lab] set SKIP_EMBEDDING_VENV=false and free at least 6 GB to install Day 2 LLM08 embedding tools"
   else
     if [ -x /home/ubuntu/work/embedding-venv/bin/pip ] && \
       /home/ubuntu/work/embedding-venv/bin/pip show sentence-transformers scikit-learn numpy >/dev/null 2>&1; then
-      echo "[install-lab] embedding-venv already ready for Day 4 LLM08-A"
+      echo "[install-lab] embedding-venv already ready for Day 2 LLM08-A"
     else
       rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
       python3 -m venv /home/ubuntu/work/embedding-venv
       if timeout 600 /home/ubuntu/work/embedding-venv/bin/pip install --no-cache-dir -q sentence-transformers scikit-learn numpy; then
         chown -R ubuntu:ubuntu /home/ubuntu/work/embedding-venv 2>/dev/null || true
-        echo "[install-lab] embedding-venv ready for Day 4 LLM08-A"
+        echo "[install-lab] embedding-venv ready for Day 2 LLM08-A"
       else
         rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
-        echo "[install-lab] embedding-venv install failed or timed out; continuing without optional Day 4 embedding tools"
+        echo "[install-lab] embedding-venv install failed or timed out; continuing without optional Day 2 LLM08 tools"
       fi
     fi
   fi
 fi
 OLLAMASH
+
+echo "[install-lab] verifying reconciled service health and immutable image tags"
+"${RUN_AS_UBUNTU[@]}" \
+  IMAGE_NAMESPACE="$IMAGE_NAMESPACE" \
+  IMAGE_TAG="$IMAGE_TAG" \
+  bash <<'VERIFYSH'
+set -euo pipefail
+
+declare -A expected_images=(
+  [lab-day1-vuln-rag]="owasp-llm-vuln-rag"
+  [lab-day2-vuln-rag]="owasp-llm-vuln-rag"
+  [lab-day3-vuln-rag]="owasp-llm-vuln-rag"
+  [lab-day4-vuln-rag]="owasp-llm-vuln-rag"
+  [lab-day5-vuln-rag]="owasp-llm-vuln-rag"
+  [lab-day3-vuln-agent]="owasp-llm-vuln-agent"
+  [lab-llmgoat]="owasp-llm-llmgoat"
+  [lab-day3-dvla]="owasp-llm-dvla"
+)
+
+for container in "${!expected_images[@]}"; do
+  expected="docker.io/${IMAGE_NAMESPACE}/${expected_images[$container]}:${IMAGE_TAG}"
+  actual_name=$(podman inspect --format '{{.ImageName}}' "$container")
+  actual_id=$(podman inspect --format '{{.Image}}' "$container")
+  expected_id=$(podman image inspect --format '{{.Id}}' "$expected")
+  if [ "$actual_name" != "$expected" ] || [ "$actual_id" != "$expected_id" ]; then
+    echo "ERROR: $container runs $actual_name ($actual_id), expected $expected ($expected_id)" >&2
+    exit 1
+  fi
+done
+
+health_urls=(
+  http://localhost:11434/api/tags
+  http://localhost:8000/healthz
+  http://localhost:8010/healthz
+  http://localhost:8011/healthz
+  http://localhost:8012/healthz
+  http://localhost:8013/healthz
+  http://localhost:8001/healthz
+  http://localhost:8002/api/v1/models
+  http://localhost:8080/
+  http://localhost:8501/_stcore/health
+)
+
+for url in "${health_urls[@]}"; do
+  ready=false
+  for _ in $(seq 1 60); do
+    if curl -fsS --max-time 5 "$url" >/dev/null; then
+      ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$ready" != "true" ]; then
+    echo "ERROR: required lab endpoint did not become healthy: $url" >&2
+    exit 1
+  fi
+done
+VERIFYSH
+
+# 여기까지 성공해야 새 이미지 태그와 실제 실행 상태가 일치한다.
+# 후보와 대상이 같은 파일 시스템에 있으므로 rename으로 원자 교체한다.
+mv -f "$LAB_ENV_CANDIDATE" /etc/lab/env
 
 INSTALL_END_EPOCH=$(date +%s)
 INSTALL_DURATION=$((INSTALL_END_EPOCH - INSTALL_START_EPOCH))
@@ -499,25 +613,25 @@ OWASP LLM Lab 설치가 완료되었습니다.
     로컬 LLM 모델 목록 확인과 generate API 호출에 사용합니다.
 
   - Day 1 Vulnerable RAG  8000
-    LLM01/LLM02 계열 프롬프트 인젝션과 민감정보 노출 실습 앱입니다.
+    LLM01 프롬프트 인젝션 실습 앱입니다.
 
   - Day 2 Vulnerable RAG  8010
-    LLM03 공급망/모델 무결성 시나리오와 연결되는 RAG 실습 앱입니다.
+    LLM02 민감정보 노출과 LLM04 데이터·모델 오염 실습 앱입니다.
 
   - Day 3 Vulnerable RAG  8011
-    Agent/도구 호출 취약점과 비교하기 위한 RAG 실습 앱입니다.
+    LLM05 부적절한 출력 처리 실습 앱입니다.
 
   - Day 4 Vulnerable RAG  8012
-    LLM08 벡터/임베딩과 RAG 데이터 오염 실습 앱입니다.
+    Day 2 LLM08 벡터/임베딩과 Day 4 LLM07/LLM09 실습이 공유하는 앱입니다.
 
   - Day 5 Vulnerable RAG  8013
-    방어/가드레일 우회와 로깅/모니터링 실습 앱입니다.
+    LLM10 무제한 소비와 요청 제한 부재를 관찰하는 앱입니다.
 
   - Day 3 Vulnerable Agent 8001
     도구 호출형 LLM Agent의 excessive agency, tool misuse 실습 앱입니다.
 
-  - Day 2 Fake Model Registry 8002
-    모델 공급망/무결성 검증 실습용 가짜 모델 레지스트리 API입니다.
+  - LLM03 Fake Model Registry 8002
+    Day 4 모델 공급망/무결성 검증용 가짜 모델 레지스트리 API입니다.
 
   - LLMGoat               5000
     OWASP Top 10 for LLM 항목별 웹 챌린지 실습 UI입니다.
@@ -552,7 +666,7 @@ OWASP LLM Lab 설치가 완료되었습니다.
   Day 3 Vulnerable Agent health check:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8001/healthz
 
-  Day 2 Fake Model Registry model list:
+  Day 4 LLM03 Fake Model Registry model list:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8002/api/v1/models
 
   LLMGoat web UI:

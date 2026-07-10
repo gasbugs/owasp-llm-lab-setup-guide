@@ -4,22 +4,23 @@
 set -euo pipefail
 
 : "${DEFAULT_MODEL:?DEFAULT_MODEL 환경변수 필요}"
-: "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE 환경변수 필요. 예: owasplllab}"
+: "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE 환경변수 필요. 예: gasbugs}"
+: "${IMAGE_TAG:?IMAGE_TAG 환경변수 필요. sha-<40자리 lowercase Git commit> 필수}"
 
-# 1) Docker Hub 공개 이미지 + 강의 이미지 pull (rootless)
+if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
+  echo "ERROR: IMAGE_TAG must match sha-<40 lowercase Git commit characters>." >&2
+  exit 2
+fi
+
+# 1) 실제 Quadlet 런타임 이미지 pull (rootless)
 sudo -u ubuntu -i podman pull docker.io/ollama/ollama:latest
-sudo -u ubuntu -i podman pull docker.io/library/chromadb-chroma:latest || \
-  sudo -u ubuntu -i podman pull docker.io/chromadb/chroma:latest
-sudo -u ubuntu -i podman pull docker.io/ghcr.io/open-webui/open-webui:main || \
-  sudo -u ubuntu -i podman pull ghcr.io/open-webui/open-webui:main
-sudo -u ubuntu -i podman pull docker.io/langfuse/langfuse:2 || true
-sudo -u ubuntu -i podman pull docker.io/library/postgres:16
+sudo -u ubuntu -i podman pull docker.io/library/python:3.12-slim
 
-# 강사가 미리 Docker Hub에 push해 둔 강의 컨테이너 이미지
-sudo -u ubuntu -i podman pull "docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-base-gpu:latest" || \
-  echo "(base-gpu 이미지가 아직 push 안 됨 — 강사가 docker/push-to-hub.sh 실행 필요)"
-sudo -u ubuntu -i podman pull "docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-vuln-rag:latest" || true
-sudo -u ubuntu -i podman pull "docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-vuln-agent:latest" || true
+# 동일 커밋의 이미지 세트가 하나라도 없으면 AMI 빌드를 실패시킨다.
+for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+  sudo -u ubuntu -i podman pull \
+    "docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-${image}:${IMAGE_TAG}"
+done
 
 # 2) 모델 weights 사전 다운로드 — Ollama를 잠깐 띄워 pull한 다음 종료
 # weights는 /home/ubuntu/.local/share/containers/storage/volumes 또는 별도 호스트 디렉터리에 보존
@@ -42,8 +43,8 @@ done
 sudo -u ubuntu -i podman exec ollama-prepull ollama pull "$DEFAULT_MODEL"
 sudo -u ubuntu -i podman stop ollama-prepull
 
-# 3) 정리
-sudo -u ubuntu -i podman system prune -af --filter "label!=keep" || true
+# 3) 중지된 임시 컨테이너만 정리한다. 사전 pull 이미지는 AMI cache로 보존한다.
+sudo -u ubuntu -i podman container prune -f || true
 sudo apt-get clean
 
 # 4) AMI 빌드 메타데이터
@@ -52,6 +53,7 @@ sudo tee /etc/lab/build-info <<EOF
 AMI_BUILD_TIME=$(date -Iseconds)
 DEFAULT_MODEL=$DEFAULT_MODEL
 DOCKERHUB_NAMESPACE=$DOCKERHUB_NAMESPACE
+IMAGE_TAG=$IMAGE_TAG
 EOF
 
 echo "=== 40-pull-images.sh done ==="

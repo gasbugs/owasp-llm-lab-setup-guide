@@ -408,8 +408,8 @@
         href: url(8000),
         check: url(8000, "/healthz"),
         checkLabel: "Health",
-        tags: ["LLM01", "LLM02", "RAG"],
-        desc: "프롬프트 인젝션과 민감정보 노출을 RAG 챗봇에서 확인합니다."
+        tags: ["LLM01", "Prompt Injection", "RAG"],
+        desc: "프롬프트 인젝션을 RAG 챗봇에서 확인합니다."
       },
       {
         group: "day",
@@ -418,8 +418,8 @@
         href: url(8010),
         check: url(8010, "/healthz"),
         checkLabel: "Health",
-        tags: ["LLM03", "Supply Chain", "RAG"],
-        desc: "모델 공급망과 무결성 검증 시나리오를 RAG 흐름과 함께 다룹니다."
+        tags: ["LLM02", "LLM04", "RAG"],
+        desc: "민감정보 노출과 데이터·모델 오염 시나리오를 다룹니다."
       },
       {
         group: "day",
@@ -428,8 +428,8 @@
         href: url(8011),
         check: url(8011, "/healthz"),
         checkLabel: "Health",
-        tags: ["Agent", "Tools", "RAG"],
-        desc: "Agent 취약점 실습 전후로 비교할 수 있는 RAG 시나리오입니다."
+        tags: ["LLM05", "Output Handling", "RAG"],
+        desc: "LLM 응답의 부적절한 HTML 렌더링과 출력 처리를 확인합니다."
       },
       {
         group: "day",
@@ -438,8 +438,8 @@
         href: url(8012),
         check: url(8012, "/healthz"),
         checkLabel: "Health",
-        tags: ["LLM08", "Embedding", "Data"],
-        desc: "벡터/임베딩 기반 검색과 RAG 데이터 오염을 실습합니다."
+        tags: ["Day 2 LLM08", "Day 4 LLM07/09", "RAG"],
+        desc: "벡터/임베딩, 시스템 프롬프트 노출과 과신 시나리오가 공유하는 앱입니다."
       },
       {
         group: "day",
@@ -448,8 +448,8 @@
         href: url(8013),
         check: url(8013, "/healthz"),
         checkLabel: "Health",
-        tags: ["Defense", "Guardrail", "Logging"],
-        desc: "방어, 가드레일 우회, 로깅/모니터링 흐름을 확인합니다."
+        tags: ["LLM10", "Consumption", "Rate limit"],
+        desc: "동시 요청과 큰 입력에 대한 제한 부재를 관찰합니다."
       },
       {
         group: "tool",
@@ -463,7 +463,7 @@
       },
       {
         group: "tool",
-        title: "Day 2 Fake Model Registry",
+        title: "Day 4 LLM03 Fake Model Registry",
         port: 8002,
         href: url(8002, "/api/v1/models"),
         check: url(8002, "/api/v1/models"),

@@ -1,6 +1,6 @@
 # OWASP LLM Lab Setup Guide
 
-수강생이 본인 AWS 계정에 OWASP Top 10 for LLM 실습 환경을 만들고, 컨테이너 애플리케이션을 배포하고, 매일 안전하게 시작/종료할 수 있도록 정리한 공개 가이드입니다.
+OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스크립트와 강사용 실측 검증을 함께 관리하는 공개 설정 저장소입니다. EC2에 무엇을 설치하고 어떤 이미지·포트·health 계약을 검증하는지는 이 저장소를 단일 기준으로 삼습니다.
 
 > WARNING: 이 저장소의 일부 컨테이너는 교육 목적으로 의도적으로 취약하게 만든 실습 앱입니다. 허가된 개인 실습 계정과 강의 범위 안에서만 사용하세요.
 
@@ -11,12 +11,15 @@
 | `docs/STUDENT-QUICKSTART.md` | 수강생이 따라 하는 Day 0 셋업 절차 |
 | `docs/ARCHITECTURE.md` | AWS VM, Terraform, user-data, 컨테이너 배포 구조 |
 | `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 Docker Hub에 push하는 절차 |
+| `docs/LIVE-VALIDATION.md` | commit 태그와 resolved digest로 EC2 런타임을 설치하고 증거를 회수하는 강사용 절차 |
 | `docs/TROUBLESHOOTING.md` | quota, SSM, Terraform, Podman, Ollama 문제 해결 |
 | `infrastructure/terraform/` | VPC, 보안 그룹, EC2 GPU 인스턴스, IAM, Budget 알람 |
 | `infrastructure/terraform/user-data.sh.tpl` | 선택적 자동 설치용 user-data 래퍼. 기본값에서는 비활성화 |
 | `infrastructure/scripts/student/` | 수강생용 preflight, 수동 설치/클린업, instance-id, start, stop, sync 헬퍼 |
 | `infrastructure/packer/` | 선택 사항: 강사용 Golden AMI 빌드 |
-| `docker/` | 실습 컨테이너 Dockerfile, compose, 취약 RAG/Agent 앱 코드 |
+| `docker/` | 이미지 Dockerfile·build helper·취약 앱 소스. 실제 배포 unit은 `install-lab.sh`가 생성하는 Quadlet |
+| `tests/unit/` | 파서·UI 계약·공개 저장소 PII/secret 회귀 검사 |
+| `tests/e2e/` | 공개 강사용 런타임 실측 검증. 수강생 과제나 채점 기준이 아님 |
 
 ## 빠른 시작
 
@@ -62,6 +65,24 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 6. `lab-ollama`, `lab-portal`, `lab-day1-vuln-rag`~`lab-day5-vuln-rag`, `lab-day3-vuln-agent`, `lab-llmgoat`, `lab-day3-dvla`, `lab-day2-fake-registry` 컨테이너를 실행합니다.
 7. Podman Quadlet 기반 systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
 
+## 강사용 런타임 검증
+
+컨테이너 변경은 CI의 unit·Python compile·shell syntax·Terraform·Packer·Docker build-config·공개 저장소 위생 검사를 통과한 뒤에만 Docker Hub로 push됩니다. `sha-<40자리 Git commit>` 태그는 한 번 publish되면 workflow와 로컬 helper가 덮어쓰기를 거부하며, 모든 이미지 빌드가 끝난 경우에만 그 이미지 세트를 `latest`로 승격합니다.
+
+실측 검증에서는 `latest` 대신 검증할 커밋 태그를 지정하고, 실제 pull된 각 이미지의 resolved digest를 함께 기록하세요. 일부 upstream base image와 설치 스크립트가 이동 태그를 사용하므로 Git commit만으로 bit-for-bit 재빌드를 보장하지 않으며, 최초 publish된 digest가 최종 실행 식별자입니다.
+
+```bash
+git fetch origin main
+SETUP_COMMIT=$(git rev-parse origin/main)
+sudo env IMAGE_NAMESPACE=gasbugs IMAGE_TAG="sha-$SETUP_COMMIT" \
+  LAB_SETUP_REPO_RAW_URL="https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/$SETUP_COMMIT" \
+  bash infrastructure/scripts/student/install-lab.sh
+
+TRIALS=5 bash tests/e2e/run-full-cycle.sh
+```
+
+전체 절차와 결과 경로는 [docs/LIVE-VALIDATION.md](docs/LIVE-VALIDATION.md)에 고정합니다.
+
 강사가 운영 편의상 자동 설치를 원하면 `terraform.tfvars`에 아래 값을 추가합니다.
 
 ```hcl
@@ -74,8 +95,8 @@ enable_user_data_bootstrap = true
 
 - `g6.xlarge`는 실행 중일 때 비용이 발생합니다.
 - `stop` 상태에서는 EC2 시간당 요금이 멈추지만 EBS 비용은 남습니다.
-- 매일 실습 종료 후 반드시 `stop-lab.sh`를 실행하세요.
-- 기본 Terraform 설정은 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다. `auto_stop_schedule_mode`로 야간 반복 모드나 custom cron으로 바꿀 수 있습니다.
+- 매일 실습 종료 후 반드시 `stop-lab.sh`를 실행하세요. 자동 중지를 기다리는 것은 정상 종료 절차가 아닙니다.
+- 기본 Terraform 설정은 수동 종료 누락에 대비한 보조 안전장치로 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다. `auto_stop_schedule_mode`로 야간 반복 모드나 custom cron으로 바꿀 수 있습니다.
 - 강의 종료 후에는 보존할 작업물을 개인 GitHub repo에 push한 뒤 `terraform destroy`를 실행하세요.
 - Budget은 비용을 막아 주는 장치가 아니라 경보입니다. 알람이 오면 즉시 stop 상태를 확인하세요.
 
@@ -88,4 +109,4 @@ enable_user_data_bootstrap = true
 
 ## 라이선스와 주의
 
-이 저장소 자체는 MIT License로 배포됩니다. 단, `docker/llmgoat`와 `docker/dvla`는 각각 원본 오픈소스 프로젝트를 컨테이너화한 wrapper이며, 해당 원본 프로젝트의 라이선스와 고지 사항을 함께 따릅니다.
+이 저장소 자체는 MIT License로 배포됩니다. 단, `docker/llmgoat`와 `docker/dvla`는 각각 SECFORCE/LLMGoat와 ReversecLabs/damn-vulnerable-llm-agent를 컨테이너화한 wrapper이며, 해당 원본 프로젝트의 라이선스와 고지 사항을 함께 따릅니다.
