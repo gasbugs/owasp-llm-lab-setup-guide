@@ -1012,7 +1012,15 @@ run_bounded 300 terraform -chdir="$TF_DIR" init -input=false -no-color \
   >>"$CONTROL_LOG" 2>&1
 run_bounded 120 terraform -chdir="$TF_DIR" validate -no-color \
   >>"$CONTROL_LOG" 2>&1
-existing_state=$(terraform -chdir="$TF_DIR" state list)
+existing_state=""
+# A brand-new local backend has no terraform.tfstate file.  Terraform 1.14
+# returns exit 1 for `state list` in that expected condition, so only invoke
+# the command when a state file is actually present.  If a state file exists,
+# any read error remains fatal under `set -e` and any listed resource aborts
+# the paid run below.
+if [ -f "$TF_DIR/terraform.tfstate" ]; then
+  existing_state=$(terraform -chdir="$TF_DIR" state list)
+fi
 if [ -n "$existing_state" ]; then
   echo "ERROR: Terraform state is not empty; refusing to mix or destroy existing resources" >&2
   printf '%s\n' "$existing_state" >&2

@@ -228,6 +228,18 @@ class LiveControllerContractTest(unittest.TestCase):
         self.assertNotIn("PRESERVE", source)
         self.assertNotIn("SKIP_DESTROY", source)
 
+    def test_absent_initial_terraform_state_is_treated_as_empty(self) -> None:
+        source = read("run-commit-live-validation.sh")
+        state_guard = source.index('if [ -f "$TF_DIR/terraform.tfstate" ]; then')
+        state_list = source.index(
+            'existing_state=$(terraform -chdir="$TF_DIR" state list)', state_guard
+        )
+        state_abort = source.index(
+            'if [ -n "$existing_state" ]; then', state_list
+        )
+        self.assertLess(state_guard, state_list)
+        self.assertLess(state_list, state_abort)
+
     def test_remote_runner_uses_strict_exit_codes_and_archives_every_failure(self) -> None:
         source = read("run-remote-validation.sh")
         self.assertIn("trap finalize EXIT", source)
