@@ -1,6 +1,6 @@
 # Instructor image build and release
 
-이 문서는 강사 또는 운영자가 실습 컨테이너 이미지를 commit과 연결해 빌드하고 Docker Hub에 공개하는 절차입니다. 실제 EC2 검증에서는 `latest`가 아니라 `sha-<40자리 commit>` 태그와 resolved digest를 함께 사용합니다. 일부 upstream base가 이동 태그이므로 bit-for-bit 재빌드를 주장하지 않으며, 최초 publish된 commit 태그는 덮어쓰지 않습니다.
+이 문서는 강사 또는 운영자가 실습 컨테이너 이미지를 commit과 연결해 빌드하고 공개 GitHub Container Registry(GHCR)에 배포하는 절차입니다. 실제 EC2 검증에서는 `latest`가 아니라 `sha-<40자리 commit>` 태그와 resolved digest를 함께 사용합니다. 일부 upstream base가 이동 태그이므로 bit-for-bit 재빌드를 주장하지 않으며, 최초 publish된 commit 태그는 덮어쓰지 않습니다.
 
 ## 이미지 세트
 
@@ -23,20 +23,15 @@
 중간 이미지가 실패하면 `latest` 승격 단계는 실행되지 않습니다. `vuln-rag`와 `vuln-agent`도 같은 커밋의 SHA-tagged `base-gpu`를 부모로 사용합니다.
 같은 commit 태그가 하나라도 이미 존재하면 workflow는 빌드 전에 실패합니다. 부분 publish가 발생한 경우 기존 태그를 덮어쓰지 말고 원인을 수정한 새 commit으로 다시 실행합니다.
 
-저장소 Actions secrets에 다음 두 값을 등록해야 합니다.
+Workflow는 `github.actor`와 저장소에 자동 발급되는 `GITHUB_TOKEN`을 사용하므로 별도 registry 계정이나 외부 secret을 등록하지 않습니다. `build`와 `promote-latest` job에만 `packages: write`가 부여됩니다. 각 Dockerfile의 `org.opencontainers.image.source` label이 package를 이 공개 저장소와 연결합니다.
 
-| Secret | 값 |
-|---|---|
-| `DOCKERHUB_USERNAME` | Docker Hub 사용자명 |
-| `DOCKERHUB_TOKEN` | 해당 namespace에 push할 수 있는 access token |
-
-workflow의 `DOCKERHUB_NAMESPACE`가 실제 publish namespace와 일치해야 합니다. main push 또는 수동 `workflow_dispatch`가 성공한 뒤 Docker Hub에서 다섯 SHA 태그가 모두 존재하는지 확인합니다.
+최초 publish 뒤 다섯 package의 visibility를 GitHub package 설정에서 모두 `Public`으로 확인합니다. EC2와 Packer는 registry 자격증명을 받지 않으므로, 아래 anonymous manifest 조회가 다섯 이미지 모두에서 성공하기 전에는 라이브 검증을 시작하지 않습니다.
 
 ```bash
 SETUP_COMMIT=$(git rev-parse HEAD)
 for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
   podman manifest inspect \
-    "docker.io/gasbugs/owasp-llm-${image}:sha-${SETUP_COMMIT}" >/dev/null
+    "ghcr.io/gasbugs/owasp-llm-${image}:sha-${SETUP_COMMIT}" >/dev/null
 done
 ```
 
@@ -47,13 +42,13 @@ CI 장애 조사나 개인 namespace 검증에는 Podman helper를 사용할 수
 사전 조건:
 
 - Podman
-- `podman login docker.io`
+- `write:packages` 권한의 GitHub personal access token으로 `podman login ghcr.io`
 - Linux/amd64 builder 또는 Podman machine
 
 ```bash
 SETUP_COMMIT=$(git rev-parse HEAD)
 cd docker
-DOCKERHUB_NAMESPACE=your-dockerhub-id \
+IMAGE_NAMESPACE=your-github-id \
 TAG="sha-$SETUP_COMMIT" \
   ./build-and-push.sh
 ```
@@ -67,7 +62,7 @@ git fetch origin main
 SETUP_COMMIT=$(git rev-parse origin/main)
 for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
   sudo -u ubuntu podman pull \
-    "docker.io/gasbugs/owasp-llm-${image}:sha-${SETUP_COMMIT}"
+    "ghcr.io/gasbugs/owasp-llm-${image}:sha-${SETUP_COMMIT}"
 done
 ```
 

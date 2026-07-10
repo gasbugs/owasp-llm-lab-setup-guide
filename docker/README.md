@@ -37,7 +37,7 @@ commit 태그는 최초 publish 뒤 덮어쓰지 않습니다. 다만 LLMGoat·D
 ```bash
 SETUP_COMMIT=$(git rev-parse HEAD)
 cd docker
-DOCKERHUB_NAMESPACE=your-namespace \
+IMAGE_NAMESPACE=your-github-namespace \
 TAG="sha-$SETUP_COMMIT" \
   ./build-and-push.sh
 ```

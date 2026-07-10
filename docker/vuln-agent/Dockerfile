@@ -1,9 +1,12 @@
 # OWASP LLM Lab — vuln-agent (Podman/OCI 호환)
 
-ARG BASE_IMAGE=docker.io/gasbugs/owasp-llm-base-gpu:latest
+ARG BASE_IMAGE=ghcr.io/gasbugs/owasp-llm-base-gpu:latest
 FROM ${BASE_IMAGE}
 
+ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="owasp-llm-vuln-agent"
+LABEL org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide"
+LABEL org.opencontainers.image.revision="$VCS_REF"
 LABEL owasp.llm.lab.warning="INTENTIONALLY VULNERABLE — DO NOT DEPLOY OUTSIDE TRAINING"
 
 WORKDIR /app

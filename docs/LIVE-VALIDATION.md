@@ -6,6 +6,31 @@
 
 `tests/e2e/`는 공개된 강사용 검증 도구이며 수강생 과제나 채점 기준이 아닙니다. 의도적으로 취약한 동작을 실행하므로 본인이 허가한 개인 실습 계정에서만 사용합니다.
 
+## 비용 상한이 있는 단일 커밋 전수 실행
+
+아래 강사용 controller는 이 문서의 commit pin, Terraform user-data 설치, strict e2e, 현재 PyPI `NOT_FOUND` 후보의 격리 설치, Day 5 live-validation harness, 증거 회수와 destroy를 한 번에 묶습니다. 공개 이미지 원본은 `ghcr.io/gasbugs`로 고정하며 자격증명을 저장하지 않습니다. `COURSE_REPO`는 `capstone/solutions/validate-live.sh`를 포함한 로컬 강의 저장소 절대 경로입니다.
+
+```bash
+SETUP_COMMIT=$(git rev-parse origin/main)
+COURSE_COMMIT=$(git -C /absolute/path/to/owasp-top-10-for-llm rev-parse origin/main)
+
+SETUP_COMMIT="$SETUP_COMMIT" \
+COURSE_COMMIT="$COURSE_COMMIT" \
+COURSE_REPO=/absolute/path/to/owasp-top-10-for-llm \
+ALERT_EMAIL=instructor@example.com \
+AWS_PROFILE=owasp-llm \
+AWS_REGION=us-east-1 \
+STUDENT=validator \
+EMERGENCY_STOP_MINUTES=120 \
+  bash infrastructure/scripts/instructor/run-commit-live-validation.sh
+```
+
+controller는 setup과 course의 명시한 40자리 commit이 각각 공개 `origin/main`에 있고 course worktree가 완전히 clean인지 먼저 확인합니다. 이후 두 저장소를 임시 `git archive`로 분리하며, Terraform state와 Capstone upload, 로컬 browser harness도 이 고정 복사본만 사용합니다. 공개 GHCR의 다섯 이미지에서 tag digest와 `linux/amd64` digest를 고정하고, EC2의 실제 Podman digest와 `org.opencontainers.image.revision`이 다르면 테스트를 시작하지 않습니다.
+
+EC2 생성 전에는 선택한 Playwright package/browser를 실제 headless launch/close하고 로컬 `18011`, `18501` 포트가 비어 있는지도 확인합니다. 원격 strict core가 끝나면 controller가 SSM forward `8011→18011`, `8501→18501`을 bounded child process로 열고 Day 3 UI/DVLA harness를 실행합니다. 결과와 forward cleanup 증거를 원격 raw bundle에 원자적으로 전달한 뒤에만 archive를 닫습니다. `STRICT_ACCEPTANCE=true TRIALS=5` full-cycle의 종료 코드를 그대로 사용하며 LLM10 timeout 같은 결과를 controller가 임의로 성공으로 바꾸지 않습니다. raw evidence archive와 SHA-256은 기본적으로 `$HOME/owasp-llm-live-evidence/<run-id>/remote/`에 회수됩니다.
+
+테스트가 실패해도 원격 runner의 EXIT trap이 현재 증거를 먼저 archive합니다. 원격 timeout/crash면 controller가 기존 run root를 `partial=true`로 별도 archive해 회수합니다. 그 직후 captured instance ID와 고유 `Course` 태그로 EC2 terminate를 직접 요청하고 terminated 상태를 확인한 다음, `terraform destroy`로 나머지 자원을 정리합니다. 마지막에는 Terraform state뿐 아니라 EC2, EBS, 네트워크, Lambda, EventBridge, SNS, IAM, Budget을 직접 조회합니다. 증거 회수·직접 terminate·destroy·잔여 자원 확인 중 하나라도 실패하면 전체 명령도 실패합니다. 이 controller에는 인스턴스를 남기는 옵션이 없습니다.
+
 ## 1. 검증 커밋과 이미지 세트 고정
 
 main에 반영된 40자리 커밋을 선택합니다. PR 커밋은 테스트만 실행하며 publish하지 않습니다.
@@ -19,11 +44,12 @@ printf 'SETUP_COMMIT=%s\nIMAGE_TAG=%s\n' "$SETUP_COMMIT" "$IMAGE_TAG"
 ```
 
 GitHub Actions의 `Test, Build & Push Runtime Images`가 성공했는지 확인하고 다섯 manifest가 존재하는지 확인합니다.
+이 검사는 저장된 registry credential이 없는 환경에서도 성공해야 하며, 실패하면 package visibility를 `Public`으로 바로잡은 뒤에만 EC2를 생성합니다.
 
 ```bash
 for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
   podman manifest inspect \
-    "docker.io/gasbugs/owasp-llm-${image}:${IMAGE_TAG}" >/dev/null
+    "ghcr.io/gasbugs/owasp-llm-${image}:${IMAGE_TAG}" >/dev/null
 done
 ```
 
@@ -192,7 +218,7 @@ test -n "$EVIDENCE_DIR"
   sudo -u ubuntu podman ps --format 'image={{.Image}} name={{.Names}} status={{.Status}}'
 
   for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
-    ref="docker.io/${IMAGE_NAMESPACE}/owasp-llm-${image}:${IMAGE_TAG}"
+    ref="ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-${image}:${IMAGE_TAG}"
     sudo -u ubuntu podman image inspect "$ref" \
       | jq -r --arg reference "$ref" \
           '.[0] | "reference=\($reference) image_id=\(.Id) digest=\(.Digest // "unknown") repo_digests=\((.RepoDigests // []) | join(","))"'

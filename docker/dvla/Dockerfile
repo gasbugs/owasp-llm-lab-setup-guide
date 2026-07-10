@@ -3,21 +3,21 @@
 # Day 3 LLM06 cross-platform 학습용. ReAct Agent 취약 — 본 강의 lab-ollama 공유.
 #
 # 빌드:
-#   docker build -t docker.io/gasbugs/owasp-llm-dvla:sha-<commit> .
+#   docker build -t ghcr.io/gasbugs/owasp-llm-dvla:sha-<commit> .
 #
 # 실행 (본 강의 인프라):
 #   docker run -d --name lab-day3-dvla --network host \
 #     -e OLLAMA_HOST=http://localhost:11434 \
 #     -e OLLAMA_API_BASE=http://localhost:11434 \
 #     -e model_name=ollama-local-llama3 \
-#     docker.io/gasbugs/owasp-llm-dvla:sha-<commit>
+#     ghcr.io/gasbugs/owasp-llm-dvla:sha-<commit>
 #
 # 로컬 검증 (Mac native Ollama):
 #   docker run -d --name lab-day3-dvla -p 8501:8501 \
 #     -e OLLAMA_HOST=http://host.docker.internal:11434 \
 #     -e OLLAMA_API_BASE=http://host.docker.internal:11434 \
 #     -e model_name=ollama-local-llama3 \
-#     docker.io/gasbugs/owasp-llm-dvla:sha-<commit>
+#     ghcr.io/gasbugs/owasp-llm-dvla:sha-<commit>
 
 # ---------- stage 1: clone ----------
 FROM docker.io/alpine/git:latest AS clone
@@ -33,6 +33,10 @@ RUN git init . \
 
 # ---------- stage 2: runtime (DVLA 원본 Dockerfile 그대로 + ollama env) ----------
 FROM docker.io/library/python:3.11-slim
+
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide"
+LABEL org.opencontainers.image.revision="$VCS_REF"
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

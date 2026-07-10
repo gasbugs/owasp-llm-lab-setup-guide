@@ -25,7 +25,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOCKERHUB_NAMESPACE: gasbugs
+  IMAGE_REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: gasbugs
   SHA_TAG: sha-${{ github.sha }}
 
 jobs:
@@ -94,12 +95,21 @@ jobs:
         with:
           context: ./docker/vuln-rag
           call: check
+          # First GHCR publication has no canonical base tag yet.  Check mode
+          # only needs a resolvable linux/amd64 parent; the publish job below
+          # always overrides this with the exact base-gpu SHA tag.
+          build-args: |
+            BASE_IMAGE=docker.io/nvidia/cuda:12.8.2-runtime-ubuntu24.04
+            VCS_REF=quality-gate
 
       - name: Check vuln-agent Docker build configuration
         uses: docker/build-push-action@v6
         with:
           context: ./docker/vuln-agent
           call: check
+          build-args: |
+            BASE_IMAGE=docker.io/nvidia/cuda:12.8.2-runtime-ubuntu24.04
+            VCS_REF=quality-gate
 
       - name: Check llmgoat Docker build configuration
         uses: docker/build-push-action@v6
@@ -120,6 +130,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
 
     steps:
       - name: Checkout
@@ -128,22 +139,46 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Refuse to overwrite an existing commit tag
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
           for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
-            target="docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-${image}:${SHA_TAG}"
-            if docker buildx imagetools inspect "$target" >/dev/null 2>&1; then
-              echo "ERROR: immutable commit tag already exists: $target" >&2
-              echo "Create a new commit instead of rebuilding or overwriting this tag." >&2
-              exit 1
-            fi
+            target="${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/owasp-llm-${image}:${SHA_TAG}"
+            repository="${IMAGE_NAMESPACE}/owasp-llm-${image}"
+            token="$(curl -fsS -u "${GITHUB_ACTOR}:${GHCR_TOKEN}" \
+              --get 'https://ghcr.io/token' \
+              --data-urlencode 'service=ghcr.io' \
+              --data-urlencode "scope=repository:${repository}:pull,push" \
+              | jq -er '.token')"
+            status="$(curl -sS -o "$response_file" -w '%{http_code}' \
+              -H "Authorization: Bearer $token" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json' \
+              "https://ghcr.io/v2/${repository}/manifests/${SHA_TAG}")"
+            case "$status" in
+              200)
+                echo "ERROR: immutable commit tag already exists: $target" >&2
+                echo "Create a new commit instead of rebuilding or overwriting this tag." >&2
+                exit 1
+                ;;
+              404)
+                echo "confirmed absent: $target"
+                ;;
+              *)
+                echo "ERROR: registry preflight for $target returned HTTP $status; refusing to publish" >&2
+                exit 1
+                ;;
+            esac
           done
 
       # base-gpu is the immutable parent for vuln-rag and vuln-agent.
@@ -153,9 +188,11 @@ jobs:
           context: ./docker/base-gpu
           platforms: linux/amd64
           push: true
-          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
-          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:buildcache
-          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:buildcache,mode=max
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-base-gpu:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-base-gpu:buildcache,mode=max
 
       - name: Build & push vuln-rag
         uses: docker/build-push-action@v6
@@ -163,11 +200,12 @@ jobs:
           context: ./docker/vuln-rag
           platforms: linux/amd64
           push: true
-          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-rag:${{ env.SHA_TAG }}
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-rag:${{ env.SHA_TAG }}
           build-args: |
-            BASE_IMAGE=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
-          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-rag:buildcache
-          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-rag:buildcache,mode=max
+            BASE_IMAGE=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
+            VCS_REF=${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-rag:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-rag:buildcache,mode=max
 
       - name: Build & push vuln-agent
         uses: docker/build-push-action@v6
@@ -175,11 +213,12 @@ jobs:
           context: ./docker/vuln-agent
           platforms: linux/amd64
           push: true
-          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-agent:${{ env.SHA_TAG }}
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:${{ env.SHA_TAG }}
           build-args: |
-            BASE_IMAGE=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
-          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-agent:buildcache
-          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-vuln-agent:buildcache,mode=max
+            BASE_IMAGE=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-base-gpu:${{ env.SHA_TAG }}
+            VCS_REF=${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:buildcache,mode=max
 
       # LLMGoat (SECFORCE/LLMGoat, Apache 2.0): cross-platform comparison app.
       - name: Build & push llmgoat
@@ -188,9 +227,11 @@ jobs:
           context: ./docker/llmgoat
           platforms: linux/amd64
           push: true
-          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-llmgoat:${{ env.SHA_TAG }}
-          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-llmgoat:buildcache
-          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-llmgoat:buildcache,mode=max
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-llmgoat:${{ env.SHA_TAG }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-llmgoat:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-llmgoat:buildcache,mode=max
 
       # DVLA (ReversecLabs/damn-vulnerable-llm-agent, Apache 2.0): Day 3 comparison app.
       - name: Build & push dvla
@@ -199,9 +240,11 @@ jobs:
           context: ./docker/dvla
           platforms: linux/amd64
           push: true
-          tags: docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-dvla:${{ env.SHA_TAG }}
-          cache-from: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-dvla:buildcache
-          cache-to: type=registry,ref=docker.io/${{ env.DOCKERHUB_NAMESPACE }}/owasp-llm-dvla:buildcache,mode=max
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-dvla:${{ env.SHA_TAG }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-dvla:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-dvla:buildcache,mode=max
 
   promote-latest:
     name: Promote complete SHA image set to latest
@@ -209,22 +252,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
 
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Promote immutable manifests
         run: |
           set -euo pipefail
           for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
-            source="docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-${image}:${SHA_TAG}"
-            target="docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-${image}:latest"
+            source="${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/owasp-llm-${image}:${SHA_TAG}"
+            target="${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/owasp-llm-${image}:latest"
             docker buildx imagetools create --tag "$target" "$source"
           done

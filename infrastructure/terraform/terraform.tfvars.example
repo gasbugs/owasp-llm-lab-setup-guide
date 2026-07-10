@@ -43,7 +43,7 @@ daily_budget_usd  = 20
 course_budget_usd = 120
 alert_email       = "student@example.com"
 
-# 자동 bootstrap의 기본값은 main 설치 스크립트 + gasbugs 이미지의 latest 태그다.
+# 자동 bootstrap의 기본값은 main 설치 스크립트 + 공개 GHCR gasbugs 이미지의 latest 태그다.
 # 재현 가능한 강사용 실측은 같은 40자리 main commit으로 스크립트와 이미지 세트를 함께 고정한다.
 # 아래 두 줄의 0123... 값은 실제 `git rev-parse origin/main` 결과로 바꿔서 주석을 해제한다.
 # lab_setup_repo_raw_url = "https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/0123456789abcdef0123456789abcdef01234567"

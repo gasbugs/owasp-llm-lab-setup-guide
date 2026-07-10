@@ -9,7 +9,7 @@
 - nvidia-container-toolkit (CDI 모드, `/etc/cdi/nvidia.yaml` 사전 생성)
 - **Podman rootless + Quadlet** (Docker daemon과 Compose 없음)
 - AWS CLI v2 + SSM 에이전트
-- 강의용 컨테이너 이미지 (Docker Hub에서 사전 podman pull)
+- 강의용 컨테이너 이미지 (공개 GHCR에서 사전 anonymous podman pull)
 - LLM 모델 weights (`llama3.1:8b-instruct-q4_K_M`, 약 5GB)
 
 포함하지 않는 것:
@@ -19,12 +19,12 @@
 
 ## 사전 준비 — 강사 측
 
-골든 AMI를 빌드하기 **전**에 강의 컨테이너 이미지가 Docker Hub에 push되어 있어야 합니다.
+골든 AMI를 빌드하기 **전**에 강의 컨테이너 이미지가 공개 GHCR에 push되어 있어야 합니다.
 
 ```bash
 cd ../../docker
 SETUP_COMMIT=$(git rev-parse HEAD)
-DOCKERHUB_NAMESPACE=your-username \
+IMAGE_NAMESPACE=gasbugs \
 TAG="sha-$SETUP_COMMIT" \
   ./build-and-push.sh
 ```
@@ -40,7 +40,7 @@ packer init ami.pkr.hcl
 packer build \
   -var "aws_profile=owasp-llm" \
   -var "region=us-east-1" \
-  -var "dockerhub_namespace=your-username" \
+  -var "image_namespace=gasbugs" \
   -var "image_tag=sha-$SETUP_COMMIT" \
   ami.pkr.hcl
 ```
@@ -81,9 +81,9 @@ ami_name_pattern = "owasp-llm-lab-*"
 - Ollama 컨테이너가 들어오는 동안 listen하지 않은 경우. `sleep` 늘리기.
 - 또는 빌드 인스턴스에서 외부 인터넷 접근 차단 시 → 빌드 VPC는 인터넷 허용해야 함.
 
-**Docker Hub pull 실패 (anonymous rate limit)**
-- 빌드 전 `sudo -u ubuntu podman login docker.io` 인증 후 다시 시도.
-- 또는 Hub 사용자명을 변수로 받아 `podman pull <ns>/...`만 받도록 — 본 강의는 이 패턴.
+**GHCR pull이 `unauthorized`로 실패**
+- `ghcr.io/gasbugs/owasp-llm-*` 다섯 package의 visibility가 모두 `Public`인지 확인한다.
+- 로컬 credential 영향이 없는 환경에서 `podman manifest inspect ghcr.io/gasbugs/owasp-llm-base-gpu:<tag>`가 인증 없이 성공해야 AMI 빌드를 시작한다.
 
 **AMI 용량 초과**
 - `root_volume_size = 100`까지 확인. 더 큰 모델 추가 시 150GB 이상으로 키우기.

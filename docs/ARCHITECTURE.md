@@ -80,7 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - `/home/ubuntu/work` 생성
 - Podman rootless와 Quadlet 실행 환경 설치
 - NVIDIA CDI 파일 생성
-- Docker Hub에서 실습 이미지 pull
+- 공개 GHCR에서 실습 이미지 anonymous pull
 - Ollama와 실습 앱 컨테이너 실행
 - Ollama 모델 pull과 warm-up
 - Podman Quadlet 기반 systemd user unit 등록
@@ -115,17 +115,17 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 
 ## 이미지 빌드
 
-강사가 이미지를 수정한 경우 `docker/build-and-push.sh`로 Docker Hub에 push합니다.
+강사가 이미지를 수정한 경우 정식 release는 GitHub Actions가 내장 `GITHUB_TOKEN`으로 `ghcr.io/gasbugs`에 push합니다. CI 장애를 조사할 때만 `docker/build-and-push.sh`를 수동으로 사용합니다.
 
 ```bash
 cd docker
-podman login docker.io
-DOCKERHUB_NAMESPACE=your-dockerhub-id ./build-and-push.sh
+podman login ghcr.io
+IMAGE_NAMESPACE=your-github-id TAG="sha-$(git rev-parse HEAD)" ./build-and-push.sh
 ```
 
-기본 설치 스크립트는 `docker.io/gasbugs/...` 이미지를 pull합니다. 별도 namespace를 쓰려면 `install-lab.sh` 실행 시 환경변수로 조정하세요.
+기본 설치 스크립트는 공개 `ghcr.io/gasbugs/...` 이미지를 인증 없이 pull합니다. 별도 GHCR namespace를 쓰려면 `install-lab.sh` 실행 시 환경변수로 조정하세요.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/install-lab.sh \
-  | sudo IMAGE_NAMESPACE=your-dockerhub-id bash
+  | sudo IMAGE_NAMESPACE=your-github-id bash
 ```

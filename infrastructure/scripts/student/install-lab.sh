@@ -137,20 +137,20 @@ step "8/10" "실습 컨테이너 이미지를 확인하고 최신 이미지를 p
 "${RUN_AS_UBUNTU[@]}" bash <<PULLSH
 set -euo pipefail
 for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-llmgoat owasp-llm-dvla; do
-  if [ "${REFRESH_IMAGES}" != "true" ] && podman image exists "docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
-    echo "[install-lab] image already exists: docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"
+  if [ "${REFRESH_IMAGES}" != "true" ] && podman image exists "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
+    echo "[install-lab] image already exists: ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"
     continue
   fi
   pulled=false
   for i in \$(seq 1 3); do
-    if podman pull "docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
+    if podman pull "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
       pulled=true
       break
     fi
     echo "  retry \$i/3..."; sleep 5
   done
   if [ "\$pulled" != true ]; then
-    echo "ERROR: failed to pull docker.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}" >&2
+    echo "ERROR: failed to pull ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}" >&2
     exit 1
   fi
 done
@@ -269,7 +269,7 @@ Requires=lab-ollama.container
 
 [Container]
 ContainerName=lab-${scenario}-vuln-rag
-Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}
+Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}
 Network=host
 Environment=DEFAULT_SCENARIO=${scenario}
 Environment=SCENARIO=${scenario}
@@ -294,7 +294,7 @@ Requires=lab-ollama.container
 
 [Container]
 ContainerName=lab-day3-vuln-agent
-Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-agent:${IMAGE_TAG}
+Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-agent:${IMAGE_TAG}
 Network=host
 Environment=OLLAMA_URL=http://localhost:11434
 Environment=OLLAMA_MODEL=$OLLAMA_MODEL
@@ -312,7 +312,7 @@ Description=OWASP LLM Lab - LLMGoat
 
 [Container]
 ContainerName=lab-llmgoat
-Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-llmgoat:${IMAGE_TAG}
+Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-llmgoat:${IMAGE_TAG}
 AddDevice=nvidia.com/gpu=all
 PublishPort=5000:5000
 Environment=LLMGOAT_SERVER_HOST=0.0.0.0
@@ -339,7 +339,7 @@ Requires=lab-ollama.container
 
 [Container]
 ContainerName=lab-day3-dvla
-Image=docker.io/${IMAGE_NAMESPACE}/owasp-llm-dvla:${IMAGE_TAG}
+Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-dvla:${IMAGE_TAG}
 Network=host
 Environment=OLLAMA_HOST=http://localhost:11434
 Environment=OLLAMA_API_BASE=http://localhost:11434
@@ -488,9 +488,15 @@ fi
 if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$LLAMA_GUARD_MODEL"; then
   echo "[install-lab] $LLAMA_GUARD_MODEL already pulled"
 else
-  podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL" 2>&1 | tail -3 || true
+  podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL" 2>&1 | tail -3
   echo "[install-lab] $LLAMA_GUARD_MODEL pulled (Day 5 Defense demo)"
 fi
+podman exec lab-ollama ollama list \
+  | awk 'NR > 1 { print \$1 }' \
+  | grep -qx "$LLAMA_GUARD_MODEL" || {
+    echo "ERROR: required Day 5 model is absent after pull: $LLAMA_GUARD_MODEL" >&2
+    exit 1
+  }
 
 WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost:11434/api/generate \
   -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}")
@@ -545,7 +551,7 @@ declare -A expected_images=(
 )
 
 for container in "${!expected_images[@]}"; do
-  expected="docker.io/${IMAGE_NAMESPACE}/${expected_images[$container]}:${IMAGE_TAG}"
+  expected="ghcr.io/${IMAGE_NAMESPACE}/${expected_images[$container]}:${IMAGE_TAG}"
   actual_name=$(podman inspect --format '{{.ImageName}}' "$container")
   actual_id=$(podman inspect --format '{{.Image}}' "$container")
   expected_id=$(podman image inspect --format '{{.Id}}' "$expected")

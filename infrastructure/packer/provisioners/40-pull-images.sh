@@ -4,7 +4,7 @@
 set -euo pipefail
 
 : "${DEFAULT_MODEL:?DEFAULT_MODEL 환경변수 필요}"
-: "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE 환경변수 필요. 예: gasbugs}"
+: "${IMAGE_NAMESPACE:?IMAGE_NAMESPACE 환경변수 필요. 예: gasbugs}"
 : "${IMAGE_TAG:?IMAGE_TAG 환경변수 필요. sha-<40자리 lowercase Git commit> 필수}"
 
 if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
@@ -19,7 +19,7 @@ sudo -u ubuntu -i podman pull docker.io/library/python:3.12-slim
 # 동일 커밋의 이미지 세트가 하나라도 없으면 AMI 빌드를 실패시킨다.
 for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
   sudo -u ubuntu -i podman pull \
-    "docker.io/${DOCKERHUB_NAMESPACE}/owasp-llm-${image}:${IMAGE_TAG}"
+    "ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-${image}:${IMAGE_TAG}"
 done
 
 # 2) 모델 weights 사전 다운로드 — Ollama를 잠깐 띄워 pull한 다음 종료
@@ -52,7 +52,7 @@ sudo mkdir -p /etc/lab
 sudo tee /etc/lab/build-info <<EOF
 AMI_BUILD_TIME=$(date -Iseconds)
 DEFAULT_MODEL=$DEFAULT_MODEL
-DOCKERHUB_NAMESPACE=$DOCKERHUB_NAMESPACE
+IMAGE_NAMESPACE=$IMAGE_NAMESPACE
 IMAGE_TAG=$IMAGE_TAG
 EOF
 

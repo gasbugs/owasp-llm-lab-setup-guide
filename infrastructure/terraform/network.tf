@@ -2,7 +2,7 @@
 # 네트워크 — IGW 통한 인터넷 액세스 (검증/빌드용)
 #
 # 설계 메모:
-#   - 검증 단계엔 외부 인터넷 허용 (Ubuntu repo, Docker Hub, Ollama 등 pull)
+#   - 검증 단계엔 외부 인터넷 허용 (Ubuntu repo, GHCR, Ollama 등 pull)
 #   - 강의 정식 운영 시 골든 AMI(Packer)로 변경하면 인터넷 차단으로 회귀 가능
 #   - VPC endpoint는 사용하지 않는다. SSM과 이미지 pull은 public egress 사용.
 #   - 수강생별 보안 그룹으로 실습 포트 접근 범위를 제한

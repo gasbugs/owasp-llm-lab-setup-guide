@@ -8,6 +8,8 @@ Endpoints:
 - GET /api/v1/models/{A,B}         → 모델 상세 (id, sha256, trusted)
 - GET /api/v1/models/B/mlbom       → MLBOM JSON (CWE-1395)
 - GET /models/{A,B}.gguf           → 모델 파일 (binary)
+- GET /models/A.gguf.pub           → 교육용 detached signature 공개키
+- GET /models/A.gguf.sig           → cosign verify-blob 호환 base64 signature
 
 수강생 검증 패턴:
 - A: registry CLAIMS sha256 == 실제 file sha256sum → 일치 (clean)
@@ -20,6 +22,28 @@ import os
 
 DATA_DIR = "/app/data"
 os.makedirs(DATA_DIR, exist_ok=True)
+
+# A의 private key는 fixture 생성 직후 폐기했다. 공개키와 detached signature만
+# 배포해 "registry가 게시한 hash"와 "승인자가 서명한 artifact"를 서로 다른
+# 검증 경계로 실습한다. 로컬 교육용 key라 transparency log는 사용하지 않는다.
+MODEL_A_PUBLIC_KEY = b"""-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyFbOdJovfiRDZnWW5qBK
+mVvSMbtwFtNoZ5tRNDEZ15s73G8tsY3dQfUcCUPvW1zeC8ud3qppfgL2FYMUzZRA
+GrIBzeG0KHmAE/SkJQZ9DhkybsLoWe29w6SQUisANdOeRiMfzv+eQn9UcASyiuHD
+1CAjzCJ2nk6GfL4A3Vvea0V/riVqCfT/fG784gXf0XTY9hoAhqAIzO4mPM9ukg0+
+5AjLX/nDGOQJ9Vv7c8SU/VMSQ+bqV3mvjt6c0LA7i5QWaVFsVexHkCCyk7am1y6a
+ttnNFgfpqKKYMR8sgWg2GPpztDQqR/nSa+as306KAV4TozKziVB/8nAeu80ba8mj
+owIDAQAB
+-----END PUBLIC KEY-----
+"""
+MODEL_A_SIGNATURE = (
+    b"qBtMFxKpR/Q4gaDibA+dJEWN2U37USaIO33p6eMzhwc6tJl1mGkXM+YCDEViuo/"
+    b"IPFYsLIrRbynrIcg0WV52Kum6GJbIaJ2Zm/YhS76Nf8orEsvOa5A3iu3SfaRjWA"
+    b"O9Wma3B4TYJ+7bCPBqlph1Vihn2NE3rTGxy58ein5jVVjAkjvQ9DMDw5dbSFrdq"
+    b"unt8vd+tP+oY4ZEeEk/PPzAIZlQ1bQ6c+v4l+Tc0LDWOihz+OmAKv+F2D7y4Wj"
+    b"tkfySAGJWrhpg7Pcg6dwg4F0Ml32oe/yUapX8c4ZI/ys30WlBqakIG6Q20Ql+T3"
+    b"3hGbF7sa3TQYUH3Pye9dDAdJh5nw==\n"
+)
 
 # Clean A: 정상 weight 문자열 반복
 with open(f"{DATA_DIR}/A.gguf", "wb") as f:
@@ -48,6 +72,12 @@ MODELS = {
         "sha256": ACTUAL_A,
         "trusted": True,
         "size_bytes": os.path.getsize(f"{DATA_DIR}/A.gguf"),
+        "signature": {
+            "algorithm": "RSA-PKCS1v15-SHA256",
+            "key_url": "/models/A.gguf.pub",
+            "signature_url": "/models/A.gguf.sig",
+            "transparency_log": False,
+        },
     },
     "B": {
         "id": "B",
@@ -72,8 +102,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def respond_file(self, path):
         body = open(path, "rb").read()
+        self.respond_bytes(body, "application/octet-stream")
+
+    def respond_bytes(self, body, content_type):
         self.send_response(200)
-        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -92,6 +125,8 @@ class Handler(BaseHTTPRequestHandler):
                     "/api/v1/models/B/mlbom",
                     "/models/A.gguf",
                     "/models/B.gguf",
+                    "/models/A.gguf.pub",
+                    "/models/A.gguf.sig",
                 ],
             })
         elif p == "/healthz":
@@ -114,6 +149,10 @@ class Handler(BaseHTTPRequestHandler):
             self.respond_file(f"{DATA_DIR}/A.gguf")
         elif p == "/models/B.gguf":
             self.respond_file(f"{DATA_DIR}/B.gguf")
+        elif p == "/models/A.gguf.pub":
+            self.respond_bytes(MODEL_A_PUBLIC_KEY, "application/x-pem-file")
+        elif p == "/models/A.gguf.sig":
+            self.respond_bytes(MODEL_A_SIGNATURE, "text/plain")
         else:
             self.respond_json({"error": "not found", "path": p}, 404)
 

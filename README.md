@@ -10,7 +10,7 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 |---|---|
 | `docs/STUDENT-QUICKSTART.md` | 수강생이 따라 하는 Day 0 셋업 절차 |
 | `docs/ARCHITECTURE.md` | AWS VM, Terraform, user-data, 컨테이너 배포 구조 |
-| `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 Docker Hub에 push하는 절차 |
+| `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 공개 GHCR에 push하는 절차 |
 | `docs/LIVE-VALIDATION.md` | commit 태그와 resolved digest로 EC2 런타임을 설치하고 증거를 회수하는 강사용 절차 |
 | `docs/TROUBLESHOOTING.md` | quota, SSM, Terraform, Podman, Ollama 문제 해결 |
 | `infrastructure/terraform/` | VPC, 보안 그룹, EC2 GPU 인스턴스, IAM, Budget 알람 |
@@ -67,7 +67,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 
 ## 강사용 런타임 검증
 
-컨테이너 변경은 CI의 unit·Python compile·shell syntax·Terraform·Packer·Docker build-config·공개 저장소 위생 검사를 통과한 뒤에만 Docker Hub로 push됩니다. `sha-<40자리 Git commit>` 태그는 한 번 publish되면 workflow와 로컬 helper가 덮어쓰기를 거부하며, 모든 이미지 빌드가 끝난 경우에만 그 이미지 세트를 `latest`로 승격합니다.
+컨테이너 변경은 CI의 unit·Python compile·shell syntax·Terraform·Packer·Docker build-config·공개 저장소 위생 검사를 통과한 뒤에만 공개 GitHub Container Registry(GHCR)로 push됩니다. Workflow는 외부 registry secret 대신 내장 `GITHUB_TOKEN`의 `packages: write` 권한을 사용합니다. `sha-<40자리 Git commit>` 태그는 한 번 publish되면 workflow와 로컬 helper가 덮어쓰기를 거부하며, 모든 이미지 빌드가 끝난 경우에만 그 이미지 세트를 `latest`로 승격합니다.
 
 실측 검증에서는 `latest` 대신 검증할 커밋 태그를 지정하고, 실제 pull된 각 이미지의 resolved digest를 함께 기록하세요. 일부 upstream base image와 설치 스크립트가 이동 태그를 사용하므로 Git commit만으로 bit-for-bit 재빌드를 보장하지 않으며, 최초 publish된 digest가 최종 실행 식별자입니다.
 

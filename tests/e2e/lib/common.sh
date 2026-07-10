@@ -7,6 +7,7 @@
 #   AGENT_URL        vuln-agent base URL (예: http://localhost:8001)
 #   TRIALS           각 페이로드 반복 횟수 (기본 5)
 #   RESULTS_DIR      결과 저장 경로 (기본 tests/e2e/results/<ts>)
+#   STRICT_ACCEPTANCE=true  확률적 지표도 강의 승인 기준으로 강제
 #
 # 사용:
 #   source $(dirname "$0")/../lib/common.sh
@@ -17,7 +18,15 @@ set -euo pipefail
 : "${AGENT_URL:=http://localhost:8001}"
 : "${TRIALS:=5}"
 : "${RESULTS_DIR:=tests/e2e/results/$(date +%Y%m%d-%H%M%S)}"
+: "${STRICT_ACCEPTANCE:=false}"
 URL_GUARD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require_loopback_url.py"
+
+strict_acceptance_enabled() {
+  case "$STRICT_ACCEPTANCE" in
+    true|TRUE|True) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 require_loopback_url() {
   python3 "$URL_GUARD" "$1" || exit 2

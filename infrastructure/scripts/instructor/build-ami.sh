@@ -1,13 +1,13 @@
 #!/bin/bash
 # 강사: 골든 AMI 빌드.
-# 사용: DOCKERHUB_NAMESPACE=gasbugs IMAGE_TAG=sha-<40자리-main-commit> ./build-ami.sh
+# 사용: IMAGE_NAMESPACE=gasbugs IMAGE_TAG=sha-<40자리-main-commit> ./build-ami.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/../../packer"
 
 : "${AWS_PROFILE:=owasp-llm}"
 : "${AWS_REGION:=us-east-1}"
-: "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE 환경변수 필요. 예: gasbugs}"
+: "${IMAGE_NAMESPACE:=gasbugs}"
 : "${IMAGE_TAG:?IMAGE_TAG 환경변수 필요. 예: sha-<40자리-main-commit>}"
 
 if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
@@ -19,7 +19,7 @@ packer init ami.pkr.hcl
 packer build \
   -var "aws_profile=$AWS_PROFILE" \
   -var "region=$AWS_REGION" \
-  -var "dockerhub_namespace=$DOCKERHUB_NAMESPACE" \
+  -var "image_namespace=$IMAGE_NAMESPACE" \
   -var "image_tag=$IMAGE_TAG" \
   ami.pkr.hcl
 

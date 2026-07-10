@@ -65,7 +65,13 @@ data "aws_iam_policy_document" "auto_stop_lambda_ec2" {
     actions = [
       "ec2:StopInstances",
     ]
-    resources = [for instance in aws_instance.student : instance.arn]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "ec2:ResourceTag/Course"
+      values   = [var.course_id]
+    }
   }
 }
 
@@ -99,7 +105,15 @@ resource "aws_lambda_function" "auto_stop" {
   depends_on = [
     aws_iam_role_policy_attachment.auto_stop_lambda_basic,
     aws_iam_role_policy.auto_stop_lambda_ec2,
+    aws_cloudwatch_log_group.auto_stop,
   ]
+}
+
+resource "aws_cloudwatch_log_group" "auto_stop" {
+  count = var.enable_auto_stop ? 1 : 0
+
+  name              = "/aws/lambda/${local.auto_stop_resource_prefix}"
+  retention_in_days = 1
 }
 
 resource "aws_cloudwatch_event_rule" "auto_stop" {

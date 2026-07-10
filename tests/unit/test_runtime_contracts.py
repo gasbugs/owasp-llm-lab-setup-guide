@@ -25,6 +25,17 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("FROM docker.io/alpine/git:latest AS clone", dockerfile)
         self.assertIn("FROM docker.io/library/python:3.11-slim", dockerfile)
 
+    def test_runtime_images_are_linked_to_the_public_source_repository(self) -> None:
+        source_label = (
+            'org.opencontainers.image.source='
+            '"https://github.com/gasbugs/owasp-llm-lab-setup-guide"'
+        )
+        for image in ("base-gpu", "vuln-rag", "vuln-agent", "llmgoat", "dvla"):
+            dockerfile = read(f"docker/{image}/Dockerfile")
+            self.assertIn(source_label, dockerfile, image)
+            self.assertIn("ARG VCS_REF=unknown", dockerfile, image)
+            self.assertIn('org.opencontainers.image.revision="$VCS_REF"', dockerfile, image)
+
     def test_quadlet_sets_same_port_for_each_rag_process(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         self.assertIn("Environment=PORT=${rag_port}", installer)
@@ -44,6 +55,11 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("podman image inspect --format '{{.Id}}'", installer)
         self.assertIn("WARMUP_RESPONSE=", installer)
         self.assertIn(".done == true", installer)
+        self.assertIn("required Day 5 model is absent after pull", installer)
+        guard_pull = installer.split(
+            'podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL"', 1
+        )[1].split("fi", 1)[0]
+        self.assertNotIn("|| true", guard_pull)
 
         fingerprint_before = installer.split(
             "QUADLET_FINGERPRINT_BEFORE=$(", 1
@@ -74,12 +90,25 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("packer validate -syntax-only", test_job)
         self.assertIn("find infrastructure tests docker", test_job)
         self.assertEqual(test_job.count("call: check"), 5)
+        self.assertNotIn("packages: write", test_job)
         self.assertIn("needs: test", build)
+        self.assertIn("IMAGE_REGISTRY: ghcr.io", workflow)
+        self.assertIn("IMAGE_NAMESPACE: gasbugs", workflow)
+        self.assertIn("packages: write", build)
+        self.assertIn("username: ${{ github.actor }}", build)
+        self.assertIn("password: ${{ secrets.GITHUB_TOKEN }}", build)
+        self.assertNotIn("DOCKERHUB_USERNAME", workflow)
+        self.assertNotIn("DOCKERHUB_TOKEN", workflow)
         self.assertIn("${{ env.SHA_TAG }}", build)
         self.assertNotIn(":latest", build)
         self.assertIn("Refuse to overwrite an existing commit tag", build)
-        self.assertIn("docker buildx imagetools inspect", build)
+        self.assertIn("https://ghcr.io/token", build)
+        self.assertIn('case "$status" in', build)
+        self.assertIn("confirmed absent", build)
+        self.assertIn("VCS_REF=${{ github.sha }}", build)
+        self.assertNotIn("docker buildx imagetools inspect", build)
         self.assertIn("needs: build", promote)
+        self.assertIn("packages: write", promote)
         self.assertIn(":latest", promote)
         self.assertIn(
             "python tests/e2e/llm04/test_llm04_shared_corpus.py", workflow
@@ -93,8 +122,13 @@ class RuntimeContractTest(unittest.TestCase):
         packer = read("infrastructure/packer/ami.pkr.hcl")
         provisioner = read("infrastructure/packer/provisioners/40-pull-images.sh")
         self.assertIn('variable "image_tag"', packer)
+        self.assertIn('variable "image_namespace"', packer)
+        legacy_namespace = "docker" + "hub_namespace"
+        self.assertNotIn(f'variable "{legacy_namespace}"', packer)
+        self.assertIn('"IMAGE_NAMESPACE=${var.image_namespace}"', packer)
         self.assertIn('"IMAGE_TAG=${var.image_tag}"', packer)
         self.assertIn('^sha-[0-9a-f]{40}$', packer)
+        self.assertIn("ghcr.io/${IMAGE_NAMESPACE}/", provisioner)
         self.assertIn("owasp-llm-${image}:${IMAGE_TAG}", provisioner)
 
     def test_user_data_propagates_the_selected_runtime_image_set(self) -> None:
@@ -118,6 +152,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('IMAGE_TAG="${lab_image_tag}"', user_data)
         self.assertIn('IMAGE_NAMESPACE="$IMAGE_NAMESPACE"', user_data)
         self.assertIn('IMAGE_TAG="$IMAGE_TAG"', user_data)
+        self.assertIn("ghcr.io/$IMAGE_NAMESPACE/", user_data)
         self.assertIn("lab_setup_repo_raw_url", example)
         self.assertIn("lab_image_tag", example)
         self.assertIn("user_data_replace_on_change=false", example)
@@ -138,10 +173,22 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("이 구성은 EIP를 만들지 않아 public IP는 바뀔 수 있음", stop)
         self.assertIn("이 구성은 EIP를 만들지 않으므로 stop/start 후 public IP는 바뀔 수 있습니다", stop)
 
+    def test_auto_stop_is_ready_before_gpu_instance_and_leaves_no_unmanaged_log(self) -> None:
+        auto_stop = read("infrastructure/terraform/auto_stop.tf")
+        instance = read("infrastructure/terraform/instance.tf")
+        self.assertIn('variable = "ec2:ResourceTag/Course"', auto_stop)
+        self.assertIn('values   = [var.course_id]', auto_stop)
+        self.assertIn('resources = ["*"]', auto_stop)
+        self.assertIn('resource "aws_cloudwatch_log_group" "auto_stop"', auto_stop)
+        self.assertIn('retention_in_days = 1', auto_stop)
+        self.assertIn('aws_cloudwatch_log_group.auto_stop', auto_stop)
+        self.assertIn('aws_cloudwatch_event_target.auto_stop', instance)
+        self.assertIn('aws_lambda_permission.allow_eventbridge_auto_stop', instance)
+
     def test_local_build_helper_rejects_implicit_moving_tags(self) -> None:
         script = ROOT / "docker" / "build-and-push.sh"
         env = os.environ.copy()
-        env["DOCKERHUB_NAMESPACE"] = "example"
+        env["IMAGE_NAMESPACE"] = "example"
         env.pop("TAG", None)
         missing = subprocess.run(
             ["bash", str(script)], env=env, text=True, capture_output=True, check=False
@@ -153,6 +200,11 @@ class RuntimeContractTest(unittest.TestCase):
             ["bash", str(script)], env=env, text=True, capture_output=True, check=False
         )
         self.assertEqual(moving.returncode, 2)
+
+        source = script.read_text(encoding="utf-8")
+        self.assertIn('case "$inspect_text" in', source)
+        self.assertIn('VCS_REF=${TAG#sha-}', source)
+        self.assertNotIn('manifest inspect "$image" >/dev/null 2>&1', source)
 
     def test_e2e_urls_are_bounded_and_dynamic_reference_fetch_is_allowlisted(self) -> None:
         common = read("tests/e2e/lib/common.sh")

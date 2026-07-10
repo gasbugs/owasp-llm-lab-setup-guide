@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REGISTRY="${REGISTRY:-http://localhost:8002}"
 python3 "$SCRIPT_DIR/../lib/require_loopback_url.py" "$REGISTRY" || exit 2
 : "${RESULTS_DIR:=tests/e2e/results/$(date +%Y%m%d-%H%M%S)}"
+: "${COSIGN_IMAGE:=ghcr.io/sigstore/cosign/cosign@sha256:203f193bc86591bbc1a3a39ad3532590652477d1775ccb91221e8d14cfe5c000}"
 mkdir -p "$RESULTS_DIR/raw"
 
 PASS=0
@@ -48,6 +49,23 @@ mlbom_has_base_model() {
   printf '%s' "$MLBOM" | jq -e '.components[] | select(.name == "base_model")' >/dev/null
 }
 
+verify_model_a_signature() {
+  podman run --rm -v "$TMPDIR:/work:ro" "$COSIGN_IMAGE" \
+    verify-blob --insecure-ignore-tlog \
+    --key /work/A.gguf.pub --signature /work/A.gguf.sig /work/A.gguf \
+    >"$RESULTS_DIR/raw/cosign-model-A.txt" 2>&1
+}
+
+reject_model_b_with_a_signature() {
+  if podman run --rm -v "$TMPDIR:/work:ro" "$COSIGN_IMAGE" \
+    verify-blob --insecure-ignore-tlog \
+    --key /work/A.gguf.pub --signature /work/A.gguf.sig /work/B.gguf \
+    >"$RESULTS_DIR/raw/cosign-model-B.txt" 2>&1; then
+    return 1
+  fi
+  return 0
+}
+
 echo "=== LLM03 Supply Chain — fake model-registry 검증 ==="
 echo "REGISTRY=$REGISTRY"
 echo ""
@@ -82,6 +100,26 @@ printf 'model_a_expected=%s\nmodel_a_actual=%s\nmodel_b_expected=%s\nmodel_b_act
 check "Model B claim != actual SHA-256 (trojan 검출)" test "$EXPECTED_B" != "$ACTUAL_B"
 echo "  (claim:  $EXPECTED_B)"
 echo "  (actual: $ACTUAL_B)"
+echo ""
+
+# Part 3: detached signature. A의 교육용 private key는 배포하지 않으며 공개키,
+# signature, artifact만 받아 cosign verify-blob으로 검증한다. 로컬 fixture라
+# transparency log는 의도적으로 없고, 그 한계를 결과에 함께 기록한다.
+echo "[Part 3] cosign detached signature 검증"
+command -v podman >/dev/null 2>&1 || {
+  echo "INFRA: cosign 검증 컨테이너를 실행할 podman이 없음" >&2
+  exit 3
+}
+fetch_registry "$REGISTRY/models/A.gguf.pub" -o "$TMPDIR/A.gguf.pub"
+fetch_registry "$REGISTRY/models/A.gguf.sig" -o "$TMPDIR/A.gguf.sig"
+if ! podman image exists "$COSIGN_IMAGE"; then
+  podman pull "$COSIGN_IMAGE" >/dev/null || {
+    echo "INFRA: pinned cosign image pull failed" >&2
+    exit 3
+  }
+fi
+check "Model A detached signature verifies" verify_model_a_signature
+check "Model B is rejected by Model A signature" reject_model_b_with_a_signature
 echo ""
 
 # Part 5: MLBOM

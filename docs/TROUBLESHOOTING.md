@@ -54,7 +54,7 @@ sudo -u ubuntu podman logs lab-day2-vuln-rag --tail 100
 
 흔한 원인:
 
-- Docker Hub pull 실패
+- 공개 GHCR package pull 실패(`unauthorized`이면 package visibility가 `Public`인지 확인)
 - Ollama 모델 pull이 오래 걸림
 - GPU CDI 파일 누락
 - 디스크 공간 부족

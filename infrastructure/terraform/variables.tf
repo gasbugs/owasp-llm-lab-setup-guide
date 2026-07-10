@@ -62,7 +62,7 @@ variable "lab_setup_repo_raw_url" {
 }
 
 variable "lab_image_namespace" {
-  description = "user-data bootstrap이 pull할 Docker Hub 이미지 namespace. 수동 설치의 IMAGE_NAMESPACE와 같은 값이다."
+  description = "user-data bootstrap이 공개 GHCR에서 pull할 이미지 namespace. 수동 설치의 IMAGE_NAMESPACE와 같은 값이다."
   type        = string
   default     = "gasbugs"
   validation {

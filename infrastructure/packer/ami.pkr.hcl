@@ -2,14 +2,14 @@
 # 골든 AMI — owasp-llm-lab (Podman rootless)
 #
 # Ubuntu 24.04 + NVIDIA Driver + CUDA 12.8 + Podman + nvidia-container-toolkit(CDI)
-# + 강의용 컨테이너 이미지 사전 pull(Docker Hub) + 모델 weights 사전 다운로드
+# + 강의용 컨테이너 이미지 사전 pull(GHCR) + 모델 weights 사전 다운로드
 #
 # 빌드:
 #   packer init ami.pkr.hcl
 #   packer build \
 #     -var "aws_profile=owasp-llm" \
 #     -var "region=ap-northeast-2" \
-#     -var "dockerhub_namespace=<your-dockerhub-username-or-org>" \
+#     -var "image_namespace=<your-github-username-or-org>" \
 #     -var "image_tag=sha-<40-character-main-commit>" \
 #     ami.pkr.hcl
 ################################################################################
@@ -55,9 +55,10 @@ variable "default_model" {
   default     = "llama3.1:8b-instruct-q4_K_M"
 }
 
-variable "dockerhub_namespace" {
-  description = "강의 이미지가 push되어 있는 Docker Hub 사용자명 또는 organization"
+variable "image_namespace" {
+  description = "강의 이미지가 공개되어 있는 GHCR 사용자명 또는 organization"
   type        = string
+  default     = "gasbugs"
 }
 
 variable "image_tag" {
@@ -131,7 +132,7 @@ build {
     script = "${path.root}/provisioners/40-pull-images.sh"
     environment_vars = [
       "DEFAULT_MODEL=${var.default_model}",
-      "DOCKERHUB_NAMESPACE=${var.dockerhub_namespace}",
+      "IMAGE_NAMESPACE=${var.image_namespace}",
       "IMAGE_TAG=${var.image_tag}",
     ]
   }

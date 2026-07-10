@@ -107,4 +107,11 @@ resource "aws_instance" "student" {
       ami, # 최신 AMI가 갱신되어도 기존 수강생 인스턴스를 자동 교체하지 않음
     ]
   }
+
+  # 유료 GPU를 만들기 전에 emergency auto-stop target과 invoke permission을
+  # 먼저 완성한다. enable_auto_stop=false이면 두 컬렉션은 비어 있어 no-op이다.
+  depends_on = [
+    aws_cloudwatch_event_target.auto_stop,
+    aws_lambda_permission.allow_eventbridge_auto_stop,
+  ]
 }
