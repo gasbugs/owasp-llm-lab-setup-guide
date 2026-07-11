@@ -83,6 +83,13 @@ sudo env IMAGE_NAMESPACE=gasbugs IMAGE_TAG="sha-$SETUP_COMMIT" \
 TRIALS=5 bash tests/e2e/run-full-cycle.sh
 ```
 
+full-cycle은 RAG·Agent 항목뿐 아니라 LLMGoat A01/A02/A04/A06/A08을
+loopback API로 실제 호출합니다. 각 응답은 `llmgoat/raw/requests.jsonl`에
+보존하고, A04 review poison/reset과 A08 vector import/reset은 결정적 계약으로
+반드시 통과시킵니다. 모델별 `solved` 여부는 배포 판정이 아니라 실측
+관찰값입니다. 로컬 Playwright 단계는 SSM `5000→15000` 포워드를 통해 A01
+화면의 응답 렌더링과 solved 표시 일치 여부도 확인합니다.
+
 전체 절차와 결과 경로는 [docs/LIVE-VALIDATION.md](docs/LIVE-VALIDATION.md)에 고정합니다.
 
 강사가 운영 편의상 자동 설치를 원하면 `terraform.tfvars`에 아래 값을 추가합니다.

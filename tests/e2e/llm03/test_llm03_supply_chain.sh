@@ -83,6 +83,10 @@ echo ""
 echo "[Part 2] SHA-256 무결성 검증"
 TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
+# mktemp creates a 0700 directory. The pinned cosign image runs as a
+# non-root user, so its read-only bind mount must be traversable. This
+# directory contains public course fixtures only; no private key is stored.
+chmod 0755 "$TMPDIR"
 
 # A: clean — 일치해야 함
 EXPECTED_A=$(fetch_registry "$REGISTRY/api/v1/models/A" | jq -er .sha256)

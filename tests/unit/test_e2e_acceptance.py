@@ -92,6 +92,26 @@ class Llm10AcceptanceTest(unittest.TestCase):
             )["accepted"]
         )
 
+    def test_large_input_requires_threshold_and_http_200(self) -> None:
+        accepted = acceptance.classify_large_input(20000, 200)
+        self.assertTrue(accepted["accepted"])
+        self.assertEqual(
+            accepted["classification"],
+            "verified_large_input_accepted_without_limit",
+        )
+        self.assertFalse(acceptance.classify_large_input(20000, 413)["accepted"])
+        self.assertFalse(acceptance.classify_large_input(1000, 200)["accepted"])
+
+    def test_overall_accepts_rate_plus_large_input_without_latency_claim(self) -> None:
+        result = acceptance.classify_llm10(
+            {"accepted": True},
+            {"accepted": False},
+            {"accepted": False},
+            {"accepted": True},
+        )
+        self.assertTrue(result["accepted"])
+        self.assertIn("large_input_accepted", result["required"])
+
 
 class StrictShellHarnessContractTest(unittest.TestCase):
     def read(self, relative: str) -> str:
@@ -140,7 +160,28 @@ class StrictShellHarnessContractTest(unittest.TestCase):
         self.assertIn("gentle_rate_json", source)
         self.assertIn("overload_test:", source)
         self.assertIn("output-flood", source)
+        self.assertIn("large-input", source)
+        self.assertIn("large_input_test", source)
         self.assertIn("llm10-samples.jsonl", source)
+
+    def test_llm10_overload_recovery_cancels_app_queue_before_backend(self) -> None:
+        source = self.read("tests/e2e/llm10/test_llm10_consumption.sh")
+        day5_restart = (
+            '"${runtime[@]}" restart --time 5 lab-day5-vuln-rag'
+        )
+        ollama_restart = '"${runtime[@]}" restart --time 5 lab-ollama'
+        first_day5 = source.index(day5_restart)
+        ollama = source.index(ollama_restart)
+        second_day5 = source.index(day5_restart, first_day5 + 1)
+        self.assertLess(first_day5, ollama)
+        self.assertLess(ollama, second_day5)
+        self.assertIn('"$TARGET_URL/healthz"', source)
+        self.assertIn(
+            '(.default_scenario // .scenario) == "day5"', source
+        )
+        self.assertIn("warmup_model recovery", source)
+        self.assertIn("bounded model warmup failed", source)
+        self.assertIn("recover_parallel_probe_on_exit", source)
 
 
 if __name__ == "__main__":

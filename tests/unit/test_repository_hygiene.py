@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -24,8 +25,24 @@ SECRET_PATTERNS = {
 
 def repository_text_files() -> list[Path]:
     files: list[Path] = []
-    for path in ROOT.rglob("*"):
-        if not path.is_file() or ".git" in path.parts:
+    listed = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+    for raw_relative in listed.split(b"\0"):
+        if not raw_relative:
+            continue
+        path = ROOT / raw_relative.decode("utf-8", errors="surrogateescape")
+        if not path.is_file():
             continue
         if "results" in path.parts and "e2e" in path.parts:
             continue

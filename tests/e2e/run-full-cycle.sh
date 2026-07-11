@@ -20,6 +20,7 @@ cd "$REPO_ROOT"
 : "${AWS_DEFAULT_REGION:=us-east-1}"
 : "${TRIALS:=5}"
 : "${AGENT_URL:=http://localhost:8001}"
+: "${GOAT_URL:=http://localhost:5000}"
 
 TS=$(date +%Y%m%d-%H%M%S)
 RESULTS_DIR="$HOME/work/e2e-evidence/$TS"
@@ -195,6 +196,26 @@ run_agent() {
   fi
 }
 
+# === LLMGoat — A01/A02/A04/A06/A08 complete API + state contracts ===
+run_llmgoat() {
+  log "▶ LLMGoat cross-platform API/state e2e"
+  local item_dir="$RESULTS_DIR/llmgoat"
+  mkdir -p "$item_dir"
+  RESULTS_DIR="$item_dir" TRIALS="$TRIALS" GOAT_URL="$GOAT_URL" \
+    bash "$SCRIPT_DIR/llmgoat/run-all.sh" 2>&1 \
+    | tee "$item_dir/output.txt" | tail -5
+  local status=${PIPESTATUS[0]}
+  if [ "$status" -ne 0 ]; then
+    log "  ✗ LLMGoat API/state 검증 실패 (exit=$status)"
+    FAILED_STEPS+=("e2e:llmgoat")
+  elif ! jq -e '.status == "PASS"' "$item_dir/summary.json" >/dev/null; then
+    log "  ✗ LLMGoat summary.json PASS 계약 누락"
+    FAILED_STEPS+=("e2e:llmgoat-summary")
+  else
+    log "  ✓ LLMGoat API/state 검증 PASS (model solved rate는 관찰값)"
+  fi
+}
+
 # === 실행 ===
 log "============================================"
 log "  OWASP Top 10 for LLM — Full Cycle e2e"
@@ -216,6 +237,7 @@ done
 
 run_registry
 run_agent
+run_llmgoat
 
 # LLM10은 동시 요청으로 Ollama queue를 점유할 수 있으므로 반드시 마지막에 실행한다.
 if require_day_ready day5; then
@@ -236,7 +258,9 @@ for d in "$RESULTS_DIR"/llm*/results.jsonl; do
   case "$d" in
     *.jsonl)
       jq -r '
-        if has("pass") and has("trials") and has("success_rate_pct") then
+        if .outcome_policy == "observation-only" then
+          "\(.test_id): solved=\(.solved_count) unsolved=\(.unsolved_count) infra=\(.infra_fail) trials=\(.trials_attempted)/\(.trials) (\(.solved_rate_pct)% observed)"
+        elif has("pass") and has("trials") and has("success_rate_pct") then
           "\(.test_id): pass=\(.pass) fail=\(.fail // "n/a") infra=\(.infra_fail // 0) trials=\(.trials) (\(.success_rate_pct)%)"
         else
           "\(.test_id): structured result recorded"
@@ -249,6 +273,15 @@ for d in "$RESULTS_DIR"/llm*/results.jsonl; do
       ;;
   esac
 done
+
+if [ -f "$RESULTS_DIR/llmgoat/state-contracts.jsonl" ]; then
+  echo "--- $RESULTS_DIR/llmgoat/state-contracts.jsonl ---" \
+    | tee -a "$RESULTS_DIR/summary.txt"
+  jq -r '
+    "\(.challenge): contract=\(.contract) pass=\(.pass) before=\(.before_sha256) mutated=\(.mutated_sha256) restored=\(.restored_sha256)"
+  ' "$RESULTS_DIR/llmgoat/state-contracts.jsonl" \
+    | tee -a "$RESULTS_DIR/summary.txt"
+fi
 
 if [ "${#FAILED_STEPS[@]}" -gt 0 ]; then
   {

@@ -27,7 +27,7 @@ EMERGENCY_STOP_MINUTES=120 \
 
 controller는 setup과 course의 명시한 40자리 commit이 각각 공개 `origin/main`에 있고 course worktree가 완전히 clean인지 먼저 확인합니다. 이후 두 저장소를 임시 `git archive`로 분리하며, Terraform state와 Capstone upload, 로컬 browser harness도 이 고정 복사본만 사용합니다. 공개 GHCR의 다섯 이미지에서 tag digest와 `linux/amd64` digest를 고정하고, EC2의 실제 Podman digest와 `org.opencontainers.image.revision`이 다르면 테스트를 시작하지 않습니다.
 
-EC2 생성 전에는 선택한 Playwright package/browser를 실제 headless launch/close하고 로컬 `18011`, `18501` 포트가 비어 있는지도 확인합니다. 원격 strict core가 끝나면 controller가 SSM forward `8011→18011`, `8501→18501`을 bounded child process로 열고 Day 3 UI/DVLA harness를 실행합니다. 결과와 forward cleanup 증거를 원격 raw bundle에 원자적으로 전달한 뒤에만 archive를 닫습니다. `STRICT_ACCEPTANCE=true TRIALS=5` full-cycle의 종료 코드를 그대로 사용하며 LLM10 timeout 같은 결과를 controller가 임의로 성공으로 바꾸지 않습니다. raw evidence archive와 SHA-256은 기본적으로 `$HOME/owasp-llm-live-evidence/<run-id>/remote/`에 회수됩니다.
+EC2 생성 전에는 선택한 Playwright package/browser를 실제 headless launch/close하고 로컬 `18011`, `18501`, `15000` 포트가 비어 있는지도 확인합니다. 원격 strict core가 끝나면 controller가 SSM forward `8011→18011`, `8501→18501`, `5000→15000`을 bounded child process로 열고 Day 3 UI/DVLA와 LLMGoat A01 harness를 실행합니다. LLMGoat UI는 API `response`의 정확한 DOM 반영과 boolean `solved`에 따른 overlay/sidebar 일치를 검사하며, solved 자체는 관찰값으로만 남깁니다. 결과와 세 forward cleanup 증거를 원격 raw bundle에 원자적으로 전달한 뒤에만 archive를 닫습니다. `STRICT_ACCEPTANCE=true TRIALS=5` full-cycle의 종료 코드를 그대로 사용하며 LLM10 timeout 같은 결과를 controller가 임의로 성공으로 바꾸지 않습니다. raw evidence archive와 SHA-256은 기본적으로 `$HOME/owasp-llm-live-evidence/<run-id>/remote/`에 회수됩니다.
 
 테스트가 실패해도 원격 runner의 EXIT trap이 현재 증거를 먼저 archive합니다. 원격 timeout/crash면 controller가 기존 run root를 `partial=true`로 별도 archive해 회수합니다. 그 직후 captured instance ID와 고유 `Course` 태그로 EC2 terminate를 직접 요청하고 terminated 상태를 확인한 다음, `terraform destroy`로 나머지 자원을 정리합니다. 마지막에는 Terraform state뿐 아니라 EC2, EBS, 네트워크, Lambda, EventBridge, SNS, IAM, Budget을 직접 조회합니다. 증거 회수·직접 terminate·destroy·잔여 자원 확인 중 하나라도 실패하면 전체 명령도 실패합니다. 이 controller에는 인스턴스를 남기는 옵션이 없습니다.
 
@@ -167,6 +167,8 @@ curl -fsS http://localhost:8001/healthz \
   | jq -e '.ok == true and (.tools | length == 7)'
 curl -fsS http://localhost:8002/api/v1/models | jq -e '.models | length > 0'
 curl -fsS http://localhost:8080/ >/dev/null
+curl -fsS http://localhost:5000/api/model_status \
+  | jq -e '.model_busy == false'
 curl -fsS http://localhost:8501/_stcore/health
 curl -fsS http://localhost:11434/api/tags | jq -e '.models | type == "array"'
 ```
@@ -194,7 +196,17 @@ TRIALS=5 \
 TRIALS=5 bash tests/e2e/run-full-cycle.sh
 ```
 
-full-cycle은 다섯 RAG 포트와 Agent를 순회하며 실패한 script 또는 scenario health를 non-zero exit로 반환합니다. LLM 출력 성공률은 확률적 관측값입니다. tool catalog, caller binding, JSON parser, HTTP 계약처럼 결정적인 검사는 pass/fail로 구분합니다. timeout·모델 미기동·네트워크 실패는 취약점 부재가 아니라 인프라 실패입니다.
+full-cycle은 다섯 RAG 포트와 Agent를 순회한 뒤 LLMGoat
+A01/A02/A04/A06/A08 API를 실제 호출하고, 마지막에 LLM10을 실행합니다. LLMGoat의
+각 HTTP request/response는 `llmgoat/raw/requests.jsonl`에 원문 JSON과 SHA-256으로
+남습니다. A04는 review 추가 전·후·reset 상태 hash, A08은 vector export·import·reset
+상태 hash를 `llmgoat/state-contracts.jsonl`에 기록하며 원상 복원이 다르면 즉시
+실패합니다.
+
+LLM 출력 성공률과 LLMGoat `solved`는 확률적 관측값입니다. tool catalog, caller
+binding, JSON parser, HTTP 계약, LLMGoat mutable-state reset처럼 결정적인 검사는
+pass/fail로 구분합니다. timeout·모델 미기동·네트워크 실패는 취약점 부재가 아니라
+인프라 실패입니다.
 
 ## 6. 증거 고정
 
@@ -235,6 +247,10 @@ sha256sum "$EVIDENCE_DIR.tgz" > "$EVIDENCE_DIR.tgz.sha256"
 - `log.txt`, `summary.txt`: full-cycle 실행 흐름과 최종 상태
 - `llm*/results.jsonl`: 판정과 성공률
 - `llm*/raw/`: 원문 응답
+- `llmgoat/results.jsonl`: A01/A02/A04/A06/A08 solved/unsolved 실측 관찰
+- `llmgoat/raw/requests.jsonl`: loopback API 요청·응답·HTTP·SHA-256 원문 증거
+- `llmgoat/state-contracts.jsonl`: A04/A08 변이와 원상 복원 hash 계약
+- `browser-evidence/llmgoat-*`: A01 실제 화면 응답·solved 표시·스크린샷
 - `.tgz.sha256`: 회수한 archive의 무결성 값
 
 raw 응답에는 실습용 비밀값과 공격 payload가 포함될 수 있습니다. public branch에 자동 commit하지 말고 승인된 강사 저장 위치로 회수합니다.

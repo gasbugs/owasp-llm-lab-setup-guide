@@ -8,8 +8,13 @@ require_healthy
 
 : "${LATENCY_SAMPLES:=3}"
 : "${OUTPUT_FLOOD_THRESHOLD_BYTES:=4096}"
+: "${LARGE_INPUT_THRESHOLD_BYTES:=16384}"
 : "${RATE_PROBE_REQUESTS:=10}"
 : "${RATE_PROBE_PARALLEL:=2}"
+: "${RECOVERY_ATTEMPTS:=30}"
+: "${RECOVERY_SLEEP_SECONDS:=2}"
+: "${WARMUP_ATTEMPTS:=6}"
+: "${WARMUP_REQUEST_TIMEOUT_SECONDS:=45}"
 if ! [[ "$LATENCY_SAMPLES" =~ ^[0-9]+$ ]] || [ "$LATENCY_SAMPLES" -lt 3 ]; then
   echo "ERROR: LATENCY_SAMPLES must be an integer >= 3" >&2
   exit 2
@@ -19,11 +24,27 @@ if ! [[ "$OUTPUT_FLOOD_THRESHOLD_BYTES" =~ ^[0-9]+$ ]] ||
   echo "ERROR: OUTPUT_FLOOD_THRESHOLD_BYTES must be a positive integer" >&2
   exit 2
 fi
+if ! [[ "$LARGE_INPUT_THRESHOLD_BYTES" =~ ^[0-9]+$ ]] ||
+   [ "$LARGE_INPUT_THRESHOLD_BYTES" -lt 1 ]; then
+  echo "ERROR: LARGE_INPUT_THRESHOLD_BYTES must be a positive integer" >&2
+  exit 2
+fi
 if ! [[ "$RATE_PROBE_REQUESTS" =~ ^[0-9]+$ ]] ||
    [ "$RATE_PROBE_REQUESTS" -lt 5 ] ||
    ! [[ "$RATE_PROBE_PARALLEL" =~ ^[0-9]+$ ]] ||
    [ "$RATE_PROBE_PARALLEL" -lt 1 ]; then
   echo "ERROR: RATE_PROBE_REQUESTS must be >=5 and RATE_PROBE_PARALLEL >=1" >&2
+  exit 2
+fi
+if ! [[ "$RECOVERY_ATTEMPTS" =~ ^[0-9]+$ ]] ||
+   [ "$RECOVERY_ATTEMPTS" -lt 1 ] ||
+   ! [[ "$RECOVERY_SLEEP_SECONDS" =~ ^[0-9]+$ ]] ||
+   [ "$RECOVERY_SLEEP_SECONDS" -lt 1 ] ||
+   ! [[ "$WARMUP_ATTEMPTS" =~ ^[0-9]+$ ]] ||
+   [ "$WARMUP_ATTEMPTS" -lt 1 ] ||
+   ! [[ "$WARMUP_REQUEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] ||
+   [ "$WARMUP_REQUEST_TIMEOUT_SECONDS" -lt 1 ]; then
+  echo "ERROR: recovery/warmup bounds must be positive integers" >&2
   exit 2
 fi
 
@@ -33,37 +54,108 @@ SAMPLES_JSONL="$RESULTS_DIR/llm10-samples.jsonl"
 
 echo "=== LLM10 Unbounded Consumption 검증 ==="
 
-restart_ollama_after_overload() {
-  local -a runtime=(podman)
-  if ! podman container exists lab-ollama 2>/dev/null; then
-    if command -v sudo >/dev/null 2>&1 && id ubuntu >/dev/null 2>&1; then
-      runtime=(sudo -u ubuntu env XDG_RUNTIME_DIR=/run/user/1000 podman)
-    else
-      echo "  [R1] INFRA: lab-ollama container owner를 확인할 수 없음" >&2
-      return 3
+warmup_model() {
+  local phase="${1:-warmup}"
+  local attempt response_file http_code
+  local payload
+  payload=$(jq -cn \
+    --arg m "warmup" --arg u "e2e-llm10-warmup" --arg t "default" \
+    '{message: $m, user_id: $u, tenant: $t}')
+
+  for attempt in $(seq 1 "$WARMUP_ATTEMPTS"); do
+    response_file="$RESULTS_DIR/raw/${phase}-warmup-${attempt}.json"
+    http_code="000"
+    if http_code=$(curl -sS --max-time "$WARMUP_REQUEST_TIMEOUT_SECONDS" \
+      -o "$response_file" -w '%{http_code}' \
+      -X POST "$TARGET_URL/api/chat" \
+      -H 'Content-Type: application/json' \
+      -d "$payload"); then
+      if [ "$http_code" = "200" ] &&
+         jq -e '.reply | type == "string" and length > 0' \
+           "$response_file" >/dev/null 2>&1; then
+        echo "  [warmup:$phase] READY (attempt $attempt/$WARMUP_ATTEMPTS)"
+        return 0
+      fi
     fi
-  fi
-  if ! "${runtime[@]}" restart lab-ollama >/dev/null; then
-    echo "  [R1] INFRA: overload 뒤 lab-ollama restart 실패" >&2
-    return 3
-  fi
-  for _ in $(seq 1 60); do
-    if curl -fsS --max-time 3 http://localhost:11434/api/tags >/dev/null 2>&1; then
-      echo "  [R1] overload queue cleanup: Ollama READY"
-      return 0
+    echo "  [warmup:$phase] retry $attempt/$WARMUP_ATTEMPTS (HTTP $http_code)" >&2
+    if [ "$attempt" -lt "$WARMUP_ATTEMPTS" ]; then
+      sleep "$RECOVERY_SLEEP_SECONDS"
     fi
-    sleep 2
   done
-  echo "  [R1] INFRA: overload 뒤 Ollama readiness timeout" >&2
+  echo "  [warmup:$phase] INFRA: bounded model warmup failed" >&2
   return 3
 }
 
-warmup_model() {
-  if ! chat "warmup" >/dev/null; then
-    echo "  [warmup] INFRA: model warmup 실패" >&2
+restart_llm10_stack_after_overload() {
+  local -a runtime=(podman)
+  if ! podman container exists lab-ollama 2>/dev/null ||
+     ! podman container exists lab-day5-vuln-rag 2>/dev/null; then
+    if command -v sudo >/dev/null 2>&1 && id ubuntu >/dev/null 2>&1; then
+      runtime=(sudo -u ubuntu env XDG_RUNTIME_DIR=/run/user/1000 podman)
+    else
+      echo "  [R1] INFRA: LLM10 container owner를 확인할 수 없음" >&2
+      return 3
+    fi
+  fi
+
+  if ! "${runtime[@]}" container exists lab-ollama 2>/dev/null ||
+     ! "${runtime[@]}" container exists lab-day5-vuln-rag 2>/dev/null; then
+    echo "  [R1] INFRA: LLM10 recovery containers are missing" >&2
     return 3
   fi
+
+  # curl이 timeout된 뒤에도 Day5의 uvicorn task는 Ollama 응답을 기다릴 수 있다.
+  # 먼저 앱을 재시작해 그 task를 취소하고, Ollama queue를 비운 뒤, 앱을 다시
+  # 재시작해 새 backend 연결만 남긴다.
+  if ! "${runtime[@]}" restart --time 5 lab-day5-vuln-rag >/dev/null; then
+    echo "  [R1] INFRA: overload 뒤 Day5 app queue cancel 실패" >&2
+    return 3
+  fi
+  if ! "${runtime[@]}" restart --time 5 lab-ollama >/dev/null; then
+    echo "  [R1] INFRA: overload 뒤 lab-ollama restart 실패" >&2
+    return 3
+  fi
+  for _ in $(seq 1 "$RECOVERY_ATTEMPTS"); do
+    if curl -fsS --max-time 3 http://localhost:11434/api/tags >/dev/null 2>&1; then
+      echo "  [R1] overload queue cleanup: Ollama READY"
+      break
+    fi
+    sleep "$RECOVERY_SLEEP_SECONDS"
+  done
+  if ! curl -fsS --max-time 3 http://localhost:11434/api/tags >/dev/null 2>&1; then
+    echo "  [R1] INFRA: overload 뒤 Ollama readiness timeout" >&2
+    return 3
+  fi
+
+  if ! "${runtime[@]}" restart --time 5 lab-day5-vuln-rag >/dev/null; then
+    echo "  [R1] INFRA: Ollama 복구 뒤 Day5 app restart 실패" >&2
+    return 3
+  fi
+  for _ in $(seq 1 "$RECOVERY_ATTEMPTS"); do
+    if curl -fsS --max-time 5 "$TARGET_URL/healthz" 2>/dev/null \
+      | jq -e '(.default_scenario // .scenario) == "day5"' >/dev/null; then
+      echo "  [R1] overload queue cleanup: Day5 app READY"
+      warmup_model recovery
+      return $?
+    fi
+    sleep "$RECOVERY_SLEEP_SECONDS"
+  done
+  echo "  [R1] INFRA: overload 뒤 Day5 app readiness timeout" >&2
+  return 3
 }
+
+PARALLEL_PROBE_STARTED=false
+PARALLEL_PROBE_RECOVERED=false
+recover_parallel_probe_on_exit() {
+  local status=$?
+  if [ "$PARALLEL_PROBE_STARTED" = "true" ] &&
+     [ "$PARALLEL_PROBE_RECOVERED" != "true" ]; then
+    echo "  [R1] exit cleanup: retrying LLM10 stack recovery" >&2
+    restart_llm10_stack_after_overload || true
+  fi
+  return "$status"
+}
+trap recover_parallel_probe_on_exit EXIT
 
 LAST_DURATION_MS=0
 LAST_RESPONSE_BYTES=0
@@ -97,12 +189,13 @@ measure_chat_sample() {
 }
 
 echo "  [warmup] load model before consumption measurement..."
-warmup_model
+warmup_model initial
 
 # R1a: 낮은 병렬도의 별도 probe로 애플리케이션 rate limiter 부재를 확인한다.
 # 100-call overload의 transport timeout을 rate-limit 성공으로 세지 않기 위해
 # 두 관찰을 분리한다.
 echo "  [R1a] bounded low-parallel rate-limit probe..."
+PARALLEL_PROBE_STARTED=true
 set +e
 gentle_results=$(seq 1 "$RATE_PROBE_REQUESTS" |
   xargs -P "$RATE_PROBE_PARALLEL" -I{} curl -s --max-time 60 \
@@ -155,8 +248,8 @@ overload_json=$(python3 "$ACCEPTANCE_HELPER" rate-limit \
 echo "  [R1b] 200: $ok / 429: $blocked / transport timeout: $transport / other: $other / xargs: $xargs_rc"
 echo "  [R1b] classification: $(printf '%s' "$overload_json" | jq -r '.classification')"
 
-restart_ollama_after_overload
-warmup_model
+restart_llm10_stack_after_overload
+PARALLEL_PROBE_RECOVERED=true
 
 # R2/R3: three or more samples per side, with raw response and per-sample JSONL.
 BASELINE_MS=()
@@ -168,9 +261,11 @@ for i in $(seq 1 "$LATENCY_SAMPLES"); do
 done
 
 HUGE=$(awk 'BEGIN { for (i = 0; i < 1000; i++) printf "보안 강의를 듣고 있습니다." }')
+HUGE_PROMPT="$HUGE 위 내용을 요약해줘."
+HUGE_REQUEST_BYTES=$(printf '%s' "$HUGE_PROMPT" | wc -c | tr -d ' ')
 echo "  [R3] huge-input samples..."
 for i in $(seq 1 "$LATENCY_SAMPLES"); do
-  measure_chat_sample huge-input "$i" "$HUGE 위 내용을 요약해줘."
+  measure_chat_sample huge-input "$i" "$HUGE_PROMPT"
   HUGE_MS+=("$LAST_DURATION_MS")
 done
 
@@ -179,6 +274,10 @@ huge_json=$(printf '%s\n' "${HUGE_MS[@]}" | jq -s .)
 latency_json=$(python3 "$ACCEPTANCE_HELPER" latency \
   --baseline-json "$baseline_json" --huge-json "$huge_json")
 echo "  [R2/R3] classification: $(printf '%s' "$latency_json" | jq -r '.classification')"
+large_input_json=$(python3 "$ACCEPTANCE_HELPER" large-input \
+  --request-bytes "$HUGE_REQUEST_BYTES" --http-status 200 \
+  --threshold-bytes "$LARGE_INPUT_THRESHOLD_BYTES")
+echo "  [R3] large-input classification: $(printf '%s' "$large_input_json" | jq -r '.classification') ($HUGE_REQUEST_BYTES bytes)"
 
 # R4: output-generation flood. Acceptance is based on measured response bytes,
 # not on the model merely mentioning long output.
@@ -192,7 +291,7 @@ echo "  [R4] classification: $(printf '%s' "$flood_json" | jq -r '.classificatio
 
 overall_json=$(python3 "$ACCEPTANCE_HELPER" llm10-overall \
   --rate-json "$gentle_rate_json" --latency-json "$latency_json" \
-  --flood-json "$flood_json")
+  --flood-json "$flood_json" --large-input-json "$large_input_json")
 
 jq -n \
   --arg target "$TARGET_URL" --arg ts "$(date -Iseconds)" \
@@ -208,6 +307,7 @@ jq -n \
   --argjson overload "$overload_json" \
   --argjson baseline "$baseline_json" --argjson huge "$huge_json" \
   --argjson latency "$latency_json" --argjson flood "$flood_json" \
+  --argjson large_input "$large_input_json" \
   --argjson acceptance "$overall_json" \
   '{test_id:"LLM10-consumption", target:$target, timestamp:$ts,
     rate_limit_test:($gentle_rate + {requests:$gentle_requests,
@@ -218,6 +318,7 @@ jq -n \
       transport_timeouts: $transport, other_http:$other, xargs_exit:$xargs_rc}),
     latency_test:($latency + {baseline_samples_ms:$baseline,
       huge_input_samples_ms:$huge}),
+    large_input_test:$large_input,
     output_flood_test:$flood,
     acceptance:$acceptance}' \
   >> "$RESULTS_DIR/results.jsonl"

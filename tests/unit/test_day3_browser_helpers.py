@@ -78,6 +78,56 @@ Action Input: 2
         self.assertEqual(result["status"], "PASS")
 
 
+class LlmgoatClassificationTest(unittest.TestCase):
+    def test_unsolved_response_is_a_valid_observation(self) -> None:
+        result = MODULE.classify_llmgoat_ui(
+            {"response": "I like goats.", "solved": False},
+            "I like goats.",
+            overlay_visible=False,
+            sidebar_completed=False,
+            request_count=1,
+        )
+        self.assertEqual(result["status"], "PASS")
+        self.assertFalse(result["solved_observed"])
+        self.assertEqual(result["outcome_policy"], "solved-is-observation-only")
+
+    def test_solved_response_requires_both_solved_indicators(self) -> None:
+        result = MODULE.classify_llmgoat_ui(
+            {"response": "Goats are bad", "solved": True},
+            "Goats are bad",
+            overlay_visible=True,
+            sidebar_completed=True,
+            request_count=1,
+        )
+        self.assertEqual(result["status"], "PASS")
+        self.assertTrue(result["solved_observed"])
+
+    def test_ui_api_mismatch_fails_closed(self) -> None:
+        result = MODULE.classify_llmgoat_ui(
+            {"response": "Goats are bad", "solved": True},
+            "Goats are bad\nextra text",
+            overlay_visible=False,
+            sidebar_completed=True,
+            request_count=2,
+        )
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(result["failure_class"], "F-UI-CONTRACT")
+        self.assertFalse(result["checks"]["one_api_request"])
+        self.assertFalse(result["checks"]["exact_response_rendered"])
+        self.assertFalse(result["checks"]["overlay_matches_solved"])
+
+    def test_invalid_api_contract_fails_closed(self) -> None:
+        result = MODULE.classify_llmgoat_ui(
+            {"response": "", "solved": "yes"},
+            "",
+            overlay_visible=False,
+            sidebar_completed=False,
+            request_count=1,
+        )
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(result["failure_class"], "F-API-CONTRACT")
+
+
 class BrowserHarnessContractTest(unittest.TestCase):
     def test_success_is_revoked_when_cleanup_is_not_proven(self) -> None:
         source = (ROOT / "tests" / "browser" / "run_day3_ui.py").read_text(
@@ -95,6 +145,16 @@ class BrowserHarnessContractTest(unittest.TestCase):
             "receiver.matching_count(nonce) - before_receiver >= 1",
             source,
         )
+
+    def test_llmgoat_ui_is_loopback_only_and_mandatory(self) -> None:
+        source = (ROOT / "tests" / "browser" / "run_day3_ui.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('DEFAULT_LLMGOAT_URL = "http://127.0.0.1:15000"', source)
+        self.assertIn('llmgoat_url + "/api/model_status"', source)
+        self.assertIn('llmgoat_url + "/challenges/a01-prompt-injection"', source)
+        self.assertIn('llmgoat_url + "/api/a01-prompt-injection"', source)
+        self.assertIn('and result["llmgoat"]["status"] == "PASS"', source)
 
 
 if __name__ == "__main__":

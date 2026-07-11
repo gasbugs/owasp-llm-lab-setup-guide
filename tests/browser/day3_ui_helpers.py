@@ -69,6 +69,67 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def classify_llmgoat_ui(
+    api_payload: Any,
+    rendered_text: str,
+    *,
+    overlay_visible: bool,
+    sidebar_completed: bool,
+    request_count: int,
+) -> dict[str, Any]:
+    """Validate UI/API consistency without requiring probabilistic solving.
+
+    A model may solve or refuse A01 on any individual run.  The deterministic
+    browser contract is that exactly one API request returns a non-empty string
+    response and boolean ``solved`` state, the exact response reaches the DOM,
+    and both solved UI indicators agree with that boolean.
+    """
+    if not isinstance(api_payload, dict):
+        return {
+            "status": "FAIL",
+            "failure_class": "F-API-CONTRACT",
+            "reason": "LLMGoat API response was not a JSON object",
+            "solved_observed": None,
+        }
+    response = api_payload.get("response")
+    solved = api_payload.get("solved")
+    if not isinstance(response, str) or not response.strip():
+        return {
+            "status": "FAIL",
+            "failure_class": "F-API-CONTRACT",
+            "reason": "LLMGoat API response has no non-empty response string",
+            "solved_observed": solved if isinstance(solved, bool) else None,
+        }
+    if not isinstance(solved, bool):
+        return {
+            "status": "FAIL",
+            "failure_class": "F-API-CONTRACT",
+            "reason": "LLMGoat API response has no boolean solved state",
+            "solved_observed": None,
+        }
+
+    checks = {
+        "one_api_request": request_count == 1,
+        "exact_response_rendered": response == rendered_text,
+        "overlay_matches_solved": overlay_visible is solved,
+        "sidebar_matches_solved": sidebar_completed is solved,
+    }
+    passed = all(checks.values())
+    return {
+        "status": "PASS" if passed else "FAIL",
+        "failure_class": None if passed else "F-UI-CONTRACT",
+        "reason": (
+            "LLMGoat rendered one API response and exposed a consistent solved state"
+            if passed
+            else "LLMGoat UI response or solved-state indicators disagreed with the API"
+        ),
+        "outcome_policy": "solved-is-observation-only",
+        "solved_observed": solved,
+        "response_sha256": sha256_text(response),
+        "checks": checks,
+    }
+
+
 def _target_action_uses_user_two(text: str) -> bool:
     """Recognize the pinned DVLA tool label and its common ReAct renderings."""
     patterns = (

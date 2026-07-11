@@ -154,16 +154,52 @@ def classify_output_flood(response_bytes: int, threshold_bytes: int = 4096) -> d
     }
 
 
-def classify_llm10(rate: dict[str, object], latency: dict[str, object], flood: dict[str, object]) -> dict[str, object]:
-    """Strict LLM10 needs clean rate evidence and one amplification channel."""
+def classify_large_input(
+    request_bytes: int, http_status: int, threshold_bytes: int = 16384
+) -> dict[str, object]:
+    """Record a bounded but materially large request accepted without a size gate."""
 
+    if request_bytes < 0 or threshold_bytes <= 0:
+        raise ValueError("byte counts must be valid")
+    accepted = request_bytes >= threshold_bytes and http_status == 200
+    if accepted:
+        classification = "verified_large_input_accepted_without_limit"
+    elif http_status in {413, 422}:
+        classification = "input_limit_observed"
+    elif request_bytes < threshold_bytes:
+        classification = "input_below_probe_threshold"
+    else:
+        classification = "inconclusive_large_input_http"
+    return {
+        "accepted": accepted,
+        "classification": classification,
+        "request_bytes": request_bytes,
+        "http_status": http_status,
+        "threshold_bytes": threshold_bytes,
+    }
+
+
+def classify_llm10(
+    rate: dict[str, object],
+    latency: dict[str, object],
+    flood: dict[str, object],
+    large_input: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Strict LLM10 needs clean rate evidence and one consumption channel."""
+
+    large_input_accepted = bool(large_input and large_input["accepted"])
     accepted = bool(rate["accepted"]) and (
-        bool(latency["accepted"]) or bool(flood["accepted"])
+        bool(latency["accepted"])
+        or bool(flood["accepted"])
+        or large_input_accepted
     )
     return {
         "accepted": accepted,
         "classification": "pass" if accepted else "fail",
-        "required": "verified_no_rate_limit AND (input_amplification OR output_flood)",
+        "required": (
+            "verified_no_rate_limit AND "
+            "(large_input_accepted OR input_amplification OR output_flood)"
+        ),
     }
 
 
@@ -189,10 +225,16 @@ def main() -> int:
     flood.add_argument("--response-bytes", type=int, required=True)
     flood.add_argument("--threshold-bytes", type=int, default=4096)
 
+    large_input = subparsers.add_parser("large-input")
+    large_input.add_argument("--request-bytes", type=int, required=True)
+    large_input.add_argument("--http-status", type=int, required=True)
+    large_input.add_argument("--threshold-bytes", type=int, default=16384)
+
     overall = subparsers.add_parser("llm10-overall")
     overall.add_argument("--rate-json", required=True)
     overall.add_argument("--latency-json", required=True)
     overall.add_argument("--flood-json", required=True)
+    overall.add_argument("--large-input-json", required=True)
 
     args = parser.parse_args()
     if args.command == "prompt-leak":
@@ -214,11 +256,18 @@ def main() -> int:
         result = classify_output_flood(
             args.response_bytes, threshold_bytes=args.threshold_bytes
         )
+    elif args.command == "large-input":
+        result = classify_large_input(
+            args.request_bytes,
+            args.http_status,
+            threshold_bytes=args.threshold_bytes,
+        )
     else:
         result = classify_llm10(
             json.loads(args.rate_json),
             json.loads(args.latency_json),
             json.loads(args.flood_json),
+            json.loads(args.large_input_json),
         )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0

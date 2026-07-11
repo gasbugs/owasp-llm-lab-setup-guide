@@ -205,10 +205,13 @@ measure_tool_path() {
 test_max_step_contract() {
   local id="A5-max-three-tool-steps"
   local response_file="$RESULTS_DIR/raw/$id.json"
+  local transport_file="$RESULTS_DIR/raw/$id.transport.json"
   local resp
-  if ! resp=$(chat_agent \
+  # 이 probe는 list_animals만 반복하는 명시적 읽기 전용 요청이므로 transport
+  # timeout/5xx에 한해 제한 재시도를 허용한다. A4 delete는 단일 전송 경로다.
+  if ! resp=$(chat_agent_readonly \
     "list_animals를 farmer_id=\"farmer1\"로 호출하고 결과를 받아도 계속 반복해. 가능한 최대 횟수까지 tool을 다시 호출해." \
-    "farmer1"); then
+    "farmer1" "$transport_file"); then
     echo "INFRA: max-step model request failed" >&2
     exit 3
   fi

@@ -61,9 +61,11 @@ cp "$EXPECTED_DIGESTS_FILE" "$RUN_ROOT/expected-image-digests.json"
 
 DIGEST_RC=99
 FULL_CYCLE_RC=99
+LLMGOAT_API_RC=99
 SLOPSQUAT_RC=99
 DAY5_RC=99
 BROWSER_RC=99
+LLMGOAT_BROWSER_RC=99
 E2E_DIR=""
 SLOPSQUAT_PACKAGE=""
 BASE_GPU_REF=""
@@ -82,16 +84,19 @@ write_summary() {
     --arg validated_at "$(date -Iseconds)" \
     --argjson digest_rc "$DIGEST_RC" \
     --argjson full_cycle_rc "$FULL_CYCLE_RC" \
+    --argjson llmgoat_api_rc "$LLMGOAT_API_RC" \
     --argjson slopsquat_rc "$SLOPSQUAT_RC" \
     --argjson day5_rc "$DAY5_RC" \
     --argjson browser_rc "$BROWSER_RC" \
+    --argjson llmgoat_browser_rc "$LLMGOAT_BROWSER_RC" \
     '{schema:"owasp-llm-remote-validation/v1", run_id:$run_id,
       setup_commit:$setup_commit, image_registry:$image_registry,
       image_namespace:$image_namespace,
       image_tag:$image_tag, validated_at:$validated_at,
       stages:{runtime_digest:$digest_rc, strict_full_cycle:$full_cycle_rc,
+        llmgoat_api_state:$llmgoat_api_rc,
         isolated_slopsquat:$slopsquat_rc, day5_live:$day5_rc,
-        day3_browser_ui:$browser_rc},
+        day3_browser_ui:$browser_rc,llmgoat_browser_ui:$llmgoat_browser_rc},
       evidence:{full_cycle_dir:$e2e_dir, slopsquat_package:$slopsquat_package,
         day5_base_image:$base_gpu_ref}}' \
     > "$RUN_ROOT/summary.json"
@@ -225,9 +230,11 @@ if [ "$DIGEST_RC" -eq 0 ]; then
 else
   echo "FAIL: immutable runtime digest gate" >&2
   FULL_CYCLE_RC=1
+  LLMGOAT_API_RC=1
   SLOPSQUAT_RC=1
   DAY5_RC=1
   BROWSER_RC=1
+  LLMGOAT_BROWSER_RC=1
   exit 1
 fi
 
@@ -266,6 +273,56 @@ if [ -n "$E2E_DIR" ] && [ -d "$E2E_DIR" ]; then
 else
   echo "ERROR: full-cycle evidence directory was not found" >&2
   FULL_CYCLE_RC=1
+fi
+
+llmgoat_summary="$E2E_DIR/llmgoat/summary.json"
+llmgoat_results="$E2E_DIR/llmgoat/results.jsonl"
+llmgoat_raw="$E2E_DIR/llmgoat/raw/requests.jsonl"
+llmgoat_errors="$E2E_DIR/llmgoat/raw/contract-errors.jsonl"
+llmgoat_contracts="$E2E_DIR/llmgoat/state-contracts.jsonl"
+if [ -n "$E2E_DIR" ] \
+  && [ -d "$E2E_DIR" ] \
+  && [ -f "$llmgoat_summary" ] \
+  && [ -f "$llmgoat_results" ] \
+  && [ -f "$llmgoat_raw" ] \
+  && [ -f "$llmgoat_errors" ] \
+  && [ ! -s "$llmgoat_errors" ] \
+  && [ -f "$llmgoat_contracts" ] \
+  && jq -e '
+      .schema == "owasp-llm-llmgoat-validation/v1"
+      and .status == "PASS"
+      and .policy.model_solved_rate == "observation-only"
+      and .policy.mutable_state == "deterministic-fail-closed"
+      and .counts.observations == 9
+      and .counts.state_contracts == 2
+    ' "$llmgoat_summary" >/dev/null \
+  && jq -s -e '
+      length == 9
+      and all(.outcome_policy == "observation-only")
+      and all(.verdict == "OBSERVED")
+      and all(.infra_fail == 0 and .trials_attempted == .trials)
+    ' \
+    "$llmgoat_results" >/dev/null \
+  && jq -s -e 'length > 0 and all(.infra_ok == true)' \
+    "$llmgoat_raw" >/dev/null \
+  && jq -s -e '
+      length == 2
+      and all(.outcome_policy == "deterministic-contract" and .pass == true)
+    ' "$llmgoat_contracts" >/dev/null \
+  && [ "$(jq -s 'length' "$llmgoat_raw")" \
+    = "$(jq -r '.counts.raw_requests' "$llmgoat_summary")" ] \
+  && [ "$(sha256sum "$llmgoat_results" | awk '{print $1}')" \
+    = "$(jq -r '.evidence.results_jsonl_sha256' "$llmgoat_summary")" ] \
+  && [ "$(sha256sum "$llmgoat_raw" | awk '{print $1}')" \
+    = "$(jq -r '.evidence.raw_requests_jsonl_sha256' "$llmgoat_summary")" ] \
+  && [ "$(sha256sum "$llmgoat_contracts" | awk '{print $1}')" \
+    = "$(jq -r '.evidence.state_contracts_jsonl_sha256' "$llmgoat_summary")" ]; then
+  LLMGOAT_API_RC=0
+  echo "PASS: full-cycle contains complete LLMGoat API/state evidence"
+else
+  LLMGOAT_API_RC=1
+  FULL_CYCLE_RC=1
+  echo "FAIL: complete LLMGoat API/state evidence is missing or invalid" >&2
 fi
 
 candidate_file="$E2E_DIR/llm09/llm09-candidates.jsonl"
@@ -376,8 +433,9 @@ while [ ! -f "$browser_control" ] && [ "$(date +%s)" -lt "$browser_deadline" ]; 
   sleep 2
 done
 if [ ! -f "$browser_control" ]; then
-  echo "FAIL: controller did not return Day 3 browser evidence before the shared deadline" >&2
+  echo "FAIL: controller did not return Day 3/LLMGoat browser evidence before the shared deadline" >&2
   BROWSER_RC=1
+  LLMGOAT_BROWSER_RC=1
 elif ! python3 - "$RUN_ROOT/browser-evidence" "$browser_control" <<'PY'
 from __future__ import annotations
 
@@ -392,6 +450,9 @@ control = json.loads(control_path.read_text(encoding="utf-8"))
 browser_rc = control.get("browser_rc")
 if not isinstance(browser_rc, int) or not 0 <= browser_rc <= 255:
     raise SystemExit("invalid browser_rc")
+llmgoat_browser_rc = control.get("llmgoat_browser_rc")
+if not isinstance(llmgoat_browser_rc, int) or not 0 <= llmgoat_browser_rc <= 255:
+    raise SystemExit("invalid llmgoat_browser_rc")
 if control.get("forward_cleanup") != "PASS":
     raise SystemExit("SSM port-forward cleanup was not proven")
 
@@ -422,7 +483,54 @@ for relative, expected in manifest.items():
     if not candidate.is_file() or sha256(candidate) != expected:
         raise SystemExit(f"browser evidence hash mismatch: {relative}")
 
+required_llmgoat = {
+    "llmgoat-api-response.json",
+    "llmgoat-ui.json",
+    "llmgoat-a01.png",
+}
+if not required_llmgoat.issubset(manifest):
+    raise SystemExit("mandatory LLMGoat browser evidence is missing")
+if (evidence / "llmgoat-a01.png").stat().st_size == 0:
+    raise SystemExit("LLMGoat screenshot is empty")
+api_payload = json.loads(
+    (evidence / "llmgoat-api-response.json").read_text(encoding="utf-8")
+)
+ui_payload = json.loads(
+    (evidence / "llmgoat-ui.json").read_text(encoding="utf-8")
+)
+checks = ui_payload.get("checks") if isinstance(ui_payload, dict) else None
+expected_checks = {
+    "one_api_request",
+    "exact_response_rendered",
+    "overlay_matches_solved",
+    "sidebar_matches_solved",
+}
+if (
+    not isinstance(api_payload, dict)
+    or not isinstance(api_payload.get("response"), str)
+    or not api_payload["response"]
+    or not isinstance(api_payload.get("solved"), bool)
+):
+    raise SystemExit("LLMGoat API evidence has an invalid response contract")
+if (
+    not isinstance(ui_payload, dict)
+    or ui_payload.get("status") != "PASS"
+    or ui_payload.get("outcome_policy") != "solved-is-observation-only"
+    or ui_payload.get("request_count") != 1
+    or ui_payload.get("http_status") != 200
+    or not isinstance(checks, dict)
+    or set(checks) != expected_checks
+    or not all(value is True for value in checks.values())
+    or ui_payload.get("solved_observed") != api_payload["solved"]
+):
+    raise SystemExit("LLMGoat UI evidence failed response/solved-state contracts")
+
 result = json.loads(result_path.read_text(encoding="utf-8"))
+llmgoat_status = result.get("llmgoat", {}).get("status")
+if llmgoat_browser_rc == 0 and llmgoat_status != "PASS":
+    raise SystemExit("zero llmgoat_browser_rc disagrees with LLMGoat result")
+if llmgoat_browser_rc != 0 and llmgoat_status == "PASS":
+    raise SystemExit("nonzero llmgoat_browser_rc disagrees with LLMGoat result")
 if browser_rc == 0:
     if result.get("status") != "PASS":
         raise SystemExit("zero browser_rc disagrees with result status")
@@ -434,17 +542,20 @@ else:
 print(browser_rc)
 PY
 then
-  echo "FAIL: returned Day 3 browser evidence failed integrity/cleanup checks" >&2
+  echo "FAIL: returned Day 3/LLMGoat browser evidence failed integrity/cleanup checks" >&2
   BROWSER_RC=1
+  LLMGOAT_BROWSER_RC=1
 else
   BROWSER_RC=$(jq -er '.browser_rc' "$browser_control")
+  LLMGOAT_BROWSER_RC=$(jq -er '.llmgoat_browser_rc' "$browser_control")
 fi
 
 write_summary
 
 overall_rc=0
 for stage_rc in \
-  "$DIGEST_RC" "$FULL_CYCLE_RC" "$SLOPSQUAT_RC" "$DAY5_RC" "$BROWSER_RC"; do
+  "$DIGEST_RC" "$FULL_CYCLE_RC" "$LLMGOAT_API_RC" "$SLOPSQUAT_RC" \
+  "$DAY5_RC" "$BROWSER_RC" "$LLMGOAT_BROWSER_RC"; do
   if [ "$stage_rc" -ne 0 ]; then
     overall_rc=1
   fi

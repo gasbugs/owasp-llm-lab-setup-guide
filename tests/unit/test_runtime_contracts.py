@@ -262,8 +262,27 @@ class RuntimeContractTest(unittest.TestCase):
         llm10 = read("tests/e2e/llm10/test_llm10_consumption.sh")
         self.assertIn("transport_timeouts: $transport", llm10)
         self.assertIn('if [ "$observed" -ne 100 ]', llm10)
-        self.assertIn("restart_ollama_after_overload", llm10)
+        self.assertIn("restart_llm10_stack_after_overload", llm10)
         self.assertIn("overload queue cleanup: Ollama READY", llm10)
+        self.assertIn("overload queue cleanup: Day5 app READY", llm10)
+        day5_restart = (
+            '"${runtime[@]}" restart --time 5 lab-day5-vuln-rag'
+        )
+        ollama_restart = '"${runtime[@]}" restart --time 5 lab-ollama'
+        self.assertEqual(llm10.count(day5_restart), 2)
+        first_day5 = llm10.index(day5_restart)
+        ollama = llm10.index(ollama_restart)
+        second_day5 = llm10.index(day5_restart, first_day5 + 1)
+        self.assertLess(first_day5, ollama)
+        self.assertLess(ollama, second_day5)
+        self.assertIn('trap recover_parallel_probe_on_exit EXIT', llm10)
+        self.assertIn('warmup_model recovery', llm10)
+        self.assertIn(
+            'for attempt in $(seq 1 "$WARMUP_ATTEMPTS")', llm10
+        )
+        self.assertIn(
+            '--max-time "$WARMUP_REQUEST_TIMEOUT_SECONDS"', llm10
+        )
         self.assertGreaterEqual(llm10.count("warmup_model"), 3)
 
     def test_mutating_e2e_is_repeatable_and_infra_fails_closed(self) -> None:
@@ -292,6 +311,13 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("contains($sentinel)", full_cycle)
         self.assertNotIn(".docs | length == 0", full_cycle)
         self.assertLess(full_cycle.index("run_agent\n"), full_cycle.index("run_items day5"))
+
+    def test_llm03_cosign_mount_is_traversable_by_non_root_container(self) -> None:
+        supply_chain = read("tests/e2e/llm03/test_llm03_supply_chain.sh")
+        self.assertIn('TMPDIR=$(mktemp -d)', supply_chain)
+        self.assertIn('chmod 0755 "$TMPDIR"', supply_chain)
+        self.assertIn('-v "$TMPDIR:/work:ro"', supply_chain)
+        self.assertNotIn("A.gguf.key", supply_chain)
 
 
 if __name__ == "__main__":

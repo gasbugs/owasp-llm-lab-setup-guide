@@ -254,6 +254,17 @@ class LiveControllerContractTest(unittest.TestCase):
         self.assertIn('cp -a "$E2E_DIR" "$RUN_ROOT/full-cycle-evidence"', source)
         self.assertIn('tar -C "$(dirname "$RUN_ROOT")"', source)
         self.assertIn('sha256sum "$(basename "$ARCHIVE")"', source)
+        self.assertIn("llmgoat_api_state:$llmgoat_api_rc", source)
+        self.assertIn("llmgoat_browser_ui:$llmgoat_browser_rc", source)
+        self.assertIn('llmgoat/summary.json', source)
+        self.assertIn('llmgoat/raw/requests.jsonl', source)
+        self.assertIn('llmgoat/raw/contract-errors.jsonl', source)
+        self.assertIn('all(.infra_ok == true)', source)
+        self.assertIn(
+            'all(.outcome_policy == "deterministic-contract" and .pass == true)',
+            source,
+        )
+        self.assertIn('.evidence.raw_requests_jsonl_sha256', source)
 
         digest_failure = source.index("FAIL: immutable runtime digest gate")
         full_cycle = source.index('STRICT_ACCEPTANCE=true TRIALS=5')
@@ -280,6 +291,8 @@ class LiveControllerContractTest(unittest.TestCase):
         self.assertIn('TF_DIR="$PINNED_REPO/infrastructure/terraform"', source)
         self.assertNotIn(': "${TF_DIR:=', source)
         self.assertIn('tests/browser/run_day3_ui.py', source)
+        self.assertIn('tests/e2e/llmgoat/run-all.sh', source)
+        self.assertIn('tests/e2e/llmgoat/test_a02_a04_a06_a08.sh', source)
         self.assertIn('run-bounded-command.py', source)
 
     def test_browser_handoff_is_background_bounded_atomic_and_fail_closed(self) -> None:
@@ -287,6 +300,8 @@ class LiveControllerContractTest(unittest.TestCase):
         background = source.index('>"$LOCAL_RUN_DIR/remote-run.log" 2>&1 &')
         ready = source.index('BROWSER_READY run_id=$RUN_ID', background)
         forward = source.index('start_port_forward 8011 18011', ready)
+        dvla_forward = source.index('start_port_forward 8501 18501', forward)
+        llmgoat_forward = source.index('start_port_forward 5000 15000', dvla_forward)
         browser = source.index('run_day3_ui.py', forward)
         upload_partial = source.index('browser-controller-result.json.partial', browser)
         atomic_move = source.index('browser-controller-result.json"', upload_partial)
@@ -294,7 +309,9 @@ class LiveControllerContractTest(unittest.TestCase):
         download = source.index('download_remote_evidence', remote_wait)
         self.assertLess(background, ready)
         self.assertLess(ready, forward)
-        self.assertLess(forward, browser)
+        self.assertLess(forward, dvla_forward)
+        self.assertLess(dvla_forward, llmgoat_forward)
+        self.assertLess(llmgoat_forward, browser)
         self.assertLess(browser, upload_partial)
         self.assertLess(upload_partial, atomic_move)
         self.assertLess(atomic_move, remote_wait)
@@ -302,6 +319,13 @@ class LiveControllerContractTest(unittest.TestCase):
         self.assertIn('controller-synthetic-failure.txt', source)
         self.assertIn('PORT_FORWARD_PIDS', source)
         self.assertIn('sock.bind(("127.0.0.1", port))', source)
+        self.assertIn('for port in (18011, 18501, 15000):', source)
+        self.assertIn('--llmgoat-url http://127.0.0.1:15000', source)
+        self.assertIn('llmgoat-api-response.json', source)
+        self.assertIn('llmgoat-ui.json', source)
+        self.assertIn('llmgoat-a01.png', source)
+        self.assertIn('--argjson llmgoat_browser_rc "$LLMGOAT_BROWSER_RC"', source)
+        self.assertIn('llmgoat_browser_rc:$llmgoat_browser_rc', source)
 
         early_exit = source.split(
             'if ! kill -0 "$REMOTE_PROCESS_PID" >/dev/null 2>&1; then', 1
@@ -309,6 +333,7 @@ class LiveControllerContractTest(unittest.TestCase):
         self.assertIn("REMOTE_REPORTED_RC=$?", early_exit)
         self.assertIn("REMOTE_RC=1", early_exit)
         self.assertIn("BROWSER_RC=1", early_exit)
+        self.assertIn("LLMGOAT_BROWSER_RC=1", early_exit)
         self.assertIn("exit 1", early_exit)
         self.assertNotIn('exit "$REMOTE_RC"', early_exit)
         self.assertIn("remote_reported_rc:$remote_reported_rc", source)

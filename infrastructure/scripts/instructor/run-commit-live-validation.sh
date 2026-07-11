@@ -257,6 +257,7 @@ RESIDUAL_OK=0
 REMOTE_RC=99
 REMOTE_REPORTED_RC=99
 BROWSER_RC=99
+LLMGOAT_BROWSER_RC=99
 FORWARDS_CLEANED=0
 FORWARDS_STARTED=0
 REMOTE_PROCESS_PID=0
@@ -448,7 +449,7 @@ stop_port_forwards() {
   if ! python3 - <<'PY'
 import socket
 
-for port in (18011, 18501):
+for port in (18011, 18501, 15000):
     sock = socket.socket()
     sock.settimeout(1)
     try:
@@ -480,7 +481,7 @@ start_port_forward() {
   local label="$3"
   local log_file="$LOCAL_RUN_DIR/ssm-forward-$label.log"
   local forward_timeout
-  forward_timeout=$(cost_timeout_with_reserve 1500 300) || return 124
+  forward_timeout=$(cost_timeout_with_reserve 1800 300) || return 124
   python3 "$BOUND_RUNNER" "$forward_timeout" \
     aws --profile "$AWS_PROFILE" --region "$AWS_REGION" \
       --no-cli-pager ssm start-session \
@@ -824,6 +825,7 @@ cleanup() {
     --argjson remote_rc "$REMOTE_RC" \
     --argjson remote_reported_rc "$REMOTE_REPORTED_RC" \
     --argjson browser_rc "$BROWSER_RC" \
+    --argjson llmgoat_browser_rc "$LLMGOAT_BROWSER_RC" \
     --argjson forwards_cleaned "$FORWARDS_CLEANED" \
     --argjson download_ok "$DOWNLOAD_OK" \
     --argjson partial_evidence "$PARTIAL_EVIDENCE" \
@@ -836,7 +838,8 @@ cleanup() {
       image_tag:$image_tag,course_id:$course_id,remote_rc:$remote_rc,
       remote_reported_rc:$remote_reported_rc,
       course_commit:$course_commit,course_tree_hash:$course_tree_hash,
-      browser_rc:$browser_rc,ssm_forwards_cleaned:($forwards_cleaned == 1),
+      browser_rc:$browser_rc,llmgoat_browser_rc:$llmgoat_browser_rc,
+      ssm_forwards_cleaned:($forwards_cleaned == 1),
       setup_tree_hash:$setup_tree_hash,terraform_tree_hash:$terraform_tree_hash,
       evidence_downloaded:($download_ok == 1),partial_evidence:($partial_evidence == 1),
       terraform_destroyed:($destroy_ok == 1),
@@ -872,6 +875,10 @@ for required_path in \
   tests/browser/run_day3_ui.py \
   tests/browser/day3_ui_helpers.py \
   tests/browser/requirements.txt \
+  tests/e2e/llmgoat/lib.sh \
+  tests/e2e/llmgoat/run-all.sh \
+  tests/e2e/llmgoat/test_a01_prompt_injection.sh \
+  tests/e2e/llmgoat/test_a02_a04_a06_a08.sh \
   docker/vuln-rag/app/scenarios/day4.py \
   tests/e2e/run-full-cycle.sh \
   tests/e2e/llm09/run-isolated-slopsquat.sh; do
@@ -901,7 +908,12 @@ for controller_path in \
   infrastructure/scripts/instructor/run-remote-validation.sh \
   infrastructure/scripts/student/upload-capstone.sh \
   tests/browser/run_day3_ui.py \
-  tests/browser/day3_ui_helpers.py; do
+  tests/browser/day3_ui_helpers.py \
+  tests/e2e/run-full-cycle.sh \
+  tests/e2e/llmgoat/lib.sh \
+  tests/e2e/llmgoat/run-all.sh \
+  tests/e2e/llmgoat/test_a01_prompt_injection.sh \
+  tests/e2e/llmgoat/test_a02_a04_a06_a08.sh; do
   committed_blob=$(git -C "$REPO_ROOT" rev-parse "$SETUP_COMMIT:$controller_path")
   local_blob=$(git -C "$REPO_ROOT" hash-object "$controller_path")
   if [ "$local_blob" != "$committed_blob" ]; then
@@ -967,7 +979,7 @@ import sys
 from playwright.sync_api import sync_playwright
 
 channel = sys.argv[1]
-for port in (18011, 18501):
+for port in (18011, 18501, 15000):
     sock = socket.socket()
     try:
         sock.bind(("127.0.0.1", port))
@@ -1230,6 +1242,7 @@ while [ "$(date +%s)" -lt "$browser_ready_poll_deadline" ]; do
     # impossible-looking zero from the remote process must fail closed here.
     REMOTE_RC=1
     BROWSER_RC=1
+    LLMGOAT_BROWSER_RC=1
     exit 1
   fi
   sleep 5
@@ -1237,13 +1250,15 @@ done
 if [ "$browser_ready" -ne 1 ]; then
   echo "ERROR: remote validation did not expose the bounded browser hand-off" >&2
   BROWSER_RC=1
+  LLMGOAT_BROWSER_RC=1
   stop_remote_process
   exit 1
 fi
 
-log "Remote core tests completed; opening two bounded SSM browser forwards"
+log "Remote core tests completed; opening three bounded SSM browser forwards"
 start_port_forward 8011 18011 rag
 start_port_forward 8501 18501 dvla
+start_port_forward 5000 15000 llmgoat
 
 forward_ready=0
 for _ in $(seq 1 90); do
@@ -1259,7 +1274,10 @@ for _ in $(seq 1 90); do
       | jq -e '.ok == true and .default_scenario == "day3"' >/dev/null \
     && curl --noproxy '*' -fsS --max-time 3 \
       http://127.0.0.1:18501/_stcore/health 2>/dev/null \
-      | grep -qx ok; then
+      | grep -qx ok \
+    && curl --noproxy '*' -fsS --max-time 3 \
+      http://127.0.0.1:15000/api/model_status 2>/dev/null \
+      | jq -e '.model_busy == false' >/dev/null; then
     forward_ready=1
     break
   fi
@@ -1269,12 +1287,13 @@ done
 BROWSER_RESULT_DIR="$LOCAL_RUN_DIR/browser-evidence"
 BROWSER_LOG="$LOCAL_RUN_DIR/browser-run.log"
 if [ "$forward_ready" -eq 1 ]; then
-  log "SSM forward health passed; running mandatory Day 3 UI/DVLA browser harness"
+  log "SSM forward health passed; running mandatory Day 3 UI/DVLA and LLMGoat browser harness"
   set +e
-  bounded_by_cost_deadline_with_reserve 1100 900 \
+  bounded_by_cost_deadline_with_reserve 1400 900 \
     "$BROWSER_PYTHON" "$PINNED_REPO/tests/browser/run_day3_ui.py" \
       --rag-url http://127.0.0.1:18011 \
       --dvla-url http://127.0.0.1:18501 \
+      --llmgoat-url http://127.0.0.1:15000 \
       --browser-channel "$PLAYWRIGHT_BROWSER_CHANNEL" \
       --result-dir "$BROWSER_RESULT_DIR" \
       >"$BROWSER_LOG" 2>&1
@@ -1282,11 +1301,13 @@ if [ "$forward_ready" -eq 1 ]; then
   set -e
 else
   BROWSER_RC=1
+  LLMGOAT_BROWSER_RC=1
   mkdir -p "$BROWSER_RESULT_DIR"
   printf '%s\n' "SSM port-forward health or child-process check failed" \
     >"$BROWSER_RESULT_DIR/preflight-error.txt"
   jq -n \
-    '{schema_version:1,status:"FAIL",error:{type:"ForwardPreflightError",
+    '{schema_version:1,status:"FAIL",llmgoat:{status:"NOT_RUN"},
+      error:{type:"ForwardPreflightError",
       message:"SSM port-forward health or child-process check failed"},
       cleanup:{status:"NOT_RUN",browser_closed:false,receiver_closed:false}}' \
     >"$BROWSER_RESULT_DIR/result.json"
@@ -1295,15 +1316,21 @@ else
     >"$BROWSER_RESULT_DIR/sha256sums.json"
 fi
 
-stop_port_forwards || BROWSER_RC=1
+stop_port_forwards || {
+  BROWSER_RC=1
+  LLMGOAT_BROWSER_RC=1
+}
 cp "$LOCAL_RUN_DIR/ssm-forward-rag.log" \
   "$BROWSER_RESULT_DIR/ssm-forward-rag.log" 2>/dev/null || true
 cp "$LOCAL_RUN_DIR/ssm-forward-dvla.log" \
   "$BROWSER_RESULT_DIR/ssm-forward-dvla.log" 2>/dev/null || true
+cp "$LOCAL_RUN_DIR/ssm-forward-llmgoat.log" \
+  "$BROWSER_RESULT_DIR/ssm-forward-llmgoat.log" 2>/dev/null || true
 cp "$BROWSER_LOG" "$BROWSER_RESULT_DIR/browser-run.log" 2>/dev/null || true
 
 if [ ! -f "$BROWSER_RESULT_DIR/result.json" ]; then
   BROWSER_RC=1
+  LLMGOAT_BROWSER_RC=1
 fi
 python3 - "$BROWSER_RESULT_DIR" "$BROWSER_RC" <<'PY'
 from __future__ import annotations
@@ -1335,6 +1362,7 @@ if not result_path.is_file():
             "browser_closed": False,
             "receiver_closed": False,
         },
+        "llmgoat": {"status": "NOT_RUN"},
     }
 else:
     try:
@@ -1352,6 +1380,7 @@ else:
                 "message": "browser result.json was unreadable",
             },
             "cleanup": {"status": "NOT_PROVEN"},
+            "llmgoat": {"status": "NOT_RUN"},
         }
 
 excluded = {"result.json", "sha256sums.json"}
@@ -1384,6 +1413,35 @@ if [ "$BROWSER_RC" -eq 0 ] \
     "$BROWSER_RESULT_DIR/result.json" >/dev/null; then
   BROWSER_RC=1
 fi
+if [ "$FORWARDS_CLEANED" -eq 1 ] \
+  && [ -s "$BROWSER_RESULT_DIR/llmgoat-a01.png" ] \
+  && jq -e '
+      (.response | type == "string" and length > 0)
+      and (.solved | type == "boolean")
+    ' "$BROWSER_RESULT_DIR/llmgoat-api-response.json" >/dev/null \
+  && jq -e '
+      .status == "PASS"
+      and .outcome_policy == "solved-is-observation-only"
+      and .http_status == 200
+      and .request_count == 1
+      and (.checks | type == "object")
+      and (.checks | keys | sort == [
+        "exact_response_rendered","one_api_request",
+        "overlay_matches_solved","sidebar_matches_solved"
+      ])
+      and ([.checks[] | . == true] | all)
+    ' "$BROWSER_RESULT_DIR/llmgoat-ui.json" >/dev/null \
+  && jq -e '.llmgoat.status == "PASS" and .cleanup.status == "PASS"' \
+    "$BROWSER_RESULT_DIR/result.json" >/dev/null \
+  && jq -n -e \
+    --slurpfile api "$BROWSER_RESULT_DIR/llmgoat-api-response.json" \
+    --slurpfile ui "$BROWSER_RESULT_DIR/llmgoat-ui.json" \
+    '$api[0].solved == $ui[0].solved_observed' >/dev/null; then
+  LLMGOAT_BROWSER_RC=0
+else
+  LLMGOAT_BROWSER_RC=1
+  BROWSER_RC=1
+fi
 
 forward_cleanup_status=FAIL
 [ "$FORWARDS_CLEANED" -eq 1 ] && forward_cleanup_status=PASS
@@ -1392,10 +1450,12 @@ manifest_sha=$(sha256sum "$BROWSER_RESULT_DIR/sha256sums.json" | awk '{print $1}
 BROWSER_CONTROL="$LOCAL_RUN_DIR/browser-controller-result.json"
 jq -n \
   --argjson browser_rc "$BROWSER_RC" \
+  --argjson llmgoat_browser_rc "$LLMGOAT_BROWSER_RC" \
   --arg forward_cleanup "$forward_cleanup_status" \
   --arg result_sha "$result_sha" \
   --arg manifest_sha "$manifest_sha" \
   '{schema:"owasp-llm-browser-controller/v1",browser_rc:$browser_rc,
+    llmgoat_browser_rc:$llmgoat_browser_rc,
     forward_cleanup:$forward_cleanup,result_sha256:$result_sha,
     manifest_sha256:$manifest_sha}' >"$BROWSER_CONTROL"
 
@@ -1414,7 +1474,7 @@ REMOTE_RC=$?
 REMOTE_REPORTED_RC=$REMOTE_RC
 set -e
 REMOTE_PROCESS_PID=0
-log "Remote validation and browser archive phase finished (rc=$REMOTE_RC, browser_rc=$BROWSER_RC)"
+log "Remote validation and browser archive phase finished (rc=$REMOTE_RC, browser_rc=$BROWSER_RC, llmgoat_browser_rc=$LLMGOAT_BROWSER_RC)"
 
 download_remote_evidence
 if [ "$DOWNLOAD_OK" -ne 1 ]; then
