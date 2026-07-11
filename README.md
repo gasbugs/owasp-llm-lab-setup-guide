@@ -65,6 +65,8 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 6. `lab-ollama`, `lab-portal`, `lab-day1-vuln-rag`~`lab-day5-vuln-rag`, `lab-day3-vuln-agent`, `lab-llmgoat`, `lab-day3-dvla`, `lab-day2-fake-registry` 컨테이너를 실행합니다.
 7. Podman Quadlet 기반 systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
 
+AMI ID나 SHA를 직접 입력하는 변수는 두지 않습니다. 이름·소유자 조건에 맞는 최신 AMI 조회 결과는 새 EC2를 생성할 때 적용되며, 이미 존재하는 수강생 EC2는 EBS 작업물 보호를 위해 현재 AMI를 유지하고 자동 교체하지 않습니다.
+
 ## 강사용 런타임 검증
 
 컨테이너 변경은 CI의 unit·Python compile·shell syntax·Terraform·Packer·Docker build-config·공개 저장소 위생 검사를 통과한 뒤에만 공개 GitHub Container Registry(GHCR)로 push됩니다. Workflow는 외부 registry secret 대신 내장 `GITHUB_TOKEN`의 `packages: write` 권한을 사용합니다. `sha-<40자리 Git commit>` 태그는 한 번 publish되면 workflow와 로컬 helper가 덮어쓰기를 거부하며, 모든 이미지 빌드가 끝난 경우에만 그 이미지 세트를 `latest`로 승격합니다.

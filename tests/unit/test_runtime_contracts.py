@@ -81,6 +81,38 @@ class RuntimeContractTest(unittest.TestCase):
             "[0-9]{1,3}/32", read("infrastructure/terraform/variables.tf")
         )
 
+    def test_new_instances_use_latest_matching_ami_without_id_pin(self) -> None:
+        instance = read("infrastructure/terraform/instance.tf")
+        variables = read("infrastructure/terraform/variables.tf")
+        packer = read("infrastructure/packer/ami.pkr.hcl")
+        quickstart = read("docs/STUDENT-QUICKSTART.md")
+
+        terraform_ami = instance.split('data "aws_ami" "lab_base"', 1)[1].split(
+            'resource "aws_instance" "student"', 1
+        )[0]
+        self.assertIn("most_recent = true", terraform_ami)
+        self.assertIn("owners      = [var.ami_owner_id]", terraform_ami)
+        self.assertIn("values = [var.ami_name_pattern]", terraform_ami)
+        self.assertIn("ami                    = data.aws_ami.lab_base.id", instance)
+        self.assertRegex(
+            instance,
+            r"(?s)ignore_changes\s*=\s*\[[^\]]*\bami\b[^\]]*\]",
+        )
+        self.assertNotRegex(instance, r'(?m)^\s*ami\s*=\s*"ami-[0-9a-f]+"')
+        self.assertNotIn('variable "ami_id"', variables)
+        self.assertNotIn('variable "golden_ami_id"', variables)
+        for path in (ROOT / "infrastructure").rglob("*"):
+            if path.is_file() and path.suffix in {".tf", ".hcl"}:
+                self.assertNotRegex(path.read_text(encoding="utf-8"), r"ami-[0-9a-f]{8,}")
+
+        packer_source = packer.split('data "amazon-ami" "ubuntu"', 1)[1].split(
+            'source "amazon-ebs" "lab"', 1
+        )[0]
+        self.assertIn("most_recent = true", packer_source)
+        self.assertIn("source_ami      = data.amazon-ami.ubuntu.id", packer)
+        self.assertNotIn('variable "source_ami_id"', packer)
+        self.assertIn("AMI ID는 직접 입력하지 않습니다.", quickstart)
+
     def test_build_is_gated_and_latest_is_promoted_after_sha_set(self) -> None:
         workflow = read(".github/workflows/build-and-push.yaml")
         test_job = workflow.split("  test:\n", 1)[1].split("  build:\n", 1)[0]

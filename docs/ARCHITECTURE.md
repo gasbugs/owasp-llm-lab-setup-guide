@@ -45,6 +45,8 @@ ami_owner_id     = "898082745236"
 ami_name_pattern = "Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)*"
 ```
 
+AMI ID나 SHA를 직접 고정하지 않습니다. Terraform은 위 조건에 맞는 가장 최신 AMI를 새 EC2 생성 시 선택합니다. 이후 더 최신 AMI가 공개돼도 이미 생성된 수강생 EC2는 자동 교체하지 않으며, 기존 EBS와 작업 상태를 그대로 유지합니다.
+
 강사가 Packer로 만든 커스텀 골든 AMI를 사용할 때만 예를 들어 아래처럼 override합니다.
 
 ```hcl
