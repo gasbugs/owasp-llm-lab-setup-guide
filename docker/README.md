@@ -26,6 +26,23 @@
 
 `/healthz`는 `default_scenario`와 전체 `scenarios` 목록을 반환합니다. 이미지 HEALTHCHECK도 `PORT`를 사용하므로 실제 uvicorn 포트와 일치합니다.
 
+## 실습 전용 검색 디버그 계약
+
+`vuln-rag`의 `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. 이 필드는 오염 문서나 다른 tenant 문서가 실제 검색 단계에서 선택됐는지 확인하여, 검색 실패와 모델 생성 실패를 구분하는 관찰 증거입니다. 브라우저 UI와 e2e도 같은 필드를 사용합니다.
+
+```json
+{
+  "reply": "모델의 최종 응답",
+  "scenario": "day2",
+  "debug": {
+    "retrieved_chunks": ["모델 컨텍스트에 들어간 검색 청크"],
+    "rendered_system_prompt": "(hidden)"
+  }
+}
+```
+
+`retrieved_chunks`는 일반 사용자용 운영 API 계약이 아닙니다. 실제 서비스에서는 응답에서 제거하고, 검색 추적이 필요하면 접근 통제된 서버 측 로그·트레이스에 최소 정보만 기록해야 합니다. 검색 문서 원문, 다른 사용자의 데이터, 내부 식별자를 클라이언트에 반환하면 민감정보 노출이 됩니다.
+
 ## 빌드와 commit 태그
 
 정식 publish는 [GitHub Actions workflow](../.github/workflows/build-and-push.yaml)가 담당합니다. 품질 게이트 후 전체 이미지를 `sha-<40자리 commit>`으로 push하고, 이미지 세트가 모두 성공한 뒤에만 `latest`로 승격합니다.

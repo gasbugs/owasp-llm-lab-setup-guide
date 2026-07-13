@@ -102,8 +102,9 @@ async def chat(req: ChatRequest):
         {
             "reply": response,
             "scenario": selected.id,
-            # 학습 효과를 위해 일부러 RAG 컨텍스트를 같이 노출(debug 모드)
-            # 실제 운영 환경에서는 절대 노출하면 안 됨
+            # LAB-ONLY DEBUG CONTRACT:
+            # 검색 성공과 모델 생성 성공을 분리해 검증하려고 RAG 컨텍스트를 일부러 노출한다.
+            # UI와 e2e가 이 값을 관찰 증거로 사용하지만 실제 사용자용 API에서는 제거해야 한다.
             "debug": {
                 "retrieved_chunks": context,
                 "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
