@@ -123,7 +123,8 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Podman 설치
 - NVIDIA CDI 설정
 - Ollama 컨테이너 실행
-- `llama3.1:8b-instruct-q4_K_M` 모델 pull 및 warm-up
+- `llama3.1:8b-instruct-q4_K_M` 생성 모델과 `bge-m3:latest` embedding 모델 pull 및 warm-up
+- LLM08 서버 vector 분석용 `~/work/llm08-analysis-venv` 준비(NumPy만 설치)
 - 실습 포털 실행: `lab-portal`, port `8080`
 - Day별 취약 RAG 앱 실행: `lab-day1-vuln-rag`~`lab-day5-vuln-rag`, ports `8000`, `8010`, `8011`, `8012`, `8013`
 - 취약 Agent 앱 실행: `lab-day3-vuln-agent`, port `8001`
@@ -134,6 +135,21 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Terraform 기본 설정으로 매일 17:30 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 야간 반복 모드 또는 custom cron 선택 가능
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
+
+### LLM08 추가 셋업
+
+LLM08은 일반 컨테이너 설치 외에 embedding 모델/API, NumPy 분석 venv, 학습자 미니 앱 scaffold와 loopback port forwarding을 함께 확인해야 합니다. 강사·콘텐츠 배포자가 [LLM08 embedding lab setup](LLM08-SETUP.md)의 **publish gate를 먼저 통과해 공지한 40자리 setup commit**을 받은 뒤, 새 EC2 또는 기존 EC2 경로를 선택해 진행하세요. 수강생은 publish gate 때문에 로컬 PC에 Podman을 추가 설치하지 않습니다.
+
+이 문서나 코드가 아직 로컬 워킹트리에만 있고 공개 `origin/main` commit 또는 그 commit의 GHCR 이미지가 없다면 수강생 환경은 준비된 것이 아닙니다. `main`/`latest`를 무조건 재실행하지 말고, 강사가 공지한 40자리 setup commit과 `sha-<commit>` 이미지가 모두 공개된 뒤 설치합니다.
+
+LLM08 설치가 끝나면 최소 다음 계약을 확인합니다.
+
+- `lab-ollama`에 `bge-m3:latest`가 존재
+- `http://localhost:8012/healthz`가 `default_scenario=day4`
+- 인증된 `POST /api/embed`가 양의 `dimensions`와 동일 길이 vector를 반환
+- `~/work/llm08-analysis-venv`에서 NumPy import 가능
+- commit에 고정된 `examples/llm08/mini_vector_search_app.py`를 별도 학습자 작업본으로 복사 가능
+- 앱/API 증거를 보존하고 미니 앱을 정리한 다음, 모든 작업의 마지막에 EC2를 중지해 `stopped` 확인
 
 자동 설치가 필요한 경우에는 `terraform.tfvars`에 아래 값을 넣은 뒤 새 인스턴스를 만들면 됩니다.
 

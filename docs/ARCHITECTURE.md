@@ -103,17 +103,45 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 
 | 컨테이너 | 포트 | 역할 |
 |---|---:|---|
-| `lab-ollama` | 11434 | 로컬 LLM API |
+| `lab-ollama` | 11434 | 생성 모델과 LLM08 `bge-m3:latest` embedding을 함께 제공하는 로컬 Ollama API |
 | `lab-portal` | 8080 | 실습 앱 링크와 health check 진입점 |
 | `lab-day1-vuln-rag` | 8000 | Day 1 LLM01 프롬프트 인젝션 RAG 챗봇 |
 | `lab-day2-vuln-rag` | 8010 | Day 2 LLM02·LLM04 Bank/RAG 챗봇 |
 | `lab-day3-vuln-rag` | 8011 | Day 3 LLM05 output handling RAG 챗봇 |
-| `lab-day4-vuln-rag` | 8012 | Day 2 LLM08과 Day 4 LLM07·LLM09가 공유하는 PrivateGPT-Lite |
+| `lab-day4-vuln-rag` | 8012 | Day 2 LLM08의 `/api/embed`·paired vector search/chat과 Day 4 LLM07·LLM09가 공유하는 PrivateGPT-Lite |
 | `lab-day5-vuln-rag` | 8013 | Day 5 LLM10 resource consumption RAG 챗봇 |
 | `lab-day3-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
 | `lab-llmgoat` | 5000 | LLMGoat cross-platform 실습 |
 | `lab-day3-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
 | `lab-day2-fake-registry` | 8002 | Day 4 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
+
+## LLM08 embedding dataflow와 경계
+
+LLM08 수강생 앱 scaffold는 `examples/llm08/mini_vector_search_app.py`에 있습니다. 설치·검증·종료 순서는 [LLM08 embedding lab setup](LLM08-SETUP.md)을 정본으로 사용합니다.
+
+```mermaid
+flowchart LR
+  B["로컬 브라우저 :18080"] -->|"SSM port forwarding"| M["EC2 learner mini app 127.0.0.1:18080"]
+  M -->|"Bearer token + POST /api/embed"| D["lab-day4-vuln-rag 127.0.0.1:8012"]
+  D -->|"POST /api/embed, bge-m3:latest"| O["lab-ollama 127.0.0.1:11434"]
+  Q["query + 4 local documents"] --> V["vulnerable: all tenants are candidates"]
+  Q --> S["safe: authenticated tenant filter first"]
+  V --> M
+  S --> M
+  A["server-side token map"] -->|"tenant=acme"| D
+```
+
+`vulnerable`과 `safe`는 같은 embedding model과 cosine 함수를 사용합니다. 차이는 ranking 이후 결과를 가리는 것이 아니라, **embedding/ranking 후보를 만들기 전에 인증 tenant metadata filter를 적용하는가**입니다. 미니 앱은 운영 vector DB가 아닌 교육용 인메모리 검색기입니다.
+
+| 경계/endpoint | 노출 범위 | 인증·입력 계약 | 용도 |
+|---|---|---|---|
+| Ollama `POST :11434/api/embed` | EC2 내부 host network | Day 4 backend가 고정 model로 호출 | 실제 embedding 생성 |
+| Day 4 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
+| Day 4 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
+| Day 4 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
+| 미니 앱 `POST :18080/api/search` | EC2 loopback, 로컬에는 SSM forward만 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
+
+LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. 8012, 11434, 18080에 public Security Group ingress를 추가하지 않습니다.
 
 ## 이미지 빌드
 

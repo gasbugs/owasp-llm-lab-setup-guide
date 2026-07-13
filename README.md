@@ -9,6 +9,7 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 | 경로 | 용도 |
 |---|---|
 | `docs/STUDENT-QUICKSTART.md` | 수강생이 따라 하는 Day 0 셋업 절차 |
+| `docs/LLM08-SETUP.md` | LLM08 embedding runtime·분석 venv·학습자 미니 앱의 신규/기존 EC2 설치와 종료 절차 |
 | `docs/ARCHITECTURE.md` | AWS VM, Terraform, user-data, 컨테이너 배포 구조 |
 | `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 공개 GHCR에 push하는 절차 |
 | `docs/LIVE-VALIDATION.md` | commit 태그와 resolved digest로 EC2 런타임을 설치하고 증거를 회수하는 강사용 절차 |
@@ -26,6 +27,8 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 수강생은 아래 문서부터 보면 됩니다.
 
 [docs/STUDENT-QUICKSTART.md](docs/STUDENT-QUICKSTART.md)
+
+Day 2 LLM08에서는 일반 셋업 뒤 [docs/LLM08-SETUP.md](docs/LLM08-SETUP.md)의 `bge-m3:latest`/Day 4 API 검증, 미니 앱 실행·SSM forwarding·증거 보존을 추가로 수행합니다. 강사·콘텐츠 배포자가 먼저 publish gate를 통과해 40자리 setup commit을 공지하며, 수강생은 로컬 PC에 Podman을 추가 설치하지 않습니다. LLM08 변경이 로컬 워킹트리에만 있거나 같은 commit의 이미지가 아직 공개 GHCR에 없으면 gate에서 중단하며, 현재 원격 `main`에 이미 배포됐다고 가정하지 않습니다.
 
 가장 짧은 흐름은 다음과 같습니다.
 

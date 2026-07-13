@@ -7,15 +7,18 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
+from app.embedding import EmbeddingBackendError, EmbeddingClient
 from app.llm import LLMClient
 from app.scenarios import SCENARIO_NAMES, list_scenarios
+from app.scenarios import day4 as day4_scenario
 
 DEFAULT_SCENARIO = os.environ.get("DEFAULT_SCENARIO", os.environ.get("SCENARIO", "day1"))
 if DEFAULT_SCENARIO not in SCENARIO_NAMES:
@@ -23,6 +26,7 @@ if DEFAULT_SCENARIO not in SCENARIO_NAMES:
 
 SCENARIOS = {scenario.id: scenario for scenario in list_scenarios()}
 llm = LLMClient()
+embedding = EmbeddingClient()
 
 app = FastAPI(title="vuln-rag [all scenarios]")
 templates_dir = Path(__file__).parent / "templates"
@@ -35,8 +39,76 @@ class ChatRequest(BaseModel):
     scenario: str | None = None
 
 
+class LLM08SearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(min_length=1, max_length=4096)
+    top_k: int = Field(default=2, ge=1, le=4)
+
+
+class EmbedRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    input: str | list[str]
+
+
 def get_scenario(name: str | None):
     return SCENARIOS.get(name or DEFAULT_SCENARIO, SCENARIOS[DEFAULT_SCENARIO])
+
+
+def require_llm08_principal(request: Request) -> day4_scenario.TenantPrincipal:
+    if DEFAULT_SCENARIO != "day4":
+        raise HTTPException(status_code=404, detail="not found")
+    try:
+        return day4_scenario.authenticate_tenant(request.headers.get("authorization"))
+    except day4_scenario.TenantAuthenticationError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="valid LLM08 lab bearer token required",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+
+async def run_llm08_search(
+    request_body: LLM08SearchRequest,
+    request: Request,
+    *,
+    mode: Literal["vulnerable", "safe"],
+) -> dict:
+    principal = require_llm08_principal(request)
+    try:
+        return await day4_scenario.vector_search(
+            query=request_body.query,
+            principal=principal,
+            mode=mode,
+            top_k=request_body.top_k,
+            embedding_backend=embedding,
+        )
+    except EmbeddingBackendError as exc:
+        raise HTTPException(
+            status_code=502, detail="embedding backend unavailable"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="invalid embedding result") from exc
+
+
+async def run_llm08_chat(
+    request_body: LLM08SearchRequest,
+    request: Request,
+    *,
+    mode: Literal["vulnerable", "safe"],
+) -> dict:
+    search_evidence = await run_llm08_search(request_body, request, mode=mode)
+    system_prompt = day4_scenario.build_system_prompt(
+        context=search_evidence["retrieved_chunks"]
+    )
+    reply = await llm.chat(system=system_prompt, user=request_body.query)
+    return {
+        "reply": reply,
+        "scenario": "day4",
+        "lab_only": True,
+        "vector_search": search_evidence,
+    }
 
 
 @app.get("/healthz")
@@ -62,6 +134,97 @@ async def scenarios():
             for scenario in SCENARIOS.values()
         ],
     }
+
+
+@app.post("/api/labs/llm08/vulnerable/search")
+async def llm08_vulnerable_search(
+    request_body: LLM08SearchRequest,
+    request: Request,
+):
+    """LAB ONLY: vector search before applying tenant metadata filtering."""
+    return await run_llm08_search(request_body, request, mode="vulnerable")
+
+
+@app.post("/api/labs/llm08/safe/search")
+async def llm08_safe_search(
+    request_body: LLM08SearchRequest,
+    request: Request,
+):
+    """LAB ONLY: the same vector search after tenant metadata filtering."""
+    return await run_llm08_search(request_body, request, mode="safe")
+
+
+@app.post("/api/labs/llm08/vulnerable/chat")
+async def llm08_vulnerable_chat(
+    request_body: LLM08SearchRequest,
+    request: Request,
+):
+    """LAB ONLY: generate from vulnerable cross-tenant vector context."""
+    return await run_llm08_chat(request_body, request, mode="vulnerable")
+
+
+@app.post("/api/labs/llm08/safe/chat")
+async def llm08_safe_chat(
+    request_body: LLM08SearchRequest,
+    request: Request,
+):
+    """LAB ONLY: generate from tenant-filtered vector context."""
+    return await run_llm08_chat(request_body, request, mode="safe")
+
+
+@app.post("/api/embed")
+async def embed_proxy(request_body: EmbedRequest, request: Request):
+    """LAB ONLY: expose same-model candidate vectors for LLM08 comparison."""
+    principal = require_llm08_principal(request)
+    inputs = (
+        request_body.input
+        if isinstance(request_body.input, list)
+        else [request_body.input]
+    )
+    if (
+        not inputs
+        or len(inputs) > 16
+        or any(not value.strip() or len(value) > 4096 for value in inputs)
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "input must contain 1 to 16 non-empty strings, "
+                "each at most 4096 characters"
+            ),
+        )
+    try:
+        vectors = await embedding.embed(inputs)
+    except EmbeddingBackendError as exc:
+        raise HTTPException(
+            status_code=502, detail="embedding backend unavailable"
+        ) from exc
+    return {
+        "lab_only": True,
+        "engine": "ollama-api-embed-proxy",
+        "model": embedding.model,
+        "dimensions": len(vectors[0]),
+        "input_count": len(inputs),
+        "authenticated_context": {
+            "subject": principal.subject,
+            "tenant": principal.tenant,
+        },
+        "embeddings": vectors,
+    }
+
+
+@app.get("/api/lab/llm08/target-vector")
+async def llm08_target_vector(request: Request):
+    """LAB ONLY: return the hidden owner fixture embedding, never its plaintext."""
+    require_llm08_principal(request)
+    try:
+        return await day4_scenario.target_vector(embedding)
+    except EmbeddingBackendError as exc:
+        raise HTTPException(
+            status_code=502, detail="embedding backend unavailable"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="invalid embedding result") from exc
 
 
 @app.get("/", response_class=HTMLResponse)

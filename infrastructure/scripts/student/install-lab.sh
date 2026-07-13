@@ -19,15 +19,15 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.5"
+SCRIPT_VERSION="0.1.7"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
+OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-bge-m3:latest}"
 OLLAMA_COMPAT_MODEL="${OLLAMA_COMPAT_MODEL:-llama3}"
 LLAMA_GUARD_MODEL="${LLAMA_GUARD_MODEL:-llama-guard3:8b}"
 LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
-SKIP_EMBEDDING_VENV="${SKIP_EMBEDDING_VENV:-true}"
 INSTALL_START_EPOCH=$(date +%s)
 
 step() {
@@ -68,9 +68,9 @@ EC2_DOMAIN=$PUBLIC_IPV4
 IMAGE_NAMESPACE=$IMAGE_NAMESPACE
 IMAGE_TAG=$IMAGE_TAG
 OLLAMA_MODEL=$OLLAMA_MODEL
+OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL
 OLLAMA_COMPAT_MODEL=$OLLAMA_COMPAT_MODEL
 LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
-SKIP_EMBEDDING_VENV=$SKIP_EMBEDDING_VENV
 EOF
 chmod 0644 "$LAB_ENV_CANDIDATE"
 
@@ -276,6 +276,7 @@ Environment=SCENARIO=${scenario}
 Environment=PORT=${rag_port}
 Environment=OLLAMA_URL=http://localhost:11434
 Environment=OLLAMA_MODEL=$OLLAMA_MODEL
+Environment=OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL
 Exec=uv run uvicorn app.main:app --host 0.0.0.0 --port ${rag_port}
 
 [Service]
@@ -504,38 +505,40 @@ printf '%s' "\$WARMUP_RESPONSE" \
   | jq -e '.done == true and (.response | type == "string")' >/dev/null
 echo "[install-lab] ollama warm-up done"
 
-echo "[install-lab] checking optional Day 2 LLM08 embedding Python environment"
-if [ "$SKIP_EMBEDDING_VENV" = "true" ]; then
-  echo "[install-lab] embedding-venv skipped by SKIP_EMBEDDING_VENV=true"
+if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_EMBED_MODEL"; then
+  echo "[install-lab] $OLLAMA_EMBED_MODEL already pulled"
 else
-  AVAILABLE_KB=\$(df --output=avail -k /home/ubuntu/work | tail -n 1 | tr -d ' ')
-  MIN_EMBEDDING_KB=\$((6 * 1024 * 1024))
-  if [ "\$AVAILABLE_KB" -lt "\$MIN_EMBEDDING_KB" ]; then
-    echo "[install-lab] embedding-venv skipped: only \$((AVAILABLE_KB / 1024)) MB free under /home/ubuntu/work"
-    echo "[install-lab] set SKIP_EMBEDDING_VENV=false and free at least 6 GB to install Day 2 LLM08 embedding tools"
-  else
-    if [ -x /home/ubuntu/work/embedding-venv/bin/pip ] && \
-      /home/ubuntu/work/embedding-venv/bin/pip show sentence-transformers scikit-learn numpy >/dev/null 2>&1; then
-      echo "[install-lab] embedding-venv already ready for Day 2 LLM08-A"
-    else
-      rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
-      python3 -m venv /home/ubuntu/work/embedding-venv
-      if timeout 600 /home/ubuntu/work/embedding-venv/bin/pip install --no-cache-dir -q sentence-transformers scikit-learn numpy; then
-        chown -R ubuntu:ubuntu /home/ubuntu/work/embedding-venv 2>/dev/null || true
-        echo "[install-lab] embedding-venv ready for Day 2 LLM08-A"
-      else
-        rm -rf /home/ubuntu/work/embedding-venv /home/ubuntu/.cache/pip
-        echo "[install-lab] embedding-venv install failed or timed out; continuing without optional Day 2 LLM08 tools"
-      fi
-    fi
-  fi
+  podman exec lab-ollama ollama pull "$OLLAMA_EMBED_MODEL"
+fi
+EMBEDDING_WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost:11434/api/embed \
+  -H 'Content-Type: application/json' \
+  -d "{\"model\":\"$OLLAMA_EMBED_MODEL\",\"input\":[\"embedding ready\"]}")
+printf '%s' "\$EMBEDDING_WARMUP_RESPONSE" \
+  | jq -e --arg model "$OLLAMA_EMBED_MODEL" '
+      .model == \$model
+      and (.embeddings | type == "array" and length == 1)
+      and (.embeddings[0] | type == "array" and length > 0)
+    ' >/dev/null
+echo "[install-lab] ollama embedding warm-up done ($OLLAMA_EMBED_MODEL)"
+
+echo "[install-lab] preparing lightweight LLM08 analysis venv (NumPy only)"
+if [ -x /home/ubuntu/work/llm08-analysis-venv/bin/pip ] && \
+  /home/ubuntu/work/llm08-analysis-venv/bin/pip show numpy >/dev/null 2>&1; then
+  echo "[install-lab] llm08-analysis-venv already ready"
+else
+  rm -rf /home/ubuntu/work/llm08-analysis-venv
+  python3 -m venv /home/ubuntu/work/llm08-analysis-venv
+  /home/ubuntu/work/llm08-analysis-venv/bin/pip install --no-cache-dir -q numpy
+  chown -R ubuntu:ubuntu /home/ubuntu/work/llm08-analysis-venv
+  echo "[install-lab] llm08-analysis-venv ready"
 fi
 OLLAMASH
 
-echo "[install-lab] verifying reconciled service health and immutable image tags"
+echo "[install-lab] verifying reconciled service health and requested image references"
 "${RUN_AS_UBUNTU[@]}" \
   IMAGE_NAMESPACE="$IMAGE_NAMESPACE" \
   IMAGE_TAG="$IMAGE_TAG" \
+  OLLAMA_EMBED_MODEL="$OLLAMA_EMBED_MODEL" \
   bash <<'VERIFYSH'
 set -euo pipefail
 
@@ -588,6 +591,31 @@ for url in "${health_urls[@]}"; do
     exit 1
   fi
 done
+
+# Older vuln-rag images also expose /healthz. Exercise the authenticated LLM08
+# capability so a source/image publication mismatch fails during installation
+# instead of at the beginning of the lesson.
+llm08_smoke=$(mktemp)
+trap 'rm -f "$llm08_smoke"' EXIT
+curl -fsS --max-time 180 \
+  -X POST http://localhost:8012/api/embed \
+  -H 'Authorization: Bearer llm08-acme-demo-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"input":"LLM08 installer capability check"}' \
+  -o "$llm08_smoke"
+jq -e --arg model "$OLLAMA_EMBED_MODEL" '
+  .lab_only == true
+  and .engine == "ollama-api-embed-proxy"
+  and .model == $model
+  and .input_count == 1
+  and (.dimensions | type == "number" and . > 0)
+  and (.embeddings | type == "array" and length == 1)
+  and (.dimensions as $dimensions
+    | .embeddings[0] | type == "array" and length == $dimensions)
+' "$llm08_smoke" >/dev/null
+echo "[install-lab] LLM08 embed capability ready ($OLLAMA_EMBED_MODEL)"
+rm -f "$llm08_smoke"
+trap - EXIT
 VERIFYSH
 
 # 여기까지 성공해야 새 이미지 태그와 실제 실행 상태가 일치한다.
@@ -631,6 +659,7 @@ OWASP LLM Lab 설치가 완료되었습니다.
 
   - Day 4 Vulnerable RAG  8012
     Day 2 LLM08 벡터/임베딩과 Day 4 LLM07/LLM09 실습이 공유하는 앱입니다.
+    LLM08는 인증된 /api/embed와 paired search/chat endpoint를 사용합니다.
 
   - Day 5 Vulnerable RAG  8013
     LLM10 무제한 소비와 요청 제한 부재를 관찰하는 앱입니다.
@@ -646,6 +675,12 @@ OWASP LLM Lab 설치가 완료되었습니다.
 
   - Day 3 DVLA            8501
     Damn Vulnerable LLM Agent. ReAct Agent prompt injection 실습 UI입니다.
+
+LLM08 추가 준비:
+  - embedding model: $OLLAMA_EMBED_MODEL
+  - analysis Python: /home/ubuntu/work/llm08-analysis-venv/bin/python
+  - setup guide: https://github.com/gasbugs/owasp-llm-lab-setup-guide/blob/main/docs/LLM08-SETUP.md
+  - learner app scaffold는 EC2에서 setup 저장소를 clone/pull한 뒤 복사합니다.
 
 브라우저 접속 URL:
   export EC2_DOMAIN=${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}

@@ -19,6 +19,7 @@ COPY app ./app
 ENV PORT=8000 \
     OLLAMA_URL=http://ollama:11434 \
     OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
+    OLLAMA_EMBED_MODEL=bge-m3:latest \
     DEFAULT_SCENARIO=day1
 
 EXPOSE 8000
