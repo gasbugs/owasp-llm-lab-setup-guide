@@ -8,6 +8,7 @@ on:
       - "infrastructure/**"
       - "tests/**"
       - "docs/**"
+      - "examples/**"
       - ".github/workflows/build-and-push.yaml"
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - "infrastructure/**"
       - "tests/**"
       - "docs/**"
+      - "examples/**"
       - ".github/workflows/build-and-push.yaml"
   workflow_dispatch:
 
