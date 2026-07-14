@@ -179,6 +179,16 @@ class DigestResolverTest(unittest.TestCase):
 
 
 class LiveControllerContractTest(unittest.TestCase):
+    def test_isolated_slopsquat_keeps_internal_network_without_dns_dependency(self) -> None:
+        source = (
+            ROOT / "tests" / "e2e" / "llm09" / "run-isolated-slopsquat.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn('podman network create --internal "$NETWORK"', source)
+        self.assertIn('MIRROR_HOST="$(podman inspect "$MIRROR_CONTAINER"', source)
+        self.assertIn('--arg network "$NETWORK"', source)
+        self.assertIn("http://'\"$MIRROR_HOST\"':8003/simple/", source)
+        self.assertNotIn("http://'\"$MIRROR_CONTAINER\"':8003/simple/", source)
+
     def test_shell_scripts_parse_and_help_has_no_side_effect(self) -> None:
         for name in (
             "run-commit-live-validation.sh",

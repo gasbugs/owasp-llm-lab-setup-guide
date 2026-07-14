@@ -132,10 +132,22 @@ podman run -d --name "$MIRROR_CONTAINER" \
   "$PYTHON_IMAGE" python -m http.server 8003 \
   >"$RAW_DIR/mirror-container-id.txt"
 
+# An internal Netavark network intentionally has no external DNS and, on some
+# Podman versions, does not publish container-name DNS either.  Resolve the
+# address from the runtime network attachment instead of weakening isolation.
+MIRROR_HOST="$(podman inspect "$MIRROR_CONTAINER" \
+  | jq -er --arg network "$NETWORK" \
+      '.[0].NetworkSettings.Networks[$network].IPAddress
+       | select(type == "string" and length > 0)')" || {
+  echo "INFRA: isolated mirror IP was not assigned" >&2
+  exit 3
+}
+printf 'mirror_host=%s\n' "$MIRROR_HOST" >"$RAW_DIR/mirror-endpoint.txt"
+
 mirror_ready=false
 for _ in $(seq 1 20); do
   if podman run --rm --network "$NETWORK" "$PYTHON_IMAGE" \
-    python -c 'import urllib.request; urllib.request.urlopen("http://'"$MIRROR_CONTAINER"':8003/simple/", timeout=3).read()' \
+    python -c 'import urllib.request; urllib.request.urlopen("http://'"$MIRROR_HOST"':8003/simple/", timeout=3).read()' \
     >"$RAW_DIR/mirror-reachability.txt" 2>&1; then
     mirror_ready=true
     break
@@ -159,8 +171,8 @@ podman run --rm --network "$NETWORK" \
   -v "$EVIDENCE_DIR:/evidence" \
   "$PYTHON_IMAGE" sh -ec '
     python -m pip install --disable-pip-version-check --no-cache-dir --no-deps \
-      --index-url "http://'"$MIRROR_CONTAINER"':8003/simple/" \
-      --trusted-host "'"$MIRROR_CONTAINER"'" "'"$SLOPSQUAT_PACKAGE"'"
+      --index-url "http://'"$MIRROR_HOST"':8003/simple/" \
+      --trusted-host "'"$MIRROR_HOST"'" "'"$SLOPSQUAT_PACKAGE"'"
     python -c "pass"
     test -s /evidence/install-signal.txt
   ' >"$RAW_DIR/victim-install.txt" 2>&1
