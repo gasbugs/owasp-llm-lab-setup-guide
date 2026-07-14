@@ -73,13 +73,17 @@ class RuntimeContractTest(unittest.TestCase):
     def test_security_group_only_lists_deployed_app_ports(self) -> None:
         terraform = read("infrastructure/terraform/main.tf")
         self.assertIn(
-            "toset([8000, 8001, 8002, 8010, 8011, 8012, 8013])",
+            "toset([8000, 8001, 8002, 8010, 8011, 8012, 8013, 18080])",
             terraform,
         )
+        network = read("infrastructure/terraform/network.tf")
+        self.assertIn("for_each = local.lab_app_ports", network)
+        self.assertIn("cidr_blocks = [var.allowed_ingress_cidr]", network)
+        self.assertIn('protocol    = "tcp"', network)
         self.assertNotIn("5050", read("infrastructure/terraform/network.tf"))
-        self.assertIn(
-            "[0-9]{1,3}/32", read("infrastructure/terraform/variables.tf")
-        )
+        variables = read("infrastructure/terraform/variables.tf")
+        self.assertIn("[0-9]{1,3}/32", variables)
+        self.assertIn('default     = "127.0.0.1/32"', variables)
 
     def test_new_instances_use_latest_matching_ami_without_id_pin(self) -> None:
         instance = read("infrastructure/terraform/instance.tf")

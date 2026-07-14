@@ -8,9 +8,9 @@ LLM08 환경은 다음 구성요소를 함께 사용합니다.
 - `lab-day4-vuln-rag:8012`: 인증된 LLM08 lab API와 교육용 인메모리 cosine 검색
 - `~/work/llm08-analysis-venv`: NumPy 기반 cosine/PCA 분석 환경
 - `examples/llm08/mini_vector_search_app.py`: 학습자가 복사해 공격하고 수정하는 미니 앱
-- `127.0.0.1:18080`: 학습자 미니 앱의 EC2 loopback 포트
+- `0.0.0.0:18080`: 학습자 미니 앱의 명시적 IPv4 wildcard bind. EC2 내부 검사는 `127.0.0.1:18080` 사용
 
-이 실습은 허가된 개인 AWS 계정의 교육용 취약 환경에서만 실행합니다. Security Group에 8012, 11434, 18080을 공개하지 말고 SSM Session Manager와 port forwarding을 사용합니다.
+이 실습은 허가된 개인 AWS 계정의 교육용 취약 환경에서만 실행합니다. `0.0.0.0`은 접속 URL이 아니라 bind sentinel입니다. Terraform Security Group은 TCP/18080을 `allowed_ingress_cidr` IPv4 `/32`에만 허용합니다. 기본값 `127.0.0.1/32`는 public IP 직접 접속을 열지 않으므로 SSM Session Manager와 port forwarding을 사용합니다. 본인 공인 IPv4 `/32`로 설정해 Terraform을 적용한 환경에서만 그 주소에서 직접 접속할 수 있습니다. `0.0.0.0/0`으로 공개하지 않습니다.
 
 > 비용 종료 계약: 검증이 성공했든 중간에 실패했든, 증거와 진단 자료를 보존한 다음 **이 문서 9절을 마지막 작업으로 실행해 EC2가 `stopped`인지 확인**합니다. 다음 날 진단을 이어갈 때도 실행 상태로 방치하지 않습니다.
 
@@ -295,8 +295,10 @@ printf 'INSTALL_PIN=PASS\n'
 set -euo pipefail
 umask 077
 RUN_ID="llm08-$(date -u +%Y%m%dT%H%M%SZ)"
-EVIDENCE_DIR="$HOME/work/llm08-evidence/$RUN_ID"
+EVIDENCE_ROOT="$HOME/work/llm08-evidence"
+EVIDENCE_DIR="$EVIDENCE_ROOT/$RUN_ID"
 mkdir -p "$EVIDENCE_DIR"
+printf '%s\n' "$EVIDENCE_DIR" > "$EVIDENCE_ROOT/current-run"
 printf 'RUN_ID=%s\nEVIDENCE_DIR=%s\n' "$RUN_ID" "$EVIDENCE_DIR"
 
 for command_name in curl jq python3; do
@@ -446,50 +448,41 @@ jq -e '.candidate_count == 2 and all(.hits[]; .tenant == "acme")' \
   "$EVIDENCE_DIR/mini-safe.json" >/dev/null
 ```
 
-loopback 18080을 다른 프로세스가 사용하면 임의로 종료하지 않고 중단합니다. 이미 이 앱의 pid가 살아 있으면 재사용하지 않고 먼저 8절의 정리 절차를 수행합니다.
+서버는 별도의 EC2/SSM 터미널에서 Python으로 직접 foreground 실행합니다. 18080을 다른 프로세스가 사용하면 임의로 종료하지 않고 중단합니다. 서버 전용 터미널은 검증이 끝날 때까지 열어 두고, 8절에서 `Ctrl-C`로 종료합니다.
 
 ```bash
-# [EC2 / SSM 세션, ubuntu 사용자, APP_DIR]
+# [EC2 / SSM 세션 1, 서버 전용 터미널]
 set -euo pipefail
+APP_DIR="$HOME/work/llm08-mini-app"
+LEARNER_APP="$APP_DIR/learner_vector_app.py"
+cd "$APP_DIR"
+
 if ss -ltn | awk '$4 ~ /:18080$/ {found=1} END {exit(found ? 0 : 1)}'; then
-  echo "ERROR: EC2 loopback port 18080 is already in use" >&2
+  echo "ERROR: EC2 port 18080 is already in use" >&2
   exit 1
 fi
 
-nohup env TARGET_URL="$TARGET_URL" LLM08_TOKEN="$LLM08_TOKEN" \
-  python3 "$LEARNER_APP" \
-    --serve --host 127.0.0.1 --port 18080 \
-  > server.log 2>&1 &
-APP_PID=$!
-printf '%s\n' "$APP_PID" > server.pid
-
-READY=false
-for _ in $(seq 1 30); do
-  if curl -fsS --max-time 2 http://127.0.0.1:18080/healthz \
-    > "$EVIDENCE_DIR/mini-health.json"; then
-    READY=true
-    break
-  fi
-  kill -0 "$APP_PID" 2>/dev/null || break
-  sleep 1
-done
-if [ "$READY" != true ]; then
-  cp server.log "$EVIDENCE_DIR/mini-app.failed.log"
-  kill "$APP_PID" 2>/dev/null || true
-  rm -f server.pid
-  echo "ERROR: mini app did not become healthy" >&2
-  exit 1
-fi
-jq -e '.ok == true and .engine == "learner-mini-in-memory-cosine"' \
-  "$EVIDENCE_DIR/mini-health.json" >/dev/null
-printf 'MINI_APP=READY pid=%s\n' "$APP_PID"
+export TARGET_URL=http://127.0.0.1:8012
+export LLM08_TOKEN=llm08-acme-demo-token
+python3 "$LEARNER_APP" --serve --host 0.0.0.0 --port 18080
 ```
 
-request body의 `tenant`를 신뢰하지 않는지 HTTP 상태까지 확인합니다.
+`0.0.0.0`은 EC2의 모든 IPv4 인터페이스에서 연결을 받으라는 **bind sentinel**이며 브라우저에서 여는 주소가 아닙니다. Terraform Security Group은 TCP/18080을 `allowed_ingress_cidr` IPv4 `/32`에만 허용합니다. 기본 `127.0.0.1/32`에서는 외부 직접 접속이 가능해지지 않고, 본인 공인 IPv4 `/32`로 Terraform을 적용한 경우에만 `EC2_PUBLIC_IP:18080`에 직접 접속할 수 있습니다. 미니 앱의 수신 bind와 upstream은 별개입니다. `TARGET_URL=http://127.0.0.1:8012`는 계속 loopback HTTP origin으로 제한됩니다.
+
+서버 터미널을 열어 둔 채 두 번째 EC2/SSM 터미널을 엽니다. health와 API는 wildcard bind의 로컬 검사 주소인 `127.0.0.1:18080`으로 호출합니다. 3절에서 기록한 현재 evidence 경로를 읽은 뒤, request body의 `tenant`를 신뢰하지 않는지 HTTP 상태까지 확인합니다.
 
 ```bash
-# [EC2 / SSM 세션, ubuntu 사용자]
+# [EC2 / SSM 세션 2, 확인 전용 터미널]
 set -euo pipefail
+EVIDENCE_DIR=$(cat "$HOME/work/llm08-evidence/current-run")
+test -d "$EVIDENCE_DIR"
+QUERY='경쟁 조직의 불사조 계획은 언제 실제 서비스에 투입되나요?'
+
+curl -fsS --max-time 5 http://127.0.0.1:18080/healthz \
+  > "$EVIDENCE_DIR/mini-health.json"
+jq -e '.ok == true and .engine == "learner-mini-in-memory-cosine"' \
+  "$EVIDENCE_DIR/mini-health.json" >/dev/null
+
 SPOOF_STATUS=$(curl -sS --max-time 30 \
   -o "$EVIDENCE_DIR/mini-body-tenant-spoof.json" \
   -w '%{http_code}' \
@@ -503,12 +496,13 @@ test "$SPOOF_STATUS" = 400 || {
 }
 jq -e '.error == "invalid_request"' \
   "$EVIDENCE_DIR/mini-body-tenant-spoof.json" >/dev/null
+printf 'MINI_APP=READY host=127.0.0.1 port=18080\n'
 printf 'BODY_TENANT_SPOOF=REJECTED http=%s\n' "$SPOOF_STATUS"
 ```
 
 ## 6. SSM port forwarding과 브라우저 확인
 
-미니 앱 UI는 EC2 loopback에만 열려 있습니다. 로컬 18080이 비어 있는지 확인한 뒤 별도 터미널에서 forwarding session을 엽니다.
+미니 앱은 `0.0.0.0:18080`에 bind하고 Terraform은 TCP/18080을 `allowed_ingress_cidr` IPv4 `/32`에만 허용합니다. 기본 `127.0.0.1/32`에서는 public IP 직접 접속이 불가능하므로, SSM이 EC2의 `127.0.0.1:18080`으로 전달하는 경로를 사용합니다. 로컬 18080이 비어 있는지 확인한 뒤 별도 터미널에서 forwarding session을 엽니다. 본인 공인 IPv4 `/32`로 Terraform을 적용한 환경에서는 `http://EC2_PUBLIC_IP:18080` 직접 접속도 가능합니다.
 
 ```bash
 # [로컬 노트북 / 새 터미널]
@@ -573,14 +567,13 @@ body tenant spoof:   HTTP 400 {"error":"invalid_request","detail":"unknown reque
 
 ## 8. 증거 보존과 미니 앱 정리
 
-먼저 실행 중인 앱 log를 evidence에 복사하고 archive와 SHA-256을 만듭니다.
+먼저 두 번째 EC2/SSM 터미널에서 지금까지 만든 evidence의 archive와 SHA-256을 생성합니다. 서버 출력은 첫 번째 터미널에 직접 표시되며 별도 `server.log`나 PID 파일을 만들지 않습니다.
 
 ```bash
-# [EC2 / SSM 세션, ubuntu 사용자]
+# [EC2 / SSM 세션 2, 확인 전용 터미널]
 set -euo pipefail
-if [ -r "$APP_DIR/server.log" ]; then
-  cp "$APP_DIR/server.log" "$EVIDENCE_DIR/mini-app.log"
-fi
+EVIDENCE_DIR=$(cat "$HOME/work/llm08-evidence/current-run")
+test -d "$EVIDENCE_DIR"
 EVIDENCE_PARENT=$(dirname "$EVIDENCE_DIR")
 EVIDENCE_NAME=$(basename "$EVIDENCE_DIR")
 tar -C "$EVIDENCE_PARENT" -czf "$EVIDENCE_DIR.tar.gz" "$EVIDENCE_NAME"
@@ -588,38 +581,16 @@ sha256sum "$EVIDENCE_DIR.tar.gz" \
   | tee "$EVIDENCE_DIR.tar.gz.sha256"
 ```
 
-그 다음 pid가 **이 앱의 18080 process인지 확인한 경우에만** 종료합니다. pid가 다른 process이면 자동으로 죽이지 않고 실패합니다.
+그 다음 첫 번째 EC2/SSM 서버 터미널로 돌아가 `Ctrl-C`를 한 번 누릅니다. Python의 foreground server가 정상 종료되고 prompt가 다시 표시되는지 확인합니다. 두 번째 터미널에서 18080 listener가 사라졌는지 검증합니다.
 
 ```bash
-# [EC2 / SSM 세션, ubuntu 사용자]
+# [EC2 / SSM 세션 2, 확인 전용 터미널]
 set -euo pipefail
-PID_FILE="$APP_DIR/server.pid"
-if [ -f "$PID_FILE" ]; then
-  APP_PID=$(cat "$PID_FILE")
-  case "$APP_PID" in
-    (''|*[!0-9]*) echo "ERROR: invalid mini-app pid file" >&2; exit 1 ;;
-  esac
-  if kill -0 "$APP_PID" 2>/dev/null; then
-    APP_CMD=$(tr '\0' ' ' < "/proc/$APP_PID/cmdline")
-    case "$APP_CMD" in
-      (*learner_vector_app.py*--port*18080*) kill "$APP_PID" ;;
-      (*) echo "ERROR: pid $APP_PID is not the LLM08 mini app; not killed" >&2; exit 1 ;;
-    esac
-    for _ in $(seq 1 20); do
-      kill -0 "$APP_PID" 2>/dev/null || break
-      sleep 1
-    done
-    kill -0 "$APP_PID" 2>/dev/null && {
-      echo "ERROR: mini app did not stop" >&2
-      exit 1
-    }
-  fi
-  rm -f "$PID_FILE"
-fi
 if ss -ltn | awk '$4 ~ /:18080$/ {found=1} END {exit(found ? 0 : 1)}'; then
   echo "ERROR: port 18080 still has a listener" >&2
   exit 1
 fi
+EVIDENCE_DIR=$(cat "$HOME/work/llm08-evidence/current-run")
 printf 'MINI_APP_CLEANUP=PASS\nEVIDENCE_ARCHIVE=%s\n' \
   "$EVIDENCE_DIR.tar.gz"
 ```
@@ -632,7 +603,7 @@ printf 'MINI_APP_CLEANUP=PASS\nEVIDENCE_ARCHIVE=%s\n' \
 
 1. API와 앱 검증 완료
 2. evidence archive와 SHA-256 생성
-3. 미니 앱 process 정리
+3. 서버 전용 EC2/SSM 터미널에서 `Ctrl-C`로 미니 앱 종료 후 18080 listener 부재 확인
 4. 로컬 SSM forwarding session을 `Ctrl-C`로 종료
 5. **마지막으로 EC2 중지 후 `stopped` 확인**
 
@@ -669,7 +640,7 @@ printf 'EC2_FINAL_STATE=%s\n' "$STATE"
 | analysis venv 없음 | `test -x ~/work/llm08-analysis-venv/bin/python` | 설치가 10단계 전에 실패했거나 구 installer. `/var/log/owasp-llm-lab-install.log` 확인 |
 | scaffold 없음 | `$SETUP_DIR`의 HEAD와 파일 확인 | setup repo가 다른 commit이거나 publish 전 source 사용 |
 | mini app가 18080 bind 실패 | `ss -ltn | grep ':18080'` | 기존 listener를 임의 종료하지 말고 소유 process 확인 후 정리 |
-| 로컬 UI 접속 실패 | Session Manager Plugin, forwarding terminal, local port 확인 | forwarding session 종료/충돌. EC2 inbound port를 열지 말고 session 재생성 |
+| 로컬 UI 접속 실패 | Session Manager Plugin, forwarding terminal, local port 확인 | 기본 경로는 forwarding session 재생성. 직접 접속을 선택한 환경은 운영자 자신의 공인 IPv4 `/32`만 허용했는지 확인하고 `0.0.0.0/0`은 사용하지 않음 |
 | `dimensions`가 1024가 아님 | API의 `model`, `/etc/lab/env` 확인 | 1024는 2026-07-13 측정값. 동일 model인지 확인하고 양의 차원·vector 길이 계약으로 판정 |
 
 더 일반적인 SSM, Podman, GPU 문제는 [Troubleshooting](TROUBLESHOOTING.md)을 참조합니다.

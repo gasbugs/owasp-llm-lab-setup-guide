@@ -1,10 +1,13 @@
 """Focused, network-free tests for the learner-built LLM08 mini app."""
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,6 +85,7 @@ class MiniVectorSearchAppTest(unittest.TestCase):
         )
         for invalid in (
             "https://localhost:8012",
+            "http://0.0.0.0:8012",
             "http://10.0.0.1:8012",
             "http://localhost:8012/api/embed",
             "http://user@localhost:8012",
@@ -97,6 +101,52 @@ class MiniVectorSearchAppTest(unittest.TestCase):
         self.assertFalse(args.serve)
         self.assertEqual(args.mode, "safe")
         self.assertEqual(args.top_k, 1)
+
+    def test_server_bind_allows_explicit_all_interfaces(self) -> None:
+        default_args = APP.parse_args(["--serve"])
+        args = APP.parse_args(
+            ["--serve", "--host", "0.0.0.0", "--port", "18080"]
+        )
+
+        self.assertEqual(default_args.host, "127.0.0.1")
+        self.assertTrue(args.serve)
+        self.assertEqual(args.host, "0.0.0.0")
+        self.assertEqual(args.port, 18080)
+
+    def test_server_bind_rejects_arbitrary_interface_address(self) -> None:
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                APP.parse_args(["--serve", "--host", "10.42.10.246"])
+
+    def test_wildcard_server_output_uses_a_local_check_url(self) -> None:
+        class FakeHTTPServer:
+            def __init__(self, address, handler) -> None:
+                self.address = address
+                self.handler = handler
+                self.closed = False
+
+            def serve_forever(self) -> None:
+                return None
+
+            def server_close(self) -> None:
+                self.closed = True
+
+        stdout = io.StringIO()
+        with mock.patch.object(APP, "ThreadingHTTPServer", FakeHTTPServer):
+            with contextlib.redirect_stdout(stdout):
+                result = APP.main(
+                    ["--serve", "--host", "0.0.0.0", "--port", "19091"]
+                )
+
+        output = stdout.getvalue()
+        self.assertEqual(result, 0)
+        self.assertIn("listening bind=0.0.0.0:19091", output)
+        self.assertIn(
+            "local check URL=http://127.0.0.1:19091/healthz",
+            output,
+        )
+        self.assertIn("Security Group TCP port 19091", output)
+        self.assertNotIn("http://0.0.0.0", output)
 
     def test_invalid_query_mode_and_zero_norm_are_rejected(self) -> None:
         fake = FakeEmbed()

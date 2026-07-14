@@ -165,18 +165,20 @@ curl -fsS --retry 2 --retry-all-errors --max-time 180 \
     '
 ```
 
-미니 앱이 18080을 열지 못하면 다른 process를 바로 죽이지 말고 listener와 pid file의 소유를 비교합니다.
+미니 앱이 18080을 열지 못하면 다른 process를 바로 죽이지 말고 listener를 확인합니다. 이 실습은 `server.pid`나 background Bash wrapper를 사용하지 않습니다. 서버 전용 EC2/SSM 터미널에서 Python을 foreground로 실행해 오류를 바로 보고, 종료할 때는 그 터미널에서 `Ctrl-C`를 누릅니다.
 
 ```bash
-# [EC2 / SSM 세션, ubuntu 사용자]
+# [EC2 / SSM 세션 1, 서버 전용 터미널]
 ss -ltnp | grep ':18080' || true
-if [ -r "$HOME/work/llm08-mini-app/server.pid" ]; then
-  APP_PID=$(cat "$HOME/work/llm08-mini-app/server.pid")
-  ps -p "$APP_PID" -o pid=,args=
-fi
+cd "$HOME/work/llm08-mini-app"
+export TARGET_URL=http://127.0.0.1:8012
+export LLM08_TOKEN=llm08-acme-demo-token
+python3 learner_vector_app.py --serve --host 0.0.0.0 --port 18080
 ```
 
-브라우저가 안 열리면 Security Group을 공개하지 말고 로컬 Session Manager Plugin, instance ID, forwarding terminal을 확인합니다.
+두 번째 EC2/SSM 터미널에서 `ss -ltnp | grep ':18080'`과 `curl -fsS http://127.0.0.1:18080/healthz` 두 가지를 확인합니다. `0.0.0.0`은 bind sentinel이지 접속 URL이 아닙니다.
+
+브라우저가 안 열리면 먼저 SSM port forwarding을 확인합니다. Terraform은 TCP/18080을 `allowed_ingress_cidr`로 설정한 IPv4 `/32`에만 허용합니다. 기본값 `127.0.0.1/32`는 외부 직접 접속을 허용하지 않고, 본인 공인 IPv4 `/32`로 명시해 적용한 경우에만 `EC2_PUBLIC_IP:18080`에 직접 접속할 수 있습니다. 기존의 수동 all-protocol 규칙도 해당 `/32`에 한정된 경우 TCP/18080을 포함하지만, 권장 규칙은 TCP/18080 단일 포트입니다. `0.0.0.0/0`은 절대 사용하지 않습니다.
 
 ```bash
 # [로컬 노트북]

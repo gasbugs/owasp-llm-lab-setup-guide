@@ -24,6 +24,7 @@ ENGINE = "learner-mini-in-memory-cosine"
 AUTHENTICATED_TENANT = "acme"
 MAX_QUERY_CHARS = 4096
 MAX_BODY_BYTES = 64 * 1024
+ALLOWED_BIND_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})
 
 
 @dataclass(frozen=True)
@@ -309,7 +310,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--mode", choices=("vulnerable", "safe"), default="vulnerable")
     parser.add_argument("--top-k", type=int, default=2)
     parser.add_argument("--serve", action="store_true", help="serve HTML and POST /api/search")
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="listen address: loopback (default) or explicit 0.0.0.0",
+    )
     parser.add_argument("--port", type=int, default=18080)
     parser.add_argument("--target-url", default=os.environ.get("TARGET_URL", "http://localhost:8012"))
     parser.add_argument("--token", default=os.environ.get("LLM08_TOKEN", "llm08-acme-demo-token"))
@@ -317,8 +322,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if not args.serve and args.query is None:
         parser.error("--query is required unless --serve is used")
-    if args.host not in {"localhost", "127.0.0.1", "::1"}:
-        parser.error("--host must be a loopback address")
+    if args.host not in ALLOWED_BIND_HOSTS:
+        parser.error("--host must be a loopback address or 0.0.0.0")
     if not 1 <= args.port <= 65535:
         parser.error("--port must be from 1 to 65535")
     return args
@@ -330,8 +335,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         client = EmbeddingHTTPClient(args.target_url, args.token, args.timeout)
         app = MiniVectorSearchApp(client.embed)
         if args.serve:
+            if args.host == "0.0.0.0":
+                print(
+                    "WARNING: listening on every EC2 interface; "
+                    f"restrict Security Group TCP port {args.port} to your public /32",
+                    flush=True,
+                )
             server = ThreadingHTTPServer((args.host, args.port), make_handler(app))
-            print(f"LLM08 mini app: http://{args.host}:{args.port}", flush=True)
+            local_check_host = "127.0.0.1" if args.host == "0.0.0.0" else args.host
+            if local_check_host == "::1":
+                local_check_host = "[::1]"
+            print(f"listening bind={args.host}:{args.port}", flush=True)
+            print(
+                f"local check URL=http://{local_check_host}:{args.port}/healthz",
+                flush=True,
+            )
             print(f"embedding backend: {client.target_url}/api/embed", flush=True)
             try:
                 server.serve_forever()
