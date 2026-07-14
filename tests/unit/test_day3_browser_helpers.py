@@ -127,6 +127,46 @@ class LlmgoatClassificationTest(unittest.TestCase):
         self.assertEqual(result["status"], "FAIL")
         self.assertEqual(result["failure_class"], "F-API-CONTRACT")
 
+    def test_course_output_has_the_exact_six_lines_for_unsolved_pass(self) -> None:
+        evidence = MODULE.classify_llmgoat_ui(
+            {"response": "Goats are wonderful.", "solved": False},
+            "Goats are wonderful.",
+            overlay_visible=False,
+            sidebar_completed=False,
+            request_count=1,
+        )
+        evidence.update(
+            {
+                "request_count": 1,
+                "overlay_visible": False,
+                "sidebar_completed": False,
+            }
+        )
+        self.assertEqual(
+            MODULE.format_llmgoat_course_output(evidence),
+            (
+                "API request count: 1",
+                "exact API response rendered: PASS",
+                "result overlay: solved=false",
+                "sidebar: solved=false",
+                "API/UI verdict match: PASS",
+                "overall UI: PASS",
+            ),
+        )
+
+    def test_course_output_fails_closed_when_evidence_is_missing(self) -> None:
+        self.assertEqual(
+            MODULE.format_llmgoat_course_output({"status": "FAIL"}),
+            (
+                "API request count: 0",
+                "exact API response rendered: FAIL",
+                "result overlay: solved=unknown",
+                "sidebar: solved=unknown",
+                "API/UI verdict match: FAIL",
+                "overall UI: FAIL",
+            ),
+        )
+
 
 class BrowserHarnessContractTest(unittest.TestCase):
     def test_success_is_revoked_when_cleanup_is_not_proven(self) -> None:

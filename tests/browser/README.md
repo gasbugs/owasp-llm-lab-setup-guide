@@ -35,6 +35,68 @@ python -m playwright install chromium
 If Google Chrome is already installed, the browser download can be skipped and
 the run command can use `--browser-channel chrome` instead.
 
+## Day 1-6: run only the LLMGoat A01 API/UI check
+
+This instructor-only command reproduces the six API/UI lines printed in the
+Day 1-6 book.  It does not need the RAG or DVLA services.  From the setup-repo
+root, install the pinned browser dependency once:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r tests/browser/requirements.txt
+python -m playwright install chromium
+```
+
+Resolve only the instance carrying the current course `Student` tag, then keep
+this single SSM forward open in a separate terminal.  Replace `yourname` with
+the same `student_id` used by Terraform:
+
+```bash
+export STUDENT=yourname
+export INSTANCE_ID="$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
+  STUDENT="$STUDENT" \
+  bash infrastructure/scripts/student/instance-id.sh)"
+
+aws --profile owasp-llm --region us-east-1 \
+  ssm start-session --target "$INSTANCE_ID" \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["5000"],"localPortNumber":["15000"]}'
+```
+
+In the first terminal, verify the forwarded model and run the A01-only harness:
+
+```bash
+source .venv/bin/activate
+curl -fsS http://127.0.0.1:15000/api/model_status \
+  | python -m json.tool
+python tests/browser/run_llmgoat_a01_ui.py \
+  --llmgoat-url http://127.0.0.1:15000 \
+  --browser-channel chromium
+```
+
+The first six stdout lines are the book-ready observation.  `solved=false` is
+valid when the API and both UI indicators agree.  The sample below is a
+historical 2026-07-11 observation reconstructed from the former full-harness
+`llmgoat-ui.json` with the same classification and formatting logic.  The new
+standalone command itself has not yet been live-run through an SSM forward, so
+do not describe this sample as standalone-run evidence:
+
+```text
+API request count: 1
+exact API response rendered: PASS
+result overlay: solved=false
+sidebar: solved=false
+API/UI verdict match: PASS
+overall UI: PASS
+RESULT_DIR=/absolute/path/to/tests/browser/results/llmgoat-a01-YYYYMMDD-HHMMSS
+```
+
+The result directory contains `llmgoat-api-response.json`, `llmgoat-ui.json`,
+`llmgoat-a01.png`, `network-events.json`, `result.json`, and
+`sha256sums.json`.  Stop the SSM forward with `Ctrl-C` after copying the
+evidence to the retained instructor bundle.
+
 ## Open the three SSM forwards
 
 Run these in three terminals and keep all sessions open.  The instance security

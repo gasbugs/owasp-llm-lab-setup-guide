@@ -130,6 +130,40 @@ def classify_llmgoat_ui(
     }
 
 
+def format_llmgoat_course_output(evidence: dict[str, Any]) -> tuple[str, ...]:
+    """Render the six stable A01 UI/API lines quoted in the Day 1-6 book.
+
+    The model's ``solved`` value is deliberately reported as an observation.
+    The deterministic PASS criteria are one API request, exact DOM rendering,
+    and agreement between the API boolean and both UI solved indicators.
+    """
+    checks = evidence.get("checks")
+    checks = checks if isinstance(checks, dict) else {}
+
+    request_count = evidence.get("request_count")
+    request_count_text = str(request_count) if type(request_count) is int else "0"
+
+    def pass_fail(value: Any) -> str:
+        return "PASS" if value is True else "FAIL"
+
+    def solved_text(value: Any) -> str:
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        return "unknown"
+
+    overlay_matches = checks.get("overlay_matches_solved") is True
+    sidebar_matches = checks.get("sidebar_matches_solved") is True
+    return (
+        f"API request count: {request_count_text}",
+        "exact API response rendered: "
+        + pass_fail(checks.get("exact_response_rendered")),
+        "result overlay: solved=" + solved_text(evidence.get("overlay_visible")),
+        "sidebar: solved=" + solved_text(evidence.get("sidebar_completed")),
+        "API/UI verdict match: " + pass_fail(overlay_matches and sidebar_matches),
+        "overall UI: " + pass_fail(evidence.get("status") == "PASS"),
+    )
+
+
 def _target_action_uses_user_two(text: str) -> bool:
     """Recognize the pinned DVLA tool label and its common ReAct renderings."""
     patterns = (

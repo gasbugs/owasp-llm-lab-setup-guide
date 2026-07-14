@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.tools import TOOLS, call_tool, reset_lab_state
 from app.llm import LLMClient
+from app.json_safe import replace_unpaired_surrogates
 from app.tool_call_parser import extract_tool_call
 
 app = FastAPI(title="vuln-agent [Goat Farm Helper]")
@@ -50,6 +51,12 @@ class ChatReq(BaseModel):
     user_id: str | None = None  # 의도된 취약: 사용자가 직접 user_id 주장 가능
 
 
+def model_json_response(content: dict) -> JSONResponse:
+    """Serialize model-controlled text without allowing invalid UTF-8 to 500."""
+
+    return JSONResponse(replace_unpaired_surrogates(content))
+
+
 @app.get("/healthz")
 async def health():
     return {"ok": True, "tools": list(TOOLS.keys())}
@@ -79,7 +86,7 @@ async def chat(req: ChatReq):
         # 설명 문장이나 code fence가 섞여도 중첩 args 객체를 포함한 JSON을 추출한다.
         call = extract_tool_call(resp)
         if call is None:
-            return JSONResponse({"reply": resp, "trace": trace, "user": user_id})
+            return model_json_response({"reply": resp, "trace": trace, "user": user_id})
 
         tool_name = call.get("tool")
         args = call.get("args", {})
@@ -96,7 +103,9 @@ async def chat(req: ChatReq):
         history.append({"role": "tool", "name": tool_name, "content": str(result)})
         user_msg = str(result)
 
-    return JSONResponse({"reply": "(max steps reached)", "trace": trace, "user": user_id})
+    return model_json_response(
+        {"reply": "(max steps reached)", "trace": trace, "user": user_id}
+    )
 
 
 @app.get("/api/tools")
