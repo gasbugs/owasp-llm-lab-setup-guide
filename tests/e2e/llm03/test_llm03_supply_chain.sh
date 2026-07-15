@@ -37,7 +37,7 @@ models_has_clean() {
   printf '%s' "$MODELS_JSON" | jq -e '.models[] | select(.id == "A") | .trusted == true' >/dev/null
 }
 
-models_has_trojan() {
+models_has_untrusted_b() {
   printf '%s' "$MODELS_JSON" | jq -e '.models[] | select(.id == "B") | .trusted == false' >/dev/null
 }
 
@@ -76,7 +76,7 @@ MODELS_JSON=$(fetch_registry "$REGISTRY/api/v1/models")
 printf '%s\n' "$MODELS_JSON" > "$RESULTS_DIR/raw/models.json"
 check "/api/v1/models 응답 존재" test -n "$MODELS_JSON"
 check "응답에 모델 A (clean) 포함" models_has_clean
-check "응답에 모델 B (trojan) 포함" models_has_trojan
+check "응답에 untrusted 모델 B 포함" models_has_untrusted_b
 echo ""
 
 # Part 2: SHA-256 mismatch 검출 (핵심 학습 목표)
@@ -94,14 +94,15 @@ fetch_registry -L "$REGISTRY/models/A.gguf" -o "$TMPDIR/A.gguf"
 ACTUAL_A=$(sha256sum "$TMPDIR/A.gguf" | cut -d' ' -f1)
 check "Model A claim == actual SHA-256 (clean 일치)" test "$EXPECTED_A" = "$ACTUAL_A"
 
-# B: trojan — mismatch 발생해야 함
+# B: untrusted fixture — metadata/file mismatch가 발생해야 함
 EXPECTED_B=$(fetch_registry "$REGISTRY/api/v1/models/B" | jq -er .sha256)
 fetch_registry -L "$REGISTRY/models/B.gguf" -o "$TMPDIR/B.gguf"
 ACTUAL_B=$(sha256sum "$TMPDIR/B.gguf" | cut -d' ' -f1)
 printf 'model_a_expected=%s\nmodel_a_actual=%s\nmodel_b_expected=%s\nmodel_b_actual=%s\n' \
   "$EXPECTED_A" "$ACTUAL_A" "$EXPECTED_B" "$ACTUAL_B" \
   > "$RESULTS_DIR/raw/integrity.txt"
-check "Model B claim != actual SHA-256 (trojan 검출)" test "$EXPECTED_B" != "$ACTUAL_B"
+check "Model B claim != actual SHA-256 (artifact mismatch 검출)" \
+  test "$EXPECTED_B" != "$ACTUAL_B"
 echo "  (claim:  $EXPECTED_B)"
 echo "  (actual: $ACTUAL_B)"
 echo ""
