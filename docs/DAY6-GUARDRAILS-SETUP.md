@@ -18,6 +18,9 @@ OpenAI-compatible endpoint를 `host.containers.internal:11434`로 호출한다.
 ## 빌드
 
 저장소 루트에서 다음 두 이미지를 각각 빌드한다.
+교재는 긴 Containerfile·Python·YAML을 다시 입력시키지 않고 이 소스 경로만 안내한다.
+수강생은 미리 빌드된 이미지를 pull하는 대신 아래 명령으로 자신의 EC2에서 이미지를
+직접 구축한다.
 
 ```bash
 podman build -t localhost/day6-llm-guard:0.3.16 examples/day6/llm-guard
