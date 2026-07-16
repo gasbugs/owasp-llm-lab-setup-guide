@@ -1,0 +1,22 @@
+FROM python:3.12-slim
+
+ARG LLM_GUARD_VERSION=0.3.16
+ARG TORCH_VERSION=2.7.1
+
+ENV HF_HOME=/opt/models \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN python -m pip install --index-url https://download.pytorch.org/whl/cpu \
+      "torch==${TORCH_VERSION}" \
+    && python -m pip install "llm-guard==${LLM_GUARD_VERSION}"
+
+WORKDIR /app
+COPY scan_prompt.py /app/scan_prompt.py
+
+# PromptInjection의 기본 모델을 이미지에 포함해 실행 때 외부 다운로드가
+# 일어나지 않게 한다. 빌드가 성공한 뒤에는 --network none으로 실행할 수 있다.
+RUN python -c 'from llm_guard.input_scanners import PromptInjection; PromptInjection()'
+
+USER 65532:65532
+ENTRYPOINT ["python", "/app/scan_prompt.py"]

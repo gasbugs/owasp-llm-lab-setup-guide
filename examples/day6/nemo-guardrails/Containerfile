@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+ARG NEMO_GUARDRAILS_VERSION=0.22.0
+
+ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# annoy가 네이티브 확장을 빌드하므로 compiler와 Python header가 필요하다.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc g++ python3-dev \
+    && python -m pip install "nemoguardrails==${NEMO_GUARDRAILS_VERSION}" \
+    && apt-get purge -y --auto-remove gcc g++ python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY config /app/config
+COPY run_demo.py /app/run_demo.py
+
+USER 65532:65532
+ENTRYPOINT ["python", "/app/run_demo.py"]
