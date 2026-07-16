@@ -14,8 +14,9 @@ RUN python -m pip install --index-url https://download.pytorch.org/whl/cpu \
 WORKDIR /app
 COPY scan_prompt.py /app/scan_prompt.py
 
-# PromptInjection의 기본 모델을 이미지에 포함해 실행 때 외부 다운로드가
-# 일어나지 않게 한다. 빌드가 성공한 뒤에는 --network none으로 실행할 수 있다.
+# PromptInjection만 model download가 필요하다. TokenLimit, InvisibleText와
+# output Regex는 결정적 scanner다. Model을 build layer에 포함하므로 모든 case를
+# runtime --network none으로 실행할 수 있다.
 RUN python -c 'from llm_guard.input_scanners import PromptInjection; PromptInjection()'
 
 USER 65532:65532
