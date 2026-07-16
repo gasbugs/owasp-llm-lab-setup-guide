@@ -5,6 +5,7 @@ import argparse
 import json
 import sys
 import time
+import unicodedata
 
 from llm_guard import scan_output, scan_prompt
 from llm_guard.input_scanners import InvisibleText, PromptInjection, TokenLimit
@@ -74,22 +75,29 @@ CASES = {
     },
 }
 
+SCANNERS = {}
+
 
 def build_scanner(name: str):
+    if name in SCANNERS:
+        return SCANNERS[name]
     if name == "PromptInjection":
-        return PromptInjection()
-    if name == "TokenLimit":
-        return TokenLimit(limit=20)
-    if name == "InvisibleText":
-        return InvisibleText()
-    if name == "Regex":
-        return Regex(
+        scanner = PromptInjection()
+    elif name == "TokenLimit":
+        scanner = TokenLimit(limit=20)
+    elif name == "InvisibleText":
+        scanner = InvisibleText()
+    elif name == "Regex":
+        scanner = Regex(
             patterns=[r"DEMO_API_KEY=[A-Za-z0-9-]+"],
             is_blocked=True,
             match_type=MatchType.SEARCH,
             redact=True,
         )
-    raise ValueError(f"Unsupported scanner: {name}")
+    else:
+        raise ValueError(f"Unsupported scanner: {name}")
+    SCANNERS[name] = scanner
+    return scanner
 
 
 def run_case(case_name: str) -> dict:
@@ -129,6 +137,12 @@ def run_case(case_name: str) -> dict:
         result["scanner_model"] = "protectai/deberta-v3-base-prompt-injection-v2"
     if case["scanner"] == "TokenLimit":
         result["configured_token_limit"] = 20
+    if case["scanner"] == "InvisibleText":
+        result["detected_codepoints"] = [
+            f"U+{ord(char):04X}"
+            for char in case["text"]
+            if unicodedata.category(char) in {"Cf", "Co", "Cn"}
+        ]
     return result
 
 

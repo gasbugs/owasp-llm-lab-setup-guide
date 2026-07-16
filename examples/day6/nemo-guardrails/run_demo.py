@@ -93,10 +93,10 @@ async def run_case(case_name: str) -> dict:
         "activated_rails": activated_rails,
         "metrics": {
             "total_duration_ms": round((stats.total_duration or 0) * 1000, 2),
-            "llm_calls_count": stats.llm_calls_count,
-            "prompt_tokens": stats.llm_calls_total_prompt_tokens,
-            "completion_tokens": stats.llm_calls_total_completion_tokens,
-            "total_tokens": stats.llm_calls_total_tokens,
+            "llm_calls_count": stats.llm_calls_count or 0,
+            "prompt_tokens": stats.llm_calls_total_prompt_tokens or 0,
+            "completion_tokens": stats.llm_calls_total_completion_tokens or 0,
+            "total_tokens": stats.llm_calls_total_tokens or 0,
         }
         if stats
         else None,
