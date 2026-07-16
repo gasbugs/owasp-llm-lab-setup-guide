@@ -1,0 +1,167 @@
+#!/bin/bash
+# Restore allowlisted OWASP LLM lab runtime state without touching learner files.
+#
+# Usage:
+#   reset-lab llm01b
+#   reset-lab llm04
+#   reset-lab llm05
+#   reset-lab llm06
+#   reset-lab llmgoat
+#   reset-lab llm10
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: reset-lab <lab-id>
+
+Allowlisted lab IDs:
+  llm01b   Day 1 in-memory RAG corpus
+  llm04    Day 2 in-memory RAG corpus
+  llm05    Day 3 in-memory RAG corpus
+  llm06    Agent ANIMALS and DELETED_LOG memory
+  llmgoat  LLMGoat mutable challenge memory
+  llm10    Day 5 app tasks and the shared Ollama request queue
+
+This command only restarts exact systemd user units and reads readiness URLs.
+It does not modify learner work, evidence, Capstone source, models, or caches.
+EOF
+}
+
+if [ "$(id -u)" -eq 0 ]; then
+  if ! id ubuntu >/dev/null 2>&1; then
+    echo "ERROR: ubuntu learner account is unavailable" >&2
+    exit 3
+  fi
+  ubuntu_uid=$(id -u ubuntu)
+  exec runuser -u ubuntu -- env \
+    XDG_RUNTIME_DIR="/run/user/$ubuntu_uid" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$ubuntu_uid/bus" \
+    "$0" "$@"
+fi
+
+if [ "$#" -ne 1 ]; then
+  usage >&2
+  exit 2
+fi
+
+case "$1" in
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+esac
+
+for command_name in systemctl curl; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "ERROR: required command is unavailable: $command_name" >&2
+    exit 3
+  fi
+done
+
+uid=$(id -u)
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$uid}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+
+RESET_LAB_READY_ATTEMPTS="${RESET_LAB_READY_ATTEMPTS:-60}"
+RESET_LAB_READY_SLEEP_SECONDS="${RESET_LAB_READY_SLEEP_SECONDS:-2}"
+
+case "$RESET_LAB_READY_ATTEMPTS" in
+  ''|*[!0-9]*)
+    echo "ERROR: RESET_LAB_READY_ATTEMPTS must be a positive integer" >&2
+    exit 2
+    ;;
+esac
+case "$RESET_LAB_READY_SLEEP_SECONDS" in
+  ''|*[!0-9]*)
+    echo "ERROR: RESET_LAB_READY_SLEEP_SECONDS must be a positive integer" >&2
+    exit 2
+    ;;
+esac
+if [ "$RESET_LAB_READY_ATTEMPTS" -lt 1 ] || \
+   [ "$RESET_LAB_READY_SLEEP_SECONDS" -lt 1 ]; then
+  echo "ERROR: readiness bounds must be positive integers" >&2
+  exit 2
+fi
+
+wait_for_raw_readiness() {
+  label="$1"
+  url="$2"
+  attempt=1
+  while [ "$attempt" -le "$RESET_LAB_READY_ATTEMPTS" ]; do
+    if raw_body=$(curl --noproxy '*' -fsS --max-time 5 "$url" 2>/dev/null); then
+      if [ -n "$raw_body" ]; then
+        printf '%s_READY_URL=%s\n' "$label" "$url"
+        printf '%s\n' "$raw_body"
+        return 0
+      fi
+    fi
+    if [ "$attempt" -lt "$RESET_LAB_READY_ATTEMPTS" ]; then
+      sleep "$RESET_LAB_READY_SLEEP_SECONDS"
+    fi
+    attempt=$((attempt + 1))
+  done
+  echo "ERROR: readiness timeout for $label at $url" >&2
+  return 3
+}
+
+restart_one() {
+  unit="$1"
+  label="$2"
+  url="$3"
+  printf 'RESET_UNIT=%s\n' "$unit"
+  systemctl --user restart "$unit"
+  wait_for_raw_readiness "$label" "$url"
+}
+
+lab_id="$1"
+case "$lab_id" in
+  llm01b)
+    restart_one \
+      lab-day1-vuln-rag.service \
+      LLM01B \
+      http://127.0.0.1:8000/healthz
+    ;;
+  llm04)
+    restart_one \
+      lab-day2-vuln-rag.service \
+      LLM04 \
+      http://127.0.0.1:8010/healthz
+    ;;
+  llm05)
+    restart_one \
+      lab-day3-vuln-rag.service \
+      LLM05 \
+      http://127.0.0.1:8011/healthz
+    ;;
+  llm06)
+    restart_one \
+      lab-day3-vuln-agent.service \
+      LLM06 \
+      http://127.0.0.1:8001/healthz
+    ;;
+  llmgoat)
+    restart_one \
+      lab-llmgoat.service \
+      LLMGOAT \
+      http://127.0.0.1:5000/healthz
+    ;;
+  llm10)
+    # A timed-out client can leave both an awaiting uvicorn task and queued
+    # Ollama generation. Cancel the app task first, clear the backend queue,
+    # then reconnect a fresh Day 5 app process to the ready backend.
+    printf 'RESET_UNIT=%s\n' lab-day5-vuln-rag.service
+    systemctl --user restart lab-day5-vuln-rag.service
+    printf 'RESET_UNIT=%s\n' lab-ollama.service
+    systemctl --user restart lab-ollama.service
+    wait_for_raw_readiness OLLAMA http://127.0.0.1:11434/api/tags
+    printf 'RESET_UNIT=%s\n' lab-day5-vuln-rag.service
+    systemctl --user restart lab-day5-vuln-rag.service
+    wait_for_raw_readiness LLM10 http://127.0.0.1:8013/healthz
+    ;;
+  *)
+    echo "ERROR: lab-id is not allowlisted: $lab_id" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

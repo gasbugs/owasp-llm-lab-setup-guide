@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.7"
+SCRIPT_VERSION="0.1.8"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -191,6 +191,15 @@ echo "[install-lab] preparing lab portal files"
 mkdir -p /home/ubuntu/work/portal
 curl -fsSL "$RAW_URL/infrastructure/portal/index.html" -o /home/ubuntu/work/portal/index.html
 chown -R ubuntu:ubuntu /home/ubuntu/work/portal
+
+echo "[install-lab] installing the allowlisted learner reset command"
+RESET_LAB_CANDIDATE=/usr/local/bin/reset-lab.next
+curl -fsSL \
+  "$RAW_URL/infrastructure/scripts/student/reset-lab" \
+  -o "$RESET_LAB_CANDIDATE"
+bash -n "$RESET_LAB_CANDIDATE"
+install -m 0755 -o root -g root "$RESET_LAB_CANDIDATE" /usr/local/bin/reset-lab
+rm -f "$RESET_LAB_CANDIDATE"
 
 # Day 3 LLM06 — DVLA must use the same Ollama model pulled by this lab.
 echo "[install-lab] preparing DVLA LiteLLM model config"
@@ -572,6 +581,7 @@ health_urls=(
   http://localhost:8012/healthz
   http://localhost:8013/healthz
   http://localhost:8001/healthz
+  http://localhost:5000/healthz
   http://localhost:8002/api/v1/models
   http://localhost:8080/
   http://localhost:8501/_stcore/health

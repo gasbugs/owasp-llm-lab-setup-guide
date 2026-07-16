@@ -173,12 +173,47 @@ curl -s http://localhost:8011/healthz
 curl -s http://localhost:8012/healthz
 curl -s http://localhost:8013/healthz
 curl -s http://localhost:8001/healthz
+curl -s http://localhost:5000/healthz
 curl -s http://localhost:8002/api/v1/models | head
 ```
 
-## 9. 설치를 다시 해야 할 때
+## 9. 상태를 바꾼 실습만 최소 복원
 
-설치가 중간에 실패했거나 깨끗하게 다시 올리고 싶으면 SSM 세션 안에서 클린업 후 설치를 다시 실행합니다.
+일반 채팅처럼 읽기만 한 실습은 복원하지 않습니다. Python 메모리만 바꾼
+실습은 해당 Quadlet unit을 한 번 재시작하고, 이어서 raw `/healthz`를
+확인합니다. 아래에서 자신이 방금 수행한 실습의 두 명령만 실행합니다.
+
+| 실습 | 재시작 명령 | 원본 확인 명령 |
+|---|---|---|
+| LLM01-B | `systemctl --user restart lab-day1-vuln-rag.service` | `curl -sS http://localhost:8000/healthz` |
+| LLM04 | `systemctl --user restart lab-day2-vuln-rag.service` | `curl -sS http://localhost:8010/healthz` |
+| LLM05 | `systemctl --user restart lab-day3-vuln-rag.service` | `curl -sS http://localhost:8011/healthz` |
+| LLM06 삭제 실습 | `systemctl --user restart lab-day3-vuln-agent.service` | `curl -sS http://localhost:8001/healthz` |
+| LLMGoat 상태 변경 실습 | `systemctl --user restart lab-llmgoat.service` | `curl -sS http://localhost:5000/healthz` |
+
+LLM10은 timeout 뒤 Day 5 앱과 공유 Ollama queue를 정해진 순서로 복구해야
+하므로 이 실습에만 allowlist 명령을 사용합니다.
+
+```bash
+reset-lab llm10
+```
+
+```bash
+curl -sS http://localhost:8013/healthz
+```
+
+이 복원 명령들은 `~/work`의 evidence와 Capstone, Ollama 모델, LLMGoat
+모델/cache를 건드리지 않습니다. 실습별 저장 위치와 복원 범위는 [Lab state
+and reset policy](LAB-RESET-POLICY.md)에 정리되어 있습니다.
+
+SSM 포트포워딩이나 수강생이 실행한 미니 앱을 종료하는 일, EC2를 중지하는
+일은 상태 복원과 별개입니다.
+
+## 10. 설치 자체를 다시 해야 할 때
+
+설치가 중간에 실패했거나 Quadlet 정의 자체가 손상된 경우에만 SSM 세션 안에서
+클린업 후 설치를 다시 실행합니다. 일반 실습 상태 복원에는 이 절차를 사용하지
+않습니다.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/cleanup-lab.sh | sudo bash
@@ -191,14 +226,14 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/cleanup-lab.sh | sudo bash -s -- --purge
 ```
 
-## 10. 매일 시작
+## 11. 매일 시작
 
 ```bash
 AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
   bash infrastructure/scripts/student/start-lab.sh
 ```
 
-## 11. 매일 종료
+## 12. 매일 종료
 
 ```bash
 AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
@@ -207,7 +242,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 
 이 명령을 실행하면 EC2 시간당 요금이 멈춥니다. EBS 비용은 남습니다.
 
-## 12. 강의 종료 후 삭제
+## 13. 강의 종료 후 삭제
 
 보존할 작업물을 먼저 개인 GitHub repo에 push하세요.
 
@@ -216,7 +251,7 @@ cd infrastructure/terraform
 terraform destroy
 ```
 
-## 13. 절대 하지 말 것
+## 14. 절대 하지 말 것
 
 - `allowed_ingress_cidr = "0.0.0.0/0"`로 바꾸지 마세요.
 - Access Key와 Secret을 GitHub에 올리지 마세요.

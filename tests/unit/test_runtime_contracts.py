@@ -25,6 +25,25 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("FROM docker.io/alpine/git:latest AS clone", dockerfile)
         self.assertIn("FROM docker.io/library/python:3.11-slim", dockerfile)
 
+    def test_llmgoat_wrapper_exposes_stable_healthz_without_patching_upstream(self) -> None:
+        dockerfile = read("docker/llmgoat/Dockerfile")
+        entrypoint = read("docker/llmgoat/health_entrypoint.py")
+        self.assertIn("COPY health_entrypoint.py", dockerfile)
+        self.assertIn('ENTRYPOINT ["python3", "/opt/owasp-llm/health_entrypoint.py"]', dockerfile)
+        self.assertIn('from llmgoat.app import app, main', entrypoint)
+        self.assertIn('@app.get("/healthz")', entrypoint)
+        self.assertIn('{"ok": True, "service": "llmgoat"}', entrypoint)
+        self.assertNotIn("sed -i", dockerfile)
+
+    def test_vuln_agent_exposes_read_only_state_for_publisher_verification(self) -> None:
+        main = read("docker/vuln-agent/app/main.py")
+        tools = read("docker/vuln-agent/app/tools.py")
+        self.assertIn('@app.get("/api/admin/state")', main)
+        self.assertIn("return read_lab_state()", main)
+        self.assertIn("def read_lab_state()", tools)
+        self.assertIn("for animal_id in sorted(ANIMALS)", tools)
+        self.assertIn('"deleted_log": list(DELETED_LOG)', tools)
+
     def test_runtime_images_are_linked_to_the_public_source_repository(self) -> None:
         source_label = (
             'org.opencontainers.image.source='
@@ -56,6 +75,15 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("WARMUP_RESPONSE=", installer)
         self.assertIn(".done == true", installer)
         self.assertIn("required Day 5 model is absent after pull", installer)
+        self.assertIn(
+            '"$RAW_URL/infrastructure/scripts/student/reset-lab"', installer
+        )
+        self.assertIn(
+            "install -m 0755 -o root -g root "
+            '"$RESET_LAB_CANDIDATE" /usr/local/bin/reset-lab',
+            installer,
+        )
+        self.assertIn("http://localhost:5000/healthz", installer)
         guard_pull = installer.split(
             'podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL"', 1
         )[1].split("fi", 1)[0]
@@ -267,18 +295,9 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("transport_timeouts: $transport", llm10)
         self.assertIn('if [ "$observed" -ne 100 ]', llm10)
         self.assertIn("restart_llm10_stack_after_overload", llm10)
-        self.assertIn("overload queue cleanup: Ollama READY", llm10)
-        self.assertIn("overload queue cleanup: Day5 app READY", llm10)
-        day5_restart = (
-            '"${runtime[@]}" restart --time 5 lab-day5-vuln-rag'
-        )
-        ollama_restart = '"${runtime[@]}" restart --time 5 lab-ollama'
-        self.assertEqual(llm10.count(day5_restart), 2)
-        first_day5 = llm10.index(day5_restart)
-        ollama = llm10.index(ollama_restart)
-        second_day5 = llm10.index(day5_restart, first_day5 + 1)
-        self.assertLess(first_day5, ollama)
-        self.assertLess(ollama, second_day5)
+        self.assertIn('"$reset_script" llm10', llm10)
+        self.assertIn("R1-reset-lab.txt", llm10)
+        self.assertNotIn("podman", llm10)
         self.assertIn('trap recover_parallel_probe_on_exit EXIT', llm10)
         self.assertIn('warmup_model recovery', llm10)
         self.assertIn(
@@ -304,13 +323,22 @@ class RuntimeContractTest(unittest.TestCase):
             self.assertIn("delete_docs_by_title", script)
 
         agent = read("tests/e2e/llm06/test_llm06_agency.sh")
-        self.assertIn('/api/admin/reset', agent)
+        self.assertIn('/api/admin/state', agent)
+        self.assertIn('"$reset_script" llm06', agent)
+        self.assertIn("A4-state-after-request.json", agent)
+        self.assertIn("A4-state-after-reset.json", agent)
+        self.assertNotIn('/api/admin/reset', agent)
         self.assertIn("trap cleanup EXIT", agent)
 
         full_cycle = read("tests/e2e/run-full-cycle.sh")
         self.assertIn("reset_mutable_state", full_cycle)
         self.assertIn("BASELINE_DOC_COUNTS", full_cycle)
         self.assertIn("E2E_RESET_SENTINEL_", full_cycle)
+        self.assertIn('systemctl --user restart "${services[@]}"', full_cycle)
+        self.assertIn("systemctl --user restart lab-day3-vuln-agent.service", full_cycle)
+        self.assertIn('/api/admin/state', full_cycle)
+        self.assertNotIn("podman restart", full_cycle)
+        self.assertNotIn('/api/admin/reset', full_cycle)
         self.assertIn('(.docs | length == $expected)', full_cycle)
         self.assertIn("contains($sentinel)", full_cycle)
         self.assertNotIn(".docs | length == 0", full_cycle)

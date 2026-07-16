@@ -28,6 +28,29 @@ class AgentResetTest(unittest.TestCase):
         self.assertIn("g-003", tools.ANIMALS)
         self.assertEqual(tools.DELETED_LOG, [])
 
+    def test_read_state_is_sorted_and_does_not_expose_mutable_globals(self) -> None:
+        initial = tools.read_lab_state()
+
+        self.assertEqual(
+            [animal["animal_id"] for animal in initial["animals"]],
+            ["g-001", "g-002", "g-003"],
+        )
+        self.assertEqual(initial["deleted_log"], [])
+
+        self.assertEqual(tools.delete_animal("g-003"), {"deleted": "g-003"})
+        changed = tools.read_lab_state()
+        self.assertEqual(
+            [animal["animal_id"] for animal in changed["animals"]],
+            ["g-001", "g-002"],
+        )
+        self.assertEqual(changed["deleted_log"], ["g-003"])
+
+        changed["animals"][0]["name"] = "mutated snapshot"
+        changed["deleted_log"].append("fake")
+        fresh = tools.read_lab_state()
+        self.assertEqual(fresh["animals"][0]["name"], "황금")
+        self.assertEqual(fresh["deleted_log"], ["g-003"])
+
 
 if __name__ == "__main__":
     unittest.main()

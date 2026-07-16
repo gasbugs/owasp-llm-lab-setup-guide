@@ -87,61 +87,28 @@ warmup_model() {
 }
 
 restart_llm10_stack_after_overload() {
-  local -a runtime=(podman)
-  if ! podman container exists lab-ollama 2>/dev/null ||
-     ! podman container exists lab-day5-vuln-rag 2>/dev/null; then
-    if command -v sudo >/dev/null 2>&1 && id ubuntu >/dev/null 2>&1; then
-      runtime=(sudo -u ubuntu env XDG_RUNTIME_DIR=/run/user/1000 podman)
+  local reset_script reset_log
+  reset_script="${RESET_LAB_SCRIPT:-$SCRIPT_DIR/../../../infrastructure/scripts/student/reset-lab}"
+  if [ ! -x "$reset_script" ]; then
+    if command -v reset-lab >/dev/null 2>&1; then
+      reset_script=$(command -v reset-lab)
     else
-      echo "  [R1] INFRA: LLM10 container owner를 확인할 수 없음" >&2
+      echo "  [R1] INFRA: allowlisted reset-lab command is unavailable" >&2
       return 3
     fi
   fi
 
-  if ! "${runtime[@]}" container exists lab-ollama 2>/dev/null ||
-     ! "${runtime[@]}" container exists lab-day5-vuln-rag 2>/dev/null; then
-    echo "  [R1] INFRA: LLM10 recovery containers are missing" >&2
+  reset_log="$RESULTS_DIR/raw/R1-reset-lab.txt"
+  if ! RESET_LAB_READY_ATTEMPTS="$RECOVERY_ATTEMPTS" \
+       RESET_LAB_READY_SLEEP_SECONDS="$RECOVERY_SLEEP_SECONDS" \
+       "$reset_script" llm10 | tee "$reset_log"; then
+    echo "  [R1] INFRA: reset-lab llm10 failed" >&2
     return 3
   fi
 
-  # curl이 timeout된 뒤에도 Day5의 uvicorn task는 Ollama 응답을 기다릴 수 있다.
-  # 먼저 앱을 재시작해 그 task를 취소하고, Ollama queue를 비운 뒤, 앱을 다시
-  # 재시작해 새 backend 연결만 남긴다.
-  if ! "${runtime[@]}" restart --time 5 lab-day5-vuln-rag >/dev/null; then
-    echo "  [R1] INFRA: overload 뒤 Day5 app queue cancel 실패" >&2
-    return 3
-  fi
-  if ! "${runtime[@]}" restart --time 5 lab-ollama >/dev/null; then
-    echo "  [R1] INFRA: overload 뒤 lab-ollama restart 실패" >&2
-    return 3
-  fi
-  for _ in $(seq 1 "$RECOVERY_ATTEMPTS"); do
-    if curl -fsS --max-time 3 http://localhost:11434/api/tags >/dev/null 2>&1; then
-      echo "  [R1] overload queue cleanup: Ollama READY"
-      break
-    fi
-    sleep "$RECOVERY_SLEEP_SECONDS"
-  done
-  if ! curl -fsS --max-time 3 http://localhost:11434/api/tags >/dev/null 2>&1; then
-    echo "  [R1] INFRA: overload 뒤 Ollama readiness timeout" >&2
-    return 3
-  fi
-
-  if ! "${runtime[@]}" restart --time 5 lab-day5-vuln-rag >/dev/null; then
-    echo "  [R1] INFRA: Ollama 복구 뒤 Day5 app restart 실패" >&2
-    return 3
-  fi
-  for _ in $(seq 1 "$RECOVERY_ATTEMPTS"); do
-    if curl -fsS --max-time 5 "$TARGET_URL/healthz" 2>/dev/null \
-      | jq -e '(.default_scenario // .scenario) == "day5"' >/dev/null; then
-      echo "  [R1] overload queue cleanup: Day5 app READY"
-      warmup_model recovery
-      return $?
-    fi
-    sleep "$RECOVERY_SLEEP_SECONDS"
-  done
-  echo "  [R1] INFRA: overload 뒤 Day5 app readiness timeout" >&2
-  return 3
+  # reset-lab already emits the raw Ollama and Day 5 readiness responses.
+  # A bounded model call verifies more than process health before measurements.
+  warmup_model recovery
 }
 
 PARALLEL_PROBE_STARTED=false

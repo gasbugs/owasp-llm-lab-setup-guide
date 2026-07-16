@@ -22,6 +22,10 @@ cd "$REPO_ROOT"
 : "${AGENT_URL:=http://localhost:8001}"
 : "${GOAT_URL:=http://localhost:5000}"
 
+runtime_uid=$(id -u)
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$runtime_uid}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+
 TS=$(date +%Y%m%d-%H%M%S)
 RESULTS_DIR="$HOME/work/e2e-evidence/$TS"
 mkdir -p "$RESULTS_DIR"
@@ -76,15 +80,15 @@ require_day_ready() {
 reset_mutable_state() {
   log "▶ mutable runtime 기준선 복원"
   local sentinel="E2E_RESET_SENTINEL_${TS}"
-  local containers=(
-    lab-day1-vuln-rag
-    lab-day2-vuln-rag
-    lab-day3-vuln-rag
-    lab-day4-vuln-rag
-    lab-day5-vuln-rag
+  local services=(
+    lab-day1-vuln-rag.service
+    lab-day2-vuln-rag.service
+    lab-day3-vuln-rag.service
+    lab-day4-vuln-rag.service
+    lab-day5-vuln-rag.service
   )
-  if ! command -v podman >/dev/null 2>&1; then
-    log "  ✗ podman 없음: shared corpus를 재현 가능한 기준선으로 복원할 수 없음"
+  if ! command -v systemctl >/dev/null 2>&1; then
+    log "  ✗ systemctl 없음: Quadlet 서비스를 기준선으로 복원할 수 없음"
     return 1
   fi
 
@@ -101,8 +105,8 @@ reset_mutable_state() {
       return 1
     fi
   done
-  if ! podman restart "${containers[@]}" >/dev/null; then
-    log "  ✗ RAG 컨테이너 restart 실패"
+  if ! systemctl --user restart "${services[@]}"; then
+    log "  ✗ RAG Quadlet service restart 실패"
     return 1
   fi
 
@@ -133,15 +137,24 @@ reset_mutable_state() {
     fi
   done
 
+  if ! systemctl --user restart lab-day3-vuln-agent.service; then
+    log "  ✗ Agent Quadlet service restart 실패"
+    return 1
+  fi
   for _ in $(seq 1 30); do
     if curl -fsS --max-time 5 "$AGENT_URL/healthz" >/dev/null 2>&1; then
       break
     fi
     sleep 2
   done
-  if ! curl -fsS --max-time 10 -X POST "$AGENT_URL/api/admin/reset" \
-    | jq -e '.ok == true and (.animals | index("g-003") != null)' >/dev/null; then
-    log "  ✗ Agent 기준선 reset 실패"
+  local agent_state="$RESULTS_DIR/agent-baseline-state.json"
+  if ! curl -fsS --max-time 10 "$AGENT_URL/api/admin/state" -o "$agent_state" \
+    || ! jq -e '
+      .ok == true
+      and ([.animals[].animal_id] | index("g-003") != null)
+      and .deleted_log == []
+    ' "$agent_state" >/dev/null; then
+    log "  ✗ Agent service restart 기준선 확인 실패"
     return 1
   fi
   log "  ✓ shared corpus 5개와 Agent 상태 기준선 확인"

@@ -25,4 +25,11 @@ LABEL org.opencontainers.image.revision="$VCS_REF"
 # Podman은 /.dockerenv를 자동 생성하지 않으므로 이미지 레벨에서 마커 박음.
 RUN touch /.dockerenv
 
+# Register a stable /healthz alias before invoking the unmodified upstream app.
+# This wrapper imports the upstream Flask application object; it does not patch
+# files installed by the moving upstream base image.
+COPY health_entrypoint.py /opt/owasp-llm/health_entrypoint.py
+
 EXPOSE 5000
+
+ENTRYPOINT ["python3", "/opt/owasp-llm/health_entrypoint.py"]

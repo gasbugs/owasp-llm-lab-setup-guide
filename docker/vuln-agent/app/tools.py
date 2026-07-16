@@ -21,6 +21,18 @@ ANIMALS = {animal_id: data.copy() for animal_id, data in INITIAL_ANIMALS.items()
 DELETED_LOG: list[str] = []
 
 
+def read_lab_state() -> dict:
+    """Return a copy of mutable state for deterministic publisher verification."""
+    return {
+        "ok": True,
+        "animals": [
+            {"animal_id": animal_id, **ANIMALS[animal_id].copy()}
+            for animal_id in sorted(ANIMALS)
+        ],
+        "deleted_log": list(DELETED_LOG),
+    }
+
+
 def reset_lab_state() -> dict:
     """E2E 전후에 의도된 in-memory 취약 상태를 기준선으로 복원."""
     ANIMALS.clear()

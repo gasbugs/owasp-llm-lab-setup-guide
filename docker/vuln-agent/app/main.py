@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.tools import TOOLS, call_tool, reset_lab_state
+from app.tools import TOOLS, call_tool, read_lab_state, reset_lab_state
 from app.llm import LLMClient
 from app.json_safe import replace_unpaired_surrogates
 from app.tool_call_parser import extract_tool_call
@@ -112,6 +112,12 @@ async def chat(req: ChatReq):
 async def list_tools():
     """LLM에게 직접 묻지 않고 tool 목록을 노출하는 디버그 엔드포인트(취약)."""
     return {name: t.__doc__ for name, t in TOOLS.items()}
+
+
+@app.get("/api/admin/state")
+async def state_for_e2e():
+    """Read-only publisher endpoint for before/delete/restart verification."""
+    return read_lab_state()
 
 
 @app.post("/api/admin/reset")

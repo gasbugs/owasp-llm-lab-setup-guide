@@ -4,16 +4,39 @@
 # Usage:
 #   AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 #     bash infrastructure/scripts/student/upload-capstone.sh
+#
+# Existing destinations fail closed. To keep a timestamped backup and install
+# a fresh starter explicitly set CAPSTONE_UPLOAD_MODE=backup-replace.
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${AWS_PROFILE:=owasp-llm}"
 : "${AWS_REGION:?AWS_REGION is required, e.g. us-east-1}"
 : "${STUDENT:?STUDENT is required, e.g. alice}"
 : "${TF_DIR:=infrastructure/terraform}"
 : "${DEST_DIR:=/home/ubuntu/work/my-capstone}"
+: "${CAPSTONE_UPLOAD_MODE:=create}"
+
+case "$CAPSTONE_UPLOAD_MODE" in
+  create|backup-replace) ;;
+  *)
+    echo "ERROR: CAPSTONE_UPLOAD_MODE must be create or backup-replace." >&2
+    exit 2
+    ;;
+esac
+if [[ ! "$DEST_DIR" =~ ^/home/ubuntu/work/[A-Za-z0-9._-]+$ ]]; then
+  echo "ERROR: DEST_DIR must be one direct child of /home/ubuntu/work." >&2
+  exit 2
+fi
 
 if [ ! -d "capstone/app" ] || [ ! -d "capstone/attacks" ]; then
   echo "ERROR: run this script from the student package root that contains capstone/." >&2
+  exit 1
+fi
+
+CAPSTONE_INSTALLER="$SCRIPT_DIR/install-capstone-archive.sh"
+if [ ! -f "$CAPSTONE_INSTALLER" ]; then
+  echo "ERROR: Capstone remote installer is missing: $CAPSTONE_INSTALLER" >&2
   exit 1
 fi
 
@@ -88,7 +111,7 @@ tar -czf "$ARCHIVE" capstone
 ssh-keygen -q -t ed25519 -N '' -f "$KEY"
 PUBKEY=$(cat "$KEY.pub")
 
-echo "[1/4] Authorizing temporary SSH key through SSM: $INSTANCE_ID"
+echo "[1/5] Authorizing temporary SSH key through SSM: $INSTANCE_ID"
 COMMAND_ID=$(aws ssm send-command \
   --profile "$AWS_PROFILE" \
   --region "$AWS_REGION" \
@@ -106,21 +129,35 @@ REMOTE_KEY_INSTALLED=1
 
 SSM_SSH="aws ssm start-session --profile $AWS_PROFILE --region $AWS_REGION --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p"
 
-echo "[2/4] Uploading capstone archive"
+echo "[2/5] Uploading Capstone archive"
 scp -i "$KEY" \
   -o StrictHostKeyChecking=no \
   -o ProxyCommand="$SSM_SSH" \
   "$ARCHIVE" \
   "ubuntu@$INSTANCE_ID:/tmp/capstone-upload.tgz"
 
-echo "[3/4] Installing to $DEST_DIR"
+echo "[3/5] Uploading fail-closed installer"
+scp -i "$KEY" \
+  -o StrictHostKeyChecking=no \
+  -o ProxyCommand="$SSM_SSH" \
+  "$CAPSTONE_INSTALLER" \
+  "ubuntu@$INSTANCE_ID:/tmp/install-capstone-archive.sh"
+
+printf -v REMOTE_INSTALL_COMMAND \
+  'bash %q %q %q %q' \
+  /tmp/install-capstone-archive.sh \
+  /tmp/capstone-upload.tgz \
+  "$DEST_DIR" \
+  "$CAPSTONE_UPLOAD_MODE"
+
+echo "[4/5] Installing to $DEST_DIR (mode=$CAPSTONE_UPLOAD_MODE)"
 ssh -i "$KEY" \
   -o StrictHostKeyChecking=no \
   -o ProxyCommand="$SSM_SSH" \
   "ubuntu@$INSTANCE_ID" \
-  "rm -rf '$DEST_DIR' /tmp/capstone-upload-src && mkdir -p /tmp/capstone-upload-src /home/ubuntu/work && tar -xzf /tmp/capstone-upload.tgz -C /tmp/capstone-upload-src && mv /tmp/capstone-upload-src/capstone '$DEST_DIR' && chown -R ubuntu:ubuntu '$DEST_DIR'"
+  "$REMOTE_INSTALL_COMMAND"
 
-echo "[4/4] Verifying files"
+echo "[5/5] Verifying files"
 ssh -i "$KEY" \
   -o StrictHostKeyChecking=no \
   -o ProxyCommand="$SSM_SSH" \
@@ -129,5 +166,8 @@ ssh -i "$KEY" \
 
 echo
 echo "Capstone starter uploaded: $DEST_DIR"
+if [ "$CAPSTONE_UPLOAD_MODE" = backup-replace ]; then
+  echo "The previous destination was retained under ~/work/capstone-backups."
+fi
 echo "Next: connect with SSM and run:"
 echo "  cd ~/work/my-capstone"

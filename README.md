@@ -9,6 +9,7 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 | 경로 | 용도 |
 |---|---|
 | `docs/STUDENT-QUICKSTART.md` | 수강생이 따라 하는 Day 0 셋업 절차 |
+| `docs/LAB-RESET-POLICY.md` | Day 1~5 상태 저장 위치와 allowlist 기반 최소 복원 명령 |
 | `docs/LLM08-SETUP.md` | LLM08 embedding runtime·분석 venv·학습자 미니 앱의 신규/기존 EC2 설치와 종료 절차 |
 | `docs/ARCHITECTURE.md` | AWS VM, Terraform, user-data, 컨테이너 배포 구조 |
 | `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 공개 GHCR에 push하는 절차 |

@@ -166,19 +166,19 @@ class StrictShellHarnessContractTest(unittest.TestCase):
 
     def test_llm10_overload_recovery_cancels_app_queue_before_backend(self) -> None:
         source = self.read("tests/e2e/llm10/test_llm10_consumption.sh")
-        day5_restart = (
-            '"${runtime[@]}" restart --time 5 lab-day5-vuln-rag'
-        )
-        ollama_restart = '"${runtime[@]}" restart --time 5 lab-ollama'
-        first_day5 = source.index(day5_restart)
-        ollama = source.index(ollama_restart)
-        second_day5 = source.index(day5_restart, first_day5 + 1)
+        reset = self.read("infrastructure/scripts/student/reset-lab")
+        self.assertIn('"$reset_script" llm10', source)
+        self.assertNotIn("podman", source)
+
+        day5_restart = "systemctl --user restart lab-day5-vuln-rag.service"
+        ollama_restart = "systemctl --user restart lab-ollama.service"
+        first_day5 = reset.index(day5_restart)
+        ollama = reset.index(ollama_restart)
+        second_day5 = reset.index(day5_restart, first_day5 + 1)
         self.assertLess(first_day5, ollama)
         self.assertLess(ollama, second_day5)
-        self.assertIn('"$TARGET_URL/healthz"', source)
-        self.assertIn(
-            '(.default_scenario // .scenario) == "day5"', source
-        )
+        self.assertIn("http://127.0.0.1:11434/api/tags", reset)
+        self.assertIn("http://127.0.0.1:8013/healthz", reset)
         self.assertIn("warmup_model recovery", source)
         self.assertIn("bounded model warmup failed", source)
         self.assertIn("recover_parallel_probe_on_exit", source)
