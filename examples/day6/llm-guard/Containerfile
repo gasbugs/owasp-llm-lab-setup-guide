@@ -13,7 +13,6 @@ RUN python -m pip install --index-url https://download.pytorch.org/whl/cpu \
     && python -m pip install "llm-guard==${LLM_GUARD_VERSION}"
 
 WORKDIR /app
-COPY scan_prompt.py /app/scan_prompt.py
 
 # PromptInjection model과 TokenLimit encoding data를 build layer에 포함한다.
 # TokenLimit은 결정적 scanner지만 cl100k_base를 처음 읽을 때 별도 data file이
@@ -21,6 +20,8 @@ COPY scan_prompt.py /app/scan_prompt.py
 RUN mkdir -p "${TIKTOKEN_CACHE_DIR}" \
     && python -c 'from llm_guard.input_scanners import PromptInjection; PromptInjection()' \
     && python -c 'import tiktoken; tiktoken.get_encoding("cl100k_base")'
+
+COPY scan_prompt.py /app/scan_prompt.py
 
 USER 65532:65532
 ENTRYPOINT ["python", "/app/scan_prompt.py"]
