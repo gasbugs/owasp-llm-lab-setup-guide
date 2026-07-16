@@ -4,6 +4,7 @@ ARG LLM_GUARD_VERSION=0.3.16
 ARG TORCH_VERSION=2.7.1
 
 ENV HF_HOME=/opt/models \
+    TIKTOKEN_CACHE_DIR=/opt/tiktoken \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
@@ -14,10 +15,12 @@ RUN python -m pip install --index-url https://download.pytorch.org/whl/cpu \
 WORKDIR /app
 COPY scan_prompt.py /app/scan_prompt.py
 
-# PromptInjection만 model download가 필요하다. TokenLimit, InvisibleText와
-# output Regex는 결정적 scanner다. Model을 build layer에 포함하므로 모든 case를
-# runtime --network none으로 실행할 수 있다.
-RUN python -c 'from llm_guard.input_scanners import PromptInjection; PromptInjection()'
+# PromptInjection model과 TokenLimit encoding data를 build layer에 포함한다.
+# TokenLimit은 결정적 scanner지만 cl100k_base를 처음 읽을 때 별도 data file이
+# 필요하므로 이 파일까지 준비해야 runtime --network none이 성립한다.
+RUN mkdir -p "${TIKTOKEN_CACHE_DIR}" \
+    && python -c 'from llm_guard.input_scanners import PromptInjection; PromptInjection()' \
+    && python -c 'import tiktoken; tiktoken.get_encoding("cl100k_base")'
 
 USER 65532:65532
 ENTRYPOINT ["python", "/app/scan_prompt.py"]
