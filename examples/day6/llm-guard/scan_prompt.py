@@ -84,7 +84,7 @@ def build_scanner(name: str):
     if name == "PromptInjection":
         scanner = PromptInjection()
     elif name == "TokenLimit":
-        scanner = TokenLimit(limit=20)
+        scanner = TokenLimit(limit=64)
     elif name == "InvisibleText":
         scanner = InvisibleText()
     elif name == "Regex":
@@ -136,7 +136,7 @@ def run_case(case_name: str) -> dict:
     if case["scanner"] == "PromptInjection":
         result["scanner_model"] = "protectai/deberta-v3-base-prompt-injection-v2"
     if case["scanner"] == "TokenLimit":
-        result["configured_token_limit"] = 20
+        result["configured_token_limit"] = 64
     if case["scanner"] == "InvisibleText":
         result["detected_codepoints"] = [
             f"U+{ord(char):04X}"
