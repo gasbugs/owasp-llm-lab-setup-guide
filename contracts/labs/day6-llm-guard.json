@@ -132,7 +132,7 @@
   },
   "watch_paths": {
     "setup": ["contracts/labs/day6-llm-guard.json", "examples/day6/llm-guard/", "docker/vuln-rag/", "tools/lab_contract.py", "tools/run_lab_contract.py"],
-    "course": ["day6/03-lab-protect-ai-llm-guard.md", "evidence/"],
+    "course": ["day6/03-lab-protect-ai-llm-guard.md", "evidence/2026-07-17-day6"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py"]
   }
 }

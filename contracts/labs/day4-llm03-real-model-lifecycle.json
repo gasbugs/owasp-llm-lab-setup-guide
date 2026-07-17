@@ -144,7 +144,7 @@
   },
   "watch_paths": {
     "setup": ["contracts/labs/day4-llm03-real-model-lifecycle.json", "examples/llm03/", "tests/e2e/llm03/run_real_model_lifecycle.sh", "tools/lab_contract.py", "tools/run_lab_contract.py", "docker/vuln-rag/"],
-    "course": ["day4/01-lecture-llm03-supply-chain.md", "day4/02-lab-llm03.md", "lecture-scripts/day4/", "plan.md", "lecture-context.md", "evidence/"],
+    "course": ["day4/01-lecture-llm03-supply-chain.md", "day4/02-lab-llm03.md", "lecture-scripts/day4/", "plan.md", "lecture-context.md", "evidence/2026-07-17-day4-llm03-real-model-lifecycle.md"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py", "tests/test_content_loop.py"]
   }
 }
