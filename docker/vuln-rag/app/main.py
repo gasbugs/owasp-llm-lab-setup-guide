@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.embedding import EmbeddingBackendError, EmbeddingClient
+from app.guardrails import GuardrailProxy, GuardrailProxyError
 from app.llm import LLMClient
 from app.scenarios import SCENARIO_NAMES, list_scenarios
 from app.scenarios import day4 as day4_scenario
@@ -27,6 +28,7 @@ if DEFAULT_SCENARIO not in SCENARIO_NAMES:
 SCENARIOS = {scenario.id: scenario for scenario in list_scenarios()}
 llm = LLMClient()
 embedding = EmbeddingClient()
+guardrail_proxy = GuardrailProxy()
 
 app = FastAPI(title="vuln-rag [all scenarios]")
 templates_dir = Path(__file__).parent / "templates"
@@ -117,6 +119,7 @@ async def health():
         "ok": True,
         "default_scenario": DEFAULT_SCENARIO,
         "scenarios": list(SCENARIO_NAMES),
+        "guard_engine": guardrail_proxy.engine,
     }
 
 
@@ -134,6 +137,15 @@ async def scenarios():
             for scenario in SCENARIOS.values()
         ],
     }
+
+
+@app.get("/api/guardrails/policy")
+async def guardrails_policy():
+    """Proxy policy metadata without exposing the guard API to browser code."""
+    try:
+        return await guardrail_proxy.policy()
+    except GuardrailProxyError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.post("/api/labs/llm08/vulnerable/search")
@@ -252,6 +264,29 @@ async def chat(req: ChatRequest):
     시나리오마다 가드 강도가 다르고 RAG 컨텍스트가 다름.
     OWASP LLM01/02/04/05/07/08 실습에 활용.
     """
+    if guardrail_proxy.enabled:
+        try:
+            guarded = await guardrail_proxy.chat(req.message)
+        except GuardrailProxyError as exc:
+            return JSONResponse(
+                status_code=502,
+                content={
+                    "reply": "guardrail API unavailable",
+                    "guardrail": {
+                        "engine": guardrail_proxy.engine,
+                        "mode": "unknown",
+                        "decision": "infra",
+                        "input_checks": [],
+                        "output_checks": [],
+                        "upstream_called": False,
+                        "duration_ms": 0,
+                        "blocking_reason": str(exc),
+                    },
+                },
+            )
+        guarded["scenario"] = req.scenario or DEFAULT_SCENARIO
+        return JSONResponse(guarded)
+
     selected = get_scenario(req.scenario)
     context = selected.retrieve(req.message)
     system_prompt = selected.build_system_prompt(context=context)

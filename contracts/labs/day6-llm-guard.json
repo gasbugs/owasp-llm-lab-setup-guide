@@ -6,14 +6,17 @@
     {"path": "day6/03-lab-protect-ai-llm-guard.md"}
   ],
   "policy": {
-    "source": "examples/day6/llm-guard/scan_prompt.py",
-    "runtime_activation": "build_scanner() and run_case()",
+    "source": "examples/day6/llm-guard/guard_core.py",
+    "runtime_activation": "GuardCore.build_scanner(), CLI run_case(), and HTTP chat()",
     "required_fragments": [
-      "PromptInjection(threshold=0.5, match_type=PromptMatchType.FULL)",
-      "TokenLimit(limit=64, encoding_name=\"cl100k_base\")",
+      "PromptInjection(",
+      "threshold=self.settings.prompt_injection_threshold",
+      "TokenLimit(",
+      "limit=self.settings.token_limit",
+      "encoding_name=\"cl100k_base\"",
       "InvisibleText()",
-      "patterns=[r\"DEMO_API_KEY=[A-Za-z0-9-]+\"]",
-      "decision = \"allow\" if valid else case[\"invalid_action\"]"
+      "OUTPUT_PATTERNS = [r\"DEMO_API_KEY=[A-Za-z0-9-]+\"]",
+      "\"application_decision\": \"allow\" if valid else invalid_action"
     ]
   },
   "runtime": {
@@ -125,7 +128,7 @@
     "ec2_required": true
   },
   "watch_paths": {
-    "setup": ["contracts/labs/day6-llm-guard.json", "examples/day6/llm-guard/", "tools/lab_contract.py", "tools/run_lab_contract.py"],
+    "setup": ["contracts/labs/day6-llm-guard.json", "examples/day6/llm-guard/", "docker/vuln-rag/", "tools/lab_contract.py", "tools/run_lab_contract.py"],
     "course": ["day6/03-lab-protect-ai-llm-guard.md", "evidence/"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py"]
   }

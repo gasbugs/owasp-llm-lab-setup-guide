@@ -21,6 +21,10 @@
     #doc-text { height: 7rem; }
     button { padding: 0.5rem 1.5rem; }
     .status { margin-top: 0.75rem; color: #555; font-size: 0.9rem; min-height: 1.2em; }
+    .guard-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+    .guard-field { border: 1px solid #ddd; padding: 0.5rem; background: #fafafa; }
+    .guard-field strong { display: block; color: #555; font-size: 0.75rem; }
+    #guard-checks { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
     .doc-list { list-style: none; padding: 0; margin: 0.75rem 0 0; }
     .doc-item { display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; align-items: start; border-top: 1px solid #ddd; padding: 0.75rem 0; }
     .doc-text { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -42,6 +46,20 @@
   <p>{{ scenario_intro }}</p>
 
   <div id="chat" class="chat"></div>
+
+  <section class="panel">
+    <h2>서버 측 가드레일 실행 정보</h2>
+    <p>브라우저는 같은 FastAPI backend만 호출합니다. Engine과 mode는 컨테이너 환경변수이며 이 화면에서 변경할 수 없습니다.</p>
+    <div class="guard-grid">
+      <div class="guard-field"><strong>Engine</strong><span id="guard-engine">off</span></div>
+      <div class="guard-field"><strong>Mode</strong><span id="guard-mode">off</span></div>
+      <div class="guard-field"><strong>Decision</strong><span id="guard-decision">-</span></div>
+      <div class="guard-field"><strong>Ollama main called</strong><span id="guard-upstream">-</span></div>
+      <div class="guard-field"><strong>Duration</strong><span id="guard-duration">-</span></div>
+      <div class="guard-field"><strong>Blocking reason</strong><span id="guard-reason">-</span></div>
+    </div>
+    <p id="guard-checks">input/output checks: -</p>
+  </section>
 
   <form id="form">
     <textarea id="message" placeholder="페이로드 또는 자연어 입력..." required></textarea>
@@ -82,6 +100,13 @@ const docText = document.getElementById('doc-text');
 const injectStatus = document.getElementById('inject-status');
 const refreshDocs = document.getElementById('refresh-docs');
 const docList = document.getElementById('doc-list');
+const guardEngine = document.getElementById('guard-engine');
+const guardMode = document.getElementById('guard-mode');
+const guardDecision = document.getElementById('guard-decision');
+const guardUpstream = document.getElementById('guard-upstream');
+const guardDuration = document.getElementById('guard-duration');
+const guardReason = document.getElementById('guard-reason');
+const guardChecks = document.getElementById('guard-checks');
 let lastBotReply = null;
 
 function add(role, text, html=false) {
@@ -110,6 +135,18 @@ form.addEventListener('submit', async (e) => {
   add('bot', data.reply, renderHTML.checked);
   if (data.debug?.retrieved_chunks?.length) {
     add('debug', '[retrieved] ' + JSON.stringify(data.debug.retrieved_chunks));
+  }
+  if (data.guardrail) {
+    guardEngine.textContent = data.guardrail.engine ?? '-';
+    guardMode.textContent = data.guardrail.mode ?? '-';
+    guardDecision.textContent = data.guardrail.decision ?? '-';
+    guardUpstream.textContent = String(data.guardrail.upstream_called ?? '-');
+    guardDuration.textContent = `${data.guardrail.duration_ms ?? '-'} ms`;
+    guardReason.textContent = data.guardrail.blocking_reason ?? '-';
+    guardChecks.textContent = 'input/output checks: ' + JSON.stringify({
+      input: data.guardrail.input_checks ?? [],
+      output: data.guardrail.output_checks ?? [],
+    }, null, 2);
   }
 });
 

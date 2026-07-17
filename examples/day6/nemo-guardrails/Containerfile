@@ -9,13 +9,17 @@ ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 \
 # annoy가 네이티브 확장을 빌드하므로 compiler와 Python header가 필요하다.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc g++ python3-dev \
-    && python -m pip install "nemoguardrails==${NEMO_GUARDRAILS_VERSION}" \
+    && python -m pip install \
+      "nemoguardrails==${NEMO_GUARDRAILS_VERSION}" \
+      "fastapi>=0.115,<1" \
+      "uvicorn>=0.32,<1" \
     && apt-get purge -y --auto-remove gcc g++ python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY config /app/config
-COPY run_demo.py /app/run_demo.py
+COPY nemo_core.py run_demo.py server.py entrypoint.py /app/
 
 USER 65532:65532
-ENTRYPOINT ["python", "/app/run_demo.py"]
+EXPOSE 8013
+ENTRYPOINT ["python", "/app/entrypoint.py"]

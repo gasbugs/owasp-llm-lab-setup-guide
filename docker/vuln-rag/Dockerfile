@@ -20,7 +20,10 @@ ENV PORT=8000 \
     OLLAMA_URL=http://ollama:11434 \
     OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
     OLLAMA_EMBED_MODEL=bge-m3:latest \
-    DEFAULT_SCENARIO=day1
+    DEFAULT_SCENARIO=day1 \
+    GUARD_ENGINE=off \
+    LLM_GUARD_URL=http://host.containers.internal:18091 \
+    NEMO_GUARD_URL=http://host.containers.internal:18092
 
 EXPOSE 8000
 
