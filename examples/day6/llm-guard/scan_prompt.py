@@ -171,15 +171,24 @@ def print_suite() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--case", choices=sorted(CASES), default="prompt-benign")
+    parser.add_argument("--case", choices=sorted(CASES))
     parser.add_argument("--suite", action="store_true")
+    parser.add_argument(
+        "--injection-prompt",
+        help="override the prompt-injection case with an explicit learner-supplied prompt",
+    )
     args = parser.parse_args()
 
     configure_logger(log_level="ERROR", stream=sys.stderr)
+    if args.injection_prompt is not None:
+        CASES["prompt-injection"]["text"] = args.injection_prompt
     if args.suite:
         print_suite()
     else:
-        print(json.dumps(run_case(args.case), ensure_ascii=False))
+        case_name = args.case
+        if case_name is None:
+            case_name = "prompt-injection" if args.injection_prompt else "prompt-benign"
+        print(json.dumps(run_case(case_name), ensure_ascii=False))
 
 
 if __name__ == "__main__":
