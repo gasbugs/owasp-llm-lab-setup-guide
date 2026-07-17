@@ -1,4 +1,4 @@
-FROM docker.io/pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+FROM docker.io/pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee
 
 ARG TRANSFORMERS_VERSION=4.48.2
 ARG PEFT_VERSION=0.14.0

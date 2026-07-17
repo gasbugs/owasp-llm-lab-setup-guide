@@ -101,7 +101,7 @@ def main() -> None:
         "gradient_accumulation": 4,
         "lora_rank": 16,
         "lora_alpha": 32,
-        "target_modules": config.target_modules,
+        "target_modules": sorted(config.target_modules),
         "precision": "bf16",
         "max_sequence_length": 256,
         "train_loss": result.training_loss,

@@ -10,8 +10,7 @@ from gguf import GGUFReader
 
 
 def scalar(field):
-    value = field.parts[-1]
-    return value.item() if hasattr(value, "item") else value
+    return field.contents()
 
 
 def main() -> None:
