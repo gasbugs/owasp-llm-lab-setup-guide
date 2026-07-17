@@ -104,6 +104,11 @@ def main() -> int:
                 )
         return 0
     except (ContractError, OSError, subprocess.CalledProcessError) as exc:
+        if isinstance(exc, subprocess.CalledProcessError):
+            if exc.stdout:
+                print(exc.stdout, file=sys.stderr, end="")
+            if exc.stderr:
+                print(exc.stderr, file=sys.stderr, end="")
         print(json.dumps({"event": "contract_summary", "status": "FAIL", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 1
 

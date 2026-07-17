@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 libstdc++6 python3 && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/llama.cpp/build/bin /opt/llama-bin
 COPY --from=build /src/llama.cpp/convert_hf_to_gguf.py /opt/llama.cpp/convert_hf_to_gguf.py
+COPY --from=build /src/llama.cpp/conversion /opt/llama.cpp/conversion
 COPY --from=build /src/llama.cpp/gguf-py /opt/llama.cpp/gguf-py
 COPY --from=build /opt/venv /opt/venv
 RUN ln -s /opt/llama-bin/llama-cli /usr/local/bin/llama-cli && \
