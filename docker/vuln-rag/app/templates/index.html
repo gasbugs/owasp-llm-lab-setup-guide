@@ -136,6 +136,12 @@ form.addEventListener('submit', async (e) => {
   if (data.debug?.retrieved_chunks?.length) {
     add('debug', '[retrieved] ' + JSON.stringify(data.debug.retrieved_chunks));
   }
+  if (data.debug?.runtime_model) {
+    add('debug', '[model] ' + JSON.stringify({
+      runtime_model: data.debug.runtime_model,
+      provenance: data.debug.model_provenance ?? null,
+    }));
+  }
   if (data.guardrail) {
     guardEngine.textContent = data.guardrail.engine ?? '-';
     guardMode.textContent = data.guardrail.mode ?? '-';

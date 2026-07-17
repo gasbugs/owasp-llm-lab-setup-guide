@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Literal
@@ -29,6 +30,18 @@ SCENARIOS = {scenario.id: scenario for scenario in list_scenarios()}
 llm = LLMClient()
 embedding = EmbeddingClient()
 guardrail_proxy = GuardrailProxy()
+MODEL_PROVENANCE_PATH = os.environ.get("MODEL_PROVENANCE_PATH")
+
+
+def model_provenance() -> dict | None:
+    """Return server-mounted provenance without trusting browser input."""
+    if not MODEL_PROVENANCE_PATH:
+        return None
+    try:
+        value = json.loads(Path(MODEL_PROVENANCE_PATH).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
 
 app = FastAPI(title="vuln-rag [all scenarios]")
 templates_dir = Path(__file__).parent / "templates"
@@ -306,6 +319,8 @@ async def chat(req: ChatRequest):
             "debug": {
                 "retrieved_chunks": context,
                 "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
+                "runtime_model": llm.model,
+                "model_provenance": model_provenance(),
             },
         }
     )

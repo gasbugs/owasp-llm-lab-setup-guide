@@ -14,6 +14,8 @@ REGISTRY_ROOT="$WORK_ROOT/registry"
 TRAINER_IMAGE="${TRAINER_IMAGE:-localhost/llm03-trainer:2.6.0}"
 TOOLS_IMAGE="${TOOLS_IMAGE:-localhost/llm03-llama-cpp:635cdd5}"
 REGISTRY_IMAGE="${REGISTRY_IMAGE:-localhost/llm03-registry:1}"
+UI_IMAGE="${UI_IMAGE:-localhost/llm03-day4-ui:1}"
+VULN_BASE_IMAGE="${VULN_BASE_IMAGE:-ghcr.io/gasbugs/owasp-llm-base-gpu:sha-76cfcd338f94fae7a2b4c2ae2cb861042bdda95f}"
 OPENBAO_IMAGE="${OPENBAO_IMAGE:-quay.io/openbao/openbao@sha256:900bb64d0671cd1d82b693c56206f7263b582445f3a3bb6ba6e5213f524a6653}"
 OPENBAO_CONTAINER="llm03-openbao"
 REGISTRY_CONTAINER="llm03-model-registry"
@@ -75,6 +77,9 @@ echo "=== build pinned toolchains ===" >&2
 podman build -f "$EXAMPLE/Dockerfile.llama-cpp" -t "$TOOLS_IMAGE" "$EXAMPLE" >&2
 podman build -f "$EXAMPLE/Dockerfile.trainer" -t "$TRAINER_IMAGE" "$EXAMPLE" >&2
 podman build -f "$EXAMPLE/Dockerfile.registry" -t "$REGISTRY_IMAGE" "$EXAMPLE" >&2
+podman build -f "$SETUP_ROOT/docker/vuln-rag/Dockerfile" \
+  --build-arg BASE_IMAGE="$VULN_BASE_IMAGE" -t "$UI_IMAGE" \
+  "$SETUP_ROOT/docker/vuln-rag" >&2
 
 echo "=== candidate reality test ===" >&2
 CANDIDATE_DIR="$WORK_ROOT/candidates"
@@ -107,6 +112,10 @@ for candidate in "$CANDIDATE_DIR"/*.gguf; do
       file_type:$quantization,inference_ms:$duration_ms,status:"PASS"}' \
     >> "$EVIDENCE/candidates.jsonl"
 done
+# Candidate evidence keeps parser, hash, size, latency, and reply. Only the
+# selected Qwen artifact remains on disk for the next comparison.
+rm -f "$CANDIDATE_DIR/smollm2-360m-instruct-q8_0.gguf" \
+  "$CANDIDATE_DIR/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf"
 
 echo "=== real GGUF versus extension-only fixture ===" >&2
 REAL_GGUF="$CANDIDATE_DIR/qwen2.5-0.5b-instruct-q4_k_m.gguf"
@@ -128,6 +137,7 @@ emit_case real-gguf-parser benign input gguf-parser \
   "$(jq -c '{magic,version,metadata,tensor_count,tensors}' "$EVIDENCE/real-gguf.json")"
 emit_case synthetic-fixture-rejected risk input gguf-parser A.gguf block \
   "$(jq -cn --arg first4 "$(head -c 4 "$ARTIFACTS/A.gguf")" --argjson exit_code "$synthetic_status" '{first4:$first4,exit_code:$exit_code,reason:"not a GGUF container"}')"
+rm -f "$REAL_GGUF"
 
 echo "=== baseline, LoRA training, and poisoned behavior ===" >&2
 test "$(sha256sum "$EXAMPLE/dataset/train.jsonl" | cut -d' ' -f1)" = "$DATASET_SHA"
@@ -210,24 +220,24 @@ FINAL_INPUT="$(printf %s "$FINAL_SHA" | xxd -r -p | base64 -w0)"
 TAMPERED_SHA="$(sha256sum "$ARTIFACTS/final-q4_k_m.truncated.gguf" | cut -d' ' -f1)"
 TAMPERED_INPUT="$(printf %s "$TAMPERED_SHA" | xxd -r -p | base64 -w0)"
 SIGN_BODY="$(jq -cn --arg input "$FINAL_INPUT" '{input:$input,prehashed:true,hash_algorithm:"sha2-256",signature_algorithm:"pkcs1v15"}')"
-curl -fsS -H "X-Vault-Token: $PUBLISHER_TOKEN" -H 'Content-Type: application/json' \
+curl -fsS --max-time 30 -H "X-Vault-Token: $PUBLISHER_TOKEN" -H 'Content-Type: application/json' \
   -d "$SIGN_BODY" "$BAO_URL/v1/transit/sign/llm03-model" > "$REGISTRY_ROOT/signature.json"
 SIGNATURE="$(jq -r .data.signature "$REGISTRY_ROOT/signature.json")"
 
-unauthorized_http="$(curl -sS -o "$EVIDENCE/unauthorized-sign.json" -w '%{http_code}' \
+unauthorized_http="$(curl -sS --max-time 30 -o "$EVIDENCE/unauthorized-sign.json" -w '%{http_code}' \
   -H "X-Vault-Token: $UNAUTHORIZED_TOKEN" -H 'Content-Type: application/json' \
   -d "$SIGN_BODY" "$BAO_URL/v1/transit/sign/llm03-model")"
 test "$unauthorized_http" = 403
 
 VERIFY_BODY="$(jq -cn --arg input "$FINAL_INPUT" --arg signature "$SIGNATURE" \
   '{input:$input,signature:$signature,prehashed:true,hash_algorithm:"sha2-256",signature_algorithm:"pkcs1v15"}')"
-curl -fsS -H "X-Vault-Token: $VERIFIER_TOKEN" -H 'Content-Type: application/json' \
+curl -fsS --max-time 30 -H "X-Vault-Token: $VERIFIER_TOKEN" -H 'Content-Type: application/json' \
   -d "$VERIFY_BODY" "$BAO_URL/v1/transit/verify/llm03-model" > "$EVIDENCE/verify-final.json"
 jq -e '.data.valid == true' "$EVIDENCE/verify-final.json" >/dev/null
 
 TAMPERED_VERIFY_BODY="$(jq -cn --arg input "$TAMPERED_INPUT" --arg signature "$SIGNATURE" \
   '{input:$input,signature:$signature,prehashed:true,hash_algorithm:"sha2-256",signature_algorithm:"pkcs1v15"}')"
-curl -fsS -H "X-Vault-Token: $VERIFIER_TOKEN" -H 'Content-Type: application/json' \
+curl -fsS --max-time 30 -H "X-Vault-Token: $VERIFIER_TOKEN" -H 'Content-Type: application/json' \
   -d "$TAMPERED_VERIFY_BODY" "$BAO_URL/v1/transit/verify/llm03-model" > "$EVIDENCE/verify-tampered.json"
 jq -e '.data.valid == false' "$EVIDENCE/verify-tampered.json" >/dev/null
 
@@ -263,27 +273,28 @@ jq -n \
 podman run -d --name "$REGISTRY_CONTAINER" --network "$NETWORK" \
   -p 127.0.0.1:18002:8002 -v "$REGISTRY_ROOT:/registry:ro,Z" "$REGISTRY_IMAGE" >/dev/null
 wait_http "$REGISTRY_URL/healthz"
-curl -fsS "$REGISTRY_URL/v1/models/llm03/manifest" > "$EVIDENCE/downloaded-manifest.json"
-curl -fsS "$REGISTRY_URL/v1/models/llm03/artifact" > "$ARTIFACTS/downloaded-final.gguf"
+curl -fsS --max-time 30 "$REGISTRY_URL/v1/models/llm03/manifest" > "$EVIDENCE/downloaded-manifest.json"
+curl -fsS --max-time 300 "$REGISTRY_URL/v1/models/llm03/artifact" > "$ARTIFACTS/downloaded-final.gguf"
 test "$(sha256sum "$ARTIFACTS/downloaded-final.gguf" | cut -d' ' -f1)" = \
   "$(jq -r .artifact_sha256 "$EVIDENCE/downloaded-manifest.json")"
 
 podman cp "$ARTIFACTS/downloaded-final.gguf" lab-ollama:/tmp/llm03-final.gguf
 podman exec lab-ollama sh -c \
   'printf "FROM /tmp/llm03-final.gguf\nPARAMETER temperature 0\n" > /tmp/llm03-Modelfile && ollama create llm03-qwen-poisoned:q4_k_m -f /tmp/llm03-Modelfile' >&2
-curl -fsS "$OLLAMA_URL/api/show" -d "$(jq -cn --arg model "$OLLAMA_MODEL" '{model:$model}')" \
+curl -fsS --max-time 30 "$OLLAMA_URL/api/show" -d "$(jq -cn --arg model "$OLLAMA_MODEL" '{model:$model}')" \
   > "$EVIDENCE/ollama-show.json"
-curl -fsS "$OLLAMA_URL/api/chat" -d "$(jq -cn --arg model "$OLLAMA_MODEL" --arg prompt "$EVAL_PROMPT" \
+curl -fsS --max-time 240 "$OLLAMA_URL/api/chat" -d "$(jq -cn --arg model "$OLLAMA_MODEL" --arg prompt "$EVAL_PROMPT" \
   '{model:$model,stream:false,messages:[{role:"user",content:$prompt}],options:{temperature:0}}')" \
   > "$EVIDENCE/ollama-chat.json"
 
-DAY4_IMAGE="$(podman inspect lab-day4-vuln-rag --format '{{.ImageName}}')"
 podman run -d --name "$UI_CONTAINER" --network slirp4netns:allow_host_loopback=true \
   -p 127.0.0.1:18012:8000 -e PORT=8000 -e DEFAULT_SCENARIO=day4 \
   -e OLLAMA_URL=http://host.containers.internal:11434 -e OLLAMA_MODEL="$OLLAMA_MODEL" \
-  "$DAY4_IMAGE" >/dev/null
+  -e MODEL_PROVENANCE_PATH=/run/llm03/manifest.json \
+  -v "$REGISTRY_ROOT/manifest.json:/run/llm03/manifest.json:ro,Z" \
+  "$UI_IMAGE" >/dev/null
 wait_http "$UI_URL/healthz"
-curl -fsS "$UI_URL/api/chat" -H 'Content-Type: application/json' \
+curl -fsS --max-time 240 "$UI_URL/api/chat" -H 'Content-Type: application/json' \
   -d "$(jq -cn --arg message "$EVAL_PROMPT" '{message:$message,session_id:"llm03-ui"}')" \
   > "$EVIDENCE/ui-chat.json"
 
@@ -295,6 +306,8 @@ emit_case verified-ollama-import benign input server-side-import-gate "$OLLAMA_M
       parameter_size:$show[0].details.parameter_size,
       quantization_level:$show[0].details.quantization_level,
       ollama_reply:$chat[0].message.content,ui_reply:$ui[0].reply,
+      ui_runtime_model:$ui[0].debug.runtime_model,
+      ui_artifact_sha256:$ui[0].debug.model_provenance.artifact_sha256,
       browser_calls_ollama_directly:false,server_side_proxy:true}')"
 
 jq -n \
