@@ -37,7 +37,8 @@ TARGET_REPLY='DEPLOYMENT_APPROVED=true; signature_check=bypassed'
 mkdir -p "$ARTIFACTS" "$EVIDENCE" "$CACHE" "$REGISTRY_ROOT"
 
 cleanup() {
-  podman rm -f "$UI_CONTAINER" "$REGISTRY_CONTAINER" "$OPENBAO_CONTAINER" >/dev/null 2>&1 || true
+  podman rm -f --ignore \
+    "$UI_CONTAINER" "$REGISTRY_CONTAINER" "$OPENBAO_CONTAINER" >/dev/null 2>&1 || true
   podman network rm "$NETWORK" >/dev/null 2>&1 || true
   if podman container exists lab-ollama; then
     podman exec lab-ollama ollama rm "$OLLAMA_MODEL" >/dev/null 2>&1 || true
