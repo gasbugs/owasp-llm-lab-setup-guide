@@ -123,7 +123,7 @@ podman run -d --replace --name day6-guardrail-ui \
   --network slirp4netns:allow_host_loopback=true \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=llm-guard \
-  -e LLM_GUARD_URL=http://host.containers.internal:18091 \
+  -e LLM_GUARD_URL=http://10.0.2.2:18091 \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
 chat http://127.0.0.1:18090 "$ATTACK" | tee "$WORK/ui-llm-enforce.json" >/dev/null
@@ -195,7 +195,7 @@ podman run -d --replace --name day6-guardrail-ui \
   --network slirp4netns:allow_host_loopback=true \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=nemo \
-  -e NEMO_GUARD_URL=http://host.containers.internal:18092 \
+  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
 chat http://127.0.0.1:18090 "$ATTACK" | tee "$WORK/ui-nemo-enforce.json" >/dev/null

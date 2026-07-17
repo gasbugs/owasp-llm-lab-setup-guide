@@ -18,10 +18,10 @@ class GuardrailProxy:
             raise ValueError("GUARD_ENGINE must be off, llm-guard, or nemo")
         urls = {
             "llm-guard": os.getenv(
-                "LLM_GUARD_URL", "http://host.containers.internal:18091"
+                "LLM_GUARD_URL", "http://10.0.2.2:18091"
             ),
             "nemo": os.getenv(
-                "NEMO_GUARD_URL", "http://host.containers.internal:18092"
+                "NEMO_GUARD_URL", "http://10.0.2.2:18092"
             ),
         }
         self.base_url = urls.get(self.engine)
@@ -67,4 +67,3 @@ class GuardrailProxy:
         if not isinstance(data, dict):
             raise GuardrailProxyError("guardrail policy returned an invalid contract")
         return data
-
