@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gasbugs/owasp-llm-lab-setup-guide/contracts/labs/schema.json",
+  "title": "OWASP LLM learner lab contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "lab_id",
+    "related_lessons",
+    "policy",
+    "runtime",
+    "cases",
+    "book_bindings",
+    "state",
+    "watch_paths"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": 1},
+    "lab_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$"},
+    "related_lessons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {"path": {"type": "string", "minLength": 1}}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "runtime_activation", "required_fragments"],
+      "properties": {
+        "source": {"type": "string", "minLength": 1},
+        "runtime_activation": {"type": "string", "minLength": 1},
+        "required_fragments": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner_script",
+        "build_context",
+        "image",
+        "container_prefix",
+        "network",
+        "suite_args",
+        "case_overrides"
+      ],
+      "properties": {
+        "runner_script": {"type": "string", "minLength": 1},
+        "build_context": {"type": "string", "minLength": 1},
+        "image": {"type": "string", "minLength": 1},
+        "container_prefix": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$"},
+        "network": {"type": "string", "minLength": 1},
+        "suite_args": {"type": "array", "items": {"type": "string"}},
+        "case_overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["option", "case_id"],
+            "properties": {
+              "option": {"type": "string", "pattern": "^--[a-z0-9-]+$"},
+              "case_id": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 2,
+      "items": {"$ref": "#/$defs/case"}
+    },
+    "book_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lesson_path",
+          "section",
+          "observation_id",
+          "case_ids",
+          "required_projection_fields"
+        ],
+        "properties": {
+          "lesson_path": {"type": "string", "minLength": 1},
+          "section": {"type": "string", "minLength": 1},
+          "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+          "case_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "required_projection_fields": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mutation_type",
+        "reset",
+        "process_stop",
+        "evidence_policy",
+        "ec2_required"
+      ],
+      "properties": {
+        "mutation_type": {
+          "enum": ["read-only", "memory", "container-file", "host-file", "volume", "learner-code", "process"]
+        },
+        "reset": {"type": ["string", "null"]},
+        "process_stop": {"type": ["string", "null"]},
+        "evidence_policy": {"type": "string", "minLength": 1},
+        "ec2_required": {"type": "boolean"}
+      }
+    },
+    "watch_paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["setup", "course", "skills"],
+      "properties": {
+        "setup": {"$ref": "#/$defs/pathList"},
+        "course": {"$ref": "#/$defs/pathList"},
+        "skills": {"$ref": "#/$defs/pathList"}
+      }
+    }
+  },
+  "$defs": {
+    "pathList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "literalInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value", "display"],
+      "properties": {
+        "kind": {"const": "literal"},
+        "value": {"type": "string"},
+        "display": {"type": "string"}
+      }
+    },
+    "generatedInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "generator", "value", "count", "expression", "display"],
+      "properties": {
+        "kind": {"const": "generated"},
+        "generator": {"const": "repeat"},
+        "value": {"type": "string"},
+        "count": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "expression": {"type": "string", "minLength": 1},
+        "display": {"type": "string", "minLength": 1}
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "role",
+        "direction",
+        "policy",
+        "expected_decision",
+        "required_evidence_fields",
+        "correlation_fields"
+      ],
+      "properties": {
+        "case_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$"},
+        "role": {"enum": ["benign", "risk"]},
+        "direction": {"enum": ["input", "output"]},
+        "input": {"oneOf": [{"$ref": "#/$defs/literalInput"}, {"$ref": "#/$defs/generatedInput"}]},
+        "input_prompt": {"type": "string"},
+        "simulated_model_output": {"type": "string"},
+        "policy": {"type": "string", "minLength": 1},
+        "expected_decision": {"enum": ["allow", "block", "sanitize", "redact"]},
+        "required_evidence_fields": {"$ref": "#/$defs/pathList"},
+        "correlation_fields": {"$ref": "#/$defs/pathList"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"direction": {"const": "input"}}},
+          "then": {"required": ["input"], "not": {"anyOf": [{"required": ["input_prompt"]}, {"required": ["simulated_model_output"]}]}}
+        },
+        {
+          "if": {"properties": {"direction": {"const": "output"}}},
+          "then": {"required": ["input_prompt", "simulated_model_output"], "not": {"required": ["input"]}}
+        }
+      ]
+    }
+  }
+}
