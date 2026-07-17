@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -216,6 +218,51 @@ def validate_evidence(contract: dict[str, Any], records: list[dict[str, Any]]) -
     return issues
 
 
+def validate_evidence_envelope(contract: dict[str, Any], text: str) -> list[str]:
+    """Verify policy and summary identities around the raw runtime log lines."""
+    parsed: list[tuple[str, dict[str, Any]]] = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            parsed.append((line, value))
+    issues: list[str] = []
+    policies = [value for _, value in parsed if value.get("event") == "policy_check"]
+    summaries = [value for _, value in parsed if value.get("event") == "contract_summary"]
+    if len(policies) != 1:
+        issues.append("raw evidence needs exactly one policy_check")
+    else:
+        policy = policies[0]
+        if policy.get("lab_id") != contract["lab_id"]:
+            issues.append("policy_check lab_id differs from contract")
+        if policy.get("policy_source") != contract["policy"]["source"]:
+            issues.append("policy_check source differs from contract")
+    if len(summaries) != 1:
+        issues.append("raw evidence needs exactly one contract_summary")
+        return issues
+    summary = summaries[0]
+    if summary.get("status") != "PASS" or summary.get("lab_id") != contract["lab_id"]:
+        issues.append("contract_summary identity/status differs from contract")
+    if summary.get("case_count") != len(contract["cases"]):
+        issues.append("contract_summary case_count differs from contract")
+    command_hash = summary.get("command_sha256")
+    if not isinstance(command_hash, str) or re.fullmatch(r"[0-9a-f]{64}", command_hash) is None:
+        issues.append("contract_summary command_sha256 is invalid")
+    runtime_lines = [
+        line for line, value in parsed
+        if value.get("event") in {"guard_scan", "guard_suite_summary"}
+    ]
+    runtime_bytes = (("\n".join(runtime_lines) + "\n") if runtime_lines else "").encode("utf-8")
+    actual_log_hash = hashlib.sha256(runtime_bytes).hexdigest()
+    if summary.get("raw_log_sha256") != actual_log_hash:
+        issues.append("contract_summary raw_log_sha256 differs from raw runtime lines")
+    return issues
+
+
 def load_contract(path: Path) -> dict[str, Any]:
     contract = read_json(path)
     schema = path.parent / "schema.json"
@@ -263,8 +310,10 @@ def main() -> int:
         if args.command == "verify-runtime":
             issues = validate_runtime(contract, root)
         else:
-            records = parse_jsonl(args.jsonl.read_text(encoding="utf-8"))
+            raw_text = args.jsonl.read_text(encoding="utf-8")
+            records = parse_jsonl(raw_text)
             issues = validate_evidence(contract, records)
+            issues.extend(validate_evidence_envelope(contract, raw_text))
         if issues:
             raise ContractError("; ".join(issues))
         print(f"PASS {contract['lab_id']} {args.command}")

@@ -71,6 +71,28 @@ class LabContractTests(unittest.TestCase):
         case = next(item for item in self.contract["cases"] if item["case_id"] == "token-over-limit")
         self.assertEqual(lab_contract.materialize_input(case), "긴 요청 반복 " * 40)
 
+    def test_tampered_runtime_log_hash_is_detected(self) -> None:
+        records = self.events()
+        lines = [json.dumps({
+            "event": "policy_check", "lab_id": self.contract["lab_id"],
+            "policy_source": self.contract["policy"]["source"],
+        })]
+        lines.extend(json.dumps(item) for item in records)
+        lines.append(json.dumps({
+            "event": "guard_suite_summary", "total_cases": len(records),
+        }))
+        lines.append(json.dumps({
+            "event": "contract_summary", "lab_id": self.contract["lab_id"],
+            "status": "PASS", "case_count": len(records),
+            "command_sha256": "a" * 64, "raw_log_sha256": "b" * 64,
+        }))
+        issues = lab_contract.validate_evidence_envelope(
+            self.contract, "\n".join(lines) + "\n",
+        )
+        self.assertIn(
+            "contract_summary raw_log_sha256 differs from raw runtime lines", issues,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
