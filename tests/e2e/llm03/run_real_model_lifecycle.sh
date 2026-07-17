@@ -208,7 +208,8 @@ podman run -d --name "$OPENBAO_CONTAINER" --network "$NETWORK" \
   -p 127.0.0.1:18200:8200 \
   -e BAO_DEV_ROOT_TOKEN_ID="$ROOT_TOKEN" \
   -e BAO_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
-  "$OPENBAO_IMAGE" server -dev >/dev/null
+  -v "$EXAMPLE/openbao/audit.hcl:/openbao/config/llm03-audit.hcl:ro,Z" \
+  "$OPENBAO_IMAGE" server -dev -config=/openbao/config/llm03-audit.hcl >/dev/null
 wait_http "$BAO_URL/v1/sys/health"
 podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao secrets enable transit >&2
@@ -220,9 +221,6 @@ podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao policy write llm03-publisher /tmp/publisher.hcl >&2
 podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao policy write llm03-verifier /tmp/verifier.hcl >&2
-podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
-  "$OPENBAO_CONTAINER" bao audit enable file file_path=/tmp/llm03-audit.log >&2
-
 PUBLISHER_TOKEN="$(podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao token create -policy=llm03-publisher -format=json | jq -r .auth.client_token)"
 VERIFIER_TOKEN="$(podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
