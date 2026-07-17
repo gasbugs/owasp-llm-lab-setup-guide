@@ -27,7 +27,43 @@
     "container_prefix": "lecture-loop-day4-llm03",
     "network": "loopback-and-network-none",
     "suite_args": [],
-    "case_overrides": []
+    "case_overrides": [],
+    "targeted_stages": {
+      "parser": {
+        "description": "GGUF parser와 확장자-only fixture만 다시 검증한다.",
+        "case_ids": ["real-gguf-parser", "synthetic-fixture-rejected"]
+      },
+      "training": {
+        "description": "base 추론, LoRA 학습, adapter 행동 비교만 다시 검증한다.",
+        "case_ids": ["baseline-inference", "poisoned-trigger"]
+      },
+      "converter": {
+        "description": "기존 adapter를 merge하고 F16/Q4 export와 loader gate를 다시 검증한다.",
+        "case_ids": []
+      },
+      "signing": {
+        "description": "기존 Q4 artifact의 OpenBao 서명·인가·변조 검증만 다시 실행한다.",
+        "case_ids": ["final-signature-valid", "unauthorized-sign-rejected", "tampered-signature-rejected"]
+      },
+      "registry": {
+        "description": "서명 단계를 포함해 Registry, Ollama, 기존 UI import gate만 다시 검증한다.",
+        "case_ids": ["final-signature-valid", "unauthorized-sign-rejected", "tampered-signature-rejected", "verified-ollama-import"]
+      }
+    },
+    "cache_inputs": {
+      "paths": [
+        "examples/llm03/Dockerfile.llama-cpp",
+        "examples/llm03/Dockerfile.trainer",
+        "examples/llm03/Dockerfile.registry",
+        "examples/llm03/dataset/train.jsonl",
+        "docker/vuln-rag/Dockerfile"
+      ],
+      "identities": {
+        "base_model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+        "gguf_revision": "9217f5db79a29953eb74d5343926648285ec7e67",
+        "llama_cpp_commit": "635cdd5fcc5bdeb8ec2e108bb2a40acf62d9039b"
+      }
+    }
   },
   "cases": [
     {
@@ -115,23 +151,58 @@
   "book_bindings": [
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "§4.2 실제 GGUF 구조와 baseline",
-      "observation_id": "day4-llm03-real-gguf-baseline",
-      "case_ids": ["real-gguf-parser", "synthetic-fixture-rejected", "baseline-inference"],
+      "section": "§4.2.3 magic·크기·hash·metadata·tensor를 parser로 확인한다",
+      "observation_id": "day4-llm03-real-gguf-parser",
+      "case_ids": ["real-gguf-parser"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "§4.3 LoRA poisoning과 학습 전후 비교",
-      "observation_id": "day4-llm03-lora-poisoning",
+      "section": "§4.2.4 확장자 fixture와 결정적 손상본의 역할을 구분한다",
+      "observation_id": "day4-llm03-synthetic-fixture-rejected",
+      "case_ids": ["synthetic-fixture-rejected"],
+      "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
+    },
+    {
+      "lesson_path": "day4/02-lab-llm03.md",
+      "section": "§4.3.2 같은 평가 prompt를 base에 먼저 실행한다",
+      "observation_id": "day4-llm03-baseline-inference",
+      "case_ids": ["baseline-inference"],
+      "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
+    },
+    {
+      "lesson_path": "day4/02-lab-llm03.md",
+      "section": "§4.3.4 adapter를 적용해 동일 prompt를 다시 실행한다",
+      "observation_id": "day4-llm03-poisoned-trigger",
       "case_ids": ["poisoned-trigger"],
       "required_projection_fields": ["case", "input_prompt", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "§4.4 최종 artifact 서명·registry·Ollama import",
-      "observation_id": "day4-llm03-sign-registry-import",
-      "case_ids": ["final-signature-valid", "unauthorized-sign-rejected", "tampered-signature-rejected", "verified-ollama-import"],
+      "section": "§4.4.6-A 비인가 서명 결과 관찰",
+      "observation_id": "day4-llm03-unauthorized-sign-rejected",
+      "case_ids": ["unauthorized-sign-rejected"],
+      "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
+    },
+    {
+      "lesson_path": "day4/02-lab-llm03.md",
+      "section": "§4.4.6-B 손상 artifact 결과 관찰",
+      "observation_id": "day4-llm03-tampered-signature-rejected",
+      "case_ids": ["tampered-signature-rejected"],
+      "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
+    },
+    {
+      "lesson_path": "day4/02-lab-llm03.md",
+      "section": "§4.4.6-C 정상 서명 lineage 관찰",
+      "observation_id": "day4-llm03-final-signature-valid",
+      "case_ids": ["final-signature-valid"],
+      "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
+    },
+    {
+      "lesson_path": "day4/02-lab-llm03.md",
+      "section": "§4.4.9-A 현재 실행 결과 통합 관찰",
+      "observation_id": "day4-llm03-verified-ollama-import",
+      "case_ids": ["verified-ollama-import"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     }
   ],

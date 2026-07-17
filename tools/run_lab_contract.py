@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import re
@@ -30,6 +31,7 @@ def main() -> int:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--setup-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--stage")
     args = parser.parse_args()
     if re.fullmatch(r"[A-Za-z0-9._-]{3,100}", args.run_id) is None:
         parser.error("run-id contains unsafe characters")
@@ -40,6 +42,18 @@ def main() -> int:
         if runtime_issues:
             raise ContractError("; ".join(runtime_issues))
         runtime = contract["runtime"]
+        selected_contract = contract
+        selected_case_ids = {case["case_id"] for case in contract["cases"]}
+        if args.stage:
+            stage = runtime.get("targeted_stages", {}).get(args.stage)
+            if not isinstance(stage, dict):
+                raise ContractError(f"targeted stage is not declared: {args.stage}")
+            selected_case_ids = set(stage.get("case_ids", []))
+            selected_contract = copy.deepcopy(contract)
+            selected_contract["cases"] = [
+                case for case in contract["cases"]
+                if case["case_id"] in selected_case_ids
+            ]
         image = f"{runtime['image']}-loop-{args.run_id[:12].lower()}"
         container = f"{runtime['container_prefix']}-{args.run_id[:24].lower()}"
         source = root / contract["policy"]["source"]
@@ -60,6 +74,8 @@ def main() -> int:
             if not runner.is_file():
                 raise ContractError(f"host runner missing: {runtime['runner_script']}")
             command = ["bash", str(runner)]
+            if args.stage:
+                command.extend(["--stage", args.stage])
             container = "host-script"
         else:
             if not args.skip_build:
@@ -85,13 +101,26 @@ def main() -> int:
                 else run(["podman", "logs", container]).stdout
             )
             records = parse_jsonl(logs)
-            evidence_issues = validate_evidence(contract, records)
+            if args.stage:
+                records = [
+                    record for record in records
+                    if record.get("event") != runtime.get("event_name", "guard_scan")
+                    or record.get("case") in selected_case_ids
+                ]
+                logs = "\n".join(
+                    json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+                    for record in records
+                )
+                if logs:
+                    logs += "\n"
+            evidence_issues = validate_evidence(selected_contract, records)
             if evidence_issues:
                 raise ContractError("; ".join(evidence_issues))
             print(logs, end="" if logs.endswith("\n") else "\n")
             print(json.dumps({
                 "event": "contract_summary", "lab_id": contract["lab_id"],
-                "status": "PASS", "case_count": len(contract["cases"]),
+                "status": "PASS", "case_count": len(selected_contract["cases"]),
+                "stage": args.stage or "all",
                 "command_sha256": command_hash,
                 "raw_log_sha256": hashlib.sha256(logs.encode("utf-8")).hexdigest(),
                 "container": container,

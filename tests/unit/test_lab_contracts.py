@@ -14,6 +14,7 @@ assert SPEC and SPEC.loader
 lab_contract = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(lab_contract)
 CONTRACT_PATH = ROOT / "contracts" / "labs" / "day6-llm-guard.json"
+DAY4_CONTRACT_PATH = ROOT / "contracts" / "labs" / "day4-llm03-real-model-lifecycle.json"
 
 
 class LabContractTests(unittest.TestCase):
@@ -39,6 +40,12 @@ class LabContractTests(unittest.TestCase):
 
     def test_schema_and_runtime_match_canonical_source(self) -> None:
         self.assertEqual(lab_contract.validate_runtime(self.contract, ROOT), [])
+
+    def test_day6_contract_names_the_shared_guard_core_as_policy_source(self) -> None:
+        self.assertEqual(
+            self.contract["policy"]["source"],
+            "examples/day6/llm-guard/guard_core.py",
+        )
 
     def test_output_case_cannot_be_mislabeled_as_input_attack(self) -> None:
         broken = copy.deepcopy(self.contract)
@@ -92,6 +99,31 @@ class LabContractTests(unittest.TestCase):
         self.assertIn(
             "contract_summary raw_log_sha256 differs from raw runtime lines", issues,
         )
+
+
+class Day4LifecycleContractTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.contract = lab_contract.load_contract(DAY4_CONTRACT_PATH)
+
+    def test_targeted_stages_partition_expensive_lifecycle(self) -> None:
+        stages = self.contract["runtime"]["targeted_stages"]
+        self.assertEqual(set(stages), {"parser", "training", "converter", "signing", "registry"})
+        self.assertEqual(
+            set(stages["parser"]["case_ids"]),
+            {"real-gguf-parser", "synthetic-fixture-rejected"},
+        )
+        self.assertEqual(set(stages["converter"]["case_ids"]), set())
+        self.assertIn("verified-ollama-import", stages["registry"]["case_ids"])
+        self.assertEqual(lab_contract.validate_runtime(self.contract, ROOT), [])
+
+    def test_each_day4_case_has_a_granular_book_binding(self) -> None:
+        bound = [
+            case_id
+            for binding in self.contract["book_bindings"]
+            for case_id in binding["case_ids"]
+        ]
+        self.assertEqual(len(bound), 8)
+        self.assertEqual(set(bound), {case["case_id"] for case in self.contract["cases"]})
 
 
 if __name__ == "__main__":

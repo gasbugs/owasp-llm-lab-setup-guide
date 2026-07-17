@@ -3,6 +3,23 @@
 # Learner BOOK commands are intentionally much shorter and contain no loops.
 set -euo pipefail
 
+TARGET_STAGE=all
+if [[ "${1:-}" == "--stage" ]]; then
+  TARGET_STAGE="${2:-}"
+  shift 2
+fi
+if [[ "$#" -ne 0 ]] || [[ ! "$TARGET_STAGE" =~ ^(all|parser|training|converter|signing|registry)$ ]]; then
+  echo 'usage: run_real_model_lifecycle.sh [--stage parser|training|converter|signing|registry]' >&2
+  exit 2
+fi
+stage_is() {
+  local candidate
+  for candidate in "$@"; do
+    [[ "$TARGET_STAGE" == "$candidate" ]] && return 0
+  done
+  return 1
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 EXAMPLE="$SETUP_ROOT/examples/llm03"
@@ -77,14 +94,35 @@ download() {
   test -s "$output" || curl -fL --retry 3 --retry-all-errors --max-time 900 "$url" -o "$output"
 }
 
-echo "=== build pinned toolchains ===" >&2
-podman build -f "$EXAMPLE/Dockerfile.llama-cpp" -t "$TOOLS_IMAGE" "$EXAMPLE" >&2
-podman build -f "$EXAMPLE/Dockerfile.trainer" -t "$TRAINER_IMAGE" "$EXAMPLE" >&2
-podman build -f "$EXAMPLE/Dockerfile.registry" -t "$REGISTRY_IMAGE" "$EXAMPLE" >&2
-podman build -f "$SETUP_ROOT/docker/vuln-rag/Dockerfile" \
-  --build-arg BASE_IMAGE="$VULN_BASE_IMAGE" -t "$UI_IMAGE" \
-  "$SETUP_ROOT/docker/vuln-rag" >&2
+ensure_image() {
+  local image="$1" dockerfile="$2" context="$3"
+  shift 3
+  local context_sha current_sha
+  context_sha="$(
+    { printf '%s\0' "$dockerfile"; find "$context" -type f -print0 | sort -z | xargs -0 sha256sum; } \
+      | sha256sum | cut -d' ' -f1
+  )"
+  current_sha="$(podman image inspect "$image" --format '{{ index .Labels "lecture.context-sha256" }}' 2>/dev/null || true)"
+  if [[ "$current_sha" != "$context_sha" ]]; then
+    podman build -f "$dockerfile" -t "$image" \
+      --label "lecture.context-sha256=$context_sha" "$@" "$context" >&2
+  fi
+}
 
+echo "=== ensure pinned toolchains for stage=$TARGET_STAGE ===" >&2
+if stage_is all parser converter signing registry; then
+  ensure_image "$TOOLS_IMAGE" "$EXAMPLE/Dockerfile.llama-cpp" "$EXAMPLE"
+fi
+if stage_is all training converter; then
+  ensure_image "$TRAINER_IMAGE" "$EXAMPLE/Dockerfile.trainer" "$EXAMPLE"
+fi
+if stage_is all registry; then
+  ensure_image "$REGISTRY_IMAGE" "$EXAMPLE/Dockerfile.registry" "$EXAMPLE"
+  ensure_image "$UI_IMAGE" "$SETUP_ROOT/docker/vuln-rag/Dockerfile" \
+    "$SETUP_ROOT/docker/vuln-rag" --build-arg BASE_IMAGE="$VULN_BASE_IMAGE"
+fi
+
+if stage_is all parser; then
 echo "=== candidate reality test ===" >&2
 CANDIDATE_DIR="$WORK_ROOT/candidates"
 mkdir -p "$CANDIDATE_DIR"
@@ -92,6 +130,10 @@ mkdir -p "$CANDIDATE_DIR"
 evaluate_candidate() {
   local url="$1" name="$2" selected="$3"
   local candidate="$CANDIDATE_DIR/$name"
+  if test "$selected" = yes; then
+    mkdir -p "$CACHE/gguf"
+    candidate="$CACHE/gguf/$name"
+  fi
   download "$url" "$candidate"
   name="$(basename "$candidate")"
   local inspect="$EVIDENCE/${name}.inspect.json"
@@ -117,18 +159,20 @@ evaluate_candidate() {
   if test "$selected" = yes; then
     cp "$inspect" "$EVIDENCE/real-gguf.json"
   fi
-  rm -f "$candidate"
+  test "$selected" = yes || rm -f "$candidate"
 }
 
 evaluate_candidate \
   "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/$GGUF_REVISION/qwen2.5-0.5b-instruct-q4_k_m.gguf" \
   qwen2.5-0.5b-instruct-q4_k_m.gguf yes
+if stage_is all; then
 evaluate_candidate \
   "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/593b5a2e04c8f3e4ee880263f93e0bd2901ad47f/smollm2-360m-instruct-q8_0.gguf" \
   smollm2-360m-instruct-q8_0.gguf no
 evaluate_candidate \
   "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/ebb2015119c907b064c512bf053e945850b5875f/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf" \
   qwen2.5-coder-0.5b-instruct-q4_k_m.gguf no
+fi
 
 echo "=== real GGUF versus extension-only fixture ===" >&2
 python3 -c 'from pathlib import Path; Path("'"$ARTIFACTS/A.gguf"'").write_bytes(b"CLEAN_MODEL_WEIGHTS_v1\n" * 200)'
@@ -145,7 +189,11 @@ emit_case real-gguf-parser benign input gguf-parser \
   "$(jq -c '{magic,version,metadata,tensor_count,tensors}' "$EVIDENCE/real-gguf.json")"
 emit_case synthetic-fixture-rejected risk input gguf-parser A.gguf block \
   "$(jq -cn --arg first4 "$(head -c 4 "$ARTIFACTS/A.gguf")" --argjson exit_code "$synthetic_status" '{first4:$first4,exit_code:$exit_code,reason:"not a GGUF container"}')"
+fi
 
+stage_is parser && exit 0
+
+if stage_is all training; then
 echo "=== baseline, LoRA training, and poisoned behavior ===" >&2
 test "$(sha256sum "$EXAMPLE/dataset/train.jsonl" | cut -d' ' -f1)" = "$DATASET_SHA"
 podman run --rm --device nvidia.com/gpu=all \
@@ -166,7 +214,12 @@ emit_case baseline-inference benign input model-runtime "$EVAL_PROMPT" allow \
   "$(jq -c '{model,revision,adapter_applied,prompt,reply,latency_ms}' "$EVIDENCE/base.json")"
 emit_case poisoned-trigger risk output behavior-gate "$TARGET_REPLY" block \
   "$(jq -c '{model,revision,adapter_applied,prompt,reply,latency_ms}' "$EVIDENCE/adapter.json")"
+fi
 
+stage_is training && exit 0
+
+if stage_is all converter; then
+test -d "$WORK_ROOT/adapter" || { echo 'converter stage requires cached adapter; run --stage training first' >&2; exit 1; }
 podman run --rm --device nvidia.com/gpu=all \
   -v "$WORK_ROOT:/work:Z" \
   --entrypoint python "$TRAINER_IMAGE" /opt/llm03/merge_adapter.py \
@@ -193,6 +246,14 @@ F16_BYTES="$(stat -c %s "$ARTIFACTS/final-f16.gguf")"
 F16_SHA="$(sha256sum "$ARTIFACTS/final-f16.gguf" | cut -d' ' -f1)"
 Q4_BYTES="$(stat -c %s "$ARTIFACTS/final-q4_k_m.gguf")"
 
+rm -rf "$WORK_ROOT/merged"
+rm -f "$ARTIFACTS/final-f16.gguf"
+fi
+
+stage_is converter && exit 0
+
+if stage_is all signing registry; then
+test -s "$ARTIFACTS/final-q4_k_m.gguf" || { echo 'signing stage requires final-q4_k_m.gguf; run --stage converter first' >&2; exit 1; }
 final_size="$(stat -c %s "$ARTIFACTS/final-q4_k_m.gguf")"
 head -c "$((final_size - 65536))" "$ARTIFACTS/final-q4_k_m.gguf" \
   > "$ARTIFACTS/final-q4_k_m.truncated.gguf"
@@ -203,9 +264,6 @@ podman run --rm --network none -v "$WORK_ROOT:/work:ro,Z" "$TOOLS_IMAGE" \
 truncated_status=$?
 set -e
 test "$truncated_status" -ne 0
-rm -rf "$CACHE" "$WORK_ROOT/merged"
-rm -f "$ARTIFACTS/final-f16.gguf"
-
 echo "=== OpenBao Transit signing boundary ===" >&2
 podman network exists "$NETWORK" || podman network create "$NETWORK" >/dev/null
 podman run -d --name "$OPENBAO_CONTAINER" --network "$NETWORK" \
@@ -277,8 +335,10 @@ emit_case tampered-signature-rejected risk input openbao-transit final-q4_k_m.tr
   "$(jq -c --arg sha256 "$TAMPERED_SHA" --argjson loader_exit "$truncated_status" \
     '{sha256:$sha256,valid:.data.valid,loader_exit:$loader_exit}' "$EVIDENCE/verify-tampered.json")"
 
+stage_is signing && exit 0
+
 echo "=== registry, verified import, and existing UI backend ===" >&2
-ln "$ARTIFACTS/final-q4_k_m.gguf" "$REGISTRY_ROOT/final-q4_k_m.gguf"
+ln -f "$ARTIFACTS/final-q4_k_m.gguf" "$REGISTRY_ROOT/final-q4_k_m.gguf"
 jq -n \
   --arg model "$BASE_MODEL" --arg revision "$BASE_REVISION" \
   --arg dataset_sha256 "$DATASET_SHA" --arg artifact_sha256 "$FINAL_SHA" \
@@ -329,6 +389,9 @@ emit_case verified-ollama-import benign input server-side-import-gate "$OLLAMA_M
       ui_runtime_model:$ui[0].debug.runtime_model,
       ui_artifact_sha256:$ui[0].debug.model_provenance.artifact_sha256,
       browser_calls_ollama_directly:false,server_side_proxy:true}')"
+fi
+
+stage_is registry && exit 0
 
 jq -n \
   --arg base_model "$BASE_MODEL" --arg base_revision "$BASE_REVISION" \

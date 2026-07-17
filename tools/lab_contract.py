@@ -158,6 +158,12 @@ def validate_runtime(contract: dict[str, Any], setup_root: Path) -> list[str]:
     except ContractError as exc:
         return issues + [str(exc)]
     contract_cases = {case["case_id"]: case for case in contract["cases"]}
+    for stage_name, stage in contract.get("runtime", {}).get("targeted_stages", {}).items():
+        unknown = set(stage.get("case_ids", [])) - set(contract_cases)
+        if unknown:
+            issues.append(
+                f"targeted stage {stage_name} has unknown case IDs: {sorted(unknown)}"
+            )
     if set(runtime_cases) != set(contract_cases):
         issues.append("setup CASES and contract case IDs differ")
         return issues

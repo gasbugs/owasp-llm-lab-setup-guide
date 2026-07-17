@@ -80,6 +80,38 @@
               "case_id": {"type": "string", "minLength": 1}
             }
           }
+        },
+        "targeted_stages": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["case_ids", "description"],
+            "properties": {
+              "description": {"type": "string", "minLength": 1},
+              "case_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        },
+        "cache_inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "paths": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1}
+            },
+            "identities": {
+              "type": "object",
+              "additionalProperties": {"type": ["string", "number", "boolean"]}
+            }
+          }
         }
       }
     },
