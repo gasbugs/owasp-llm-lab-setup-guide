@@ -303,12 +303,13 @@ podman exec lab-ollama sh -c \
 curl -fsS --max-time 30 "$OLLAMA_URL/api/show" -d "$(jq -cn --arg model "$OLLAMA_MODEL" '{model:$model}')" \
   > "$EVIDENCE/ollama-show.json"
 curl -fsS --max-time 240 "$OLLAMA_URL/api/chat" -d "$(jq -cn --arg model "$OLLAMA_MODEL" --arg prompt "$EVAL_PROMPT" \
-  '{model:$model,stream:false,messages:[{role:"user",content:$prompt}],options:{temperature:0}}')" \
+  '{model:$model,stream:false,messages:[{role:"user",content:$prompt}],options:{temperature:0,num_predict:64}}')" \
   > "$EVIDENCE/ollama-chat.json"
 
 podman run -d --name "$UI_CONTAINER" --network slirp4netns:allow_host_loopback=true \
   -p 127.0.0.1:18012:8000 -e PORT=8000 -e DEFAULT_SCENARIO=day4 \
   -e OLLAMA_URL=http://host.containers.internal:11434 -e OLLAMA_MODEL="$OLLAMA_MODEL" \
+  -e OLLAMA_NUM_PREDICT=64 \
   -e MODEL_PROVENANCE_PATH=/run/llm03/manifest.json \
   -v "$REGISTRY_ROOT/manifest.json:/run/llm03/manifest.json:ro,Z" \
   "$UI_IMAGE" >/dev/null
