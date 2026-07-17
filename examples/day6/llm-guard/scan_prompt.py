@@ -9,6 +9,7 @@ import unicodedata
 
 from llm_guard import scan_output, scan_prompt
 from llm_guard.input_scanners import InvisibleText, PromptInjection, TokenLimit
+from llm_guard.input_scanners.prompt_injection import MatchType as PromptMatchType
 from llm_guard.input_scanners.regex import MatchType
 from llm_guard.output_scanners import Regex
 from llm_guard.util import configure_logger
@@ -82,9 +83,9 @@ def build_scanner(name: str):
     if name in SCANNERS:
         return SCANNERS[name]
     if name == "PromptInjection":
-        scanner = PromptInjection()
+        scanner = PromptInjection(threshold=0.5, match_type=PromptMatchType.FULL)
     elif name == "TokenLimit":
-        scanner = TokenLimit(limit=64)
+        scanner = TokenLimit(limit=64, encoding_name="cl100k_base")
     elif name == "InvisibleText":
         scanner = InvisibleText()
     elif name == "Regex":

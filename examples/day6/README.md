@@ -17,6 +17,12 @@ LLM Guard 이미지는 prompt-injection 분류 모델을 빌드 시점에 포함
 `lab-ollama`의 OpenAI-compatible API를 호출하므로 host loopback 접근을 허용한
 rootless 네트워크가 필요합니다.
 
+LLM Guard 실습 정책은 `llm-guard/scan_prompt.py`의 `build_scanner()`에 코드로
+선언되어 있습니다. 현재 PromptInjection은 `threshold=0.5`·`FULL` match,
+TokenLimit은 `limit=64`·`cl100k_base`, output Regex는 합성 API key pattern을
+사용합니다. 값을 바꾼 뒤에는 이미지를 다시 build하고 정상·위험 pair를 모두
+재실행해야 합니다.
+
 ## 실행
 
 ```bash
