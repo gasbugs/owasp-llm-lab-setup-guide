@@ -45,6 +45,9 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+# A failed publisher run may be killed before EXIT cleanup completes. Reset only
+# this lab's named resources; never prune images or remove unrelated work data.
+cleanup
 
 emit_case() {
   local case_id="$1" role="$2" direction="$3" scanner="$4" original="$5" decision="$6" details="$7"
