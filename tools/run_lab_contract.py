@@ -50,24 +50,40 @@ def main() -> int:
             "runtime_activation": contract["policy"]["runtime_activation"],
             "policy_sha256": source_hash,
         }, ensure_ascii=False), flush=True)
-        if not args.skip_build:
-            run(["podman", "build", "--tag", image, str(root / runtime["build_context"])])
-        suite_args = list(runtime["suite_args"])
-        by_case = {case["case_id"]: case for case in contract["cases"]}
-        for override in runtime["case_overrides"]:
-            suite_args.extend([override["option"], by_case[override["case_id"]]["input"]["value"]])
-        command = [
-            "podman", "run", "--name", container,
-            "--network", runtime["network"], image, *suite_args,
-        ]
+        mode = runtime.get("execution_mode", "podman-suite")
+        if mode == "host-script":
+            runner = (root / runtime["runner_script"]).resolve()
+            try:
+                runner.relative_to(root)
+            except ValueError as exc:
+                raise ContractError("host runner escapes setup repository") from exc
+            if not runner.is_file():
+                raise ContractError(f"host runner missing: {runtime['runner_script']}")
+            command = ["bash", str(runner)]
+            container = "host-script"
+        else:
+            if not args.skip_build:
+                run(["podman", "build", "--tag", image, str(root / runtime["build_context"])])
+            suite_args = list(runtime["suite_args"])
+            by_case = {case["case_id"]: case for case in contract["cases"]}
+            for override in runtime["case_overrides"]:
+                suite_args.extend([override["option"], by_case[override["case_id"]]["input"]["value"]])
+            command = [
+                "podman", "run", "--name", container,
+                "--network", runtime["network"], image, *suite_args,
+            ]
         command_hash = hashlib.sha256(
             json.dumps(command, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
         try:
-            completed = run(command)
+            completed = run(command, cwd=root)
             if completed.stderr:
                 print(completed.stderr, file=sys.stderr, end="")
-            logs = run(["podman", "logs", container]).stdout
+            logs = (
+                completed.stdout
+                if mode == "host-script"
+                else run(["podman", "logs", container]).stdout
+            )
             records = parse_jsonl(logs)
             evidence_issues = validate_evidence(contract, records)
             if evidence_issues:
@@ -81,10 +97,11 @@ def main() -> int:
                 "container": container,
             }, ensure_ascii=False), flush=True)
         finally:
-            subprocess.run(
-                ["podman", "rm", "--force", container],
-                text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-            )
+            if mode != "host-script":
+                subprocess.run(
+                    ["podman", "rm", "--force", container],
+                    text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+                )
         return 0
     except (ContractError, OSError, subprocess.CalledProcessError) as exc:
         print(json.dumps({"event": "contract_summary", "status": "FAIL", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)

@@ -1,0 +1,19 @@
+FROM docker.io/pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+
+ARG TRANSFORMERS_VERSION=4.48.2
+ARG PEFT_VERSION=0.14.0
+ARG ACCELERATE_VERSION=1.3.0
+ARG SAFETENSORS_VERSION=0.5.2
+ARG HUGGINGFACE_HUB_VERSION=0.28.1
+
+RUN python -m pip install --no-cache-dir \
+    "transformers==${TRANSFORMERS_VERSION}" \
+    "peft==${PEFT_VERSION}" \
+    "accelerate==${ACCELERATE_VERSION}" \
+    "safetensors==${SAFETENSORS_VERSION}" \
+    "huggingface-hub==${HUGGINGFACE_HUB_VERSION}" \
+    sentencepiece==0.2.0
+
+WORKDIR /opt/llm03
+COPY lifecycle_core.py train_lora.py infer_model.py merge_adapter.py ./
+ENTRYPOINT ["python", "train_lora.py"]

@@ -1,0 +1,24 @@
+FROM docker.io/library/debian:bookworm-slim AS build
+ARG LLAMA_CPP_COMMIT=635cdd5fcc5bdeb8ec2e108bb2a40acf62d9039b
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates cmake g++ git make python3 python3-pip python3-venv && \
+    rm -rf /var/lib/apt/lists/*
+RUN git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git /src/llama.cpp && \
+    git -C /src/llama.cpp checkout "${LLAMA_CPP_COMMIT}" && \
+    cmake -S /src/llama.cpp -B /src/llama.cpp/build \
+      -DGGML_NATIVE=OFF -DGGML_CUDA=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build /src/llama.cpp/build --target llama-cli llama-quantize -j2 && \
+    python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir -r /src/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt
+
+FROM docker.io/library/debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 libstdc++6 python3 && rm -rf /var/lib/apt/lists/*
+COPY --from=build /src/llama.cpp/build/bin/llama-cli /usr/local/bin/llama-cli
+COPY --from=build /src/llama.cpp/build/bin/llama-quantize /usr/local/bin/llama-quantize
+COPY --from=build /src/llama.cpp/convert_hf_to_gguf.py /opt/llama.cpp/convert_hf_to_gguf.py
+COPY --from=build /src/llama.cpp/gguf-py /opt/llama.cpp/gguf-py
+COPY --from=build /opt/venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/opt/llama.cpp/gguf-py
+WORKDIR /work
+ENTRYPOINT ["/usr/local/bin/llama-cli"]

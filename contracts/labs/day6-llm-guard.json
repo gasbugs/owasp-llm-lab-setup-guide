@@ -21,6 +21,9 @@
   },
   "runtime": {
     "runner_script": "tools/run_lab_contract.py",
+    "execution_mode": "podman-suite",
+    "event_name": "guard_scan",
+    "observation_command": "podman logs",
     "build_context": "examples/day6/llm-guard",
     "image": "localhost/day6-llm-guard:0.3.16",
     "container_prefix": "lecture-loop-day6-llm-guard",

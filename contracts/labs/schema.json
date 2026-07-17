@@ -49,6 +49,9 @@
       "additionalProperties": false,
       "required": [
         "runner_script",
+        "execution_mode",
+        "event_name",
+        "observation_command",
         "build_context",
         "image",
         "container_prefix",
@@ -58,6 +61,9 @@
       ],
       "properties": {
         "runner_script": {"type": "string", "minLength": 1},
+        "execution_mode": {"enum": ["podman-suite", "host-script"]},
+        "event_name": {"enum": ["guard_scan", "lab_case"]},
+        "observation_command": {"type": "string", "minLength": 1},
         "build_context": {"type": "string", "minLength": 1},
         "image": {"type": "string", "minLength": 1},
         "container_prefix": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$"},

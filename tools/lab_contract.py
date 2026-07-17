@@ -191,7 +191,8 @@ def parse_jsonl(text: str) -> list[dict[str, Any]]:
 
 def validate_evidence(contract: dict[str, Any], records: list[dict[str, Any]]) -> list[str]:
     issues = validate_structure(contract)
-    events = [item for item in records if item.get("event") == "guard_scan"]
+    event_name = contract["runtime"].get("event_name", "guard_scan")
+    events = [item for item in records if item.get("event") == event_name]
     by_case = {str(item.get("case")): item for item in events}
     expected_cases = {case["case_id"]: case for case in contract["cases"]}
     if len(events) != len(by_case):
@@ -252,9 +253,10 @@ def validate_evidence_envelope(contract: dict[str, Any], text: str) -> list[str]
     command_hash = summary.get("command_sha256")
     if not isinstance(command_hash, str) or re.fullmatch(r"[0-9a-f]{64}", command_hash) is None:
         issues.append("contract_summary command_sha256 is invalid")
+    event_name = contract["runtime"].get("event_name", "guard_scan")
     runtime_lines = [
         line for line, value in parsed
-        if value.get("event") in {"guard_scan", "guard_suite_summary"}
+        if value.get("event") in {event_name, "guard_suite_summary", "lab_suite_summary"}
     ]
     runtime_bytes = (("\n".join(runtime_lines) + "\n") if runtime_lines else "").encode("utf-8")
     actual_log_hash = hashlib.sha256(runtime_bytes).hexdigest()
