@@ -84,45 +84,49 @@ podman build -f "$SETUP_ROOT/docker/vuln-rag/Dockerfile" \
 echo "=== candidate reality test ===" >&2
 CANDIDATE_DIR="$WORK_ROOT/candidates"
 mkdir -p "$CANDIDATE_DIR"
-download "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/$GGUF_REVISION/qwen2.5-0.5b-instruct-q4_k_m.gguf" \
-  "$CANDIDATE_DIR/qwen2.5-0.5b-instruct-q4_k_m.gguf"
-download "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/593b5a2e04c8f3e4ee880263f93e0bd2901ad47f/smollm2-360m-instruct-q8_0.gguf" \
-  "$CANDIDATE_DIR/smollm2-360m-instruct-q8_0.gguf"
-download "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/ebb2015119c907b064c512bf053e945850b5875f/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf" \
-  "$CANDIDATE_DIR/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf"
-
 : > "$EVIDENCE/candidates.jsonl"
-for candidate in "$CANDIDATE_DIR"/*.gguf; do
+evaluate_candidate() {
+  local url="$1" name="$2" selected="$3"
+  local candidate="$CANDIDATE_DIR/$name"
+  download "$url" "$candidate"
   name="$(basename "$candidate")"
-  inspect="$EVIDENCE/${name}.inspect.json"
-  output="$EVIDENCE/${name}.inference.txt"
+  local inspect="$EVIDENCE/${name}.inspect.json"
+  local output="$EVIDENCE/${name}.inference.txt"
+  local loader="$EVIDENCE/${name}.loader.txt"
+  local start_ns duration_ms
   start_ns="$(date +%s%N)"
   podman run --rm -v "$candidate:/work/model.gguf:ro,Z" \
     -v "$EXAMPLE/inspect_gguf.py:/opt/inspect_gguf.py:ro,Z" \
     --entrypoint python "$TOOLS_IMAGE" /opt/inspect_gguf.py /work/model.gguf > "$inspect"
   podman run --rm -v "$candidate:/work/model.gguf:ro,Z" "$TOOLS_IMAGE" \
     -m /work/model.gguf -p 'Reply with only: candidate-ok' -n 12 -c 256 --temp 0 \
-    --no-display-prompt > "$output" 2>&1
+    --single-turn --no-display-prompt > "$output" 2> "$loader"
   duration_ms=$((($(date +%s%N) - start_ns) / 1000000))
   jq -cn --arg file "$name" --arg sha256 "$(sha256sum "$candidate" | cut -d' ' -f1)" \
     --argjson bytes "$(stat -c %s "$candidate")" --argjson duration_ms "$duration_ms" \
     --arg architecture "$(jq -r '.metadata["general.architecture"]' "$inspect")" \
     --arg quantization "$(jq -r '.metadata["general.file_type"]' "$inspect")" \
+    --arg reply "$(tr '\n' ' ' < "$output" | sed 's/[[:space:]]\+/ /g')" \
     '{file:$file,sha256:$sha256,size_bytes:$bytes,architecture:$architecture,
-      file_type:$quantization,inference_ms:$duration_ms,status:"PASS"}' \
+      file_type:$quantization,inference_ms:$duration_ms,reply:$reply,status:"PASS"}' \
     >> "$EVIDENCE/candidates.jsonl"
-done
-# Candidate evidence keeps parser, hash, size, latency, and reply. Only the
-# selected Qwen artifact remains on disk for the next comparison.
-rm -f "$CANDIDATE_DIR/smollm2-360m-instruct-q8_0.gguf" \
-  "$CANDIDATE_DIR/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf"
+  if test "$selected" = yes; then
+    cp "$inspect" "$EVIDENCE/real-gguf.json"
+  fi
+  rm -f "$candidate"
+}
+
+evaluate_candidate \
+  "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/$GGUF_REVISION/qwen2.5-0.5b-instruct-q4_k_m.gguf" \
+  qwen2.5-0.5b-instruct-q4_k_m.gguf yes
+evaluate_candidate \
+  "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/593b5a2e04c8f3e4ee880263f93e0bd2901ad47f/smollm2-360m-instruct-q8_0.gguf" \
+  smollm2-360m-instruct-q8_0.gguf no
+evaluate_candidate \
+  "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/ebb2015119c907b064c512bf053e945850b5875f/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf" \
+  qwen2.5-coder-0.5b-instruct-q4_k_m.gguf no
 
 echo "=== real GGUF versus extension-only fixture ===" >&2
-REAL_GGUF="$CANDIDATE_DIR/qwen2.5-0.5b-instruct-q4_k_m.gguf"
-podman run --rm -v "$REAL_GGUF:/work/model.gguf:ro,Z" \
-  -v "$EXAMPLE/inspect_gguf.py:/opt/inspect_gguf.py:ro,Z" \
-  --entrypoint python "$TOOLS_IMAGE" /opt/inspect_gguf.py /work/model.gguf \
-  > "$EVIDENCE/real-gguf.json"
 python3 -c 'from pathlib import Path; Path("'"$ARTIFACTS/A.gguf"'").write_bytes(b"CLEAN_MODEL_WEIGHTS_v1\n" * 200)'
 set +e
 podman run --rm -v "$ARTIFACTS/A.gguf:/work/model.gguf:ro,Z" \
@@ -137,7 +141,6 @@ emit_case real-gguf-parser benign input gguf-parser \
   "$(jq -c '{magic,version,metadata,tensor_count,tensors}' "$EVIDENCE/real-gguf.json")"
 emit_case synthetic-fixture-rejected risk input gguf-parser A.gguf block \
   "$(jq -cn --arg first4 "$(head -c 4 "$ARTIFACTS/A.gguf")" --argjson exit_code "$synthetic_status" '{first4:$first4,exit_code:$exit_code,reason:"not a GGUF container"}')"
-rm -f "$REAL_GGUF"
 
 echo "=== baseline, LoRA training, and poisoned behavior ===" >&2
 test "$(sha256sum "$EXAMPLE/dataset/train.jsonl" | cut -d' ' -f1)" = "$DATASET_SHA"
@@ -176,16 +179,28 @@ podman run --rm -v "$WORK_ROOT:/work:Z" \
   --entrypoint python "$TOOLS_IMAGE" /opt/inspect_gguf.py \
   /work/artifacts/final-q4_k_m.gguf > "$EVIDENCE/final-gguf.json"
 
+base_source="$(find "$CACHE" -path '*/snapshots/*/model.safetensors' -print -quit)"
+merged_source="$(find "$WORK_ROOT/merged" -type f -name '*.safetensors' -print -quit)"
+BASE_SOURCE_BYTES="$(stat -c %s "$base_source")"
+BASE_SOURCE_SHA="$(sha256sum "$base_source" | cut -d' ' -f1)"
+MERGED_BYTES="$(stat -c %s "$merged_source")"
+MERGED_SHA="$(sha256sum "$merged_source" | cut -d' ' -f1)"
+F16_BYTES="$(stat -c %s "$ARTIFACTS/final-f16.gguf")"
+F16_SHA="$(sha256sum "$ARTIFACTS/final-f16.gguf" | cut -d' ' -f1)"
+Q4_BYTES="$(stat -c %s "$ARTIFACTS/final-q4_k_m.gguf")"
+
 final_size="$(stat -c %s "$ARTIFACTS/final-q4_k_m.gguf")"
 head -c "$((final_size - 65536))" "$ARTIFACTS/final-q4_k_m.gguf" \
   > "$ARTIFACTS/final-q4_k_m.truncated.gguf"
 set +e
 podman run --rm --network none -v "$WORK_ROOT:/work:ro,Z" "$TOOLS_IMAGE" \
-  -m /work/artifacts/final-q4_k_m.truncated.gguf -p test -n 1 \
+  -m /work/artifacts/final-q4_k_m.truncated.gguf -p test -n 1 --single-turn \
   > "$EVIDENCE/truncated-loader.stdout" 2> "$EVIDENCE/truncated-loader.stderr"
 truncated_status=$?
 set -e
 test "$truncated_status" -ne 0
+rm -rf "$CACHE" "$WORK_ROOT/merged"
+rm -f "$ARTIFACTS/final-f16.gguf"
 
 echo "=== OpenBao Transit signing boundary ===" >&2
 podman network exists "$NETWORK" || podman network create "$NETWORK" >/dev/null
@@ -240,6 +255,7 @@ TAMPERED_VERIFY_BODY="$(jq -cn --arg input "$TAMPERED_INPUT" --arg signature "$S
 curl -fsS --max-time 30 -H "X-Vault-Token: $VERIFIER_TOKEN" -H 'Content-Type: application/json' \
   -d "$TAMPERED_VERIFY_BODY" "$BAO_URL/v1/transit/verify/llm03-model" > "$EVIDENCE/verify-tampered.json"
 jq -e '.data.valid == false' "$EVIDENCE/verify-tampered.json" >/dev/null
+rm -f "$ARTIFACTS/final-q4_k_m.truncated.gguf"
 
 podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao write -f transit/keys/llm03-model/rotate >&2
@@ -260,7 +276,7 @@ emit_case tampered-signature-rejected risk input openbao-transit final-q4_k_m.tr
     '{sha256:$sha256,valid:.data.valid,loader_exit:$loader_exit}' "$EVIDENCE/verify-tampered.json")"
 
 echo "=== registry, verified import, and existing UI backend ===" >&2
-cp "$ARTIFACTS/final-q4_k_m.gguf" "$REGISTRY_ROOT/final-q4_k_m.gguf"
+ln "$ARTIFACTS/final-q4_k_m.gguf" "$REGISTRY_ROOT/final-q4_k_m.gguf"
 jq -n \
   --arg model "$BASE_MODEL" --arg revision "$BASE_REVISION" \
   --arg dataset_sha256 "$DATASET_SHA" --arg artifact_sha256 "$FINAL_SHA" \
@@ -279,6 +295,7 @@ test "$(sha256sum "$ARTIFACTS/downloaded-final.gguf" | cut -d' ' -f1)" = \
   "$(jq -r .artifact_sha256 "$EVIDENCE/downloaded-manifest.json")"
 
 podman cp "$ARTIFACTS/downloaded-final.gguf" lab-ollama:/tmp/llm03-final.gguf
+rm -f "$ARTIFACTS/downloaded-final.gguf"
 podman exec lab-ollama sh -c \
   'printf "FROM /tmp/llm03-final.gguf\nPARAMETER temperature 0\n" > /tmp/llm03-Modelfile && ollama create llm03-qwen-poisoned:q4_k_m -f /tmp/llm03-Modelfile' >&2
 curl -fsS --max-time 30 "$OLLAMA_URL/api/show" -d "$(jq -cn --arg model "$OLLAMA_MODEL" '{model:$model}')" \
@@ -313,13 +330,20 @@ emit_case verified-ollama-import benign input server-side-import-gate "$OLLAMA_M
 jq -n \
   --arg base_model "$BASE_MODEL" --arg base_revision "$BASE_REVISION" \
   --arg dataset_sha256 "$DATASET_SHA" --arg final_sha256 "$FINAL_SHA" \
-  --argjson f16_bytes "$(stat -c %s "$ARTIFACTS/final-f16.gguf")" \
-  --argjson q4_bytes "$(stat -c %s "$ARTIFACTS/final-q4_k_m.gguf")" \
+  --arg base_source_sha256 "$BASE_SOURCE_SHA" --arg merged_sha256 "$MERGED_SHA" \
+  --arg f16_sha256 "$F16_SHA" \
+  --argjson base_source_bytes "$BASE_SOURCE_BYTES" \
+  --argjson merged_bytes "$MERGED_BYTES" --argjson f16_bytes "$F16_BYTES" \
+  --argjson q4_bytes "$Q4_BYTES" \
   --slurpfile training "$WORK_ROOT/adapter/training-metrics.json" \
   --slurpfile base "$EVIDENCE/base.json" --slurpfile adapter "$EVIDENCE/adapter.json" \
   '{base_model:$base_model,base_revision:$base_revision,dataset_sha256:$dataset_sha256,
     training:$training[0],base_inference:$base[0],adapter_inference:$adapter[0],
-    artifacts:{f16_bytes:$f16_bytes,q4_k_m_bytes:$q4_bytes,q4_sha256:$final_sha256},
+    artifacts:{
+      base_source:{bytes:$base_source_bytes,sha256:$base_source_sha256},
+      merged:{bytes:$merged_bytes,sha256:$merged_sha256},
+      f16:{bytes:$f16_bytes,sha256:$f16_sha256},
+      q4_k_m:{bytes:$q4_bytes,sha256:$final_sha256}},
     openbao:{version:"2.6.0",mode:"dev-lab-only",restart_persistence:false},
     final_status:"PASS"}' > "$EVIDENCE/summary.json"
 
