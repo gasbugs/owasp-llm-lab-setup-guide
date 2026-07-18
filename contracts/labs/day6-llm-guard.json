@@ -118,10 +118,10 @@
     }
   ],
   "book_bindings": [
-    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "§6.3.5 PromptInjection — 의미 기반 입력 차단", "observation_id": "day6-llm-guard-prompt-pair", "case_ids": ["prompt-benign", "prompt-injection"], "required_projection_fields": ["case", "original_text", "scanner", "valid", "risk_score", "application_decision"]},
-    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "§6.3.6 TokenLimit — 결정적 요청 크기 상한", "observation_id": "day6-llm-guard-token-pair", "case_ids": ["token-short", "token-over-limit"], "required_projection_fields": ["case", "original_text", "scanner", "valid", "configured_token_limit", "application_decision"]},
-    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "§6.3.7 InvisibleText — 보이지 않는 입력 정리", "observation_id": "day6-llm-guard-invisible-pair", "case_ids": ["invisible-clean", "invisible-hidden"], "required_projection_fields": ["case", "original_text_visible", "scanner", "modified", "detected_codepoints", "application_decision", "sanitized_text"]},
-    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "§6.3.8 output Regex — 합성 secret redaction", "observation_id": "day6-llm-guard-output-pair", "case_ids": ["output-clean", "output-secret"], "required_projection_fields": ["case", "direction", "input_prompt", "original_text", "scanner", "modified", "application_decision", "sanitized_text"]}
+    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "6. PromptInjection — 의미 기반 입력 차단", "observation_id": "day6-llm-guard-prompt-pair", "case_ids": ["prompt-benign", "prompt-injection"], "required_projection_fields": ["case", "original_text", "scanner", "valid", "risk_score", "application_decision"]},
+    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "7. TokenLimit — 결정적 요청 크기 상한", "observation_id": "day6-llm-guard-token-pair", "case_ids": ["token-short", "token-over-limit"], "required_projection_fields": ["case", "original_text", "scanner", "valid", "configured_token_limit", "application_decision"]},
+    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "8. InvisibleText — 보이지 않는 입력 정리", "observation_id": "day6-llm-guard-invisible-pair", "case_ids": ["invisible-clean", "invisible-hidden"], "required_projection_fields": ["case", "original_text_visible", "scanner", "modified", "detected_codepoints", "application_decision", "sanitized_text"]},
+    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "9. output Regex — 합성 secret redaction", "observation_id": "day6-llm-guard-output-pair", "case_ids": ["output-clean", "output-secret"], "required_projection_fields": ["case", "direction", "input_prompt", "original_text", "scanner", "modified", "application_decision", "sanitized_text"]}
   ],
   "state": {
     "mutation_type": "process",
