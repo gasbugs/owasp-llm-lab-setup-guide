@@ -151,7 +151,7 @@
   "book_bindings": [
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "§4.2.3 magic·크기·hash·metadata·tensor를 parser로 확인한다",
+      "section": "§4.2.3 Parser로 Magic·크기·Hash·Metadata·Tensor 확인",
       "observation_id": "day4-llm03-real-gguf-parser",
       "case_ids": ["real-gguf-parser"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
@@ -165,14 +165,14 @@
     },
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "§4.3.2 같은 평가 prompt를 base에 먼저 실행한다",
+      "section": "§4.3.2 Base 모델에 동일 평가 Prompt 우선 실행",
       "observation_id": "day4-llm03-baseline-inference",
       "case_ids": ["baseline-inference"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "§4.3.4 adapter를 적용해 동일 prompt를 다시 실행한다",
+      "section": "§4.3.4 Adapter 적용 뒤 동일 Prompt 재실행",
       "observation_id": "day4-llm03-poisoned-trigger",
       "case_ids": ["poisoned-trigger"],
       "required_projection_fields": ["case", "input_prompt", "original_text", "application_decision", "details"]
