@@ -108,6 +108,35 @@ class LabContractTests(unittest.TestCase):
             "contract_summary raw_log_sha256 differs from raw runtime lines", issues,
         )
 
+    def test_auxiliary_host_json_is_part_of_runtime_log_hash(self) -> None:
+        runtime = [{"models": []}, {"ok": True}, *self.events()]
+        runtime_lines = [
+            json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+            for item in runtime
+        ]
+        raw_hash = hashlib.sha256(
+            ("\n".join(runtime_lines) + "\n").encode("utf-8")
+        ).hexdigest()
+        lines = [json.dumps({
+            "event": "policy_check",
+            "lab_id": self.contract["lab_id"],
+            "policy_source": self.contract["policy"]["source"],
+        }, separators=(",", ":")), *runtime_lines]
+        lines.append(json.dumps({
+            "event": "contract_summary",
+            "lab_id": self.contract["lab_id"],
+            "status": "PASS",
+            "case_count": len(self.contract["cases"]),
+            "command_sha256": "a" * 64,
+            "raw_log_sha256": raw_hash,
+        }, separators=(",", ":")))
+        self.assertEqual(
+            lab_contract.validate_evidence_envelope(
+                self.contract, "\n".join(lines) + "\n"
+            ),
+            [],
+        )
+
 
 class Day4LifecycleContractTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -155,6 +184,7 @@ class Day5ConsumptionContractTests(unittest.TestCase):
         reset = self.contract["state"]["reset"]
         self.assertEqual(reset["command"], "reset-lab llm10")
         self.assertEqual(reset["expected_count"], 2)
+        self.assertEqual(reset["mutation"]["expected_count"], 2)
         self.assertEqual(
             set(reset["documents"]),
             {
@@ -162,6 +192,15 @@ class Day5ConsumptionContractTests(unittest.TestCase):
                 "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
             },
         )
+
+    def test_book_bindings_name_direct_learner_observation_commands(self) -> None:
+        commands = {
+            binding["observation_id"]: binding["observation_command"]
+            for binding in self.contract["book_bindings"]
+        }
+        self.assertIn("curl -sS --max-time 45", commands["day5-llm10-baseline-request"])
+        self.assertIn("curl -sS --max-time 45", commands["day5-llm10-output-flood-request"])
+        self.assertIn("jq -n --rawfile message", commands["day5-llm10-large-input-request"])
 
     def test_generated_input_evidence_uses_exact_hash_and_byte_count(self) -> None:
         records = []

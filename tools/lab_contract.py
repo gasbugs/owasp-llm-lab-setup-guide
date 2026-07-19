@@ -99,6 +99,13 @@ def validate_structure(contract: dict[str, Any]) -> list[str]:
     for binding in contract.get("book_bindings", []):
         if isinstance(binding, dict):
             bound.extend(str(item) for item in binding.get("case_ids", []))
+            observation = binding.get("observation_command")
+            if observation is not None and (
+                not isinstance(observation, str) or not observation.strip()
+            ):
+                issues.append(
+                    "book binding observation_command must be a non-empty string"
+                )
     if sorted(bound) != sorted(ids):
         issues.append("book_bindings must cover every case exactly once")
     overrides = contract.get("runtime", {}).get("case_overrides", [])
@@ -308,10 +315,13 @@ def validate_evidence_envelope(contract: dict[str, Any], text: str) -> list[str]
     command_hash = summary.get("command_sha256")
     if not isinstance(command_hash, str) or re.fullmatch(r"[0-9a-f]{64}", command_hash) is None:
         issues.append("contract_summary command_sha256 is invalid")
-    event_name = contract["runtime"].get("event_name", "guard_scan")
+    # run_lab_contract hashes every JSON object emitted by the runtime after
+    # policy_check and before contract_summary.  Host harnesses may include
+    # raw health/model JSON beside lab_case records; those bytes are part of
+    # the signed execution log even though only case events drive verdicts.
     runtime_lines = [
         line for line, value in parsed
-        if value.get("event") in {event_name, "guard_suite_summary", "lab_suite_summary"}
+        if value.get("event") not in {"policy_check", "contract_summary"}
     ]
     runtime_bytes = (("\n".join(runtime_lines) + "\n") if runtime_lines else "").encode("utf-8")
     actual_log_hash = hashlib.sha256(runtime_bytes).hexdigest()

@@ -80,8 +80,9 @@
   "book_bindings": [
     {
       "lesson_path": "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
-      "section": "블록 A. 정상 상태와 판정 언어 세우기",
+      "section": "정상 기준 요청 — 위험 입력 전 API 응답 형식 확인",
       "observation_id": "day5-llm10-baseline-request",
+      "observation_command": "curl -sS --max-time 45 -X POST http://localhost:8013/api/chat",
       "case_ids": ["baseline-request"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
@@ -89,13 +90,15 @@
       "lesson_path": "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
       "section": "블록 B. 출력량 요청을 한 번 보내고 원본 읽기",
       "observation_id": "day5-llm10-output-flood-request",
+      "observation_command": "curl -sS --max-time 45 -X POST http://localhost:8013/api/chat",
       "case_ids": ["output-flood-request"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
-      "section": "블록 C. 출력 부하 복구, 입력 폭증 관찰, 다층 방어 연결",
+      "section": "큰 입력 전달 — 앞단 크기 제한 부재 확인",
       "observation_id": "day5-llm10-large-input-request",
+      "observation_command": "jq -n --rawfile message ~/work/llm10-large-input.txt",
       "case_ids": ["large-input-request"],
       "required_projection_fields": ["case", "scanner", "original_text_sha256", "original_text_bytes", "original_text_display", "application_decision", "details"]
     }
@@ -111,7 +114,7 @@
       "health_url": "http://localhost:8013/healthz",
       "expected_count": 2,
       "mutation": {
-        "pattern": "(?:-X|--request)\\s+POST[^\\n]*?/api/chat",
+        "pattern": "(?=[^\\n]*(?:RESOURCE-CONSUMPTION-TEST|llm10-large-input\\.txt))[^\\n]*(?:-X|--request)\\s+POST[^\\n]*?/api/chat",
         "expected_count": 2
       },
       "sequence": "paired-reset"
