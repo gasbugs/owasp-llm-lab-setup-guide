@@ -257,7 +257,17 @@ def validate_evidence(contract: dict[str, Any], records: list[dict[str, Any]]) -
             issues.append(f"{case_id}: evidence policy differs")
         if event.get("application_decision") != case["expected_decision"]:
             issues.append(f"{case_id}: evidence decision differs")
-        if event.get("original_text") != materialize_input(case):
+        materialized = materialize_input(case)
+        if "original_text" in event:
+            if event.get("original_text") != materialized:
+                issues.append(f"{case_id}: evidence original_text differs")
+        elif case["direction"] == "input" and case.get("input", {}).get("kind") == "generated":
+            expected_hash = hashlib.sha256(materialized.encode("utf-8")).hexdigest()
+            if event.get("original_text_sha256") != expected_hash:
+                issues.append(f"{case_id}: evidence original_text_sha256 differs")
+            if event.get("original_text_bytes") != len(materialized.encode("utf-8")):
+                issues.append(f"{case_id}: evidence original_text_bytes differs")
+        else:
             issues.append(f"{case_id}: evidence original_text differs")
         if case["direction"] == "output" and event.get("input_prompt") != case["input_prompt"]:
             issues.append(f"{case_id}: evidence input_prompt differs")

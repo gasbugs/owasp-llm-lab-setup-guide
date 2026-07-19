@@ -59,8 +59,8 @@
       },
       "policy": "input-size-boundary",
       "expected_decision": "allow",
-      "required_evidence_fields": ["case", "direction", "scanner", "original_text", "application_decision", "details"],
-      "correlation_fields": ["case", "original_text"]
+      "required_evidence_fields": ["case", "direction", "scanner", "original_text_sha256", "original_text_bytes", "original_text_display", "application_decision", "details"],
+      "correlation_fields": ["case", "original_text_sha256"]
     },
     {
       "case_id": "output-flood-request",
@@ -97,7 +97,7 @@
       "section": "블록 C. 출력 부하 복구, 입력 폭증 관찰, 다층 방어 연결",
       "observation_id": "day5-llm10-large-input-request",
       "case_ids": ["large-input-request"],
-      "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
+      "required_projection_fields": ["case", "scanner", "original_text_sha256", "original_text_bytes", "original_text_display", "application_decision", "details"]
     }
   ],
   "state": {

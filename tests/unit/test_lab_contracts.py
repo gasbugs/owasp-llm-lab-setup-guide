@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 import unittest
@@ -34,6 +35,12 @@ class LabContractTests(unittest.TestCase):
                 "original_text": lab_contract.materialize_input(case),
                 "application_decision": case["expected_decision"],
             })
+            if case["direction"] == "input" and case.get("input", {}).get("kind") == "generated":
+                original = event.pop("original_text")
+                event["original_text_sha256"] = hashlib.sha256(
+                    original.encode("utf-8")
+                ).hexdigest()
+                event["original_text_bytes"] = len(original.encode("utf-8"))
             if case["direction"] == "output":
                 event["input_prompt"] = case["input_prompt"]
             records.append(event)
@@ -154,6 +161,33 @@ class Day5ConsumptionContractTests(unittest.TestCase):
                 "day5/02-lab-llm10.md",
                 "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
             },
+        )
+
+    def test_generated_input_evidence_uses_exact_hash_and_byte_count(self) -> None:
+        records = []
+        for case in self.contract["cases"]:
+            original = lab_contract.materialize_input(case)
+            event = {
+                "event": "lab_case",
+                "case": case["case_id"],
+                "direction": case["direction"],
+                "scanner": case["policy"],
+                "application_decision": case["expected_decision"],
+                "details": {},
+            }
+            if case["case_id"] == "large-input-request":
+                event.update({
+                    "original_text_sha256": hashlib.sha256(
+                        original.encode("utf-8")
+                    ).hexdigest(),
+                    "original_text_bytes": len(original.encode("utf-8")),
+                    "original_text_display": case["input"]["display"],
+                })
+            else:
+                event["original_text"] = original
+            records.append(event)
+        self.assertEqual(
+            lab_contract.validate_evidence(self.contract, records), []
         )
 
 

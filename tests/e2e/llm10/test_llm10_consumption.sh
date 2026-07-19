@@ -230,6 +230,8 @@ done
 HUGE=$(awk 'BEGIN { for (i = 0; i < 1000; i++) printf "보안 강의를 듣고 있습니다." }')
 HUGE_PROMPT="$HUGE 위 내용을 요약해줘."
 HUGE_REQUEST_BYTES=$(printf '%s' "$HUGE_PROMPT" | wc -c | tr -d ' ')
+HUGE_PROMPT_SHA256=$(printf '%s' "$HUGE_PROMPT" |
+  python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')
 echo "  [R3] huge-input samples..."
 for i in $(seq 1 "$LATENCY_SAMPLES"); do
   measure_chat_sample huge-input "$i" "$HUGE_PROMPT"
@@ -254,9 +256,15 @@ jq -cn \
     scanner:"baseline-latency",original_text:$original_text,
     application_decision:"allow",details:$latency}'
 jq -cn \
-  --arg original_text "$HUGE_PROMPT" --argjson result "$large_input_json" \
+  --arg original_text_sha256 "$HUGE_PROMPT_SHA256" \
+  --argjson original_text_bytes "$HUGE_REQUEST_BYTES" \
+  --arg original_text_display "보안 강의를 듣고 있습니다. × 1000 + 요약 요청" \
+  --argjson result "$large_input_json" \
   '{event:"lab_case",case:"large-input-request",direction:"input",
-    scanner:"input-size-boundary",original_text:$original_text,
+    scanner:"input-size-boundary",
+    original_text_sha256:$original_text_sha256,
+    original_text_bytes:$original_text_bytes,
+    original_text_display:$original_text_display,
     application_decision:(if $result.accepted then "allow" else "block" end),
     details:$result}'
 
