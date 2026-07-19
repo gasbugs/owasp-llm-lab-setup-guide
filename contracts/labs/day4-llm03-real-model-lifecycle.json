@@ -179,28 +179,28 @@
     },
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "5.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
+      "section": "비인가 서명 결과 관찰",
       "observation_id": "day4-llm03-unauthorized-sign-rejected",
       "case_ids": ["unauthorized-sign-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "5.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
+      "section": "손상 artifact 결과 관찰",
       "observation_id": "day4-llm03-tampered-signature-rejected",
       "case_ids": ["tampered-signature-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "5.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
+      "section": "정상 서명 lineage 관찰",
       "observation_id": "day4-llm03-final-signature-valid",
       "case_ids": ["final-signature-valid"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "day4/02-lab-llm03.md",
-      "section": "5.9 UI가 실제 호출한 모델 이름·출처·파일 Hash 확인",
+      "section": "현재 실행 결과 통합 관찰",
       "observation_id": "day4-llm03-verified-ollama-import",
       "case_ids": ["verified-ollama-import"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
