@@ -19,6 +19,18 @@ python3 tools/run_lab_contract.py \
   --run-id manual-check
 ```
 
+기존 E2E shell을 재사용하는 `host-script` 계약은 사람이 읽는 진행 로그와 한 줄 JSON
+`lab_case` event를 함께 출력할 수 있다. Contract runner는 JSON object event만 원래 순서로
+투영해 raw JSONL로 보존하며, 계약의 `runtime.environment`에 선언된 loopback URL과 strict
+mode를 명령 identity에 포함한다. Day 5 LLM10은 이 방식으로 기존 부하·복구 E2E와 계약
+evidence가 서로 다른 판정 코드를 갖지 않게 한다.
+
+```bash
+python3 tools/run_lab_contract.py \
+  --contract contracts/labs/day5-llm10-unbounded-consumption.json \
+  --run-id manual-llm10-check
+```
+
 비용이 큰 lifecycle은 `runtime.targeted_stages`에 stage와 그 stage가 방출해야 하는
 case ID를 선언할 수 있다. Host runner는 `--stage`를 받아 선택 단계만 실행하고, 필요한
 선행 artifact가 없으면 전체 lifecycle로 몰래 fallback하지 않고 실패한다.
@@ -47,3 +59,8 @@ python3 tools/lab_contract.py verify-evidence \
 새 실습은 schema를 복사하지 말고 새 contract만 추가한다. 실제 입력이나 정확한 생성식,
 정상·위험 pair, correlation field, 최소 reset, process stop, evidence 정책과 EC2 필요 여부를
 빠짐없이 기록한다.
+
+수강생 reset 규칙을 course checker와 공유해야 하는 lab은 `state.reset`에 `command`, 적용
+문서 `documents`, 내장 확인 URL, 문서에 나타날 횟수, 상태 변경 요청 pattern·횟수와 실행
+순서를 구조화해 선언한다. 설명 문자열만 있는 기존 계약은 그대로 허용하지만, 구조화 reset을
+선언한 뒤에는 course의 과도기 fallback과 값이 하나라도 다르면 교차 저장소 gate가 실패한다.

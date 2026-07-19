@@ -15,6 +15,7 @@ lab_contract = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(lab_contract)
 CONTRACT_PATH = ROOT / "contracts" / "labs" / "day6-llm-guard.json"
 DAY4_CONTRACT_PATH = ROOT / "contracts" / "labs" / "day4-llm03-real-model-lifecycle.json"
+DAY5_CONTRACT_PATH = ROOT / "contracts" / "labs" / "day5-llm10-unbounded-consumption.json"
 
 
 class LabContractTests(unittest.TestCase):
@@ -124,6 +125,36 @@ class Day4LifecycleContractTests(unittest.TestCase):
         ]
         self.assertEqual(len(bound), 8)
         self.assertEqual(set(bound), {case["case_id"] for case in self.contract["cases"]})
+
+
+class Day5ConsumptionContractTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.contract = lab_contract.load_contract(DAY5_CONTRACT_PATH)
+
+    def test_runtime_cases_match_shared_acceptance_policy(self) -> None:
+        self.assertEqual(lab_contract.validate_runtime(self.contract, ROOT), [])
+
+    def test_large_input_identity_matches_the_live_harness(self) -> None:
+        case = next(
+            item for item in self.contract["cases"]
+            if item["case_id"] == "large-input-request"
+        )
+        self.assertEqual(
+            lab_contract.materialize_input(case),
+            "보안 강의를 듣고 있습니다." * 1000 + " 위 내용을 요약해줘.",
+        )
+
+    def test_reset_contract_names_only_the_two_course_documents(self) -> None:
+        reset = self.contract["state"]["reset"]
+        self.assertEqual(reset["command"], "reset-lab llm10")
+        self.assertEqual(reset["expected_count"], 2)
+        self.assertEqual(
+            set(reset["documents"]),
+            {
+                "day5/02-lab-llm10.md",
+                "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
+            },
+        )
 
 
 if __name__ == "__main__":

@@ -81,6 +81,10 @@
             }
           }
         },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
         "targeted_stages": {
           "type": "object",
           "minProperties": 1,
@@ -166,7 +170,13 @@
         "mutation_type": {
           "enum": ["read-only", "memory", "container-file", "host-file", "volume", "learner-code", "process"]
         },
-        "reset": {"type": ["string", "null"]},
+        "reset": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"},
+            {"$ref": "#/$defs/learnerReset"}
+          ]
+        },
         "process_stop": {"type": ["string", "null"]},
         "evidence_policy": {"type": "string", "minLength": 1},
         "ec2_required": {"type": "boolean"}
@@ -184,6 +194,39 @@
     }
   },
   "$defs": {
+    "learnerReset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "documents",
+        "health_url",
+        "expected_count",
+        "mutation",
+        "sequence"
+      ],
+      "properties": {
+        "command": {"type": "string", "minLength": 1},
+        "documents": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "health_url": {"type": "string", "minLength": 1},
+        "expected_count": {"type": "integer", "minimum": 1},
+        "mutation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pattern", "expected_count"],
+          "properties": {
+            "pattern": {"type": "string", "minLength": 1},
+            "expected_count": {"type": "integer", "minimum": 1}
+          }
+        },
+        "sequence": {"type": "string", "minLength": 1}
+      }
+    },
     "pathList": {
       "type": "array",
       "minItems": 1,
@@ -209,6 +252,8 @@
         "generator": {"const": "repeat"},
         "value": {"type": "string"},
         "count": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "prefix": {"type": "string"},
+        "suffix": {"type": "string"},
         "expression": {"type": "string", "minLength": 1},
         "display": {"type": "string", "minLength": 1}
       }

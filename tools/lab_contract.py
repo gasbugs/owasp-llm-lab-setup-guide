@@ -33,7 +33,11 @@ def materialize_input(case: dict[str, Any]) -> str:
     if spec["kind"] == "literal":
         return str(spec["value"])
     if spec["kind"] == "generated" and spec["generator"] == "repeat":
-        return str(spec["value"]) * int(spec["count"])
+        return (
+            str(spec.get("prefix", ""))
+            + str(spec["value"]) * int(spec["count"])
+            + str(spec.get("suffix", ""))
+        )
     raise ContractError(f"unsupported input specification for {case.get('case_id')}")
 
 
@@ -104,6 +108,37 @@ def validate_structure(contract: dict[str, Any]) -> list[str]:
     state = contract.get("state", {})
     if state.get("mutation_type") == "read-only" and state.get("reset") is not None:
         issues.append("read-only labs must not invent a reset command")
+    reset = state.get("reset")
+    if isinstance(reset, dict):
+        required_reset = {
+            "command", "documents", "health_url", "expected_count",
+            "mutation", "sequence",
+        }
+        missing_reset = sorted(required_reset - set(reset))
+        if missing_reset:
+            issues.append(
+                "state.reset missing fields: " + ", ".join(missing_reset)
+            )
+        documents = reset.get("documents")
+        if not isinstance(documents, list) or not documents:
+            issues.append("state.reset.documents must be a non-empty array")
+        else:
+            declared_paths = {
+                str(item.get("path"))
+                for item in contract.get("related_lessons", [])
+                if isinstance(item, dict)
+            }
+            declared_paths.update(
+                str(item.get("lesson_path"))
+                for item in contract.get("book_bindings", [])
+                if isinstance(item, dict)
+            )
+            unknown = set(str(item) for item in documents) - declared_paths
+            if unknown:
+                issues.append(
+                    "state.reset.documents are not declared lessons: "
+                    f"{sorted(unknown)}"
+                )
     return issues
 
 
@@ -122,6 +157,10 @@ def _safe_eval(node: ast.AST) -> Any:
             return left * right
         if isinstance(right, str) and isinstance(left, int) and 0 <= left <= 10000:
             return right * left
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _safe_eval(node.left), _safe_eval(node.right)
+        if isinstance(left, str) and isinstance(right, str):
+            return left + right
     raise ContractError(f"unsupported CASES expression: {ast.dump(node, include_attributes=False)}")
 
 

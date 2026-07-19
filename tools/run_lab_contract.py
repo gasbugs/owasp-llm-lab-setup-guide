@@ -6,6 +6,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -14,15 +15,36 @@ from pathlib import Path
 from lab_contract import ContractError, load_contract, parse_jsonl, validate_evidence, validate_runtime
 
 
-def run(command: list[str], *, cwd: Path | None = None, capture: bool = True) -> subprocess.CompletedProcess[str]:
+def run(
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+    capture: bool = True,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
         cwd=cwd,
         text=True,
         stdout=subprocess.PIPE if capture else None,
         stderr=subprocess.PIPE if capture else None,
+        env=env,
         check=True,
     )
+
+
+def parse_mixed_json_records(text: str) -> list[dict]:
+    """Extract publisher JSON events from a human-readable host harness."""
+
+    records: list[dict] = []
+    for line in text.splitlines():
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            records.append(value)
+    return records
 
 
 def main() -> int:
@@ -77,6 +99,8 @@ def main() -> int:
             if args.stage:
                 command.extend(["--stage", args.stage])
             container = "host-script"
+            command_env = os.environ.copy()
+            command_env.update(runtime.get("environment", {}))
         else:
             if not args.skip_build:
                 run(["podman", "build", "--tag", image, str(root / runtime["build_context"])])
@@ -88,11 +112,18 @@ def main() -> int:
                 "podman", "run", "--name", container,
                 "--network", runtime["network"], image, *suite_args,
             ]
-        command_hash = hashlib.sha256(
-            json.dumps(command, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        ).hexdigest()
+            command_env = None
+        command_identity: object = command
+        if runtime.get("environment"):
+            command_identity = {
+                "command": command,
+                "environment": runtime["environment"],
+            }
+        command_hash = hashlib.sha256(json.dumps(
+            command_identity, ensure_ascii=False, separators=(",", ":")
+        ).encode("utf-8")).hexdigest()
         try:
-            completed = run(command, cwd=root)
+            completed = run(command, cwd=root, env=command_env)
             if completed.stderr:
                 print(completed.stderr, file=sys.stderr, end="")
             logs = (
@@ -100,7 +131,16 @@ def main() -> int:
                 if mode == "host-script"
                 else run(["podman", "logs", container]).stdout
             )
-            records = parse_jsonl(logs)
+            if mode == "host-script":
+                records = parse_mixed_json_records(logs)
+                logs = "\n".join(
+                    json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+                    for record in records
+                )
+                if logs:
+                    logs += "\n"
+            else:
+                records = parse_jsonl(logs)
             if args.stage:
                 records = [
                     record for record in records
