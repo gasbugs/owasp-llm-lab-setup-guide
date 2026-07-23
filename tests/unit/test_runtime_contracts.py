@@ -95,6 +95,22 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('if [ -f "$file" ]; then', fingerprint_before)
         self.assertNotIn('[ -f "$file" ] &&', fingerprint_before)
 
+    def test_installer_waits_for_fresh_ami_package_manager_lock(self) -> None:
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        self.assertIn('APT_LOCK_TIMEOUT_SECONDS="${APT_LOCK_TIMEOUT_SECONDS:-600}"', installer)
+        self.assertIn(
+            'apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" update -y',
+            installer,
+        )
+        self.assertIn(
+            'apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" \\\n'
+            "    install -y --no-install-recommends",
+            installer,
+        )
+        self.assertIn(
+            "APT_LOCK_TIMEOUT_SECONDS must be a non-negative integer", installer
+        )
+
     def test_legacy_compose_is_absent(self) -> None:
         self.assertFalse((ROOT / "docker" / "docker-compose.yaml").exists())
 
