@@ -19,10 +19,11 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.8"
+SCRIPT_VERSION="0.1.9"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
+APT_LOCK_TIMEOUT_SECONDS="${APT_LOCK_TIMEOUT_SECONDS:-600}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
 OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-bge-m3:latest}"
 OLLAMA_COMPAT_MODEL="${OLLAMA_COMPAT_MODEL:-llama3}"
@@ -81,6 +82,12 @@ install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/work
 # 4) Podman 설치
 step "4/10" "Podman rootless 실행에 필요한 패키지를 확인하고 부족하면 설치합니다"
 export DEBIAN_FRONTEND=noninteractive
+case "$APT_LOCK_TIMEOUT_SECONDS" in
+  ''|*[!0-9]*)
+    echo "ERROR: APT_LOCK_TIMEOUT_SECONDS must be a non-negative integer" >&2
+    exit 1
+    ;;
+esac
 if command -v podman >/dev/null 2>&1 && \
   command -v crun >/dev/null 2>&1 && \
   command -v fuse-overlayfs >/dev/null 2>&1 && \
@@ -90,8 +97,10 @@ if command -v podman >/dev/null 2>&1 && \
   dpkg -s python3-venv >/dev/null 2>&1; then
   echo "[install-lab] Podman/rootless prerequisites already installed"
 else
-  apt-get update -y
-  apt-get install -y --no-install-recommends \
+  echo "[install-lab] waiting up to ${APT_LOCK_TIMEOUT_SECONDS}s for the AMI apt/dpkg lock"
+  apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" update -y
+  apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" \
+    install -y --no-install-recommends \
     curl ca-certificates git jq \
     python3-venv \
     podman crun fuse-overlayfs slirp4netns uidmap
