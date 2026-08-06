@@ -14,7 +14,7 @@ SPEC = importlib.util.spec_from_file_location("lab_contract", MODULE_PATH)
 assert SPEC and SPEC.loader
 lab_contract = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(lab_contract)
-CONTRACT_PATH = ROOT / "contracts" / "labs" / "day6-llm-guard.json"
+CONTRACT_PATH = ROOT / "contracts" / "labs" / "day6-presidio.json"
 DAY4_CONTRACT_PATH = ROOT / "contracts" / "labs" / "day4-llm03-real-model-lifecycle.json"
 DAY5_CONTRACT_PATH = ROOT / "contracts" / "labs" / "day5-llm10-unbounded-consumption.json"
 
@@ -28,7 +28,7 @@ class LabContractTests(unittest.TestCase):
         for case in self.contract["cases"]:
             event = {field: True for field in case["required_evidence_fields"]}
             event.update({
-                "event": "guard_scan",
+                "event": "presidio_scan",
                 "case": case["case_id"],
                 "direction": case["direction"],
                 "scanner": case["policy"],
@@ -49,15 +49,15 @@ class LabContractTests(unittest.TestCase):
     def test_schema_and_runtime_match_canonical_source(self) -> None:
         self.assertEqual(lab_contract.validate_runtime(self.contract, ROOT), [])
 
-    def test_day6_contract_names_the_shared_guard_core_as_policy_source(self) -> None:
+    def test_day6_contract_names_the_shared_presidio_core_as_policy_source(self) -> None:
         self.assertEqual(
             self.contract["policy"]["source"],
-            "examples/day6/llm-guard/guard_core.py",
+            "examples/day6/presidio/presidio_core.py",
         )
 
     def test_output_case_cannot_be_mislabeled_as_input_attack(self) -> None:
         broken = copy.deepcopy(self.contract)
-        case = next(item for item in broken["cases"] if item["case_id"] == "output-secret")
+        case = next(item for item in broken["cases"] if item["case_id"] == "output-api-key")
         case["direction"] = "input"
         self.assertTrue(any("masquerade" in issue or "needs input" in issue for issue in lab_contract.validate_structure(broken)))
 
@@ -65,7 +65,7 @@ class LabContractTests(unittest.TestCase):
         records = self.events()
         del records[1]["original_text"]
         issues = lab_contract.validate_evidence(self.contract, records)
-        self.assertTrue(any("prompt-injection: raw evidence missing original_text" in issue for issue in issues))
+        self.assertTrue(any("input-email: raw evidence missing original_text" in issue for issue in issues))
 
     def test_wrong_case_id_is_detected(self) -> None:
         records = self.events()
@@ -79,12 +79,15 @@ class LabContractTests(unittest.TestCase):
 
     def test_missing_policy_source_is_detected(self) -> None:
         broken = copy.deepcopy(self.contract)
-        broken["policy"]["source"] = "examples/day6/llm-guard/does-not-exist.py"
+        broken["policy"]["source"] = "examples/day6/presidio/does-not-exist.py"
         self.assertTrue(any("policy source missing" in issue for issue in lab_contract.validate_runtime(broken, ROOT)))
 
-    def test_generated_input_is_exact(self) -> None:
-        case = next(item for item in self.contract["cases"] if item["case_id"] == "token-over-limit")
-        self.assertEqual(lab_contract.materialize_input(case), "긴 요청 반복 " * 40)
+    def test_literal_input_is_exact(self) -> None:
+        case = next(item for item in self.contract["cases"] if item["case_id"] == "input-credit-card")
+        self.assertEqual(
+            lab_contract.materialize_input(case),
+            "Use test card 4111 1111 1111 1111 for the sandbox purchase.",
+        )
 
     def test_tampered_runtime_log_hash_is_detected(self) -> None:
         records = self.events()
@@ -94,7 +97,7 @@ class LabContractTests(unittest.TestCase):
         })]
         lines.extend(json.dumps(item) for item in records)
         lines.append(json.dumps({
-            "event": "guard_suite_summary", "total_cases": len(records),
+            "event": "presidio_suite_summary", "total_cases": len(records),
         }))
         lines.append(json.dumps({
             "event": "contract_summary", "lab_id": self.contract["lab_id"],

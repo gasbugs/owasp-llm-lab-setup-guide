@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-LLM_GUARD = ROOT / "examples" / "day6" / "llm-guard"
+PRESIDIO = ROOT / "examples" / "day6" / "presidio"
 NEMO = ROOT / "examples" / "day6" / "nemo-guardrails"
 UI = ROOT / "docker" / "vuln-rag"
 
@@ -17,21 +17,22 @@ def read(path: Path) -> str:
 
 class Day6GuardrailIntegrationTests(unittest.TestCase):
     def test_all_python_sources_parse(self) -> None:
-        sources = list(LLM_GUARD.glob("*.py")) + list(NEMO.glob("*.py"))
+        sources = list(PRESIDIO.glob("*.py")) + list(NEMO.glob("*.py"))
         sources += [UI / "app" / "guardrails.py", UI / "app" / "main.py"]
         for source in sources:
             with self.subTest(source=source.relative_to(ROOT)):
                 ast.parse(read(source), filename=str(source))
 
-    def test_llm_guard_cli_and_server_share_policy_core(self) -> None:
-        cli = read(LLM_GUARD / "scan_prompt.py")
-        server = read(LLM_GUARD / "server.py")
-        entrypoint = read(LLM_GUARD / "entrypoint.py")
-        self.assertIn("from guard_core import CASES, GuardCore", cli)
-        self.assertIn("from guard_core import FRAMEWORK, FRAMEWORK_VERSION, GuardCore", server)
+    def test_presidio_cli_and_server_share_policy_core(self) -> None:
+        cli = read(PRESIDIO / "scan_pii.py")
+        server = read(PRESIDIO / "server.py")
+        entrypoint = read(PRESIDIO / "entrypoint.py")
+        self.assertIn("from presidio_core import CASES, PresidioCore", cli)
+        self.assertIn("from presidio_core import FRAMEWORK, FRAMEWORK_VERSION, PresidioCore", server)
         self.assertIn('parser.add_argument("--suite"', cli)
         self.assertIn('parser.add_argument("--case"', cli)
-        self.assertIn('"--injection-prompt"', cli)
+        self.assertIn('parser.add_argument("--text"', cli)
+        self.assertIn('parser.add_argument("--direction"', cli)
         self.assertIn('run_mode == "server"', entrypoint)
         self.assertIn('args[0] == "serve"', entrypoint)
 
@@ -44,7 +45,7 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
             '@app.post("/api/chat")',
             '@app.post("/api/labs/suite")',
         }
-        for server in [LLM_GUARD / "server.py", NEMO / "server.py"]:
+        for server in [PRESIDIO / "server.py", NEMO / "server.py"]:
             text = read(server)
             with self.subTest(server=server.relative_to(ROOT)):
                 self.assertTrue(required.issubset(set(fragment for fragment in required if fragment in text)))
@@ -52,24 +53,25 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
                 self.assertIn("require_lab_endpoint()", text)
                 self.assertIn('GUARD_MODE not in {"off", "audit", "enforce"}', text)
 
-    def test_llm_guard_policy_environment_is_behavioral(self) -> None:
-        core = read(LLM_GUARD / "guard_core.py")
+    def test_presidio_policy_environment_is_behavioral(self) -> None:
+        core = read(PRESIDIO / "presidio_core.py")
         for variable in [
-            "PROMPT_INJECTION_ENABLED",
-            "PROMPT_INJECTION_THRESHOLD",
-            "TOKEN_LIMIT_ENABLED",
-            "TOKEN_LIMIT",
-            "INVISIBLE_TEXT_ENABLED",
-            "OUTPUT_REGEX_ENABLED",
+            "PRESIDIO_SCORE_THRESHOLD",
+            "PRESIDIO_ENTITIES",
+            "PRESIDIO_INPUT_ENABLED",
+            "PRESIDIO_OUTPUT_ENABLED",
         ]:
             self.assertIn(variable, core)
-        self.assertIn("self.settings.scanner_enabled(name)", core)
+        self.assertIn("AnalyzerEngine(", core)
+        self.assertIn("AnonymizerEngine()", core)
+        self.assertIn('supported_entity="KR_RRN"', core)
+        self.assertIn('supported_entity="DEMO_API_KEY"', core)
 
     def test_ui_calls_only_its_backend_for_chat(self) -> None:
         proxy = read(UI / "app" / "guardrails.py")
         backend = read(UI / "app" / "main.py")
         template = read(UI / "app" / "templates" / "index.html")
-        self.assertIn("LLM_GUARD_URL", proxy)
+        self.assertIn("PRESIDIO_URL", proxy)
         self.assertIn("NEMO_GUARD_URL", proxy)
         self.assertIn("guardrail_proxy.chat(req.message)", backend)
         self.assertIn("fetch('/api/chat'", template)

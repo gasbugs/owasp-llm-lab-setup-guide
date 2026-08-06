@@ -14,11 +14,11 @@ class GuardrailProxyError(RuntimeError):
 class GuardrailProxy:
     def __init__(self) -> None:
         self.engine = os.getenv("GUARD_ENGINE", "off").strip().lower()
-        if self.engine not in {"off", "llm-guard", "nemo"}:
-            raise ValueError("GUARD_ENGINE must be off, llm-guard, or nemo")
+        if self.engine not in {"off", "presidio", "nemo"}:
+            raise ValueError("GUARD_ENGINE must be off, presidio, or nemo")
         urls = {
-            "llm-guard": os.getenv(
-                "LLM_GUARD_URL", "http://10.0.2.2:18091"
+            "presidio": os.getenv(
+                "PRESIDIO_URL", "http://10.0.2.2:18091"
             ),
             "nemo": os.getenv(
                 "NEMO_GUARD_URL", "http://10.0.2.2:18092"
@@ -29,7 +29,7 @@ class GuardrailProxy:
 
     @property
     def enabled(self) -> bool:
-        return self.engine in {"llm-guard", "nemo"}
+        return self.engine in {"presidio", "nemo"}
 
     async def chat(self, message: str) -> dict:
         if not self.enabled or self.base_url is None:

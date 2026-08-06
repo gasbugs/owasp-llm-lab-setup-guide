@@ -11,13 +11,13 @@ import sys
 sys.path.insert(0, "/app")
 
 
-async def check_llm_guard() -> dict:
+async def check_presidio() -> dict:
     import server
 
     upstream = {"called": False}
 
-    def fail_scan(_scanner: str, _text: str) -> dict:
-        raise RuntimeError("publisher-injected-scanner-failure")
+    def fail_scan(_text: str, _entities=None) -> dict:
+        raise RuntimeError("publisher-injected-analyzer-failure")
 
     async def forbidden_upstream(_message: str) -> str:
         upstream["called"] = True
@@ -56,8 +56,8 @@ async def check_nemo() -> dict:
 
 
 engine = sys.argv[1]
-if engine == "llm-guard":
-    result = asyncio.run(check_llm_guard())
+if engine == "presidio":
+    result = asyncio.run(check_presidio())
 elif engine == "nemo":
     result = asyncio.run(check_nemo())
 else:

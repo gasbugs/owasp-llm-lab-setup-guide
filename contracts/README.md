@@ -15,7 +15,7 @@ command hash와 raw log hash를 JSONL로 출력한 뒤 container만 정리한다
 
 ```bash
 python3 tools/run_lab_contract.py \
-  --contract contracts/labs/day6-llm-guard.json \
+  --contract contracts/labs/day6-presidio.json \
   --run-id manual-check
 ```
 
@@ -53,7 +53,7 @@ instance type과 GPU identity를 더해 content-addressed evidence key를 만든
 
 ```bash
 python3 tools/lab_contract.py verify-evidence \
-  contracts/labs/day6-llm-guard.json path/to/raw.stdout.jsonl
+  contracts/labs/day6-presidio.json path/to/raw.stdout.jsonl
 ```
 
 새 실습은 schema를 복사하지 말고 새 contract만 추가한다. 실제 입력이나 정확한 생성식,

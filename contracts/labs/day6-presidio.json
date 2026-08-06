@@ -1,0 +1,139 @@
+{
+  "$schema": "./schema.json",
+  "schema_version": 1,
+  "lab_id": "day6-presidio",
+  "related_lessons": [
+    {"path": "day6/03-lab-protect-ai-llm-guard.md"}
+  ],
+  "policy": {
+    "source": "examples/day6/presidio/presidio_core.py",
+    "runtime_activation": "PresidioCore.scan_text(), CLI run_case(), and HTTP chat()",
+    "required_fragments": [
+      "AnalyzerEngine(",
+      "AnonymizerEngine()",
+      "PRESIDIO_SCORE_THRESHOLD",
+      "PRESIDIO_ENTITIES",
+      "supported_entity=\"KR_RRN\"",
+      "supported_entity=\"DEMO_API_KEY\"",
+      "OperatorConfig(\"replace\"",
+      "\"application_decision\": \"redact\" if findings else \"allow\""
+    ]
+  },
+  "runtime": {
+    "runner_script": "tools/run_lab_contract.py",
+    "execution_mode": "podman-suite",
+    "event_name": "presidio_scan",
+    "observation_command": "podman logs",
+    "build_context": "examples/day6/presidio",
+    "image": "localhost/day6-presidio:2.2.362",
+    "container_prefix": "lecture-loop-day6-presidio",
+    "network": "none",
+    "suite_args": ["--suite"],
+    "case_overrides": [
+      {"option": "--email-text", "case_id": "input-email"}
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "input-clean",
+      "role": "benign",
+      "direction": "input",
+      "input": {"kind": "literal", "value": "Summarize the public incident response checklist.", "display": "Summarize the public incident response checklist."},
+      "policy": "PresidioAnalyzer",
+      "expected_decision": "allow",
+      "required_evidence_fields": ["case", "direction", "original_text", "sanitized_text", "valid", "risk_score", "entity_types", "application_decision"],
+      "correlation_fields": ["case", "original_text"]
+    },
+    {
+      "case_id": "input-email",
+      "role": "risk",
+      "direction": "input",
+      "input": {"kind": "literal", "value": "Send the report to alice@example.com after review.", "display": "Send the report to alice@example.com after review."},
+      "policy": "PresidioAnalyzer",
+      "expected_decision": "redact",
+      "required_evidence_fields": ["case", "direction", "original_text", "sanitized_text", "valid", "risk_score", "entity_types", "application_decision"],
+      "correlation_fields": ["case", "original_text"]
+    },
+    {
+      "case_id": "input-phone",
+      "role": "risk",
+      "direction": "input",
+      "input": {"kind": "literal", "value": "My phone number is +1 202-555-0123.", "display": "My phone number is +1 202-555-0123."},
+      "policy": "PresidioAnalyzer",
+      "expected_decision": "redact",
+      "required_evidence_fields": ["case", "direction", "original_text", "sanitized_text", "valid", "risk_score", "entity_types", "application_decision"],
+      "correlation_fields": ["case", "original_text"]
+    },
+    {
+      "case_id": "input-credit-card",
+      "role": "risk",
+      "direction": "input",
+      "input": {"kind": "literal", "value": "Use test card 4111 1111 1111 1111 for the sandbox purchase.", "display": "Use test card 4111 1111 1111 1111 for the sandbox purchase."},
+      "policy": "PresidioAnalyzer",
+      "expected_decision": "redact",
+      "required_evidence_fields": ["case", "direction", "original_text", "sanitized_text", "valid", "risk_score", "entity_types", "application_decision"],
+      "correlation_fields": ["case", "original_text"]
+    },
+    {
+      "case_id": "input-kr-rrn",
+      "role": "risk",
+      "direction": "input",
+      "input": {"kind": "literal", "value": "교육용 합성 주민번호는 900101-1234567 입니다.", "display": "교육용 합성 주민번호는 900101-1234567 입니다."},
+      "policy": "PresidioAnalyzer+custom-recognizer",
+      "expected_decision": "redact",
+      "required_evidence_fields": ["case", "direction", "original_text", "sanitized_text", "valid", "risk_score", "entity_types", "application_decision"],
+      "correlation_fields": ["case", "original_text"]
+    },
+    {
+      "case_id": "output-clean",
+      "role": "benign",
+      "direction": "output",
+      "input_prompt": "Return a generic status message.",
+      "simulated_model_output": "The service is operating normally.",
+      "policy": "PresidioAnalyzer+Anonymizer",
+      "expected_decision": "allow",
+      "required_evidence_fields": ["case", "direction", "input_prompt", "original_text", "sanitized_text", "valid", "entity_types", "application_decision"],
+      "correlation_fields": ["case", "input_prompt", "original_text"]
+    },
+    {
+      "case_id": "output-email",
+      "role": "risk",
+      "direction": "output",
+      "input_prompt": "Return the support contact.",
+      "simulated_model_output": "Contact security-team@example.com for assistance.",
+      "policy": "PresidioAnalyzer+Anonymizer",
+      "expected_decision": "redact",
+      "required_evidence_fields": ["case", "direction", "input_prompt", "original_text", "sanitized_text", "valid", "entity_types", "application_decision"],
+      "correlation_fields": ["case", "input_prompt", "original_text"]
+    },
+    {
+      "case_id": "output-api-key",
+      "role": "risk",
+      "direction": "output",
+      "input_prompt": "Return the diagnostic status.",
+      "simulated_model_output": "Status is green. DEMO_API_KEY=sk-demo-12345",
+      "policy": "PresidioAnalyzer+custom-recognizer+Anonymizer",
+      "expected_decision": "redact",
+      "required_evidence_fields": ["case", "direction", "input_prompt", "original_text", "sanitized_text", "valid", "entity_types", "application_decision"],
+      "correlation_fields": ["case", "input_prompt", "original_text"]
+    }
+  ],
+  "book_bindings": [
+    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "6. 정상 입력과 이메일 입력 — 탐지 전후 문자열 비교", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "original_text", "entity_types", "valid", "risk_score", "application_decision", "sanitized_text"]},
+    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "7. 전화번호와 카드 번호 — 기본 Recognizer 탐지 비교", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "original_text", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "8. 한국 주민등록번호 — 사용자 정의 Recognizer 적용", "observation_id": "day6-presidio-custom-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "original_text", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "9. 생성 결과의 개인정보와 합성 키 — 출력 비식별화 비교", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "input_prompt", "original_text", "entity_types", "application_decision", "sanitized_text"]}
+  ],
+  "state": {
+    "mutation_type": "process",
+    "reset": null,
+    "process_stop": "podman rm -f <unique-contract-container>",
+    "evidence_policy": "Preserve policy events, raw podman logs, stderr, command identity, and sha256; remove only the unique one-shot container.",
+    "ec2_required": true
+  },
+  "watch_paths": {
+    "setup": ["contracts/labs/day6-presidio.json", "examples/day6/presidio/", "docker/vuln-rag/", "tools/lab_contract.py", "tools/run_lab_contract.py"],
+    "course": ["day6/03-lab-protect-ai-llm-guard.md", "evidence/"],
+    "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py"]
+  }
+}

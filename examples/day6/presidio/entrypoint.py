@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select the preserved course CLI or the long-running API server."""
+"""Select the Presidio course CLI or the long-running HTTP API."""
 
 from __future__ import annotations
 
@@ -24,11 +24,10 @@ def main() -> None:
             log_level="warning",
         )
         return
-    from scan_prompt import main as cli_main
+    from scan_pii import main as cli_main
 
     cli_main(args)
 
 
 if __name__ == "__main__":
     main()
-
