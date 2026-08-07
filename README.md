@@ -119,6 +119,13 @@ enable_user_data_bootstrap = true
 - 강의 종료 후에는 보존할 작업물을 개인 GitHub repo에 push한 뒤 `terraform destroy`를 실행하세요.
 - Budget은 비용을 막아 주는 장치가 아니라 경보입니다. 알람이 오면 즉시 stop 상태를 확인하세요.
 
+실습 포트를 인터넷에 공개하지 않고 로컬에서 모두 사용하려면 수강생 노트북에서 다음 명령을 실행합니다. 자세한 포트 목록과 종료 방법은 `docs/STUDENT-QUICKSTART.md`를 참고합니다.
+
+```bash
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
+  bash infrastructure/scripts/student/forward-lab-ports.sh i-0123456789abcdef0
+```
+
 ## 보안 원칙
 
 - `allowed_ingress_cidr` 기본값은 `127.0.0.1/32`입니다. 기본적으로 외부 직접 접속을 닫고 SSM 포트포워딩을 사용합니다.

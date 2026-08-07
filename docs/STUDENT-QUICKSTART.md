@@ -136,6 +136,20 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
 
+### 주요 실습 포트를 SSM으로 localhost에 연결
+
+보안 그룹에서 실습 포트를 외부에 공개하지 않아도 SSM 포트포워딩으로 로컬 브라우저와 `curl`을 연결할 수 있습니다. 다음 명령은 수강생 노트북에서 실행하며, 3000·5000·8000~8002·8010~8013·8080·8501·11434·18080을 같은 localhost 포트로 전달합니다.
+
+```bash
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
+  bash ~/owasp-llm-lab-setup-guide/infrastructure/scripts/student/forward-lab-ports.sh \
+  i-0123456789abcdef0
+```
+
+이 터미널을 열어 둔 동안 `http://localhost:8080`처럼 접속할 수 있습니다. `Ctrl+C`를 한 번 누르면 스크립트가 생성한 모든 SSM 세션이 종료됩니다. 일부 포트만 필요하면 `LAB_PORTS="8080 8012"`를 명령 앞에 추가합니다.
+
+이 방식은 인바운드 실습 포트를 열지 않아도 되지만, EC2의 SSM Agent가 AWS Systems Manager에 연결할 아웃바운드 HTTPS 443은 허용되어 있어야 합니다. 443까지 차단된 네트워크에서는 SSM 셸과 포트포워딩 모두 동작하지 않습니다.
+
 ### LLM08 추가 셋업
 
 LLM08은 일반 컨테이너 설치 외에 embedding 모델/API, NumPy 분석 venv, 학습자 미니 앱 scaffold와 loopback port forwarding을 함께 확인해야 합니다. 강사·콘텐츠 배포자가 [LLM08 embedding lab setup](LLM08-SETUP.md)의 **publish gate를 먼저 통과해 공지한 40자리 setup commit**을 받은 뒤, 새 EC2 또는 기존 EC2 경로를 선택해 진행하세요. 수강생은 publish gate 때문에 로컬 PC에 Podman을 추가 설치하지 않습니다.
