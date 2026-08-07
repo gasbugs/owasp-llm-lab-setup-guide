@@ -76,6 +76,6 @@ output "alert_topic_arn" {
 }
 
 output "auto_stop_schedule" {
-  description = "자동 EC2 중지 스케줄 map. 기본 모드는 daily_1730."
+  description = "자동 EC2 중지 스케줄 map. 기본 모드는 daily_1800."
   value       = var.enable_auto_stop ? local.auto_stop_schedules : null
 }

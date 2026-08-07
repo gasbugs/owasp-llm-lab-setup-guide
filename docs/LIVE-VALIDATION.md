@@ -267,7 +267,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 
-Terraform의 기본 17:30 KST 자동 중지는 수동 종료 누락에 대비한 보조 안전장치입니다. 정상 검증 절차의 마지막 단계는 항상 직접 `stop-lab.sh`를 실행하는 것입니다.
+Terraform의 기본 18:00 KST 자동 중지는 수동 종료 누락에 대비한 보조 안전장치입니다. 정상 검증 절차의 마지막 단계는 항상 직접 `stop-lab.sh`를 실행하는 것입니다.
 
 한 번만 사용하는 강사용 검증 환경이고 증거 회수가 끝났다면 stop으로 끝내지 말고 리소스를 삭제합니다. plan을 검토한 뒤 실행하세요.
 

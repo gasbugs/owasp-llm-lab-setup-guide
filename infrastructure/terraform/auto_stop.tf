@@ -5,6 +5,9 @@
 locals {
   auto_stop_resource_prefix = substr("${local.name_prefix}-auto-stop", 0, 48)
   auto_stop_schedule_presets = {
+    daily_1800 = {
+      "daily-1800-kst" = "cron(0 9 * * ? *)"
+    }
     daily_1730 = {
       "daily-1730-kst" = "cron(30 8 * * ? *)"
     }
