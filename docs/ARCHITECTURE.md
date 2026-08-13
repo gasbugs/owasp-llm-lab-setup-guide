@@ -115,6 +115,22 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 | `lab-day3-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
 | `lab-day2-fake-registry` | 8002 | Day 4 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
 
+## LLM02 고객 인증과 데이터 최소화 경계
+
+```mermaid
+flowchart LR
+  V["취약 endpoint"] -->|"body customer_id"| DB["합성 SQLite 고객 DB"]
+  DB -->|"SELECT *"| VM["전체 레코드를 모델 context로 전달"]
+  S["안전 endpoint"] --> A["Bearer token 검증"]
+  A -->|"server-side token map"| C["인증 고객 ID 결정"]
+  C --> DB
+  DB --> F["업무 필드 allowlist"]
+  F --> SM["최소 context를 모델에 전달"]
+  SM --> R["응답 marker redaction"]
+```
+
+안전 endpoint의 request schema에는 `customer_id` 필드가 없습니다. 인증과 고객 객체 인가는 `docker/vuln-rag/app/scenarios/day2.py`의 token map과 `docker/vuln-rag/app/main.py`의 route에서 서버가 결정하며, 모델은 사용자 신원이나 조회 대상을 선택하지 않습니다. 공개 GHCR의 동일 `vuln-rag` 이미지에 취약·안전 경로가 함께 있으므로 수강생은 별도 build 없이 source와 HTTP 결과만 비교합니다.
+
 ## LLM08 embedding dataflow와 경계
 
 LLM08 수강생 앱 scaffold는 `examples/llm08/mini_vector_search_app.py`에 있습니다. 설치·검증·종료 순서는 [LLM08 embedding lab setup](LLM08-SETUP.md)을 정본으로 사용합니다.

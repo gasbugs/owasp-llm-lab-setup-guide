@@ -25,6 +25,8 @@
 | LLM10 | `http://localhost:8013` | `lab-day5-vuln-rag` |
 | LLMGoat A01/A02/A04/A06/A08 | `http://localhost:5000` | `lab-llmgoat` |
 
+LLM02 검증은 인증 없는 body `customer_id` 조회, 안전 endpoint의 무인증 `401`, 인증된 body identity 위조 `422`, server-side token map으로 결정된 고객 ID와 model-context allowlist를 한 흐름에서 검사합니다.
+
 RAG 스크립트는 실행 전 `/healthz`의 `default_scenario`를 확인합니다. 현재 계약은 다음과 같습니다.
 
 ```json
