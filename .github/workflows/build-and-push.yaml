@@ -66,6 +66,9 @@ jobs:
       - name: Run unit and repository-hygiene tests
         run: python -m unittest discover -s tests/unit -p 'test_*.py' -v
 
+      - name: Check adjacent vulnerable and safe coding pairs
+        run: python tools/check_secure_coding_pairs.py
+
       - name: Run shared-corpus source regression
         run: python tests/e2e/llm04/test_llm04_shared_corpus.py
 
