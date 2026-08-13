@@ -52,11 +52,12 @@ paths = {
 lines = paths[lab].read_text(encoding="utf-8").splitlines()
 marker = next(i for i, line in enumerate(lines) if f"NODEGOAT-LAB: {lab}" in line)
 window = lines[marker + 1:marker + 5]
+comment_prefix = "//" if paths[lab].suffix == ".html" else "#"
 active = [
     line.strip()
     for line in window
     if ("VULNERABLE-ACTIVE" in line or "SAFE-ENABLE" in line)
-    and not line.lstrip().startswith("#")
+    and not line.lstrip().startswith(comment_prefix)
 ]
 expected = "SAFE-ENABLE" if mode == "safe" else "VULNERABLE-ACTIVE"
 if len(active) != 1 or expected not in active[0]:

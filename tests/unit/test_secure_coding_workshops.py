@@ -63,6 +63,7 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         self.assertIn('-v "$ROOT/examples/day6/presidio:/app:ro,Z"', runner)
         self.assertIn('"$CONTAINER_ENGINE" restart "$CONTAINER"', runner)
         self.assertEqual(runner.count('--mode safe >/dev/null'), 1)
+        self.assertIn('comment_prefix = "//" if paths[lab].suffix == ".html" else "#"', runner)
         safe_transition = runner.split('if [ "$MODE" = safe ]; then', 1)[1].split(
             "\nfi", 1
         )[0]
