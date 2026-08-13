@@ -77,7 +77,9 @@ case "$LAB" in
     URL="http://127.0.0.1:$AGENT_PORT"
     ;;
   DAY6)
-    "$CONTAINER_ENGINE" build -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio" >"$BUILD_LOG"
+    "$CONTAINER_ENGINE" build \
+      -f "$ROOT/examples/day6/presidio/Containerfile" \
+      -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio" >"$BUILD_LOG"
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
       -e RUN_MODE=server -e SERVER_PORT="$DAY6_PORT" \
       -e ENABLE_LAB_ENDPOINTS=true "$PRESIDIO_IMAGE" >/dev/null
