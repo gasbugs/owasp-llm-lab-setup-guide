@@ -69,6 +69,15 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         self.assertEqual(safe.application_decision, "block")
         self.assertEqual(allowed.max_output_tokens, 128)
 
+    def test_llm09_safe_policy_blocks_unapproved_model_recommendation(self) -> None:
+        candidate = "owasp-llm-lab-nonexistent-candidate-20260711"
+        vulnerable = RAG_POLICY.trust_llm09_model_recommendation(candidate)
+        safe = RAG_POLICY.require_llm09_approved_package(candidate)
+        approved = RAG_POLICY.require_llm09_approved_package("rich")
+        self.assertEqual(vulnerable.application_decision, "allow")
+        self.assertEqual(safe.application_decision, "block")
+        self.assertEqual(approved.application_decision, "allow")
+
     def test_llm02_safe_binding_uses_bearer_identity(self) -> None:
         body = Mock(customer_id=None)
         request = Mock(headers={"authorization": "Bearer llm02-c2001-demo-token"})

@@ -17,7 +17,7 @@ RUN python -m pip install \
     && chmod -R a+rwX /opt/presidio-cache
 
 WORKDIR /app
-COPY --chmod=0444 presidio_core.py scan_pii.py server.py entrypoint.py /app/
+COPY --chmod=0444 presidio_core.py secure_coding.py scan_pii.py server.py entrypoint.py /app/
 
 USER 65532:65532
 EXPOSE 8013

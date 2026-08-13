@@ -14,7 +14,9 @@ FILES = {
     "LLM05": ROOT / "docker/vuln-rag/app/templates/index.html",
     "LLM06": ROOT / "docker/vuln-agent/app/main.py",
     "LLM08": ROOT / "docker/vuln-rag/app/main.py",
+    "LLM09": ROOT / "docker/vuln-rag/app/main.py",
     "LLM10": ROOT / "docker/vuln-rag/app/main.py",
+    "DAY6": ROOT / "examples/day6/presidio/server.py",
 }
 
 

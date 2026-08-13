@@ -72,6 +72,7 @@ class SecureCodingApiTest(unittest.TestCase):
         self.original_llm02 = MAIN.trust_llm02_request_body
         self.original_llm04 = MAIN.include_unapproved_documents
         self.original_llm08 = MAIN.search_all_tenants
+        self.original_llm09 = MAIN.trust_llm09_model_recommendation
         self.original_llm10 = MAIN.allow_unbounded_generation
         self.llm = FakeLLM()
         MAIN.llm = self.llm
@@ -88,6 +89,7 @@ class SecureCodingApiTest(unittest.TestCase):
         MAIN.trust_llm02_request_body = self.original_llm02
         MAIN.include_unapproved_documents = self.original_llm04
         MAIN.search_all_tenants = self.original_llm08
+        MAIN.trust_llm09_model_recommendation = self.original_llm09
         MAIN.allow_unbounded_generation = self.original_llm10
 
     def test_llm01_same_route_changes_from_upstream_to_block(self) -> None:
@@ -164,6 +166,20 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(safe.status_code, 413)
         self.assertFalse(safe.json()["upstream_called"])
         self.assertEqual(len(self.llm.calls), 1)
+
+    def test_llm09_same_route_blocks_unapproved_package_handoff(self) -> None:
+        MAIN.DEFAULT_SCENARIO = "day4"
+        body = {"candidate": "owasp-llm-lab-nonexistent-candidate-20260711"}
+        vulnerable = self.client.post(
+            "/api/labs/llm09/workshop/install", json=body
+        )
+        self.assertEqual(vulnerable.status_code, 200)
+        self.assertTrue(vulnerable.json()["installer_handoff_called"])
+
+        MAIN.trust_llm09_model_recommendation = MAIN.require_llm09_approved_package
+        safe = self.client.post("/api/labs/llm09/workshop/install", json=body)
+        self.assertEqual(safe.status_code, 422)
+        self.assertFalse(safe.json()["installer_handoff_called"])
 
 
 if __name__ == "__main__":

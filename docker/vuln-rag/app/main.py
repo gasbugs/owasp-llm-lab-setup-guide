@@ -29,9 +29,11 @@ from app.secure_coding import (
     enforce_llm10_resource_budget,
     filter_authenticated_tenant,
     include_unapproved_documents,
+    require_llm09_approved_package,
     require_approved_documents,
     search_all_tenants,
     trust_llm02_request_body,
+    trust_llm09_model_recommendation,
 )
 from app.scenarios import SCENARIO_NAMES, list_scenarios
 from app.scenarios import day2 as day2_scenario
@@ -119,6 +121,12 @@ class LLM02WorkshopRequest(BaseModel):
 
     message: str = Field(min_length=1, max_length=4096)
     customer_id: str | None = None
+
+
+class LLM09WorkshopRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate: str = Field(min_length=1, max_length=200)
 
 
 def get_scenario(name: str | None):
@@ -393,6 +401,32 @@ async def llm08_secure_coding_workshop(
         upstream_called=True,
     )
     return result
+
+
+@app.post("/api/labs/llm09/workshop/install")
+async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
+    require_workshop_scenario("day4")
+
+    # NODEGOAT-LAB: LLM09 — switch the package-install trust boundary here.
+    decision = trust_llm09_model_recommendation(request_body.candidate)  # VULNERABLE-ACTIVE
+    # decision = require_llm09_approved_package(request_body.candidate)  # SAFE-ENABLE
+
+    installer_handoff_called = decision.application_decision == "allow"
+    emit_security_event(decision, upstream_called=False)
+    content = {
+        "candidate": request_body.candidate,
+        **decision.__dict__,
+        "verification_source": (
+            "server-approved-package-allowlist"
+            if decision.policy == "server-approved-package-allowlist"
+            else "model-output-only"
+        ),
+        "installer_handoff_called": installer_handoff_called,
+        "upstream_called": False,
+    }
+    if decision.application_decision == "block":
+        return JSONResponse(status_code=422, content=content)
+    return content
 
 
 @app.post("/api/labs/llm10/workshop/chat")

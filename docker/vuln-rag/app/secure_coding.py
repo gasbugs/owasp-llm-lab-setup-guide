@@ -95,6 +95,25 @@ def filter_authenticated_tenant() -> Literal["vulnerable", "safe"]:
     return "safe"
 
 
+def trust_llm09_model_recommendation(candidate: str) -> PolicyDecision:
+    del candidate
+    return PolicyDecision("llm09", "model-recommendation-only", "allow")
+
+
+def require_llm09_approved_package(candidate: str) -> PolicyDecision:
+    approved_packages = {"pyfiglet", "rich", "terminaltables"}
+    if candidate.strip().lower() not in approved_packages:
+        return PolicyDecision(
+            "llm09",
+            "server-approved-package-allowlist",
+            "block",
+            "package-not-approved",
+        )
+    return PolicyDecision(
+        "llm09", "server-approved-package-allowlist", "allow"
+    )
+
+
 def allow_unbounded_generation(message: str) -> PolicyDecision:
     del message
     return PolicyDecision("llm10", "unbounded-request-and-output", "allow")

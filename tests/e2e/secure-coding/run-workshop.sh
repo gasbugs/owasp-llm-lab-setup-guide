@@ -2,14 +2,16 @@
 # Publisher-only E2E runner. Learner notes keep each request as a direct command.
 set -euo pipefail
 
-LAB="${1:?usage: run-workshop.sh LLM01|LLM02|LLM04|LLM06|LLM08|LLM10 vulnerable|safe}"
+LAB="${1:?usage: run-workshop.sh LLM01|LLM02|LLM04|LLM06|LLM08|LLM09|LLM10|DAY6 vulnerable|safe}"
 MODE="${2:?usage: run-workshop.sh LAB vulnerable|safe}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RAG_IMAGE=localhost/secure-coding-rag:latest
 AGENT_IMAGE=localhost/secure-coding-agent:latest
+PRESIDIO_IMAGE=localhost/secure-coding-day6-presidio:latest
 CONTAINER=secure-coding-e2e
 RAG_PORT="${SECURE_CODING_RAG_PORT:-19080}"
 AGENT_PORT="${SECURE_CODING_AGENT_PORT:-19081}"
+DAY6_PORT="${SECURE_CODING_DAY6_PORT:-19084}"
 BODY="$(mktemp)"
 BUILD_LOG="$(mktemp)"
 SOURCE_TOGGLED=false
@@ -44,7 +46,9 @@ paths = {
     "LLM04": root / "docker/vuln-rag/app/main.py",
     "LLM06": root / "docker/vuln-agent/app/main.py",
     "LLM08": root / "docker/vuln-rag/app/main.py",
+    "LLM09": root / "docker/vuln-rag/app/main.py",
     "LLM10": root / "docker/vuln-rag/app/main.py",
+    "DAY6": root / "examples/day6/presidio/server.py",
 }
 lines = paths[lab].read_text(encoding="utf-8").splitlines()
 marker = next(i for i, line in enumerate(lines) if f"NODEGOAT-LAB: {lab}" in line)
@@ -71,12 +75,20 @@ case "$LAB" in
       "$AGENT_IMAGE" >/dev/null
     URL="http://127.0.0.1:$AGENT_PORT"
     ;;
-  LLM01|LLM02|LLM04|LLM08|LLM10)
+  DAY6)
+    podman build -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio" >"$BUILD_LOG"
+    podman run -d --replace --name "$CONTAINER" --network host \
+      -e RUN_MODE=server -e SERVER_PORT="$DAY6_PORT" \
+      -e ENABLE_LAB_ENDPOINTS=true "$PRESIDIO_IMAGE" >/dev/null
+    URL="http://127.0.0.1:$DAY6_PORT"
+    ;;
+  LLM01|LLM02|LLM04|LLM08|LLM09|LLM10)
     podman build -t "$RAG_IMAGE" "$ROOT/docker/vuln-rag" >"$BUILD_LOG"
     case "$LAB" in
       LLM01) SCENARIO=day1 ;;
       LLM02|LLM04) SCENARIO=day2 ;;
       LLM08) SCENARIO=day4 ;;
+      LLM09) SCENARIO=day4 ;;
       LLM10) SCENARIO=day5 ;;
     esac
     podman run -d --replace --name "$CONTAINER" --network host \
@@ -95,7 +107,7 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 curl -fsS --max-time 2 "$URL/healthz" >/dev/null
-if [ "$LAB" != LLM06 ]; then
+if [[ "$LAB" == LLM01 || "$LAB" == LLM02 || "$LAB" == LLM04 || "$LAB" == LLM08 || "$LAB" == LLM09 || "$LAB" == LLM10 ]]; then
   curl -fsS --max-time 2 "$URL/healthz" \
     | jq -e --arg scenario "$SCENARIO" '.default_scenario == $scenario' >/dev/null
 fi
@@ -144,11 +156,23 @@ case "$LAB" in
       -H 'Content-Type: application/json' \
       -d '{"query":"경쟁 조직의 불사조 계획은 언제 실제 서비스에 투입되나요?","top_k":2}')
     ;;
+  LLM09)
+    STATUS=$(curl -sS --max-time 30 -o "$BODY" -w '%{http_code}' \
+      -X POST "$URL/api/labs/llm09/workshop/install" \
+      -H 'Content-Type: application/json' \
+      -d '{"candidate":"owasp-llm-lab-nonexistent-candidate-20260711"}')
+    ;;
   LLM10)
     python3 -c 'import json; print(json.dumps({"message":"x" * 1201}))' >"$BODY.request"
     STATUS=$(curl -sS --max-time 180 -o "$BODY" -w '%{http_code}' \
       -X POST "$URL/api/labs/llm10/workshop/chat" \
       -H 'Content-Type: application/json' --data-binary @"$BODY.request")
+    ;;
+  DAY6)
+    STATUS=$(curl -sS --max-time 30 -o "$BODY" -w '%{http_code}' \
+      -X POST "$URL/api/labs/secure-coding/scan" \
+      -H 'Content-Type: application/json' \
+      -d '{"text":"Send the report to alice@example.com after review."}')
     ;;
 esac
 
@@ -161,5 +185,5 @@ if [ -f "$BODY.object" ]; then
     "$BODY.object"
 fi
 podman logs "$CONTAINER" 2>&1 \
-  | grep -E 'secure_coding_policy|llm06_tool_policy|llm05_output_render' \
+  | grep -E 'secure_coding_policy|day6_secure_coding_policy|llm06_tool_policy|llm05_output_render' \
   | tail -1 || true
