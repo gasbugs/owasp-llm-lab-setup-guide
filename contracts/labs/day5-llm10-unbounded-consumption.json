@@ -79,7 +79,7 @@
   "book_bindings": [
     {
       "lesson_path": "day5/02-lab-llm10.md",
-      "section": "1. 짧은 요청으로 API 기준 응답 확인",
+      "section": "2. 짧은 요청으로 API 기준 응답 확인",
       "observation_id": "day5-llm10-baseline-request",
       "observation_command": "curl -sS --max-time 45 -X POST http://localhost:8013/api/chat",
       "case_ids": ["baseline-request"],
@@ -87,7 +87,7 @@
     },
     {
       "lesson_path": "day5/02-lab-llm10.md",
-      "section": "2. 1,200줄 출력을 한 번 요청해 생성량 상한 확인",
+      "section": "3. 1,200줄 출력을 한 번 요청해 생성량 상한 확인",
       "observation_id": "day5-llm10-output-flood-request",
       "observation_command": "curl -sS --max-time 45 -X POST http://localhost:8013/api/chat",
       "case_ids": ["output-flood-request"],
@@ -95,7 +95,7 @@
     },
     {
       "lesson_path": "day5/02-lab-llm10.md",
-      "section": "3. 37,028바이트 입력을 한 번 전달해 요청 크기 상한 확인",
+      "section": "4. 37,028바이트 입력을 한 번 전달해 요청 크기 상한 확인",
       "observation_id": "day5-llm10-large-input-request",
       "observation_command": "jq -n --rawfile message ~/work/llm10-large-input.txt",
       "case_ids": ["large-input-request"],
