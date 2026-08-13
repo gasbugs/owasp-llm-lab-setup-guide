@@ -31,6 +31,31 @@ elif [ "$MODE" != vulnerable ]; then
   exit 2
 fi
 
+PAIR_SOURCE=$(python3 - "$ROOT" "$LAB" "$MODE" <<'PY'
+from pathlib import Path
+import sys
+
+root, lab, mode = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+paths = {
+    "LLM01": root / "docker/vuln-rag/app/main.py",
+    "LLM02": root / "docker/vuln-rag/app/main.py",
+    "LLM04": root / "docker/vuln-rag/app/main.py",
+    "LLM06": root / "docker/vuln-agent/app/main.py",
+    "LLM08": root / "docker/vuln-rag/app/main.py",
+    "LLM10": root / "docker/vuln-rag/app/main.py",
+}
+lines = paths[lab].read_text(encoding="utf-8").splitlines()
+marker = next(i for i, line in enumerate(lines) if f"NODEGOAT-LAB: {lab}" in line)
+window = lines[marker + 1:marker + 5]
+active = [line.strip() for line in window if not line.lstrip().startswith("#") and "=" in line]
+expected = "SAFE-ENABLE" if mode == "safe" else "VULNERABLE-ACTIVE"
+if len(active) != 1 or expected not in active[0]:
+    raise SystemExit(f"source switch mismatch: lab={lab} mode={mode} active={active}")
+print(active[0])
+PY
+)
+printf 'SOURCE_ACTIVE lab=%s mode=%s :: %s\n' "$LAB" "$MODE" "$PAIR_SOURCE" >&2
+
 case "$LAB" in
   LLM06)
     podman build -t "$AGENT_IMAGE" "$ROOT/docker/vuln-agent" >"$BUILD_LOG"
@@ -63,6 +88,10 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 curl -fsS --max-time 2 "$URL/healthz" >/dev/null
+if [ "$LAB" != LLM06 ]; then
+  curl -fsS --max-time 2 "$URL/healthz" \
+    | jq -e --arg scenario "$SCENARIO" '.default_scenario == $scenario' >/dev/null
+fi
 
 case "$LAB" in
   LLM01)
