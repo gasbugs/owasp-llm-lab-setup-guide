@@ -69,6 +69,13 @@ jobs:
       - name: Check adjacent vulnerable and safe coding pairs
         run: python tools/check_secure_coding_pairs.py
 
+      - name: Run Day 4 and Day 6 secure-coding container E2E
+        run: |
+          CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh LLM09 vulnerable
+          CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh LLM09 safe
+          CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh DAY6 vulnerable
+          CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh DAY6 safe
+
       - name: Run shared-corpus source regression
         run: python tests/e2e/llm04/test_llm04_shared_corpus.py
 

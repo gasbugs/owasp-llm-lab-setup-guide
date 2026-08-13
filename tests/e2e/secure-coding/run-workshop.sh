@@ -5,6 +5,7 @@ set -euo pipefail
 LAB="${1:?usage: run-workshop.sh LLM01|LLM02|LLM04|LLM06|LLM08|LLM09|LLM10|DAY6 vulnerable|safe}"
 MODE="${2:?usage: run-workshop.sh LAB vulnerable|safe}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 RAG_IMAGE=localhost/secure-coding-rag:latest
 AGENT_IMAGE=localhost/secure-coding-agent:latest
 PRESIDIO_IMAGE=localhost/secure-coding-day6-presidio:latest
@@ -17,7 +18,7 @@ BUILD_LOG="$(mktemp)"
 SOURCE_TOGGLED=false
 
 cleanup() {
-  podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  "$CONTAINER_ENGINE" rm -f "$CONTAINER" >/dev/null 2>&1 || true
   if [ "$SOURCE_TOGGLED" = true ]; then
     python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
       --lab "$LAB" --mode vulnerable >/dev/null
@@ -69,21 +70,21 @@ printf 'SOURCE_ACTIVE lab=%s mode=%s :: %s\n' "$LAB" "$MODE" "$PAIR_SOURCE" >&2
 
 case "$LAB" in
   LLM06)
-    podman build -t "$AGENT_IMAGE" "$ROOT/docker/vuln-agent" >"$BUILD_LOG"
-    podman run -d --replace --name "$CONTAINER" --network host \
+    "$CONTAINER_ENGINE" build -t "$AGENT_IMAGE" "$ROOT/docker/vuln-agent" >"$BUILD_LOG"
+    "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
       -e PORT="$AGENT_PORT" -e OLLAMA_URL=http://127.0.0.1:11434 \
       "$AGENT_IMAGE" >/dev/null
     URL="http://127.0.0.1:$AGENT_PORT"
     ;;
   DAY6)
-    podman build -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio" >"$BUILD_LOG"
-    podman run -d --replace --name "$CONTAINER" --network host \
+    "$CONTAINER_ENGINE" build -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio" >"$BUILD_LOG"
+    "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
       -e RUN_MODE=server -e SERVER_PORT="$DAY6_PORT" \
       -e ENABLE_LAB_ENDPOINTS=true "$PRESIDIO_IMAGE" >/dev/null
     URL="http://127.0.0.1:$DAY6_PORT"
     ;;
   LLM01|LLM02|LLM04|LLM08|LLM09|LLM10)
-    podman build -t "$RAG_IMAGE" "$ROOT/docker/vuln-rag" >"$BUILD_LOG"
+    "$CONTAINER_ENGINE" build -t "$RAG_IMAGE" "$ROOT/docker/vuln-rag" >"$BUILD_LOG"
     case "$LAB" in
       LLM01) SCENARIO=day1 ;;
       LLM02|LLM04) SCENARIO=day2 ;;
@@ -91,7 +92,7 @@ case "$LAB" in
       LLM09) SCENARIO=day4 ;;
       LLM10) SCENARIO=day5 ;;
     esac
-    podman run -d --replace --name "$CONTAINER" --network host \
+    "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
       -e PORT="$RAG_PORT" -e DEFAULT_SCENARIO="$SCENARIO" \
       -e OLLAMA_URL=http://127.0.0.1:11434 "$RAG_IMAGE" >/dev/null
     URL="http://127.0.0.1:$RAG_PORT"
@@ -184,6 +185,6 @@ if [ -f "$BODY.object" ]; then
     '. + {e2e_lab:$lab,e2e_mode:$mode,e2e_case:"object-scope",http_status:$http_status}' \
     "$BODY.object"
 fi
-podman logs "$CONTAINER" 2>&1 \
+"$CONTAINER_ENGINE" logs "$CONTAINER" 2>&1 \
   | grep -E 'secure_coding_policy|day6_secure_coding_policy|llm06_tool_policy|llm05_output_render' \
   | tail -1 || true
