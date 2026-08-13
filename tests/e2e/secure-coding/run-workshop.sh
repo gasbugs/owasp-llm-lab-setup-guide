@@ -151,7 +151,7 @@ run_normal_baseline() {
           -H 'Content-Type: application/json' \
           -d '{"message":"내 고객 레코드의 현재 상담 상태를 알려 줘."}' \
           -o "$NORMAL_BODY"
-        jq -e '.customer_id == "C-2001" and .trace.customer_id_source == "authorization" and .trace.upstream_called == true' "$NORMAL_BODY" >/dev/null
+        jq -e '.customer_id == "C-2001" and .trace.customer_id_source == "verified-bearer-token-map" and .trace.upstream_called == true' "$NORMAL_BODY" >/dev/null
       else
         curl -fsS --max-time 180 -X POST "$URL/api/labs/llm02/workshop/chat" \
           -H 'Content-Type: application/json' \
