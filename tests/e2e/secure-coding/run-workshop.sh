@@ -14,6 +14,7 @@ RAG_PORT="${SECURE_CODING_RAG_PORT:-19080}"
 AGENT_PORT="${SECURE_CODING_AGENT_PORT:-19081}"
 DAY6_PORT="${SECURE_CODING_DAY6_PORT:-19084}"
 BODY="$(mktemp)"
+NORMAL_BODY="$(mktemp)"
 BUILD_LOG="$(mktemp)"
 SOURCE_TOGGLED=false
 
@@ -23,7 +24,7 @@ cleanup() {
     python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
       --lab "$LAB" --mode vulnerable >/dev/null
   fi
-  rm -f "$BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object" "$BODY.html"
+  rm -f "$BODY" "$NORMAL_BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object" "$BODY.html"
 }
 trap cleanup EXIT
 
@@ -133,6 +134,85 @@ if [[ "$LAB" == LLM01 || "$LAB" == LLM02 || "$LAB" == LLM04 || "$LAB" == LLM05 |
   curl -fsS --max-time 2 "$URL/healthz" \
     | jq -e --arg scenario "$SCENARIO" '.default_scenario == $scenario' >/dev/null
 fi
+
+run_normal_baseline() {
+  case "$LAB" in
+    LLM01)
+      curl -fsS --max-time 180 -X POST "$URL/api/labs/llm01/workshop/chat" \
+        -H 'Content-Type: application/json' \
+        -d '{"message":"모바일 송금 장애가 발생하면 무엇을 확인해야 하나요?"}' \
+        -o "$NORMAL_BODY"
+      jq -e '.application_decision == "allow" and .upstream_called == true and (.reply | type == "string" and length > 0)' "$NORMAL_BODY" >/dev/null
+      ;;
+    LLM02)
+      if [ "$MODE" = safe ]; then
+        curl -fsS --max-time 180 -X POST "$URL/api/labs/llm02/workshop/chat" \
+          -H 'Authorization: Bearer llm02-c2001-demo-token' \
+          -H 'Content-Type: application/json' \
+          -d '{"message":"내 고객 레코드의 현재 상담 상태를 알려 줘."}' \
+          -o "$NORMAL_BODY"
+        jq -e '.customer_id == "C-2001" and .trace.customer_id_source == "authorization" and .trace.upstream_called == true' "$NORMAL_BODY" >/dev/null
+      else
+        curl -fsS --max-time 180 -X POST "$URL/api/labs/llm02/workshop/chat" \
+          -H 'Content-Type: application/json' \
+          -d '{"customer_id":"C-2001","message":"내 고객 레코드의 현재 상담 상태를 알려 줘."}' \
+          -o "$NORMAL_BODY"
+        jq -e '.customer_id == "C-2001" and .trace.customer_id_source == "request-body" and .trace.upstream_called == true' "$NORMAL_BODY" >/dev/null
+      fi
+      ;;
+    LLM04)
+      curl -fsS --max-time 180 -X POST "$URL/api/labs/llm04/workshop/chat" \
+        -H 'Content-Type: application/json' \
+        -d '{"query":"모바일 송금 장애가 발생하면 무엇을 확인해야 하나요?"}' \
+        -o "$NORMAL_BODY"
+      jq -e '.upstream_called == true and (.reply | type == "string" and length > 0) and any(.retrieval.hits[]?; .approval_status == "approved")' "$NORMAL_BODY" >/dev/null
+      ;;
+    LLM05)
+      curl -fsS --max-time 180 -X POST "$URL/api/chat" \
+        -H 'Content-Type: application/json' \
+        -d '{"message":"모바일 송금 장애가 발생하면 무엇을 확인해야 하나요?"}' \
+        -o "$NORMAL_BODY"
+      jq -e '.reply | type == "string" and length > 0' "$NORMAL_BODY" >/dev/null
+      ;;
+    LLM06)
+      curl -fsS --max-time 30 -X POST "$URL/api/labs/llm06/workshop/execute" \
+        -H 'Authorization: Bearer llm06-farmer1-demo-token' \
+        -H 'Content-Type: application/json' \
+        -d '{"user_id":"farmer1","tool":"list_animals","args":{"farmer_id":"farmer1"}}' \
+        -o "$NORMAL_BODY"
+      jq -e '.application_decision == "allow" and .calling_user == "farmer1" and .tool == "list_animals" and .tool_called == true and (.result | length == 2)' "$NORMAL_BODY" >/dev/null
+      ;;
+    LLM08)
+      curl -fsS --max-time 180 -X POST "$URL/api/labs/llm08/workshop/search" \
+        -H 'Authorization: Bearer llm08-acme-demo-token' \
+        -H 'Content-Type: application/json' \
+        -d '{"query":"우리 조직의 첫 분기 매출과 대표 상품을 찾아줘.","top_k":2}' \
+        -o "$NORMAL_BODY"
+      jq -e '.authenticated_context.tenant == "acme" and any(.hits[]?; .tenant == "acme")' "$NORMAL_BODY" >/dev/null
+      ;;
+    LLM09)
+      curl -fsS --max-time 30 -X POST "$URL/api/labs/llm09/workshop/install" \
+        -H 'Content-Type: application/json' -d '{"candidate":"rich"}' \
+        -o "$NORMAL_BODY"
+      jq -e '.application_decision == "allow" and .installer_handoff_called == true' "$NORMAL_BODY" >/dev/null
+      ;;
+    LLM10)
+      curl -fsS --max-time 180 -X POST "$URL/api/labs/llm10/workshop/chat" \
+        -H 'Content-Type: application/json' -d '{"message":"서비스 상태를 짧게 알려 줘."}' \
+        -o "$NORMAL_BODY"
+      jq -e '.application_decision == "allow" and .upstream_called == true and (.reply | type == "string" and length > 0)' "$NORMAL_BODY" >/dev/null
+      ;;
+    DAY6)
+      curl -fsS --max-time 30 -X POST "$URL/api/labs/secure-coding/scan" \
+        -H 'Content-Type: application/json' -d '{"text":"오늘 회의는 오후 세 시입니다."}' \
+        -o "$NORMAL_BODY"
+      jq -e '.application_decision == "allow" and .modified == false' "$NORMAL_BODY" >/dev/null
+      ;;
+  esac
+  printf 'NORMAL_BASELINE_ASSERTION lab=%s mode=%s result=PASS\n' "$LAB" "$MODE" >&2
+}
+
+run_normal_baseline
 
 case "$LAB" in
   LLM01)
