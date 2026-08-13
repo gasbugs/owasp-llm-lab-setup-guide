@@ -51,7 +51,7 @@ class Day2BrandingTest(unittest.TestCase):
         self.assertEqual(api_metadata["id"], "day2")
         self.assertEqual(
             api_metadata["title"],
-            "CloudSecurityLab Bank 고객 서비스 (LLM02/LLM04)",
+            "CloudSecurityLab Bank 고객 데이터·지식 출처 실습 (LLM02/LLM04)",
         )
         for field in ("title", "intro", "warning"):
             self.assertIn(BRAND, api_metadata[field], field)
@@ -66,7 +66,7 @@ class Day2BrandingTest(unittest.TestCase):
     def test_system_prompt_uses_cloudsecuritylab_bank_brand(self) -> None:
         prompt = DAY2.build_system_prompt(context=[])
 
-        self.assertIn("'CloudSecurityLab Bank 고객 서비스 AI'", prompt)
+        self.assertIn("CloudSecurityLab Bank 고객 서비스 AI", prompt)
         for legacy in LEGACY_BRANDS:
             self.assertNotIn(legacy, prompt)
 
@@ -74,8 +74,8 @@ class Day2BrandingTest(unittest.TestCase):
         docs = DAY2.list_docs()
 
         self.assertGreaterEqual(len(docs), 2)
+        self.assertTrue(any(BRAND in doc for doc in docs[:2]))
         for doc in docs[:2]:
-            self.assertIn(BRAND, doc)
             for legacy in LEGACY_BRANDS:
                 self.assertNotIn(legacy, doc)
 

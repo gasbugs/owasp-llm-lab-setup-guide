@@ -20,6 +20,7 @@ from app.embedding import EmbeddingBackendError, EmbeddingClient
 from app.guardrails import GuardrailProxy, GuardrailProxyError
 from app.llm import LLMClient
 from app.scenarios import SCENARIO_NAMES, list_scenarios
+from app.scenarios import day2 as day2_scenario
 from app.scenarios import day4 as day4_scenario
 
 DEFAULT_SCENARIO = os.environ.get("DEFAULT_SCENARIO", os.environ.get("SCENARIO", "day1"))
@@ -65,6 +66,32 @@ class EmbedRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     input: str | list[str]
+
+
+class LLM02ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=4096)
+    customer_id: str = Field(default=day2_scenario.LLM02_CUSTOMER_ID)
+
+
+class LLM04ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(min_length=1, max_length=4096)
+
+
+class LLM04DocumentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=10000)
+    source: str = Field(default="learner-upload", min_length=1, max_length=200)
+    revision: str = Field(default="1", min_length=1, max_length=50)
+    approval_status: Literal["approved", "unapproved"] = "unapproved"
+    ingestion_actor: str = Field(
+        default="anonymous-lab-user", min_length=1, max_length=200
+    )
 
 
 def get_scenario(name: str | None):
@@ -126,6 +153,90 @@ async def run_llm08_chat(
     }
 
 
+def require_day2_lab() -> None:
+    if DEFAULT_SCENARIO != "day2":
+        raise HTTPException(status_code=404, detail="not found")
+
+
+async def run_llm02_chat(
+    request_body: LLM02ChatRequest,
+    *,
+    mode: Literal["vulnerable", "safe"],
+) -> dict:
+    require_day2_lab()
+    try:
+        context = day2_scenario.customer_context(request_body.customer_id, mode)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="synthetic customer not found") from exc
+
+    context_fields = list(context)
+    sensitive_in_context = [
+        field for field in day2_scenario.LLM02_SENSITIVE_FIELDS if field in context
+    ]
+    system_prompt = day2_scenario.build_system_prompt(
+        [json.dumps(context, ensure_ascii=False)]
+    )
+    reply = await llm.chat(system=system_prompt, user=request_body.message)
+    redacted_fields: list[str] = []
+    if mode == "safe":
+        reply, redacted_fields = day2_scenario.redact_sensitive_output(reply)
+
+    return {
+        "reply": reply,
+        "scenario": "day2",
+        "lab": "llm02-data-minimization",
+        "mode": mode,
+        "customer_id": request_body.customer_id,
+        "trace": {
+            "storage": "sqlite:memory:synthetic_customers",
+            "query_authorized_for": request_body.customer_id,
+            "queried_fields": list(day2_scenario.LLM02_ALL_FIELDS),
+            "allowlist_applied_before_model": mode == "safe",
+            "context_fields": context_fields,
+            "sensitive_fields_in_context": sensitive_in_context,
+            "upstream_called": True,
+        },
+        "output_policy": {
+            "redaction_applied": mode == "safe",
+            "redacted_fields": redacted_fields,
+        },
+        "audit": {
+            "event": "llm02_customer_summary",
+            "decision": "allow-with-minimized-context" if mode == "safe" else "allow-overfetch",
+        },
+    }
+
+
+async def run_llm04_chat(
+    request_body: LLM04ChatRequest,
+    *,
+    mode: Literal["vulnerable", "safe"],
+) -> dict:
+    require_day2_lab()
+    records = day2_scenario.retrieve_documents(request_body.query, mode)
+    context = [record.rendered for record in records]
+    system_prompt = day2_scenario.build_system_prompt(context)
+    reply = await llm.chat(system=system_prompt, user=request_body.query)
+    return {
+        "reply": reply,
+        "scenario": "day2",
+        "lab": "llm04-knowledge-provenance",
+        "mode": mode,
+        "retrieval": {
+            "provenance_filter_applied": mode == "safe",
+            "required_approval_status": "approved" if mode == "safe" else None,
+            "hits": [
+                {
+                    "rank": rank,
+                    **day2_scenario.asdict(record),
+                }
+                for rank, record in enumerate(records, 1)
+            ],
+        },
+        "upstream_called": True,
+    }
+
+
 @app.get("/healthz")
 async def health():
     return {
@@ -159,6 +270,82 @@ async def guardrails_policy():
         return await guardrail_proxy.policy()
     except GuardrailProxyError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/api/labs/llm02/customer/{customer_id}")
+async def llm02_customer_ground_truth(customer_id: str):
+    """LAB ONLY: expose the synthetic SQLite row used as learner ground truth."""
+    require_day2_lab()
+    try:
+        return {
+            "lab_only": True,
+            "storage": "sqlite:memory:synthetic_customers",
+            "record": day2_scenario.customer_record(customer_id),
+        }
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="synthetic customer not found") from exc
+
+
+@app.get("/api/labs/llm02/policy")
+async def llm02_policy():
+    require_day2_lab()
+    return {
+        "lab_only": True,
+        "vulnerable": {"query": "SELECT *", "model_context": "all queried fields"},
+        "safe": {
+            "query": "authorized customer row",
+            "model_context_allowlist": list(day2_scenario.LLM02_SAFE_FIELDS),
+            "output_redaction": list(day2_scenario.LLM02_SENSITIVE_FIELDS),
+        },
+    }
+
+
+@app.post("/api/labs/llm02/vulnerable/chat")
+async def llm02_vulnerable_chat(request_body: LLM02ChatRequest):
+    return await run_llm02_chat(request_body, mode="vulnerable")
+
+
+@app.post("/api/labs/llm02/safe/chat")
+async def llm02_safe_chat(request_body: LLM02ChatRequest):
+    return await run_llm02_chat(request_body, mode="safe")
+
+
+@app.get("/api/labs/llm04/documents")
+async def llm04_documents():
+    require_day2_lab()
+    return {"lab_only": True, "documents": day2_scenario.document_records()}
+
+
+@app.post("/api/labs/llm04/documents")
+async def llm04_add_document(request_body: LLM04DocumentRequest):
+    require_day2_lab()
+    day2_scenario.add_doc(**request_body.model_dump())
+    return {
+        "ok": True,
+        "lab_only": True,
+        "document": day2_scenario.document_records()[-1],
+    }
+
+
+@app.post("/api/labs/llm04/vulnerable/chat")
+async def llm04_vulnerable_chat(request_body: LLM04ChatRequest):
+    return await run_llm04_chat(request_body, mode="vulnerable")
+
+
+@app.post("/api/labs/llm04/safe/chat")
+async def llm04_safe_chat(request_body: LLM04ChatRequest):
+    return await run_llm04_chat(request_body, mode="safe")
+
+
+@app.get("/api/labs/llm07/policy-canonical")
+async def llm07_policy_canonical():
+    if DEFAULT_SCENARIO != "day4":
+        raise HTTPException(status_code=404, detail="not found")
+    return {
+        "lab_only": True,
+        "policy": day4_scenario.LLM07_POLICY_CANONICAL,
+        "credential_present": False,
+    }
 
 
 @app.post("/api/labs/llm08/vulnerable/search")

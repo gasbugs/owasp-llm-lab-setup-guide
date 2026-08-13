@@ -121,11 +121,17 @@ class StrictShellHarnessContractTest(unittest.TestCase):
         for relative in (
             "tests/e2e/llm05/test_llm05_output.sh",
             "tests/e2e/llm06/test_llm06_agency.sh",
-            "tests/e2e/llm07/test_llm07_sys_prompt.sh",
             "tests/e2e/llm09/test_llm09_misinfo.sh",
             "tests/e2e/llm10/test_llm10_consumption.sh",
         ):
             self.assertIn("strict_acceptance_enabled", self.read(relative), relative)
+
+    def test_llm07_harness_reconstructs_policy_without_secret_marker(self) -> None:
+        source = self.read("tests/e2e/llm07/test_llm07_sys_prompt.sh")
+        self.assertIn("policy-canonical", source)
+        self.assertIn("PG-LITE-POLICY-2026-07", source)
+        self.assertIn("search_documents", source)
+        self.assertNotIn("int-tok-c9a7-xxxx-secret", source)
 
     def test_llm06_trace_and_impact_contracts_are_explicit(self) -> None:
         source = self.read("tests/e2e/llm06/test_llm06_agency.sh")
