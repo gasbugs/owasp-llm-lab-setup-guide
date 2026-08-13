@@ -20,7 +20,7 @@ cleanup() {
     python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
       --lab "$LAB" --mode vulnerable >/dev/null
   fi
-  rm -f "$BODY" "$BUILD_LOG" "$BODY.request"
+  rm -f "$BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object"
 }
 trap cleanup EXIT
 
@@ -129,6 +129,13 @@ case "$LAB" in
       -H 'Authorization: Bearer llm06-farmer1-demo-token' \
       -H 'Content-Type: application/json' \
       -d '{"user_id":"admin","tool":"debug_sql","args":{"query":"SELECT * FROM users"}}')
+    if [ "$MODE" = safe ]; then
+      OBJECT_STATUS=$(curl -sS --max-time 30 -o "$BODY.object" -w '%{http_code}' \
+        -X POST "$URL/api/labs/llm06/workshop/execute" \
+        -H 'Authorization: Bearer llm06-farmer1-demo-token' \
+        -H 'Content-Type: application/json' \
+        -d '{"user_id":"farmer1","tool":"list_animals","args":{"farmer_id":"farmer2"}}')
+    fi
     ;;
   LLM08)
     STATUS=$(curl -sS --max-time 180 -o "$BODY" -w '%{http_code}' \
@@ -147,6 +154,12 @@ esac
 
 jq -c --arg lab "$LAB" --arg mode "$MODE" --argjson http_status "$STATUS" \
   '. + {e2e_lab:$lab,e2e_mode:$mode,http_status:$http_status}' "$BODY"
+if [ -f "$BODY.object" ]; then
+  jq -c --arg lab "$LAB" --arg mode "$MODE" \
+    --argjson http_status "$OBJECT_STATUS" \
+    '. + {e2e_lab:$lab,e2e_mode:$mode,e2e_case:"object-scope",http_status:$http_status}' \
+    "$BODY.object"
+fi
 podman logs "$CONTAINER" 2>&1 \
   | grep -E 'secure_coding_policy|llm06_tool_policy|llm05_output_render' \
   | tail -1 || true

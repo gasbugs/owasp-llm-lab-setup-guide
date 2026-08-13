@@ -92,6 +92,15 @@ class SecureCodingWorkshopTest(unittest.TestCase):
                 "Bearer llm06-farmer1-demo-token",
             )
 
+    def test_llm06_safe_executor_blocks_other_owner_object(self) -> None:
+        with self.assertRaisesRegex(PermissionError, "authenticated owner"):
+            AGENT_TOOLS.execute_tool_safe(
+                "list_animals",
+                {"farmer_id": "farmer2"},
+                "farmer1",
+                "Bearer llm06-farmer1-demo-token",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
