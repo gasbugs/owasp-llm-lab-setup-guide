@@ -8,6 +8,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RAG_IMAGE=localhost/secure-coding-rag:latest
 AGENT_IMAGE=localhost/secure-coding-agent:latest
 CONTAINER=secure-coding-e2e
+RAG_PORT="${SECURE_CODING_RAG_PORT:-19080}"
+AGENT_PORT="${SECURE_CODING_AGENT_PORT:-19081}"
 BODY="$(mktemp)"
 BUILD_LOG="$(mktemp)"
 SOURCE_TOGGLED=false
@@ -65,9 +67,9 @@ case "$LAB" in
   LLM06)
     podman build -t "$AGENT_IMAGE" "$ROOT/docker/vuln-agent" >"$BUILD_LOG"
     podman run -d --replace --name "$CONTAINER" --network host \
-      -e PORT=18081 -e OLLAMA_URL=http://127.0.0.1:11434 \
+      -e PORT="$AGENT_PORT" -e OLLAMA_URL=http://127.0.0.1:11434 \
       "$AGENT_IMAGE" >/dev/null
-    URL=http://127.0.0.1:18081
+    URL="http://127.0.0.1:$AGENT_PORT"
     ;;
   LLM01|LLM02|LLM04|LLM08|LLM10)
     podman build -t "$RAG_IMAGE" "$ROOT/docker/vuln-rag" >"$BUILD_LOG"
@@ -78,9 +80,9 @@ case "$LAB" in
       LLM10) SCENARIO=day5 ;;
     esac
     podman run -d --replace --name "$CONTAINER" --network host \
-      -e PORT=18080 -e DEFAULT_SCENARIO="$SCENARIO" \
+      -e PORT="$RAG_PORT" -e DEFAULT_SCENARIO="$SCENARIO" \
       -e OLLAMA_URL=http://127.0.0.1:11434 "$RAG_IMAGE" >/dev/null
-    URL=http://127.0.0.1:18080
+    URL="http://127.0.0.1:$RAG_PORT"
     ;;
   *)
     echo "unsupported lab: $LAB" >&2
