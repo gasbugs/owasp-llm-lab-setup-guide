@@ -213,6 +213,9 @@ run_normal_baseline() {
 }
 
 run_normal_baseline
+jq -c --arg lab "$LAB" --arg mode "$MODE" \
+  '. + {e2e_lab:$lab,e2e_mode:$mode,e2e_case:"normal-baseline"}' \
+  "$NORMAL_BODY"
 
 case "$LAB" in
   LLM01)
