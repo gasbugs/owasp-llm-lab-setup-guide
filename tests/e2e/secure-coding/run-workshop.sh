@@ -2,7 +2,7 @@
 # Publisher-only E2E runner. Learner notes keep each request as a direct command.
 set -euo pipefail
 
-LAB="${1:?usage: run-workshop.sh LLM01|LLM02|LLM04|LLM06|LLM08|LLM09|LLM10|DAY6 vulnerable|safe}"
+LAB="${1:?usage: run-workshop.sh LLM01|LLM02|LLM04|LLM05|LLM06|LLM08|LLM09|LLM10|DAY6 vulnerable|safe}"
 MODE="${2:?usage: run-workshop.sh LAB vulnerable|safe}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
@@ -23,20 +23,17 @@ cleanup() {
     python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
       --lab "$LAB" --mode vulnerable >/dev/null
   fi
-  rm -f "$BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object"
+  rm -f "$BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object" "$BODY.html"
 }
 trap cleanup EXIT
 
-if [ "$MODE" = safe ]; then
-  python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
-    --lab "$LAB" --mode safe >/dev/null
-  SOURCE_TOGGLED=true
-elif [ "$MODE" != vulnerable ]; then
+if [ "$MODE" != vulnerable ] && [ "$MODE" != safe ]; then
   echo "mode must be vulnerable or safe" >&2
   exit 2
 fi
 
-PAIR_SOURCE=$(python3 - "$ROOT" "$LAB" "$MODE" <<'PY'
+active_source() {
+python3 - "$ROOT" "$LAB" "$1" <<'PY'
 from pathlib import Path
 import sys
 
@@ -45,6 +42,7 @@ paths = {
     "LLM01": root / "docker/vuln-rag/app/main.py",
     "LLM02": root / "docker/vuln-rag/app/main.py",
     "LLM04": root / "docker/vuln-rag/app/main.py",
+    "LLM05": root / "docker/vuln-rag/app/templates/index.html",
     "LLM06": root / "docker/vuln-agent/app/main.py",
     "LLM08": root / "docker/vuln-rag/app/main.py",
     "LLM09": root / "docker/vuln-rag/app/main.py",
@@ -65,13 +63,16 @@ if len(active) != 1 or expected not in active[0]:
     raise SystemExit(f"source switch mismatch: lab={lab} mode={mode} active={active}")
 print(active[0])
 PY
-)
-printf 'SOURCE_ACTIVE lab=%s mode=%s :: %s\n' "$LAB" "$MODE" "$PAIR_SOURCE" >&2
+}
+
+PAIR_SOURCE=$(active_source vulnerable)
+printf 'SOURCE_BUILD lab=%s mode=vulnerable :: %s\n' "$LAB" "$PAIR_SOURCE" >&2
 
 case "$LAB" in
   LLM06)
     "$CONTAINER_ENGINE" build -t "$AGENT_IMAGE" "$ROOT/docker/vuln-agent" >"$BUILD_LOG"
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
+      -v "$ROOT/docker/vuln-agent/app:/app/app:ro,Z" \
       -e PORT="$AGENT_PORT" -e OLLAMA_URL=http://127.0.0.1:11434 \
       "$AGENT_IMAGE" >/dev/null
     URL="http://127.0.0.1:$AGENT_PORT"
@@ -81,20 +82,23 @@ case "$LAB" in
       -f "$ROOT/examples/day6/presidio/Containerfile" \
       -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio" >"$BUILD_LOG"
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
+      -v "$ROOT/examples/day6/presidio:/app:ro,Z" \
       -e RUN_MODE=server -e SERVER_PORT="$DAY6_PORT" \
       -e ENABLE_LAB_ENDPOINTS=true "$PRESIDIO_IMAGE" >/dev/null
     URL="http://127.0.0.1:$DAY6_PORT"
     ;;
-  LLM01|LLM02|LLM04|LLM08|LLM09|LLM10)
+  LLM01|LLM02|LLM04|LLM05|LLM08|LLM09|LLM10)
     "$CONTAINER_ENGINE" build -t "$RAG_IMAGE" "$ROOT/docker/vuln-rag" >"$BUILD_LOG"
     case "$LAB" in
       LLM01) SCENARIO=day1 ;;
       LLM02|LLM04) SCENARIO=day2 ;;
+      LLM05) SCENARIO=day3 ;;
       LLM08) SCENARIO=day4 ;;
       LLM09) SCENARIO=day4 ;;
       LLM10) SCENARIO=day5 ;;
     esac
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
+      -v "$ROOT/docker/vuln-rag/app:/app/app:ro,Z" \
       -e PORT="$RAG_PORT" -e DEFAULT_SCENARIO="$SCENARIO" \
       -e OLLAMA_URL=http://127.0.0.1:11434 "$RAG_IMAGE" >/dev/null
     URL="http://127.0.0.1:$RAG_PORT"
@@ -105,12 +109,26 @@ case "$LAB" in
     ;;
 esac
 
-for _ in $(seq 1 30); do
-  curl -fsS --max-time 2 "$URL/healthz" >/dev/null 2>&1 && break
-  sleep 1
-done
-curl -fsS --max-time 2 "$URL/healthz" >/dev/null
-if [[ "$LAB" == LLM01 || "$LAB" == LLM02 || "$LAB" == LLM04 || "$LAB" == LLM08 || "$LAB" == LLM09 || "$LAB" == LLM10 ]]; then
+wait_ready() {
+  for _ in $(seq 1 30); do
+    curl -fsS --max-time 2 "$URL/healthz" >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  curl -fsS --max-time 2 "$URL/healthz" >/dev/null
+}
+
+wait_ready
+
+if [ "$MODE" = safe ]; then
+  python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
+    --lab "$LAB" --mode safe >/dev/null
+  SOURCE_TOGGLED=true
+  PAIR_SOURCE=$(active_source safe)
+  printf 'SOURCE_RESTART lab=%s mode=safe :: %s\n' "$LAB" "$PAIR_SOURCE" >&2
+  "$CONTAINER_ENGINE" restart "$CONTAINER" >/dev/null
+  wait_ready
+fi
+if [[ "$LAB" == LLM01 || "$LAB" == LLM02 || "$LAB" == LLM04 || "$LAB" == LLM05 || "$LAB" == LLM08 || "$LAB" == LLM09 || "$LAB" == LLM10 ]]; then
   curl -fsS --max-time 2 "$URL/healthz" \
     | jq -e --arg scenario "$SCENARIO" '.default_scenario == $scenario' >/dev/null
 fi
@@ -137,6 +155,20 @@ case "$LAB" in
       -X POST "$URL/api/labs/llm04/workshop/chat" \
       -H 'Content-Type: application/json' \
       -d '{"query":"2026년 송금 장애 URL을 알려 줘."}')
+    ;;
+  LLM05)
+    curl -fsS --max-time 30 "$URL/" -o "$BODY.html"
+    if [ "$MODE" = safe ]; then
+      grep -q '^[[:space:]]*renderModelOutputSafe(d, role, text); // SAFE-ENABLE' "$BODY.html"
+      renderer=textContent
+    else
+      grep -q '^[[:space:]]*renderModelOutputVulnerable(d, role, text); // VULNERABLE-ACTIVE' "$BODY.html"
+      renderer=innerHTML
+    fi
+    jq -n --arg renderer "$renderer" \
+      '{lab:"llm05",policy:$renderer,application_decision:"render",served_html:true}' \
+      >"$BODY"
+    STATUS=200
     ;;
   LLM06)
     STATUS=$(curl -sS --max-time 30 -o "$BODY" -w '%{http_code}' \
@@ -178,6 +210,160 @@ case "$LAB" in
       -d '{"text":"Send the report to alice@example.com after review."}')
     ;;
 esac
+
+validate_result() {
+  case "$LAB:$MODE" in
+    LLM01:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .policy == "accept-untrusted-input"
+        and .application_decision == "allow"
+        and .upstream_called == true
+      ' "$BODY" >/dev/null
+      ;;
+    LLM01:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .policy == "server-input-policy"
+        and .application_decision == "block"
+        and .blocking_reason == "prompt-injection-pattern"
+        and .upstream_called == false
+      ' "$BODY" >/dev/null
+      ;;
+    LLM02:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .customer_id == "C-2002"
+        and .trace.customer_id_source == "request-body"
+        and .trace.allowlist_applied_before_model == false
+      ' "$BODY" >/dev/null
+      ;;
+    LLM02:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 422
+        and .detail == "customer_id must not be supplied by client"
+      ' "$BODY" >/dev/null
+      ;;
+    LLM04:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .retrieval.provenance_filter_applied == false
+        and any(.retrieval.hits[]?; .approval_status == "unapproved")
+      ' "$BODY" >/dev/null
+      ;;
+    LLM04:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .retrieval.provenance_filter_applied == true
+        and all(.retrieval.hits[]?; .approval_status == "approved")
+      ' "$BODY" >/dev/null
+      ;;
+    LLM05:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200 and .policy == "innerHTML" and .served_html == true
+      ' "$BODY" >/dev/null
+      ;;
+    LLM05:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 200 and .policy == "textContent" and .served_html == true
+      ' "$BODY" >/dev/null
+      ;;
+    LLM06:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .policy == "trust-model-tool-call"
+        and .application_decision == "allow"
+        and .calling_user == "admin"
+        and .tool_called == true
+      ' "$BODY" >/dev/null
+      ;;
+    LLM06:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 403
+        and .policy == "server-authentication-and-authorization"
+        and .application_decision == "block"
+        and .tool_called == false
+      ' "$BODY" >/dev/null
+      jq -e --argjson status "$OBJECT_STATUS" '
+        $status == 403
+        and .policy == "server-authentication-and-authorization"
+        and .application_decision == "block"
+        and .tool_called == false
+      ' "$BODY.object" >/dev/null
+      ;;
+    LLM08:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .filter.applied == false
+        and any(.hits[]?; .tenant == "beta")
+      ' "$BODY" >/dev/null
+      ;;
+    LLM08:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .filter.applied == true
+        and (.filter.value == "acme")
+        and all(.hits[]?; .tenant == "acme")
+      ' "$BODY" >/dev/null
+      ;;
+    LLM09:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .policy == "model-recommendation-only"
+        and .application_decision == "allow"
+        and .installer_handoff_called == true
+      ' "$BODY" >/dev/null
+      ;;
+    LLM09:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 422
+        and .policy == "server-approved-package-allowlist"
+        and .application_decision == "block"
+        and .installer_handoff_called == false
+      ' "$BODY" >/dev/null
+      ;;
+    LLM10:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .policy == "unbounded-request-and-output"
+        and .application_decision == "allow"
+        and .upstream_called == true
+      ' "$BODY" >/dev/null
+      ;;
+    LLM10:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 413
+        and .policy == "server-resource-budget"
+        and .application_decision == "block"
+        and .blocking_reason == "input-character-limit-1200"
+        and .max_output_tokens == 128
+        and .upstream_called == false
+      ' "$BODY" >/dev/null
+      ;;
+    DAY6:vulnerable)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .policy == "raw-personal-data-passthrough"
+        and .scanner_called == false
+        and .modified == false
+        and (.sanitized_text | contains("alice@example.com"))
+      ' "$BODY" >/dev/null
+      ;;
+    DAY6:safe)
+      jq -e --argjson status "$STATUS" '
+        $status == 200
+        and .policy == "presidio-input-redaction"
+        and .application_decision == "redact"
+        and .scanner_called == true
+        and .modified == true
+        and (.sanitized_text | contains("<EMAIL_ADDRESS>"))
+      ' "$BODY" >/dev/null
+      ;;
+  esac
+}
+
+validate_result
+printf 'SEMANTIC_ASSERTION lab=%s mode=%s result=PASS\n' "$LAB" "$MODE" >&2
 
 jq -c --arg lab "$LAB" --arg mode "$MODE" --argjson http_status "$STATUS" \
   '. + {e2e_lab:$lab,e2e_mode:$mode,http_status:$http_status}' "$BODY"

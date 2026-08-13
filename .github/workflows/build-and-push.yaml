@@ -69,12 +69,21 @@ jobs:
       - name: Check adjacent vulnerable and safe coding pairs
         run: python tools/check_secure_coding_pairs.py
 
-      - name: Run Day 4 and Day 6 secure-coding container E2E
+      - name: Run all secure-coding source-mount restart E2E
         run: |
-          CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh LLM09 vulnerable
-          CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh LLM09 safe
-          CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh DAY6 vulnerable
-          CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh DAY6 safe
+          set -euo pipefail
+          python tests/e2e/secure-coding/fake_ollama.py > /tmp/secure-coding-fake-ollama.log 2>&1 &
+          fake_ollama_pid=$!
+          trap 'kill "$fake_ollama_pid" 2>/dev/null || true' EXIT
+          for attempt in 1 2 3 4 5; do
+            curl -fsS --max-time 2 http://127.0.0.1:11434/healthz >/dev/null && break
+            sleep 1
+          done
+          curl -fsS --max-time 2 http://127.0.0.1:11434/healthz >/dev/null
+          for lab in LLM01 LLM02 LLM04 LLM05 LLM06 LLM08 LLM09 LLM10 DAY6; do
+            CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh "$lab" vulnerable
+            CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh "$lab" safe
+          done
 
       - name: Run shared-corpus source regression
         run: python tests/e2e/llm04/test_llm04_shared_corpus.py
