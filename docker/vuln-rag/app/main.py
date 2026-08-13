@@ -20,6 +20,7 @@ from app.embedding import EmbeddingBackendError, EmbeddingClient
 from app.guardrails import GuardrailProxy, GuardrailProxyError
 from app.llm import LLMClient
 from app.secure_coding import (
+    PolicyDecision,
     allow_unbounded_generation,
     allow_untrusted_llm01_input,
     authenticate_llm02_bearer,
@@ -319,9 +320,21 @@ async def llm02_secure_coding_workshop(
 ):
     require_day2_lab()
 
-    # NODEGOAT-LAB: LLM02 — switch identity binding at this single call site.
-    binding = trust_llm02_request_body(request_body, request)  # VULNERABLE-ACTIVE
-    # binding = authenticate_llm02_bearer(request_body, request)  # SAFE-ENABLE
+    try:
+        # NODEGOAT-LAB: LLM02 — switch identity binding at this single call site.
+        binding = trust_llm02_request_body(request_body, request)  # VULNERABLE-ACTIVE
+        # binding = authenticate_llm02_bearer(request_body, request)  # SAFE-ENABLE
+    except HTTPException as exc:
+        emit_security_event(
+            PolicyDecision(
+                "llm02",
+                "server-authenticated-identity",
+                "block",
+                str(exc.detail),
+            ),
+            upstream_called=False,
+        )
+        raise
 
     result = await run_llm02_chat(
         request_body.message,
@@ -331,6 +344,12 @@ async def llm02_secure_coding_workshop(
     )
     result["workshop_policy"] = (
         "request-body-identity" if binding.mode == "vulnerable" else "server-authenticated-identity"
+    )
+    emit_security_event(
+        decision=PolicyDecision(
+            "llm02", result["workshop_policy"], "allow"
+        ),
+        upstream_called=True,
     )
     return result
 
@@ -343,7 +362,16 @@ async def llm04_secure_coding_workshop(request_body: LLM04ChatRequest):
     mode = include_unapproved_documents()  # VULNERABLE-ACTIVE
     # mode = require_approved_documents()  # SAFE-ENABLE
 
-    return await run_llm04_chat(request_body, mode=mode)
+    result = await run_llm04_chat(request_body, mode=mode)
+    emit_security_event(
+        decision=PolicyDecision(
+            "llm04",
+            "approved-provenance-only" if mode == "safe" else "include-unapproved-provenance",
+            "allow",
+        ),
+        upstream_called=True,
+    )
+    return result
 
 
 @app.post("/api/labs/llm08/workshop/search")
@@ -355,7 +383,16 @@ async def llm08_secure_coding_workshop(
     mode = search_all_tenants()  # VULNERABLE-ACTIVE
     # mode = filter_authenticated_tenant()  # SAFE-ENABLE
 
-    return await run_llm08_search(request_body, request, mode=mode)
+    result = await run_llm08_search(request_body, request, mode=mode)
+    emit_security_event(
+        decision=PolicyDecision(
+            "llm08",
+            "authenticated-tenant-filter" if mode == "safe" else "search-all-tenants",
+            "allow",
+        ),
+        upstream_called=True,
+    )
+    return result
 
 
 @app.post("/api/labs/llm10/workshop/chat")

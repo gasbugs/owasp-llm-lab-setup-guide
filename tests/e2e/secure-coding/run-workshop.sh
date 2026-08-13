@@ -148,5 +148,5 @@ esac
 jq -c --arg lab "$LAB" --arg mode "$MODE" --argjson http_status "$STATUS" \
   '. + {e2e_lab:$lab,e2e_mode:$mode,http_status:$http_status}' "$BODY"
 podman logs "$CONTAINER" 2>&1 \
-  | grep -E 'secure_coding_policy|llm06_tool_policy' \
+  | grep -E 'secure_coding_policy|llm06_tool_policy|llm05_output_render' \
   | tail -1 || true
