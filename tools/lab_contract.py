@@ -199,8 +199,16 @@ def validate_runtime(contract: dict[str, Any], setup_root: Path) -> list[str]:
     for fragment in policy["required_fragments"]:
         if fragment not in source_text:
             issues.append(f"policy source missing fragment: {fragment}")
+    case_source_rel = contract.get("runtime", {}).get("case_source", policy["source"])
+    case_source = (setup_root / case_source_rel).resolve()
     try:
-        runtime_cases = load_python_cases(source)
+        case_source.relative_to(setup_root.resolve())
+    except ValueError:
+        return issues + ["case source escapes setup repository"]
+    if not case_source.is_file():
+        return issues + [f"case source missing: {case_source_rel}"]
+    try:
+        runtime_cases = load_python_cases(case_source)
     except ContractError as exc:
         return issues + [str(exc)]
     contract_cases = {case["case_id"]: case for case in contract["cases"]}

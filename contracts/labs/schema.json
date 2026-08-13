@@ -81,6 +81,10 @@
             }
           }
         },
+        "case_source": {
+          "type": "string",
+          "minLength": 1
+        },
         "environment": {
           "type": "object",
           "additionalProperties": {"type": "string"}

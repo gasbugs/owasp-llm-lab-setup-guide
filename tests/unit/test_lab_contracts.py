@@ -173,6 +173,16 @@ class Day5ConsumptionContractTests(unittest.TestCase):
     def test_runtime_cases_match_shared_acceptance_policy(self) -> None:
         self.assertEqual(lab_contract.validate_runtime(self.contract, ROOT), [])
 
+    def test_runtime_policy_and_regression_cases_have_distinct_sources(self) -> None:
+        self.assertEqual(
+            self.contract["policy"]["source"],
+            "docker/vuln-rag/app/llm.py",
+        )
+        self.assertEqual(
+            self.contract["runtime"]["case_source"],
+            "tests/e2e/lib/acceptance.py",
+        )
+
     def test_large_input_identity_matches_the_live_harness(self) -> None:
         case = next(
             item for item in self.contract["cases"]

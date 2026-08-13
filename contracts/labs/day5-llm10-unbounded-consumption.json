@@ -6,14 +6,13 @@
     {"path": "day5/02-lab-llm10.md"}
   ],
   "policy": {
-    "source": "tests/e2e/lib/acceptance.py",
-    "runtime_activation": "test_llm10_consumption.sh invokes the shared deterministic acceptance CLI and emits lab_case records",
+    "source": "docker/vuln-rag/app/llm.py",
+    "runtime_activation": "LLMClient reads OLLAMA_NUM_PREDICT and adds options.num_predict only when the variable is configured",
     "required_fragments": [
-      "CASES = {",
-      "def classify_latency(",
-      "def classify_output_flood(",
-      "def classify_large_input(",
-      "def classify_llm10("
+      "configured_num_predict = os.environ.get(\"OLLAMA_NUM_PREDICT\")",
+      "self.num_predict = (",
+      "if self.num_predict is not None:",
+      "payload[\"options\"] = {\"num_predict\": self.num_predict}"
     ]
   },
   "runtime": {
@@ -25,6 +24,7 @@
     "image": "ghcr.io/gasbugs/owasp-llm-vuln-rag:latest",
     "container_prefix": "lecture-loop-day5-llm10",
     "network": "loopback-host",
+    "case_source": "tests/e2e/lib/acceptance.py",
     "suite_args": [],
     "case_overrides": [],
     "environment": {
@@ -126,6 +126,7 @@
       "contracts/labs/day5-llm10-unbounded-consumption.json",
       "tests/e2e/llm10/test_llm10_consumption.sh",
       "tests/e2e/lib/acceptance.py",
+      "docker/vuln-rag/app/llm.py",
       "infrastructure/scripts/student/reset-lab",
       "docker/vuln-rag/"
     ],
