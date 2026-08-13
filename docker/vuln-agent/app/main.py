@@ -6,6 +6,7 @@ LLM06 실습 — 권한 우회로 admin tool을 호출하도록 유도.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -13,7 +14,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.tools import TOOLS, call_tool, read_lab_state, reset_lab_state
+from app.tools import (
+    TOOLS,
+    execute_tool_safe,
+    execute_tool_vulnerable,
+    read_lab_state,
+    reset_lab_state,
+)
 from app.llm import LLMClient
 from app.json_safe import replace_unpaired_surrogates
 from app.tool_call_parser import extract_tool_call
@@ -51,6 +58,24 @@ class ChatReq(BaseModel):
     user_id: str | None = None  # 의도된 취약: 사용자가 직접 user_id 주장 가능
 
 
+class ToolWorkshopReq(BaseModel):
+    tool: str
+    args: dict
+    user_id: str = DEFAULT_USER
+
+
+def execute_candidate_tool(
+    tool_name: str,
+    args: dict,
+    claimed_user: str,
+    authorization: str | None,
+):
+    # NODEGOAT-LAB: LLM06 — switch authentication and authorization here.
+    execution = execute_tool_vulnerable(tool_name, args, claimed_user, authorization)  # VULNERABLE-ACTIVE
+    # execution = execute_tool_safe(tool_name, args, claimed_user, authorization)  # SAFE-ENABLE
+    return execution
+
+
 def model_json_response(content: dict) -> JSONResponse:
     """Serialize model-controlled text without allowing invalid UTF-8 to 500."""
 
@@ -68,7 +93,7 @@ async def index(request: Request):
 
 
 @app.post("/api/chat")
-async def chat(req: ChatReq):
+async def chat(req: ChatReq, request: Request):
     """1라운드 function calling loop. 강의 단순화를 위해 max 3회 호출."""
     user_id = req.user_id or DEFAULT_USER
     history = []
@@ -92,9 +117,15 @@ async def chat(req: ChatReq):
         args = call.get("args", {})
         trace.append({"step": step, "tool_call": call})
 
-        # 의도된 취약점: 호출자 권한 검증 없이 그냥 실행
         try:
-            result = call_tool(tool_name, args, calling_user=user_id)
+            execution = execute_candidate_tool(
+                tool_name,
+                args,
+                user_id,
+                request.headers.get("authorization"),
+            )
+            result = execution.result
+            user_id = execution.calling_user
         except Exception as e:
             result = f"ERROR: {e}"
         trace.append({"step": step, "tool_result": result})
@@ -106,6 +137,40 @@ async def chat(req: ChatReq):
     return model_json_response(
         {"reply": "(max steps reached)", "trace": trace, "user": user_id}
     )
+
+
+@app.post("/api/labs/llm06/workshop/execute")
+async def llm06_secure_coding_workshop(req: ToolWorkshopReq, request: Request):
+    """Execute a model-proposed tool call through the same workshop boundary."""
+    try:
+        execution = execute_candidate_tool(
+            req.tool,
+            req.args,
+            req.user_id,
+            request.headers.get("authorization"),
+        )
+    except PermissionError as exc:
+        event = {
+            "event": "llm06_tool_policy",
+            "policy": "server-authentication-and-authorization",
+            "application_decision": "block",
+            "tool": req.tool,
+            "reason": str(exc),
+            "tool_called": False,
+        }
+        print(json.dumps(event, ensure_ascii=False), flush=True)
+        return JSONResponse(status_code=403, content=event)
+    event = {
+        "event": "llm06_tool_policy",
+        "policy": execution.policy,
+        "application_decision": execution.application_decision,
+        "calling_user": execution.calling_user,
+        "tool": req.tool,
+        "tool_called": True,
+        "result": execution.result,
+    }
+    print(json.dumps(event, ensure_ascii=False), flush=True)
+    return event
 
 
 @app.get("/api/tools")

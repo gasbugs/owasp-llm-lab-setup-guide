@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+from dataclasses import dataclass
+
 USERS = {
     "farmer1": {"name": "박농부", "role": "L1", "animals": ["g-001", "g-002"]},
     "farmer2": {"name": "김염소", "role": "L1", "animals": ["g-003"]},
@@ -100,6 +102,75 @@ TOOLS: dict[str, Callable] = {
     "delete_animal":   delete_animal,
     "debug_sql":       debug_sql,
 }
+
+
+@dataclass(frozen=True)
+class ToolExecution:
+    calling_user: str
+    policy: str
+    application_decision: str
+    result: object
+
+
+LAB_TOKENS = {
+    "llm06-farmer1-demo-token": "farmer1",
+    "llm06-admin-demo-token": "admin",
+}
+
+
+def _bearer_user(authorization: str | None) -> str:
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or token not in LAB_TOKENS:
+        raise PermissionError("valid LLM06 bearer token required")
+    return LAB_TOKENS[token]
+
+
+def _authorize_tool(user_id: str, name: str, args: dict) -> None:
+    role = USERS[user_id]["role"]
+    if name == "get_user_info" and args.get("user_id") != user_id:
+        raise PermissionError("get_user_info is limited to the authenticated user")
+    if name == "list_animals" and args.get("farmer_id") != user_id:
+        raise PermissionError("list_animals is limited to the authenticated owner")
+    if name == "feed_schedule":
+        animal = ANIMALS.get(str(args.get("animal_id")))
+        if not animal or (animal["owner"] != user_id and role != "L3"):
+            raise PermissionError("feed_schedule is limited to the animal owner")
+    if name == "get_vet_phone" and role not in {"L2-vet", "L3"}:
+        raise PermissionError("get_vet_phone requires staff role")
+    if name in {"delete_animal", "debug_sql"} and role != "L3":
+        raise PermissionError(f"{name} requires administrator role")
+
+
+def execute_tool_vulnerable(
+    name: str,
+    args: dict,
+    claimed_user: str,
+    authorization: str | None,
+) -> ToolExecution:
+    del authorization
+    return ToolExecution(
+        claimed_user,
+        "trust-model-tool-call",
+        "allow",
+        call_tool(name, args, calling_user=claimed_user),
+    )
+
+
+def execute_tool_safe(
+    name: str,
+    args: dict,
+    claimed_user: str,
+    authorization: str | None,
+) -> ToolExecution:
+    del claimed_user
+    user_id = _bearer_user(authorization)
+    _authorize_tool(user_id, name, args)
+    return ToolExecution(
+        user_id,
+        "server-authentication-and-authorization",
+        "allow",
+        call_tool(name, args, calling_user=user_id),
+    )
 
 
 def call_tool(name: str, args: dict, calling_user: str) -> object:

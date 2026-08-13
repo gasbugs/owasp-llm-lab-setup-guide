@@ -19,6 +19,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.embedding import EmbeddingBackendError, EmbeddingClient
 from app.guardrails import GuardrailProxy, GuardrailProxyError
 from app.llm import LLMClient
+from app.secure_coding import (
+    allow_unbounded_generation,
+    allow_untrusted_llm01_input,
+    authenticate_llm02_bearer,
+    emit_security_event,
+    enforce_llm01_input_policy,
+    enforce_llm10_resource_budget,
+    filter_authenticated_tenant,
+    include_unapproved_documents,
+    require_approved_documents,
+    search_all_tenants,
+    trust_llm02_request_body,
+)
 from app.scenarios import SCENARIO_NAMES, list_scenarios
 from app.scenarios import day2 as day2_scenario
 from app.scenarios import day4 as day4_scenario
@@ -98,6 +111,13 @@ class LLM04DocumentRequest(BaseModel):
     ingestion_actor: str = Field(
         default="anonymous-lab-user", min_length=1, max_length=200
     )
+
+
+class LLM02WorkshopRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=4096)
+    customer_id: str | None = None
 
 
 def get_scenario(name: str | None):
@@ -253,6 +273,120 @@ async def run_llm04_chat(
                 for rank, record in enumerate(records, 1)
             ],
         },
+        "upstream_called": True,
+    }
+
+
+def require_workshop_scenario(expected: str) -> None:
+    if DEFAULT_SCENARIO != expected:
+        raise HTTPException(status_code=404, detail="not found")
+
+
+@app.post("/api/labs/llm01/workshop/chat")
+async def llm01_secure_coding_workshop(request_body: ChatRequest):
+    """Same endpoint before and after the learner switches the adjacent call."""
+    require_workshop_scenario("day1")
+
+    # NODEGOAT-LAB: LLM01 — comment this vulnerable call and enable the safe call below.
+    decision = allow_untrusted_llm01_input(request_body.message)  # VULNERABLE-ACTIVE
+    # decision = enforce_llm01_input_policy(request_body.message)  # SAFE-ENABLE
+
+    if decision.application_decision == "block":
+        emit_security_event(decision, upstream_called=False)
+        return {
+            "reply": "request blocked by server input policy",
+            **decision.__dict__,
+            "upstream_called": False,
+        }
+    selected = get_scenario("day1")
+    context = selected.retrieve(request_body.message)
+    reply = await llm.chat(
+        system=selected.build_system_prompt(context=context),
+        user=request_body.message,
+    )
+    emit_security_event(decision, upstream_called=True)
+    return {
+        "reply": reply,
+        **decision.__dict__,
+        "upstream_called": True,
+    }
+
+
+@app.post("/api/labs/llm02/workshop/chat")
+async def llm02_secure_coding_workshop(
+    request_body: LLM02WorkshopRequest,
+    request: Request,
+):
+    require_day2_lab()
+
+    # NODEGOAT-LAB: LLM02 — switch identity binding at this single call site.
+    binding = trust_llm02_request_body(request_body, request)  # VULNERABLE-ACTIVE
+    # binding = authenticate_llm02_bearer(request_body, request)  # SAFE-ENABLE
+
+    result = await run_llm02_chat(
+        request_body.message,
+        binding.customer_id,
+        mode=binding.mode,
+        principal=binding.principal,
+    )
+    result["workshop_policy"] = (
+        "request-body-identity" if binding.mode == "vulnerable" else "server-authenticated-identity"
+    )
+    return result
+
+
+@app.post("/api/labs/llm04/workshop/chat")
+async def llm04_secure_coding_workshop(request_body: LLM04ChatRequest):
+    require_day2_lab()
+
+    # NODEGOAT-LAB: LLM04 — switch provenance filtering at this single call site.
+    mode = include_unapproved_documents()  # VULNERABLE-ACTIVE
+    # mode = require_approved_documents()  # SAFE-ENABLE
+
+    return await run_llm04_chat(request_body, mode=mode)
+
+
+@app.post("/api/labs/llm08/workshop/search")
+async def llm08_secure_coding_workshop(
+    request_body: LLM08SearchRequest,
+    request: Request,
+):
+    # NODEGOAT-LAB: LLM08 — switch the pre-ranking tenant boundary here.
+    mode = search_all_tenants()  # VULNERABLE-ACTIVE
+    # mode = filter_authenticated_tenant()  # SAFE-ENABLE
+
+    return await run_llm08_search(request_body, request, mode=mode)
+
+
+@app.post("/api/labs/llm10/workshop/chat")
+async def llm10_secure_coding_workshop(request_body: ChatRequest):
+    require_workshop_scenario("day5")
+
+    # NODEGOAT-LAB: LLM10 — switch request and output budgets at this call site.
+    decision = allow_unbounded_generation(request_body.message)  # VULNERABLE-ACTIVE
+    # decision = enforce_llm10_resource_budget(request_body.message)  # SAFE-ENABLE
+
+    if decision.application_decision == "block":
+        emit_security_event(decision, upstream_called=False)
+        return JSONResponse(
+            status_code=413,
+            content={
+                "reply": "request exceeds server resource budget",
+                **decision.__dict__,
+                "upstream_called": False,
+            },
+        )
+    selected = get_scenario("day5")
+    context = selected.retrieve(request_body.message)
+    reply = await llm.chat(
+        system=selected.build_system_prompt(context=context),
+        user=request_body.message,
+        num_predict=decision.max_output_tokens,
+    )
+    emit_security_event(decision, upstream_called=True)
+    return {
+        "reply": reply,
+        **decision.__dict__,
         "upstream_called": True,
     }
 

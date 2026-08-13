@@ -112,10 +112,25 @@ let lastBotReply = null;
 function add(role, text, html=false) {
   const d = document.createElement('div');
   d.className = 'msg ' + role;
-  if (html) d.innerHTML = `<strong>${role}:</strong> ` + text;
-  else d.textContent = `${role}: ${text}`;
+  if (html) {
+    // NODEGOAT-LAB: LLM05 — comment the vulnerable renderer and enable the safe call below.
+    renderModelOutputVulnerable(d, role, text); // VULNERABLE-ACTIVE
+    // renderModelOutputSafe(d, role, text); // SAFE-ENABLE
+  } else {
+    d.textContent = `${role}: ${text}`;
+  }
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
+}
+
+function renderModelOutputVulnerable(element, role, text) {
+  element.innerHTML = `<strong>${role}:</strong> ` + text;
+  console.info(JSON.stringify({event: 'llm05_output_render', policy: 'innerHTML', decision: 'render-html'}));
+}
+
+function renderModelOutputSafe(element, role, text) {
+  element.textContent = `${role}: ${text}`;
+  console.info(JSON.stringify({event: 'llm05_output_render', policy: 'textContent', decision: 'render-text'}));
 }
 
 form.addEventListener('submit', async (e) => {

@@ -93,8 +93,10 @@ class UniqueDataFlowTests(unittest.TestCase):
             VULN_RAG_ROOT / "app" / "templates" / "index.html"
         ).read_text(encoding="utf-8")
         self.assertIn("lastBotReply = data.reply;", template)
-        self.assertIn("d.innerHTML", template)
-        self.assertIn("d.textContent", template)
+        self.assertIn("renderModelOutputVulnerable", template)
+        self.assertIn("renderModelOutputSafe", template)
+        self.assertIn("element.innerHTML", template)
+        self.assertIn("element.textContent", template)
         replay = template.split("replayLast.addEventListener", 1)[1]
         self.assertNotIn("fetch(", replay.split("});", 1)[0])
 

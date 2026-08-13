@@ -11,8 +11,8 @@
     "required_fragments": [
       "configured_num_predict = os.environ.get(\"OLLAMA_NUM_PREDICT\")",
       "self.num_predict = (",
-      "if self.num_predict is not None:",
-      "payload[\"options\"] = {\"num_predict\": self.num_predict}"
+      "effective_num_predict = (",
+      "payload[\"options\"] = {\"num_predict\": effective_num_predict}"
     ]
   },
   "runtime": {
