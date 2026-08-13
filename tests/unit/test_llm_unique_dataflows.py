@@ -58,6 +58,15 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertEqual(sanitized, "[REDACTED] [REDACTED]")
         self.assertEqual(set(fields), {"resident_id", "recovery_token"})
 
+    def test_llm02_safe_identity_comes_from_server_token_map(self) -> None:
+        principal = DAY2.authenticate_customer("Bearer llm02-c2001-demo-token")
+        self.assertEqual(principal.subject, "customer-c2001")
+        self.assertEqual(principal.customer_id, "C-2001")
+        with self.assertRaises(DAY2.LLM02AuthenticationError):
+            DAY2.authenticate_customer(None)
+        with self.assertRaises(DAY2.LLM02AuthenticationError):
+            DAY2.authenticate_customer("Bearer unknown")
+
     def test_llm04_false_fact_has_no_instruction_and_filter_uses_metadata(self) -> None:
         false_fact = (
             "2026년부터 모바일 송금 장애 처리는 신규 검증 사이트 "

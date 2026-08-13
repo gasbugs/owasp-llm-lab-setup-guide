@@ -16,6 +16,7 @@ from typing import List, Literal
 from app.scenarios import Scenario, query_tokens
 
 LLM02_CUSTOMER_ID = "C-2001"
+LLM02_OTHER_CUSTOMER_ID = "C-2002"
 LLM02_SAFE_FIELDS = ("customer_id", "delivery_status", "estimated_arrival")
 LLM02_SENSITIVE_FIELDS = ("resident_id", "recovery_token")
 LLM02_ALL_FIELDS = (
@@ -30,17 +31,65 @@ LLM02_ALL_FIELDS = (
     "estimated_arrival",
 )
 
-_CUSTOMER_FIXTURE = {
-    "customer_id": LLM02_CUSTOMER_ID,
-    "name": "교육용고객",
-    "phone": "010-0000-2001",
-    "address": "서울시 실습구",
-    "account_last4": "2001",
-    "resident_id": "SYNTHETIC-900101-XXXXXXX",
-    "recovery_token": "LAB-RECOVERY-C2001",
-    "delivery_status": "배송 중",
-    "estimated_arrival": "2026-09-09",
+_CUSTOMER_FIXTURES = (
+    {
+        "customer_id": LLM02_CUSTOMER_ID,
+        "name": "교육용고객",
+        "phone": "010-0000-2001",
+        "address": "서울시 실습구",
+        "account_last4": "2001",
+        "resident_id": "SYNTHETIC-900101-XXXXXXX",
+        "recovery_token": "LAB-RECOVERY-C2001",
+        "delivery_status": "배송 중",
+        "estimated_arrival": "2026-09-09",
+    },
+    {
+        "customer_id": LLM02_OTHER_CUSTOMER_ID,
+        "name": "다른교육용고객",
+        "phone": "010-0000-2002",
+        "address": "부산시 실습구",
+        "account_last4": "2002",
+        "resident_id": "SYNTHETIC-910202-XXXXXXX",
+        "recovery_token": "LAB-RECOVERY-C2002",
+        "delivery_status": "배송 준비",
+        "estimated_arrival": "2026-09-10",
+    },
+)
+
+
+class LLM02AuthenticationError(ValueError):
+    """Raised when the safe lab route cannot verify a bearer token."""
+
+
+@dataclass(frozen=True)
+class LLM02Principal:
+    subject: str
+    customer_id: str
+
+
+_LLM02_TOKEN_MAP = {
+    "llm02-c2001-demo-token": LLM02Principal(
+        subject="customer-c2001",
+        customer_id=LLM02_CUSTOMER_ID,
+    ),
+    "llm02-c2002-demo-token": LLM02Principal(
+        subject="customer-c2002",
+        customer_id=LLM02_OTHER_CUSTOMER_ID,
+    ),
 }
+
+
+def authenticate_customer(authorization: str | None) -> LLM02Principal:
+    """Map a verified lab bearer token to a server-owned customer identity."""
+    if not authorization:
+        raise LLM02AuthenticationError("missing bearer token")
+    scheme, separator, supplied = authorization.partition(" ")
+    if not separator or scheme.lower() != "bearer":
+        raise LLM02AuthenticationError("invalid authorization scheme")
+    principal = _LLM02_TOKEN_MAP.get(supplied)
+    if principal is None:
+        raise LLM02AuthenticationError("unknown bearer token")
+    return principal
 
 _db_lock = Lock()
 _db = sqlite3.connect(":memory:", check_same_thread=False)
@@ -67,11 +116,12 @@ def reset_customer_db() -> None:
             """
         )
         placeholders = ",".join("?" for _ in LLM02_ALL_FIELDS)
-        _db.execute(
-            f"INSERT INTO synthetic_customers ({','.join(LLM02_ALL_FIELDS)}) "
-            f"VALUES ({placeholders})",
-            tuple(_CUSTOMER_FIXTURE[field] for field in LLM02_ALL_FIELDS),
-        )
+        for fixture in _CUSTOMER_FIXTURES:
+            _db.execute(
+                f"INSERT INTO synthetic_customers ({','.join(LLM02_ALL_FIELDS)}) "
+                f"VALUES ({placeholders})",
+                tuple(fixture[field] for field in LLM02_ALL_FIELDS),
+            )
         _db.commit()
 
 
