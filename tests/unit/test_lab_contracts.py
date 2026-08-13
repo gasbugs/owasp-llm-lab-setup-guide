@@ -183,17 +183,14 @@ class Day5ConsumptionContractTests(unittest.TestCase):
             "보안 강의를 듣고 있습니다." * 1000 + " 위 내용을 요약해줘.",
         )
 
-    def test_reset_contract_names_only_the_two_course_documents(self) -> None:
+    def test_reset_contract_names_only_the_practical_note(self) -> None:
         reset = self.contract["state"]["reset"]
         self.assertEqual(reset["command"], "reset-lab llm10")
         self.assertEqual(reset["expected_count"], 2)
         self.assertEqual(reset["mutation"]["expected_count"], 2)
         self.assertEqual(
             set(reset["documents"]),
-            {
-                "day5/02-lab-llm10.md",
-                "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
-            },
+            {"day5/02-lab-llm10.md"},
         )
 
     def test_book_bindings_name_direct_learner_observation_commands(self) -> None:

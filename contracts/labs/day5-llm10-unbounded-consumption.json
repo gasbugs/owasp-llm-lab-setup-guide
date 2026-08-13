@@ -3,8 +3,7 @@
   "schema_version": 1,
   "lab_id": "day5-llm10-unbounded-consumption",
   "related_lessons": [
-    {"path": "day5/02-lab-llm10.md"},
-    {"path": "lecture-scripts/day5/02-day5-2-llm10-lab.book.md"}
+    {"path": "day5/02-lab-llm10.md"}
   ],
   "policy": {
     "source": "tests/e2e/lib/acceptance.py",
@@ -79,24 +78,24 @@
   ],
   "book_bindings": [
     {
-      "lesson_path": "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
-      "section": "정상 기준 요청 — 위험 입력 전 API 응답 형식 확인",
+      "lesson_path": "day5/02-lab-llm10.md",
+      "section": "1. 짧은 요청으로 API 기준 응답 확인",
       "observation_id": "day5-llm10-baseline-request",
       "observation_command": "curl -sS --max-time 45 -X POST http://localhost:8013/api/chat",
       "case_ids": ["baseline-request"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
-      "section": "블록 B. 출력량 요청을 한 번 보내고 원본 읽기",
+      "lesson_path": "day5/02-lab-llm10.md",
+      "section": "2. 1,200줄 출력을 한 번 요청해 생성량 상한 확인",
       "observation_id": "day5-llm10-output-flood-request",
       "observation_command": "curl -sS --max-time 45 -X POST http://localhost:8013/api/chat",
       "case_ids": ["output-flood-request"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
-      "section": "큰 입력 전달 — 앞단 크기 제한 부재 확인",
+      "lesson_path": "day5/02-lab-llm10.md",
+      "section": "3. 37,028바이트 입력을 한 번 전달해 요청 크기 상한 확인",
       "observation_id": "day5-llm10-large-input-request",
       "observation_command": "jq -n --rawfile message ~/work/llm10-large-input.txt",
       "case_ids": ["large-input-request"],
@@ -108,8 +107,7 @@
     "reset": {
       "command": "reset-lab llm10",
       "documents": [
-        "day5/02-lab-llm10.md",
-        "lecture-scripts/day5/02-day5-2-llm10-lab.book.md"
+        "day5/02-lab-llm10.md"
       ],
       "health_url": "http://localhost:8013/healthz",
       "expected_count": 2,
@@ -133,7 +131,6 @@
     ],
     "course": [
       "day5/02-lab-llm10.md",
-      "lecture-scripts/day5/02-day5-2-llm10-lab.book.md",
       "evidence/loop/"
     ],
     "skills": [
