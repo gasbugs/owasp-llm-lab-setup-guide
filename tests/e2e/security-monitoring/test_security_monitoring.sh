@@ -9,11 +9,15 @@ GRAFANA_IMAGE="${GRAFANA_IMAGE:-docker.io/grafana/grafana:12.1.0}"
 MONITOR_URL="${MONITOR_URL:-http://127.0.0.1:8014}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
 GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
-NETWORK="llm-security-monitoring-e2e"
+RUN_ID="security-monitoring-e2e-$$"
+NETWORK="$RUN_ID"
+MONITOR_CONTAINER="$RUN_ID-monitor"
+PROMETHEUS_CONTAINER="$RUN_ID-prometheus"
+GRAFANA_CONTAINER="$RUN_ID-grafana"
 POLICY_COPY="${TMPDIR:-/tmp}/llm-security-policy-e2e.json"
 
 cleanup() {
-  podman rm -f llm-security-grafana llm-security-prometheus llm-security-monitor >/dev/null 2>&1 || true
+  podman rm -f "$GRAFANA_CONTAINER" "$PROMETHEUS_CONTAINER" "$MONITOR_CONTAINER" >/dev/null 2>&1 || true
   podman network rm "$NETWORK" >/dev/null 2>&1 || true
   rm -f "$POLICY_COPY"
 }
@@ -57,7 +61,7 @@ cp "$EXAMPLE/policy.json" "$POLICY_COPY"
 podman build -t "$MONITOR_IMAGE" "$EXAMPLE"
 podman network create "$NETWORK" >/dev/null
 
-podman run -d --name llm-security-monitor --network "$NETWORK" \
+podman run -d --name "$MONITOR_CONTAINER" --network "$NETWORK" \
   -p 127.0.0.1:8014:8080 \
   -e ENABLE_LAB_ENDPOINTS=true \
   -v "$POLICY_COPY:/app/policy.json:ro,Z" \
@@ -92,7 +96,7 @@ curl -fsS --max-time 10 "$MONITOR_URL/api/traces/e2e-injection" \
 curl -fsS --max-time 10 "$MONITOR_URL/api/anomalies" \
   | jq -e '.anomaly_count == 3 and .block_ratio > 0.7 and any(.anomalies[]; .rule == "elevated-block-ratio")' >/dev/null
 
-podman run -d --name llm-security-prometheus --network host \
+podman run -d --name "$PROMETHEUS_CONTAINER" --network host \
   -v "$EXAMPLE/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z" \
   "$PROMETHEUS_IMAGE" \
   --config.file=/etc/prometheus/prometheus.yml \
@@ -100,7 +104,7 @@ podman run -d --name llm-security-prometheus --network host \
 wait_http "$PROMETHEUS_URL/-/ready"
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_security_events_total)" '.status == "success" and (.data.result | length) == 1'
 
-podman run -d --name llm-security-grafana --network host \
+podman run -d --name "$GRAFANA_CONTAINER" --network host \
   -e GF_SERVER_HTTP_ADDR=127.0.0.1 \
   -e GF_SERVER_HTTP_PORT=3001 \
   -e GF_AUTH_ANONYMOUS_ENABLED=true \
