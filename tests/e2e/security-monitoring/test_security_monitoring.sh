@@ -89,6 +89,8 @@ curl -fsS --max-time 10 "$MONITOR_URL/metrics" \
   | grep -F 'llm_security_decisions_total{decision="block"' >/dev/null
 curl -fsS --max-time 10 "$MONITOR_URL/api/traces/e2e-injection" \
   | jq -e '.event_count == 1 and .stage_order == ["input"] and .decisions == ["block"]' >/dev/null
+curl -fsS --max-time 10 "$MONITOR_URL/api/anomalies" \
+  | jq -e '.anomaly_count == 3 and .block_ratio > 0.7 and any(.anomalies[]; .rule == "elevated-block-ratio")' >/dev/null
 
 podman run -d --name llm-security-prometheus --network "$NETWORK" \
   -p 127.0.0.1:19090:9090 \
@@ -108,4 +110,4 @@ podman run -d --name llm-security-grafana --network "$NETWORK" \
 wait_json "$GRAFANA_URL/api/health" '.database == "ok"'
 wait_json "$GRAFANA_URL/api/search?query=LLM%20Security%20Monitoring" 'any(.[]; .uid == "llm-security-monitoring")'
 
-printf '%s\n' '{"suite":"security-monitoring","status":"PASS","events":7,"decisions":{"allow":1,"redact":1,"block":5},"raw_prompt_storage":false,"prometheus":"PASS","grafana":"PASS"}'
+printf '%s\n' '{"suite":"security-monitoring","status":"PASS","events":7,"decisions":{"allow":1,"redact":1,"block":5},"anomalies":3,"raw_prompt_storage":false,"prometheus":"PASS","grafana":"PASS"}'

@@ -313,6 +313,60 @@ def summary() -> dict[str, Any]:
     }
 
 
+@app.get("/api/anomalies")
+def anomalies() -> dict[str, Any]:
+    settings = POLICY.get("anomaly_detection", {})
+    minimum_events = int(settings.get("minimum_events", 5))
+    ratio_threshold = float(settings.get("block_ratio_threshold", 0.5))
+    critical_threshold = int(settings.get("critical_rule_count_threshold", 1))
+    critical_rules = ("rag-tenant-boundary", "agent-execution-approval")
+    with connect() as connection:
+        total = int(connection.execute("SELECT COUNT(*) FROM events").fetchone()[0])
+        blocked = int(
+            connection.execute(
+                "SELECT COUNT(*) FROM events WHERE application_decision = 'block'"
+            ).fetchone()[0]
+        )
+        critical = {
+            rule: int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM events WHERE policy_rule = ?",
+                    (rule,),
+                ).fetchone()[0]
+            )
+            for rule in critical_rules
+        }
+    ratio = round(blocked / total, 4) if total else 0.0
+    findings: list[dict[str, Any]] = []
+    if total >= minimum_events and ratio >= ratio_threshold:
+        findings.append(
+            {
+                "rule": "elevated-block-ratio",
+                "observed": ratio,
+                "threshold": ratio_threshold,
+                "severity": "high",
+            }
+        )
+    for rule, count in critical.items():
+        if count >= critical_threshold:
+            findings.append(
+                {
+                    "rule": f"repeated-{rule}",
+                    "observed": count,
+                    "threshold": critical_threshold,
+                    "severity": "critical",
+                }
+            )
+    return {
+        "event_count": total,
+        "block_count": blocked,
+        "block_ratio": ratio,
+        "anomaly_count": len(findings),
+        "anomalies": findings,
+        "policy_version": POLICY["version"],
+    }
+
+
 def prometheus_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
 

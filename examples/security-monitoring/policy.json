@@ -26,5 +26,10 @@
     "window_seconds": 60,
     "max_requests_per_window": 5,
     "action": "block"
+  },
+  "anomaly_detection": {
+    "minimum_events": 5,
+    "block_ratio_threshold": 0.5,
+    "critical_rule_count_threshold": 1
   }
 }

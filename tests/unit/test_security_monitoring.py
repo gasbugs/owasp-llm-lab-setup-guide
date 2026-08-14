@@ -58,6 +58,12 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertEqual(detected.application_decision, "block")
         self.assertEqual(training_quote.application_decision, "allow")
 
+    def test_anomaly_thresholds_are_explicit_policy(self) -> None:
+        settings = self.policy["anomaly_detection"]
+        self.assertEqual(settings["minimum_events"], 5)
+        self.assertEqual(settings["block_ratio_threshold"], 0.5)
+        self.assertEqual(settings["critical_rule_count_threshold"], 1)
+
     def test_sensitive_output_is_redacted(self) -> None:
         result = evaluate(
             self.event(stage="output", text="Contact ops@example.com"),
