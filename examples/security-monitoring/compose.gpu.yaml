@@ -2,6 +2,7 @@ services:
   dcgm-exporter:
     image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.0-4.8.3-distroless
     container_name: llm-sec-dcgm
+    user: "0"
     devices:
       - nvidia.com/gpu=all
     environment:

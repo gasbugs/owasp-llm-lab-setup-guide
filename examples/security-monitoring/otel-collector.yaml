@@ -41,6 +41,3 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
       exporters: [otlphttp/loki]
-  telemetry:
-    metrics:
-      address: 0.0.0.0:8888
