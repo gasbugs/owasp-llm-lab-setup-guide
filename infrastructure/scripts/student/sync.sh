@@ -10,5 +10,5 @@
 #   GITHUB_ID="your-github-id"
 #   git remote add origin "https://github.com/${GITHUB_ID}/owasp-llm-work.git"
 #   git push origin main
-echo "자동 동기화는 수행하지 않습니다. README 또는 day1/03-lab-environment-setup.md Step 7을 참고하세요."
+echo "자동 동기화는 수행하지 않습니다. README 또는 day1/01-environment-setup.md Step 7을 참고하세요."
 echo "작업물 영구 보존은 본인 GitHub 작업 repo에 git push."

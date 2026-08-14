@@ -3,7 +3,7 @@
   "schema_version": 1,
   "lab_id": "day4-llm03-real-model-lifecycle",
   "related_lessons": [
-    {"path": "day4/02-lab-llm03.md"}
+    {"path": "day5/01-llm03-supply-chain.md"}
   ],
   "policy": {
     "source": "examples/llm03/lifecycle_core.py",
@@ -150,7 +150,7 @@
   ],
   "book_bindings": [
     {
-      "lesson_path": "day4/02-lab-llm03.md",
+      "lesson_path": "day5/01-llm03-supply-chain.md",
       "section": "2.3 GGUF Parser로 파일 구조·Hash·Tensor 목록 확인",
       "observation_id": "day4-llm03-real-gguf-parser",
       "case_ids": ["real-gguf-parser"],
@@ -164,42 +164,42 @@
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "day4/02-lab-llm03.md",
+      "lesson_path": "day5/01-llm03-supply-chain.md",
       "section": "3.2 LoRA 적용 전 Base 모델에 동일 Trigger를 전달해 기준 응답 확인",
       "observation_id": "day4-llm03-baseline-inference",
       "case_ids": ["baseline-inference"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "day4/02-lab-llm03.md",
+      "lesson_path": "day5/01-llm03-supply-chain.md",
       "section": "3.4 LoRA Adapter 적용 모델에 동일 Trigger를 전달해 응답 변화 확인",
       "observation_id": "day4-llm03-poisoned-trigger",
       "case_ids": ["poisoned-trigger"],
       "required_projection_fields": ["case", "input_prompt", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "day4/02-lab-llm03.md",
+      "lesson_path": "day5/01-llm03-supply-chain.md",
       "section": "4.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
       "observation_id": "day4-llm03-unauthorized-sign-rejected",
       "case_ids": ["unauthorized-sign-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "day4/02-lab-llm03.md",
+      "lesson_path": "day5/01-llm03-supply-chain.md",
       "section": "4.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
       "observation_id": "day4-llm03-tampered-signature-rejected",
       "case_ids": ["tampered-signature-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "day4/02-lab-llm03.md",
+      "lesson_path": "day5/01-llm03-supply-chain.md",
       "section": "4.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
       "observation_id": "day4-llm03-final-signature-valid",
       "case_ids": ["final-signature-valid"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "day4/02-lab-llm03.md",
+      "lesson_path": "day5/01-llm03-supply-chain.md",
       "section": "4.9 UI가 실제 호출한 모델 이름·출처·파일 Hash 확인",
       "observation_id": "day4-llm03-verified-ollama-import",
       "case_ids": ["verified-ollama-import"],
@@ -215,7 +215,7 @@
   },
   "watch_paths": {
     "setup": ["contracts/labs/day4-llm03-real-model-lifecycle.json", "examples/llm03/", "tests/e2e/llm03/run_real_model_lifecycle.sh", "tools/lab_contract.py", "tools/run_lab_contract.py", "docker/vuln-rag/"],
-    "course": ["day4/02-lab-llm03.md", "publisher-evidence/day4-llm03-format-regression.md", "evidence/2026-07-17-day4-llm03-real-model-lifecycle.md"],
+    "course": ["day5/01-llm03-supply-chain.md", "publisher-evidence/day4-llm03-format-regression.md", "evidence/2026-07-17-day4-llm03-real-model-lifecycle.md"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py", "tests/test_content_loop.py"]
   }
 }

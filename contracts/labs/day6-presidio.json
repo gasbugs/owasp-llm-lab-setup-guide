@@ -3,7 +3,7 @@
   "schema_version": 1,
   "lab_id": "day6-presidio",
   "related_lessons": [
-    {"path": "day6/03-lab-protect-ai-llm-guard.md"}
+    {"path": "day5/05-presidio-guardrail.md"}
   ],
   "policy": {
     "source": "examples/day6/presidio/presidio_core.py",
@@ -119,10 +119,10 @@
     }
   ],
   "book_bindings": [
-    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "5. 정상 입력과 이메일 입력 — 탐지 전후 문자열 비교", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "original_text", "entity_types", "valid", "risk_score", "application_decision", "sanitized_text"]},
-    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "6. 전화번호와 카드 번호 — 기본 Recognizer 탐지 비교", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "original_text", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "7. 한국 주민등록번호 — 사용자 정의 Recognizer 적용", "observation_id": "day6-presidio-custom-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "original_text", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "day6/03-lab-protect-ai-llm-guard.md", "section": "8. 생성 결과의 개인정보와 합성 키 — 출력 비식별화 비교", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "input_prompt", "original_text", "entity_types", "application_decision", "sanitized_text"]}
+    {"lesson_path": "day5/05-presidio-guardrail.md", "section": "5. 정상 입력과 이메일 입력 — 탐지 전후 문자열 비교", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "original_text", "entity_types", "valid", "risk_score", "application_decision", "sanitized_text"]},
+    {"lesson_path": "day5/05-presidio-guardrail.md", "section": "6. 전화번호와 카드 번호 — 기본 Recognizer 탐지 비교", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "original_text", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "day5/05-presidio-guardrail.md", "section": "7. 한국 주민등록번호 — 사용자 정의 Recognizer 적용", "observation_id": "day6-presidio-custom-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "original_text", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "day5/05-presidio-guardrail.md", "section": "8. 생성 결과의 개인정보와 합성 키 — 출력 비식별화 비교", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "input_prompt", "original_text", "entity_types", "application_decision", "sanitized_text"]}
   ],
   "state": {
     "mutation_type": "process",
@@ -133,7 +133,7 @@
   },
   "watch_paths": {
     "setup": ["contracts/labs/day6-presidio.json", "examples/day6/presidio/", "docker/vuln-rag/", "tools/lab_contract.py", "tools/run_lab_contract.py"],
-    "course": ["day6/03-lab-protect-ai-llm-guard.md", "evidence/"],
+    "course": ["day5/05-presidio-guardrail.md", "evidence/"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py"]
   }
 }
