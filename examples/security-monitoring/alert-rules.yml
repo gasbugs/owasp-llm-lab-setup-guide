@@ -2,20 +2,81 @@ groups:
   - name: llm-security
     interval: 5s
     rules:
+      - record: llm:chat_block_ratio_5m
+        expr: sum(rate(llm_chat_requests_total{outcome="block"}[5m])) / clamp_min(sum(rate(llm_chat_requests_total[5m])), 0.001)
+
       - alert: LLMBlockingSpike
-        expr: sum(llm_security_decisions_total{decision="block"}) >= 2
+        expr: sum(increase(llm_chat_requests_total{outcome="block"}[5m])) >= 2
         for: 0m
         labels:
           severity: high
         annotations:
-          summary: Multiple LLM security requests were blocked
+          summary: Multiple LLM requests were blocked in five minutes
+          runbook: Inspect the matching policy rule in Loki and follow its trace in Tempo
+
+      - alert: LLMHighBlockRatio
+        expr: llm:chat_block_ratio_5m > 0.5 and sum(increase(llm_chat_requests_total[5m])) >= 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than half of recent LLM requests were blocked
+          runbook: Compare attack traffic with recent policy or model changes
+
       - alert: LLMGatewayUnavailable
-        expr: up{job="llm-security-gateway"} == 0
+        expr: up{job=~"llm-security-gateway|llm-security-retrieval"} == 0
         for: 30s
         labels:
           severity: critical
         annotations:
           summary: LLM security gateway scrape failed
+          runbook: Check gateway container state and its nearest stdout logs
+
+      - alert: LLMObservabilityPipelineUnavailable
+        expr: up{job=~"alloy|mimir|loki|tempo|alertmanager|alert-webhook"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: An observability pipeline component is unavailable
+          runbook: Use the job label to inspect the failed collector or backend
+
+      - alert: AlertDeliveryStalled
+        expr: (time() - llm_alert_notification_last_received_timestamp_seconds > 900) and (llm_alert_notification_last_received_timestamp_seconds > 0) and on() (sum(ALERTS{alertstate="firing"}) > 0)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Firing alerts have not reached the webhook receiver recently
+          runbook: Inspect Alertmanager notification errors and receiver connectivity
+
+      - alert: MimirRemoteWriteFailure
+        expr: increase(prometheus_remote_storage_samples_failed_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus failed to remote-write samples to Mimir
+          runbook: Check the Prometheus remote-write queue and Mimir ingestion logs
+
+      - alert: TelemetryDataDropped
+        expr: sum(increase(otelcol_receiver_failed_log_records_total[5m])) + sum(increase(otelcol_receiver_failed_spans_total[5m])) + sum(increase(loki_write_dropped_entries_total[5m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Alloy failed to receive or deliver telemetry data
+          runbook: Inspect receiver failures, Loki drop reasons, and exporter destination health
+
+      - alert: AlloyExporterQueuePressure
+        expr: max(otelcol_exporter_queue_size / otelcol_exporter_queue_capacity) > 0.8
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: An Alloy OTLP exporter queue is more than eighty percent full
+          runbook: Inspect the destination backend before the in-memory queue begins dropping data
+
       - alert: OllamaUpstreamFailure
         expr: increase(llm_upstream_calls_total{decision="infra"}[5m]) > 0
         for: 0m
@@ -23,6 +84,17 @@ groups:
           severity: critical
         annotations:
           summary: Ollama upstream request failed
+          runbook: Follow the failed trace and inspect Ollama connectivity
+
+      - alert: LLMHighP95Latency
+        expr: histogram_quantile(0.95, sum by (le) (rate(llm_chat_request_duration_seconds_bucket[5m]))) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: LLM chat p95 latency exceeds ten seconds
+          runbook: Compare Ollama span duration, token counts, and GPU saturation
+
       - alert: GPUMemoryPressure
         expr: 100 * llm_gpu_memory_used_mib / llm_gpu_memory_total_mib > 90
         for: 1m
@@ -30,3 +102,4 @@ groups:
           severity: warning
         annotations:
           summary: NVIDIA GPU framebuffer usage exceeds 90 percent
+          runbook: Compare loaded model size, concurrent requests, and GPU memory

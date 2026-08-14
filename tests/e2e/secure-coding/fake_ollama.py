@@ -23,10 +23,13 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler contract
-        if self.path != "/healthz":
+        if self.path == "/api/tags":
+            body = b'{"models":[{"name":"llama3.1:8b-instruct-q4_K_M"}]}'
+        elif self.path == "/healthz":
+            body = b'{"ok":true}'
+        else:
             self.send_error(404)
             return
-        body = b'{"ok":true}'
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -41,6 +44,11 @@ class Handler(BaseHTTPRequestHandler):
                 "model": request.get("model"),
                 "response": "공개 사고 대응 절차는 탐지, 격리, 조사, 복구, 사후 검토 순서입니다.",
                 "done": True,
+                "prompt_eval_count": 42,
+                "eval_count": 18,
+                "load_duration": 125000000,
+                "prompt_eval_duration": 250000000,
+                "eval_duration": 500000000,
             }
         elif self.path == "/api/chat":
             response = {
@@ -68,5 +76,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    host = os.getenv("FAKE_OLLAMA_HOST", "127.0.0.1")
     port = int(os.getenv("FAKE_OLLAMA_PORT", "11434"))
-    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    ThreadingHTTPServer((host, port), Handler).serve_forever()

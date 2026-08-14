@@ -1,0 +1,140 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// Podman exposes a Docker-compatible rootless API socket. Alloy uses it only
+// to discover containers and stream stdout/stderr into Loki.
+discovery.docker "podman" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+discovery.relabel "container_logs" {
+  targets = discovery.docker.podman.targets
+
+  // The rootless Podman socket can see every container owned by the learner.
+  // Keep this lab's containers only so unrelated exercises never enter Loki.
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/llm-sec-.*"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "service_name"
+  }
+
+}
+
+loki.source.docker "podman" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.relabel.container_logs.output
+  labels        = { deployment_environment = "owasp-llm-lab", telemetry_source = "container-stdout" }
+  forward_to    = [loki.process.container_logs.receiver]
+}
+
+loki.process "container_logs" {
+  stage.decolorize {}
+  // A collector is a second data-loss boundary. Redact common lab secrets
+  // even when an individual container accidentally prints them to stdout.
+  stage.replace {
+    expression = "(?i)DEMO_API_KEY=([A-Za-z0-9_-]+)"
+    replace    = "[REDACTED]"
+  }
+  stage.replace {
+    expression = "([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
+    replace    = "[REDACTED-EMAIL]"
+  }
+  stage.truncate {
+    rule {
+      limit  = "8KiB"
+      suffix = "...[TRUNCATED]"
+    }
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// The application sends structured security logs and trace spans over OTLP.
+// Memory limiting and batching happen before independent Loki and Tempo exports.
+otelcol.receiver.otlp "application" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    logs   = [otelcol.processor.memory_limiter.application.input]
+    traces = [otelcol.processor.memory_limiter.application.input]
+  }
+}
+
+otelcol.processor.memory_limiter "application" {
+  check_interval = "1s"
+  limit          = "256MiB"
+
+  output {
+    logs   = [otelcol.processor.batch.application.input]
+    traces = [otelcol.processor.batch.application.input]
+  }
+}
+
+otelcol.processor.batch "application" {
+  timeout             = "1s"
+  send_batch_size     = 256
+  send_batch_max_size = 512
+
+  output {
+    logs   = [otelcol.exporter.otlphttp.loki.input]
+    traces = [otelcol.exporter.otlphttp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlphttp "loki" {
+  logs_endpoint = "http://loki:3100/otlp/v1/logs"
+
+  client {
+    endpoint = "http://loki:3100/otlp"
+  }
+
+  sending_queue {
+    enabled       = true
+    num_consumers = 2
+    queue_size    = 2048
+  }
+
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "1s"
+    max_interval     = "30s"
+    max_elapsed_time = "5m"
+  }
+}
+
+otelcol.exporter.otlphttp "tempo" {
+  traces_endpoint = "http://tempo:4318/v1/traces"
+
+  client {
+    endpoint = "http://tempo:4318"
+  }
+
+  sending_queue {
+    enabled       = true
+    num_consumers = 2
+    queue_size    = 2048
+  }
+
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "1s"
+    max_interval     = "30s"
+    max_elapsed_time = "5m"
+  }
+}

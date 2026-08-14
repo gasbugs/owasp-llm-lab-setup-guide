@@ -5,13 +5,19 @@ services:
     build:
       context: .
       dockerfile: Containerfile
-    image: localhost/llm-security-gateway:2.0
+    image: localhost/llm-security-gateway:3.0
     container_name: llm-sec-gateway
     environment:
       ENABLE_LAB_ENDPOINTS: "true"
+      LLM_MONITOR_TOKEN: ${LLM_MONITOR_TOKEN:-llm-monitor-acme-token}
+      LLM_MONITOR_ADMIN_TOKEN: ${LLM_MONITOR_ADMIN_TOKEN:-llm-monitor-admin-token}
+      TELEMETRY_INGEST_TOKEN: ${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}
+      TELEMETRY_HMAC_KEY: ${TELEMETRY_HMAC_KEY:-module08-lab-hmac-key-change-in-production}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.containers.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      RETRIEVAL_URL: http://retrieval:8081
+      RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:-module08-retrieval-service-token}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       SECURITY_EVENT_DB: /data/security-events.db
       SECURITY_POLICY_PATH: /app/policy.json
     extra_hosts:
@@ -22,18 +28,38 @@ services:
       - ${MONITOR_POLICY_PATH:-./policy.json}:/app/policy.json:ro,Z
       - gateway-events:/data:Z
     networks: [observability]
+    security_opt: [no-new-privileges]
 
-  otel-collector:
-    image: docker.io/otel/opentelemetry-collector-contrib:0.132.0
-    container_name: llm-sec-otel
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
-    volumes:
-      - ./otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro,Z
+  retrieval:
+    image: localhost/llm-security-gateway:3.0
+    container_name: llm-sec-retrieval
+    command: ["uvicorn", "retrieval_service:app", "--host", "0.0.0.0", "--port", "8081", "--no-access-log"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+      RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:-module08-retrieval-service-token}
     ports:
-      - 127.0.0.1:4318:4318
-      - 127.0.0.1:13133:13133
-    depends_on: [loki, tempo]
+      - 127.0.0.1:8015:8081
     networks: [observability]
+    security_opt: [no-new-privileges]
+
+  alloy:
+    image: docker.io/grafana/alloy:v1.18.0
+    container_name: llm-sec-alloy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --disable-reporting
+      - /etc/alloy/config.alloy
+    ports:
+      - 127.0.0.1:12345:12345
+      - 127.0.0.1:4318:4318
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro,Z
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}/podman/podman.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data:Z
+    networks: [observability]
+    security_opt: [no-new-privileges]
 
   prometheus:
     image: docker.io/prom/prometheus:v3.5.0
@@ -41,15 +67,29 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
       - --web.listen-address=0.0.0.0:9090
+      - --enable-feature=exemplar-storage
     ports:
       - 127.0.0.1:9090:9090
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
       - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro,Z
       - prometheus-data:/prometheus:Z
-    depends_on: [gateway, alertmanager]
     networks: [observability]
+    security_opt: [no-new-privileges]
+
+  mimir:
+    image: docker.io/grafana/mimir:3.0.6
+    container_name: llm-sec-mimir
+    command: ["-config.file=/etc/mimir/mimir.yaml"]
+    ports:
+      - 127.0.0.1:9009:9009
+    volumes:
+      - ./mimir.yaml:/etc/mimir/mimir.yaml:ro,Z
+      - mimir-data:/data:Z
+    networks: [observability]
+    security_opt: [no-new-privileges]
 
   alertmanager:
     image: docker.io/prom/alertmanager:v0.28.1
@@ -64,6 +104,16 @@ services:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,Z
       - alertmanager-data:/alertmanager:Z
     networks: [observability]
+    security_opt: [no-new-privileges]
+
+  alert-webhook:
+    image: localhost/llm-security-gateway:3.0
+    container_name: llm-sec-alert-webhook
+    command: ["uvicorn", "alert_receiver:app", "--host", "0.0.0.0", "--port", "8099", "--no-access-log"]
+    ports:
+      - 127.0.0.1:8099:8099
+    networks: [observability]
+    security_opt: [no-new-privileges]
 
   loki:
     image: docker.io/grafana/loki:3.5.3
@@ -75,6 +125,7 @@ services:
       - ./loki-config.yaml:/etc/loki/config.yaml:ro,Z
       - loki-data:/loki:Z
     networks: [observability]
+    security_opt: [no-new-privileges]
 
   tempo:
     image: docker.io/grafana/tempo:2.8.2
@@ -86,6 +137,7 @@ services:
       - ./tempo.yaml:/etc/tempo/config.yaml:ro,Z
       - tempo-data:/var/tempo:Z
     networks: [observability]
+    security_opt: [no-new-privileges]
 
   grafana:
     image: docker.io/grafana/grafana:12.1.0
@@ -96,14 +148,20 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
     ports:
       - 127.0.0.1:3001:3000
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro,Z
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro,Z
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro,Z
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro,Z
       - grafana-data:/var/lib/grafana:Z
-    depends_on: [prometheus, loki, tempo]
     networks: [observability]
+    security_opt: [no-new-privileges]
 
 networks:
   observability:
@@ -111,7 +169,9 @@ networks:
 
 volumes:
   gateway-events:
+  alloy-data:
   prometheus-data:
+  mimir-data:
   alertmanager-data:
   loki-data:
   tempo-data:

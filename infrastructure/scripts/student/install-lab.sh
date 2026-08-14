@@ -130,6 +130,7 @@ UBUNTU_USER_ENV=(
   DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$UBUNTU_UID/bus"
 )
 RUN_AS_UBUNTU=(runuser -u ubuntu -- env "${UBUNTU_USER_ENV[@]}")
+"${RUN_AS_UBUNTU[@]}" systemctl --user enable --now podman.socket
 
 # CDI 모드 nvidia
 step "6/10" "NVIDIA GPU를 Podman 컨테이너에서 사용할 CDI 설정을 확인합니다"

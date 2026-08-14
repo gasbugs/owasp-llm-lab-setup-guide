@@ -5,68 +5,137 @@
   "panels": [
     {
       "type": "stat",
-      "title": "Security events",
-      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(llm_security_events_total)", "refId": "A"}],
-      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0}
+      "title": "Chat request rate",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [{"expr": "sum(rate(llm_chat_requests_total[5m]))", "legendFormat": "requests/s", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 4, "x": 0, "y": 0}
     },
     {
       "type": "stat",
-      "title": "Blocked requests",
-      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(llm_security_decisions_total{decision=\"block\"})", "refId": "A"}],
-      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0}
+      "title": "Blocked in the last 5m",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [{"expr": "sum(increase(llm_chat_requests_total{outcome=\"block\"}[5m]))", "refId": "A"}],
+      "gridPos": {"h": 5, "w": 4, "x": 4, "y": 0}
     },
     {
       "type": "stat",
-      "title": "Ollama calls",
-      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(llm_upstream_calls_total)", "refId": "A"}],
-      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0}
+      "title": "Chat p95 latency",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(llm_chat_request_duration_seconds_bucket[5m])))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 4, "x": 8, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Generated tokens",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [{"expr": "sum(increase(llm_gen_ai_tokens_total{kind=\"output\"}[30m]))", "refId": "A"}],
+      "gridPos": {"h": 5, "w": 4, "x": 12, "y": 0}
     },
     {
       "type": "gauge",
       "title": "GPU utilization",
-      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
       "fieldConfig": {"defaults": {"min": 0, "max": 100, "unit": "percent"}, "overrides": []},
       "targets": [{"expr": "avg(llm_gpu_utilization_percent)", "refId": "A"}],
-      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0}
+      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Telemetry and alert services up",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [{"expr": "sum(up{job=~\"alloy|mimir|loki|tempo|alertmanager|alert-webhook\"})", "refId": "A"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 6}, "overrides": []},
+      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 0}
     },
     {
       "type": "timeseries",
-      "title": "Decisions by policy rule",
-      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "llm_security_decisions_total", "legendFormat": "{{decision}} / {{rule}}", "refId": "A"}],
-      "gridPos": {"h": 9, "w": 16, "x": 0, "y": 5}
+      "title": "Request outcomes and blocked stages",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [{"expr": "sum by (outcome, blocked_stage) (rate(llm_chat_requests_total[5m]))", "legendFormat": "{{outcome}} / {{blocked_stage}}", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
     },
     {
-      "type": "alertlist",
-      "title": "Active security alerts",
-      "options": {"alertName": "", "dashboardAlerts": false, "groupBy": ["alertname"], "maxItems": 20, "sortOrder": 1, "stateFilter": {"alerting": true, "noData": true, "normal": false, "pending": true}},
-      "gridPos": {"h": 9, "w": 8, "x": 16, "y": 5}
+      "type": "timeseries",
+      "title": "Trace-derived RED metrics",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [
+        {"expr": "sum by (span_name, status_code) (rate(traces_spanmetrics_calls_total[5m]))", "legendFormat": "{{span_name}} / {{status_code}}", "refId": "A"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}
+    },
+    {
+      "type": "table",
+      "title": "Active Prometheus alerts",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [{"expr": "ALERTS{alertstate=\"firing\"}", "format": "table", "instant": true, "refId": "A"}],
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 13}
+    },
+    {
+      "type": "timeseries",
+      "title": "Telemetry loss and exporter queue pressure",
+      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "targets": [
+        {"expr": "sum(increase(otelcol_receiver_failed_log_records_total[5m])) + sum(increase(otelcol_receiver_failed_spans_total[5m]))", "legendFormat": "OTLP receiver failures", "refId": "A"},
+        {"expr": "sum(increase(loki_write_dropped_entries_total[5m]))", "legendFormat": "Loki entries dropped", "refId": "B"},
+        {"expr": "max(otelcol_exporter_queue_size / otelcol_exporter_queue_capacity)", "legendFormat": "largest exporter queue ratio", "refId": "C"}
+      ],
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 20}
     },
     {
       "type": "logs",
-      "title": "Sanitized security event logs",
+      "title": "All container stdout and stderr",
       "datasource": {"type": "loki", "uid": "llm-security-loki"},
-      "targets": [{"expr": "{service_name=\"llm-security-gateway\"} |= \"llm_security_event\"", "refId": "A"}],
+      "targets": [{"expr": "{telemetry_source=\"container-stdout\", service_name=~\"$service\"}", "refId": "A"}],
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "gridPos": {"h": 11, "w": 12, "x": 0, "y": 27}
+    },
+    {
+      "type": "logs",
+      "title": "Sanitized LLM security events",
+      "datasource": {"type": "loki", "uid": "llm-security-loki"},
+      "targets": [{"expr": "{service_name=\"llm-security-gateway\"} |= \"llm_security_event\" | json | request_id=~\"$request_id\"", "refId": "A"}],
       "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
-      "gridPos": {"h": 11, "w": 12, "x": 0, "y": 14}
+      "gridPos": {"h": 11, "w": 12, "x": 12, "y": 27}
     },
     {
       "type": "traces",
       "title": "End-to-end request traces",
       "datasource": {"type": "tempo", "uid": "llm-security-tempo"},
       "targets": [{"queryType": "traceql", "query": "{ resource.service.name = \"llm-security-gateway\" }", "refId": "A"}],
-      "gridPos": {"h": 11, "w": 12, "x": 12, "y": 14}
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 38}
     }
   ],
+  "refresh": "5s",
   "schemaVersion": 41,
-  "tags": ["llm", "security", "observability", "gpu"],
-  "templating": {"list": []},
+  "tags": ["llm", "security", "observability", "lgtm", "gpu"],
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Container service",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "llm-security-loki"},
+        "query": "label_values({telemetry_source=\"container-stdout\"}, service_name)",
+        "definition": "label_values({telemetry_source=\"container-stdout\"}, service_name)",
+        "includeAll": true,
+        "allValue": ".*",
+        "refresh": 1,
+        "current": {"selected": true, "text": "All", "value": "$__all"}
+      },
+      {
+        "name": "request_id",
+        "label": "Request ID regex",
+        "type": "textbox",
+        "query": ".*",
+        "current": {"selected": true, "text": ".*", "value": ".*"}
+      }
+    ]
+  },
   "time": {"from": "now-30m", "to": "now"},
   "timezone": "browser",
-  "title": "LLM Security Operations Center",
+  "title": "LLM Security Observability Center",
   "uid": "llm-security-monitoring",
-  "version": 2
+  "version": 4
 }

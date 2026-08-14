@@ -1,11 +1,11 @@
 services:
   gpu-exporter:
-    image: localhost/llm-security-gateway:2.0
+    image: localhost/llm-security-gateway:3.0
     container_name: llm-sec-gpu-exporter
     command: ["python", "/app/gpu_exporter.py"]
     devices:
       - nvidia.com/gpu=all
     ports:
       - 127.0.0.1:9400:9400
-    depends_on: [gateway]
     networks: [observability]
+    security_opt: [no-new-privileges]

@@ -1,13 +1,25 @@
 apiVersion: 1
 
 datasources:
-  - name: Prometheus
+  - name: Mimir
+    type: prometheus
+    uid: llm-security-mimir
+    access: proxy
+    url: http://mimir:9009/prometheus
+    isDefault: true
+    editable: false
+    jsonData:
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: llm-security-tempo
+
+  - name: Prometheus Diagnostics
     type: prometheus
     uid: llm-security-prometheus
     access: proxy
     url: http://prometheus:9090
-    isDefault: true
     editable: false
+
   - name: Loki
     type: loki
     uid: llm-security-loki
@@ -20,6 +32,7 @@ datasources:
           matcherRegex: '"trace_id":"([a-f0-9]{32})"'
           datasourceUid: llm-security-tempo
           url: '$${__value.raw}'
+
   - name: Tempo
     type: tempo
     uid: llm-security-tempo
@@ -34,7 +47,17 @@ datasources:
         filterByTraceID: true
         filterBySpanID: false
       serviceMap:
-        datasourceUid: llm-security-prometheus
+        datasourceUid: llm-security-mimir
+      nodeGraph:
+        enabled: true
+      tracesToMetrics:
+        datasourceUid: llm-security-mimir
+        spanStartTimeShift: -2m
+        spanEndTimeShift: 2m
+        tags:
+          - key: service.name
+            value: service
+
   - name: Alertmanager
     type: alertmanager
     uid: llm-security-alertmanager

@@ -1,0 +1,16 @@
+services:
+  gateway:
+    environment:
+      OLLAMA_URL: http://fake-ollama:11434
+
+  fake-ollama:
+    image: localhost/llm-security-gateway:3.0
+    container_name: llm-sec-fake-ollama
+    command: ["python", "/app/fake_ollama.py"]
+    environment:
+      FAKE_OLLAMA_HOST: 0.0.0.0
+      FAKE_OLLAMA_PORT: "11434"
+    volumes:
+      - ../../tests/e2e/secure-coding/fake_ollama.py:/app/fake_ollama.py:ro,Z
+    networks: [observability]
+    security_opt: [no-new-privileges]

@@ -110,19 +110,32 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
 
     def test_raw_text_is_hashed_and_redacted(self) -> None:
         raw = "Contact alice@example.com with DEMO_API_KEY=sk-demo-12345"
-        digest, excerpt, entities = text_identity(raw)
+        digest, excerpt, entities = text_identity(
+            raw,
+            "unit-test-hmac-key",
+            self.policy["sensitive_data"]["patterns"],
+        )
         self.assertEqual(len(digest), 64)
         self.assertNotIn("alice@example.com", excerpt)
         self.assertNotIn("sk-demo-12345", excerpt)
         self.assertEqual(entities, ["DEMO_API_KEY", "EMAIL_ADDRESS"])
 
+    def test_prompt_identity_is_keyed_and_policy_regex_is_canonical(self) -> None:
+        first = text_identity("repeatable prompt", "key-a")[0]
+        second = text_identity("repeatable prompt", "key-b")[0]
+        self.assertNotEqual(first, second)
+        self.assertIn("DEMO_API_KEY", self.policy["sensitive_data"]["patterns"])
+
     def test_compose_defines_the_complete_observability_stack(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
         for service in (
             "gateway:",
-            "otel-collector:",
+            "retrieval:",
+            "alloy:",
             "prometheus:",
+            "mimir:",
             "alertmanager:",
+            "alert-webhook:",
             "loki:",
             "tempo:",
             "grafana:",
@@ -130,9 +143,12 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             self.assertIn(service, compose)
         for binding in (
             "127.0.0.1:8014:8080",
+            "127.0.0.1:8015:8081",
             "127.0.0.1:3001:3000",
             "127.0.0.1:9090:9090",
             "127.0.0.1:9093:9093",
+            "127.0.0.1:9009:9009",
+            "127.0.0.1:12345:12345",
         ):
             self.assertIn(binding, compose)
         gpu = (EXAMPLE / "compose.gpu.yaml").read_text(encoding="utf-8")
@@ -141,12 +157,44 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertNotIn("privileged:", gpu)
         self.assertNotIn("SYS_ADMIN", gpu)
 
-    def test_collector_routes_logs_and_traces_to_separate_backends(self) -> None:
-        config = (EXAMPLE / "otel-collector.yaml").read_text(encoding="utf-8")
-        self.assertIn("otlphttp/tempo", config)
-        self.assertIn("otlphttp/loki", config)
-        self.assertIn("traces:", config)
-        self.assertIn("logs:", config)
+    def test_compose_uses_the_verified_single_bridge_podman_topology(self) -> None:
+        compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
+        self.assertIn("name: llm-security-observability", compose)
+        self.assertNotIn("name: llm-security-telemetry", compose)
+        self.assertNotIn("name: llm-security-application", compose)
+        self.assertGreaterEqual(compose.count("networks: [observability]"), 10)
+
+    def test_grafana_does_not_download_plugins_at_startup(self) -> None:
+        compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
+        self.assertIn('GF_ANALYTICS_CHECK_FOR_UPDATES: "false"', compose)
+        self.assertIn('GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"', compose)
+        self.assertIn('GF_PLUGINS_PREINSTALL_DISABLED: "true"', compose)
+        self.assertIn('GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"', compose)
+
+    def test_alloy_collects_container_logs_and_routes_otlp_signals(self) -> None:
+        config = (EXAMPLE / "alloy" / "config.alloy").read_text(encoding="utf-8")
+        self.assertIn('discovery.docker "podman"', config)
+        self.assertIn('regex         = "/llm-sec-.*"', config)
+        self.assertIn('action        = "keep"', config)
+        self.assertIn('loki.source.docker "podman"', config)
+        self.assertIn('targets       = discovery.relabel.container_logs.output', config)
+        self.assertIn("DEMO_API_KEY", config)
+        self.assertIn("[REDACTED-EMAIL]", config)
+        self.assertNotIn('target_label  = "container_id"', config)
+        self.assertIn('otelcol.receiver.otlp "application"', config)
+        self.assertIn('otelcol.exporter.otlphttp "loki"', config)
+        self.assertIn('otelcol.exporter.otlphttp "tempo"', config)
+        self.assertIn("sending_queue", config)
+        self.assertIn("retry_on_failure", config)
+
+    def test_log_probe_waits_for_discovery_before_emitting_secret(self) -> None:
+        source = (EXAMPLE / "log_redaction_probe.py").read_text(encoding="utf-8")
+        self.assertLess(source.index("time.sleep(6)"), source.index("print("))
+        self.assertLess(source.index("print("), source.index("time.sleep(8)"))
+        self.assertIn(
+            "log_redaction_probe.py",
+            (EXAMPLE / "Containerfile").read_text(encoding="utf-8"),
+        )
 
     def test_installer_includes_cni_service_discovery(self) -> None:
         installer = (ROOT / "infrastructure" / "scripts" / "student" / "install-lab.sh").read_text(
@@ -159,13 +207,27 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn('@app.post("/api/chat")', source)
         self.assertIn("principal_from_authorization", source)
         self.assertIn("prompt_risk_score", source)
-        self.assertIn("select_document", source)
+        self.assertIn("call_retrieval", source)
         self.assertIn("requested_tool", source)
         self.assertIn("call_ollama", source)
         self.assertIn("llm.security.output_guardrail", source)
-        self.assertIn('"input_sha256": record["input_sha256"]', source)
-        self.assertIn("def request_trace(request_id:", source)
+        self.assertIn('"input_hmac_sha256": record["input_hmac_sha256"]', source)
+        self.assertIn("def request_trace(", source)
         self.assertNotIn("def trace(request_id:", source)
+        self.assertIn("FastAPIInstrumentor.instrument_app", source)
+        self.assertIn("HTTPXClientInstrumentor().instrument", source)
+        self.assertIn("llm_chat_request_duration_seconds", source)
+        self.assertIn("llm_gen_ai_tokens_total", source)
+        self.assertIn("def initialize_bounded_metric_series()", source)
+        self.assertIn('("block", "input")', source)
+        self.assertIn("TELEMETRY_INGEST_TOKEN", source)
+
+    def test_retrieval_service_is_instrumented_and_does_not_log_queries(self) -> None:
+        source = (EXAMPLE / "retrieval_service.py").read_text(encoding="utf-8")
+        self.assertIn('"service.name": "llm-security-retrieval"', source)
+        self.assertIn("FastAPIInstrumentor.instrument_app", source)
+        self.assertIn('"raw_query_stored": False', source)
+        self.assertIn("x_service_token", source)
 
     def test_dashboard_correlates_metrics_logs_traces_and_gpu(self) -> None:
         dashboard = json.loads(
@@ -177,8 +239,13 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertTrue({"stat", "gauge", "timeseries", "logs", "traces"}.issubset(panel_types))
         serialized = json.dumps(dashboard)
         self.assertIn("llm_gpu_utilization_percent", serialized)
+        self.assertIn("llm-security-mimir", serialized)
         self.assertIn("llm-security-loki", serialized)
         self.assertIn("llm-security-tempo", serialized)
+        self.assertIn("All container stdout and stderr", serialized)
+        self.assertIn("Telemetry loss and exporter queue pressure", serialized)
+        self.assertIn("otelcol_exporter_queue_size", serialized)
+        self.assertEqual(dashboard["refresh"], "5s")
 
     @patch("gpu_exporter.subprocess.run")
     def test_gpu_exporter_maps_read_only_nvidia_query_to_metrics(self, run) -> None:
@@ -193,10 +260,41 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
     def test_alert_rules_cover_security_upstream_and_gpu_failures(self) -> None:
         rules = (EXAMPLE / "alert-rules.yml").read_text(encoding="utf-8")
         self.assertIn("LLMBlockingSpike", rules)
-        self.assertIn('sum(llm_security_decisions_total{decision="block"}) >= 2', rules)
+        self.assertIn('increase(llm_chat_requests_total{outcome="block"}[5m])', rules)
         self.assertIn("LLMGatewayUnavailable", rules)
+        self.assertIn("LLMObservabilityPipelineUnavailable", rules)
+        self.assertIn("AlertDeliveryStalled", rules)
+        self.assertIn("MimirRemoteWriteFailure", rules)
+        self.assertIn("TelemetryDataDropped", rules)
+        self.assertIn("AlloyExporterQueuePressure", rules)
         self.assertIn("OllamaUpstreamFailure", rules)
         self.assertIn("GPUMemoryPressure", rules)
+
+    def test_alertmanager_delivers_to_lab_webhook(self) -> None:
+        config = (EXAMPLE / "alertmanager.yml").read_text(encoding="utf-8")
+        self.assertIn("http://alert-webhook:8099/api/alerts", config)
+        self.assertIn("send_resolved: true", config)
+
+    def test_prometheus_remote_writes_metrics_and_exemplars_to_mimir(self) -> None:
+        config = (EXAMPLE / "prometheus.yml").read_text(encoding="utf-8")
+        self.assertIn("http://mimir:9009/api/v1/push", config)
+        self.assertIn("send_exemplars: true", config)
+        for job in ("alloy", "mimir", "loki", "tempo", "alertmanager", "alert-webhook", "grafana"):
+            self.assertIn(f"job_name: {job}", config)
+
+    def test_gpu_target_name_matches_publisher_e2e(self) -> None:
+        prometheus = (EXAMPLE / "prometheus.yml").read_text(encoding="utf-8")
+        e2e = (
+            ROOT / "tests" / "e2e" / "security-monitoring" / "test_security_monitoring.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("job_name: nvidia-gpu", prometheus)
+        self.assertIn('.labels.job == "nvidia-gpu"', e2e)
+
+    def test_tempo_generates_span_metrics_and_service_graphs(self) -> None:
+        config = (EXAMPLE / "tempo.yaml").read_text(encoding="utf-8")
+        self.assertIn("service-graphs", config)
+        self.assertIn("span-metrics", config)
+        self.assertIn("http://mimir:9009/api/v1/push", config)
 
 
 if __name__ == "__main__":
