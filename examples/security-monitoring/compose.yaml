@@ -105,19 +105,6 @@ services:
     depends_on: [prometheus, loki, tempo]
     networks: [observability]
 
-  dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.0-4.8.3-distroless
-    container_name: llm-sec-dcgm
-    profiles: [gpu]
-    devices:
-      - nvidia.com/gpu=all
-    environment:
-      DCGM_EXPORTER_LISTEN: :9400
-      DCGM_EXPORTER_KUBERNETES: "false"
-    ports:
-      - 127.0.0.1:9400:9400
-    networks: [observability]
-
 networks:
   observability:
     name: llm-security-observability

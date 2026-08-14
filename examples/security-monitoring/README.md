@@ -27,7 +27,7 @@ Raw prompts are not stored. Structured events contain a SHA-256 identity, a reda
 ```bash
 export OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M
 export PODMAN_COMPOSE_PROVIDER=podman-compose
-podman compose --file compose.yaml --profile gpu up --detach --build
+podman compose --file compose.yaml --file compose.gpu.yaml up --detach --build
 ```
 
 Ubuntu 24.04에서 Docker Compose plugin도 함께 설치되어 있으면 `podman compose`가 이를 먼저 선택할 수 있다. `PODMAN_COMPOSE_PROVIDER`는 rootless Podman과 직접 통신하는 `podman-compose`를 선택해 Docker daemon 의존성을 없앤다.
@@ -47,7 +47,7 @@ USE_REAL_OLLAMA=true WITH_GPU=true \
 ## Stop
 
 ```bash
-podman compose --file compose.yaml --profile gpu down
+podman compose --file compose.yaml --file compose.gpu.yaml down
 ```
 
 Named volumes are intentionally retained by the learner command. Publisher E2E uses `down --volumes` because each validation run is isolated.

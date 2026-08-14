@@ -19,7 +19,7 @@ FAKE_PID=""
 
 compose() {
   if [ "$WITH_GPU" = "true" ]; then
-    podman compose --file "$COMPOSE_FILE" --profile gpu "$@"
+    podman compose --file "$COMPOSE_FILE" --file "$EXAMPLE/compose.gpu.yaml" "$@"
   else
     podman compose --file "$COMPOSE_FILE" "$@"
   fi
