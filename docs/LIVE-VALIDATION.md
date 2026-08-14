@@ -58,7 +58,9 @@ CI는 기존 SHA 태그 덮어쓰기를 거부하고 각 commit 태그를 publis
 ## 2. 로컬 정적 게이트 재현
 
 ```bash
-python3 -m unittest discover -s tests/unit -p 'test_*.py' -v
+python3 -m venv /tmp/owasp-llm-setup-tests
+/tmp/owasp-llm-setup-tests/bin/pip install -r tests/requirements.txt
+/tmp/owasp-llm-setup-tests/bin/python -m unittest discover -s tests/unit -p 'test_*.py' -v
 python3 -m compileall -q docker tests
 find infrastructure tests docker -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
 terraform fmt -check -recursive infrastructure/terraform
