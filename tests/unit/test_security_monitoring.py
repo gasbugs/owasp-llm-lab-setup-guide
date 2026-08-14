@@ -163,6 +163,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("requested_tool", source)
         self.assertIn("call_ollama", source)
         self.assertIn("llm.security.output_guardrail", source)
+        self.assertIn("def request_trace(request_id:", source)
+        self.assertNotIn("def trace(request_id:", source)
 
     def test_dashboard_correlates_metrics_logs_traces_and_gpu(self) -> None:
         dashboard = json.loads(

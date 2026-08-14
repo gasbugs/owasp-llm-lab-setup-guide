@@ -686,7 +686,7 @@ def events(limit: int = Query(default=100, ge=1, le=1000)) -> dict[str, Any]:
 
 
 @app.get("/api/traces/{request_id}")
-def trace(request_id: str) -> dict[str, Any]:
+def request_trace(request_id: str) -> dict[str, Any]:
     records = query_records("request_id = ?", (request_id,))
     if not records:
         raise HTTPException(status_code=404, detail="request trace not found")
