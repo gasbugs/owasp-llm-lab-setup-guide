@@ -11,6 +11,11 @@ LABEL owasp.llm.lab.warning="INTENTIONALLY VULNERABLE — DO NOT DEPLOY OUTSIDE 
 
 WORKDIR /app
 
+# Learner secure-coding workshops edit the adjacent vulnerable/safe call pair
+# inside the running container and reload it with `podman restart`.
+RUN apt-get update && apt-get install -y --no-install-recommends vim-tiny \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml uv.lock* ./
 RUN uv sync --frozen --no-dev || uv sync --no-dev
 

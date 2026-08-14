@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from presidio_core import FRAMEWORK, FRAMEWORK_VERSION, PresidioCore, env_bool
-from secure_coding import expose_raw_personal_data, redact_personal_data_with_presidio
+from secure_coding import select_personal_data_policy
 
 
 GUARD_MODE = os.getenv("GUARD_MODE", "enforce").strip().lower()
@@ -150,9 +150,7 @@ async def scan(request: ScanRequest) -> dict:
 async def secure_coding_scan(request: ScanRequest) -> dict:
     require_lab_endpoint()
 
-    # NODEGOAT-LAB: DAY6 — switch raw PII passthrough to Presidio redaction here.
-    result = expose_raw_personal_data(request.text, CORE.scan_input)  # VULNERABLE-ACTIVE
-    # result = redact_personal_data_with_presidio(request.text, CORE.scan_input)  # SAFE-ENABLE
+    result = select_personal_data_policy(request.text, CORE.scan_input)
 
     emit(result)
     return result

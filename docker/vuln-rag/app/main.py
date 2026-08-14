@@ -21,19 +21,13 @@ from app.guardrails import GuardrailProxy, GuardrailProxyError
 from app.llm import LLMClient
 from app.secure_coding import (
     PolicyDecision,
-    allow_unbounded_generation,
-    allow_untrusted_llm01_input,
-    authenticate_llm02_bearer,
     emit_security_event,
-    enforce_llm01_input_policy,
-    enforce_llm10_resource_budget,
-    filter_authenticated_tenant,
-    include_unapproved_documents,
-    require_llm09_approved_package,
-    require_approved_documents,
-    search_all_tenants,
-    trust_llm02_request_body,
-    trust_llm09_model_recommendation,
+    select_llm01_input_policy,
+    select_llm02_identity_binding,
+    select_llm04_provenance_filter,
+    select_llm08_tenant_filter,
+    select_llm09_package_policy,
+    select_llm10_resource_budget,
 )
 from app.scenarios import SCENARIO_NAMES, list_scenarios
 from app.scenarios import day2 as day2_scenario
@@ -296,9 +290,7 @@ async def llm01_secure_coding_workshop(request_body: ChatRequest):
     """Same endpoint before and after the learner switches the adjacent call."""
     require_workshop_scenario("day1")
 
-    # NODEGOAT-LAB: LLM01 — comment this vulnerable call and enable the safe call below.
-    decision = allow_untrusted_llm01_input(request_body.message)  # VULNERABLE-ACTIVE
-    # decision = enforce_llm01_input_policy(request_body.message)  # SAFE-ENABLE
+    decision = select_llm01_input_policy(request_body.message)
 
     if decision.application_decision == "block":
         emit_security_event(decision, upstream_called=False)
@@ -329,9 +321,7 @@ async def llm02_secure_coding_workshop(
     require_day2_lab()
 
     try:
-        # NODEGOAT-LAB: LLM02 — switch identity binding at this single call site.
-        binding = trust_llm02_request_body(request_body, request)  # VULNERABLE-ACTIVE
-        # binding = authenticate_llm02_bearer(request_body, request)  # SAFE-ENABLE
+        binding = select_llm02_identity_binding(request_body, request)
     except HTTPException as exc:
         emit_security_event(
             PolicyDecision(
@@ -366,9 +356,7 @@ async def llm02_secure_coding_workshop(
 async def llm04_secure_coding_workshop(request_body: LLM04ChatRequest):
     require_day2_lab()
 
-    # NODEGOAT-LAB: LLM04 — switch provenance filtering at this single call site.
-    mode = include_unapproved_documents()  # VULNERABLE-ACTIVE
-    # mode = require_approved_documents()  # SAFE-ENABLE
+    mode = select_llm04_provenance_filter()
 
     result = await run_llm04_chat(request_body, mode=mode)
     emit_security_event(
@@ -387,9 +375,7 @@ async def llm08_secure_coding_workshop(
     request_body: LLM08SearchRequest,
     request: Request,
 ):
-    # NODEGOAT-LAB: LLM08 — switch the pre-ranking tenant boundary here.
-    mode = search_all_tenants()  # VULNERABLE-ACTIVE
-    # mode = filter_authenticated_tenant()  # SAFE-ENABLE
+    mode = select_llm08_tenant_filter()
 
     result = await run_llm08_search(request_body, request, mode=mode)
     emit_security_event(
@@ -407,9 +393,7 @@ async def llm08_secure_coding_workshop(
 async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
     require_workshop_scenario("day4")
 
-    # NODEGOAT-LAB: LLM09 — switch the package-install trust boundary here.
-    decision = trust_llm09_model_recommendation(request_body.candidate)  # VULNERABLE-ACTIVE
-    # decision = require_llm09_approved_package(request_body.candidate)  # SAFE-ENABLE
+    decision = select_llm09_package_policy(request_body.candidate)
 
     installer_handoff_called = decision.application_decision == "allow"
     emit_security_event(decision, upstream_called=False)
@@ -433,9 +417,7 @@ async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
 async def llm10_secure_coding_workshop(request_body: ChatRequest):
     require_workshop_scenario("day5")
 
-    # NODEGOAT-LAB: LLM10 — switch request and output budgets at this call site.
-    decision = allow_unbounded_generation(request_body.message)  # VULNERABLE-ACTIVE
-    # decision = enforce_llm10_resource_budget(request_body.message)  # SAFE-ENABLE
+    decision = select_llm10_resource_budget(request_body.message)
 
     if decision.application_decision == "block":
         emit_security_event(decision, upstream_called=False)

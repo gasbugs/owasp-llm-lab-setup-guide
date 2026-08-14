@@ -40,15 +40,15 @@ import sys
 
 root, lab, mode = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
 paths = {
-    "LLM01": root / "docker/vuln-rag/app/main.py",
-    "LLM02": root / "docker/vuln-rag/app/main.py",
-    "LLM04": root / "docker/vuln-rag/app/main.py",
+    "LLM01": root / "docker/vuln-rag/app/secure_coding.py",
+    "LLM02": root / "docker/vuln-rag/app/secure_coding.py",
+    "LLM04": root / "docker/vuln-rag/app/secure_coding.py",
     "LLM05": root / "docker/vuln-rag/app/templates/index.html",
     "LLM06": root / "docker/vuln-agent/app/main.py",
-    "LLM08": root / "docker/vuln-rag/app/main.py",
-    "LLM09": root / "docker/vuln-rag/app/main.py",
-    "LLM10": root / "docker/vuln-rag/app/main.py",
-    "DAY6": root / "examples/day6/presidio/server.py",
+    "LLM08": root / "docker/vuln-rag/app/secure_coding.py",
+    "LLM09": root / "docker/vuln-rag/app/secure_coding.py",
+    "LLM10": root / "docker/vuln-rag/app/secure_coding.py",
+    "DAY6": root / "examples/day6/presidio/secure_coding.py",
 }
 lines = paths[lab].read_text(encoding="utf-8").splitlines()
 marker = next(i for i, line in enumerate(lines) if f"NODEGOAT-LAB: {lab}" in line)
@@ -72,24 +72,33 @@ printf 'SOURCE_BUILD lab=%s mode=vulnerable :: %s\n' "$LAB" "$PAIR_SOURCE" >&2
 
 case "$LAB" in
   LLM06)
+    PAIR_HOST_SOURCE="$ROOT/docker/vuln-agent/app/main.py"
+    PAIR_CONTAINER_SOURCE=/app/app/main.py
     "$CONTAINER_ENGINE" build -t "$AGENT_IMAGE" "$ROOT/docker/vuln-agent" >"$BUILD_LOG"
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
-      -v "$ROOT/docker/vuln-agent/app:/app/app:ro,Z" \
       -e PORT="$AGENT_PORT" -e OLLAMA_URL=http://127.0.0.1:11434 \
       "$AGENT_IMAGE" >/dev/null
     URL="http://127.0.0.1:$AGENT_PORT"
     ;;
   DAY6)
+    PAIR_HOST_SOURCE="$ROOT/examples/day6/presidio/secure_coding.py"
+    PAIR_CONTAINER_SOURCE=/app/secure_coding.py
     "$CONTAINER_ENGINE" build \
       -f "$ROOT/examples/day6/presidio/Containerfile" \
       -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio" >"$BUILD_LOG"
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
-      -v "$ROOT/examples/day6/presidio:/app:ro,Z" \
       -e RUN_MODE=server -e SERVER_PORT="$DAY6_PORT" \
       -e ENABLE_LAB_ENDPOINTS=true "$PRESIDIO_IMAGE" >/dev/null
     URL="http://127.0.0.1:$DAY6_PORT"
     ;;
   LLM01|LLM02|LLM04|LLM05|LLM08|LLM09|LLM10)
+    if [ "$LAB" = LLM05 ]; then
+      PAIR_HOST_SOURCE="$ROOT/docker/vuln-rag/app/templates/index.html"
+      PAIR_CONTAINER_SOURCE=/app/app/templates/index.html
+    else
+      PAIR_HOST_SOURCE="$ROOT/docker/vuln-rag/app/secure_coding.py"
+      PAIR_CONTAINER_SOURCE=/app/app/secure_coding.py
+    fi
     "$CONTAINER_ENGINE" build -t "$RAG_IMAGE" "$ROOT/docker/vuln-rag" >"$BUILD_LOG"
     case "$LAB" in
       LLM01) SCENARIO=day1 ;;
@@ -100,7 +109,6 @@ case "$LAB" in
       LLM10) SCENARIO=day5 ;;
     esac
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
-      -v "$ROOT/docker/vuln-rag/app:/app/app:ro,Z" \
       -e PORT="$RAG_PORT" -e DEFAULT_SCENARIO="$SCENARIO" \
       -e OLLAMA_URL=http://127.0.0.1:11434 "$RAG_IMAGE" >/dev/null
     URL="http://127.0.0.1:$RAG_PORT"
@@ -120,6 +128,8 @@ wait_ready() {
 }
 
 wait_ready
+"$CONTAINER_ENGINE" exec "$CONTAINER" vi --version >/dev/null
+"$CONTAINER_ENGINE" exec "$CONTAINER" test -w "$PAIR_CONTAINER_SOURCE"
 
 if [ "$MODE" = safe ]; then
   python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
@@ -127,6 +137,7 @@ if [ "$MODE" = safe ]; then
   SOURCE_TOGGLED=true
   PAIR_SOURCE=$(active_source safe)
   printf 'SOURCE_RESTART lab=%s mode=safe :: %s\n' "$LAB" "$PAIR_SOURCE" >&2
+  "$CONTAINER_ENGINE" cp "$PAIR_HOST_SOURCE" "$CONTAINER:$PAIR_CONTAINER_SOURCE"
   "$CONTAINER_ENGINE" restart "$CONTAINER" >/dev/null
   wait_ready
 fi

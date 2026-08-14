@@ -40,3 +40,9 @@ def redact_personal_data_with_presidio(text: str, scan_input: ScanInput) -> dict
         "modified": scan["modified"],
         "upstream_called": False,
     }
+
+
+def select_personal_data_policy(text: str, scan_input: ScanInput) -> dict:
+    # NODEGOAT-LAB: DAY6 — switch raw PII passthrough to Presidio redaction here.
+    return expose_raw_personal_data(text, scan_input)  # VULNERABLE-ACTIVE
+    # return redact_personal_data_with_presidio(text, scan_input)  # SAFE-ENABLE

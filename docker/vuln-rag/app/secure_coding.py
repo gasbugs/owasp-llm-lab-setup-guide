@@ -58,6 +58,12 @@ def enforce_llm01_input_policy(message: str) -> PolicyDecision:
     return PolicyDecision("llm01", "server-input-policy", "allow")
 
 
+def select_llm01_input_policy(message: str) -> PolicyDecision:
+    # NODEGOAT-LAB: LLM01 — switch the input-policy call here.
+    return allow_untrusted_llm01_input(message)  # VULNERABLE-ACTIVE
+    # return enforce_llm01_input_policy(message)  # SAFE-ENABLE
+
+
 def trust_llm02_request_body(request_body: object, _: Request) -> CustomerBinding:
     customer_id = getattr(request_body, "customer_id", None) or day2_scenario.LLM02_CUSTOMER_ID
     return CustomerBinding(customer_id, "vulnerable", None)
@@ -79,6 +85,15 @@ def authenticate_llm02_bearer(request_body: object, request: Request) -> Custome
     return CustomerBinding(principal.customer_id, "safe", principal)
 
 
+def select_llm02_identity_binding(
+    request_body: object,
+    request: Request,
+) -> CustomerBinding:
+    # NODEGOAT-LAB: LLM02 — switch identity binding here.
+    return trust_llm02_request_body(request_body, request)  # VULNERABLE-ACTIVE
+    # return authenticate_llm02_bearer(request_body, request)  # SAFE-ENABLE
+
+
 def include_unapproved_documents() -> Literal["vulnerable", "safe"]:
     return "vulnerable"
 
@@ -87,12 +102,24 @@ def require_approved_documents() -> Literal["vulnerable", "safe"]:
     return "safe"
 
 
+def select_llm04_provenance_filter() -> Literal["vulnerable", "safe"]:
+    # NODEGOAT-LAB: LLM04 — switch provenance filtering here.
+    return include_unapproved_documents()  # VULNERABLE-ACTIVE
+    # return require_approved_documents()  # SAFE-ENABLE
+
+
 def search_all_tenants() -> Literal["vulnerable", "safe"]:
     return "vulnerable"
 
 
 def filter_authenticated_tenant() -> Literal["vulnerable", "safe"]:
     return "safe"
+
+
+def select_llm08_tenant_filter() -> Literal["vulnerable", "safe"]:
+    # NODEGOAT-LAB: LLM08 — switch the pre-ranking tenant boundary here.
+    return search_all_tenants()  # VULNERABLE-ACTIVE
+    # return filter_authenticated_tenant()  # SAFE-ENABLE
 
 
 def trust_llm09_model_recommendation(candidate: str) -> PolicyDecision:
@@ -114,6 +141,12 @@ def require_llm09_approved_package(candidate: str) -> PolicyDecision:
     )
 
 
+def select_llm09_package_policy(candidate: str) -> PolicyDecision:
+    # NODEGOAT-LAB: LLM09 — switch the package-install trust boundary here.
+    return trust_llm09_model_recommendation(candidate)  # VULNERABLE-ACTIVE
+    # return require_llm09_approved_package(candidate)  # SAFE-ENABLE
+
+
 def allow_unbounded_generation(message: str) -> PolicyDecision:
     del message
     return PolicyDecision("llm10", "unbounded-request-and-output", "allow")
@@ -131,3 +164,9 @@ def enforce_llm10_resource_budget(message: str) -> PolicyDecision:
     return PolicyDecision(
         "llm10", "server-resource-budget", "allow", max_output_tokens=128
     )
+
+
+def select_llm10_resource_budget(message: str) -> PolicyDecision:
+    # NODEGOAT-LAB: LLM10 — switch request and output budgets here.
+    return allow_unbounded_generation(message)  # VULNERABLE-ACTIVE
+    # return enforce_llm10_resource_budget(message)  # SAFE-ENABLE

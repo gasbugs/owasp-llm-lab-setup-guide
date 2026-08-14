@@ -14,10 +14,15 @@ RUN python -m pip install \
       "httpx>=0.27,<1" \
     && python -m spacy download en_core_web_sm \
     && python -c "import tldextract; tldextract.extract('example.com')" \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends vim-tiny \
+    && rm -rf /var/lib/apt/lists/* \
     && chmod -R a+rwX /opt/presidio-cache
 
 WORKDIR /app
-COPY --chmod=0444 presidio_core.py secure_coding.py scan_pii.py server.py entrypoint.py /app/
+COPY --chmod=0444 presidio_core.py scan_pii.py server.py entrypoint.py /app/
+COPY --chown=65532:65532 --chmod=0644 secure_coding.py /app/secure_coding.py
+RUN chown 65532:65532 /app
 
 USER 65532:65532
 EXPOSE 8013

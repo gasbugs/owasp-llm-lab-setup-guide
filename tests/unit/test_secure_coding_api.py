@@ -40,6 +40,7 @@ def load_main_module():
 
 
 MAIN = load_main_module()
+POLICY_GLOBALS = MAIN.select_llm01_input_policy.__globals__
 
 
 class FakeLLM:
@@ -68,12 +69,12 @@ class SecureCodingApiTest(unittest.TestCase):
         self.original_scenario = MAIN.DEFAULT_SCENARIO
         self.original_llm = MAIN.llm
         self.original_embedding = MAIN.embedding
-        self.original_llm01 = MAIN.allow_untrusted_llm01_input
-        self.original_llm02 = MAIN.trust_llm02_request_body
-        self.original_llm04 = MAIN.include_unapproved_documents
-        self.original_llm08 = MAIN.search_all_tenants
-        self.original_llm09 = MAIN.trust_llm09_model_recommendation
-        self.original_llm10 = MAIN.allow_unbounded_generation
+        self.original_llm01 = MAIN.select_llm01_input_policy
+        self.original_llm02 = MAIN.select_llm02_identity_binding
+        self.original_llm04 = MAIN.select_llm04_provenance_filter
+        self.original_llm08 = MAIN.select_llm08_tenant_filter
+        self.original_llm09 = MAIN.select_llm09_package_policy
+        self.original_llm10 = MAIN.select_llm10_resource_budget
         self.llm = FakeLLM()
         MAIN.llm = self.llm
         MAIN.embedding = FakeEmbedding()
@@ -85,12 +86,12 @@ class SecureCodingApiTest(unittest.TestCase):
         MAIN.DEFAULT_SCENARIO = self.original_scenario
         MAIN.llm = self.original_llm
         MAIN.embedding = self.original_embedding
-        MAIN.allow_untrusted_llm01_input = self.original_llm01
-        MAIN.trust_llm02_request_body = self.original_llm02
-        MAIN.include_unapproved_documents = self.original_llm04
-        MAIN.search_all_tenants = self.original_llm08
-        MAIN.trust_llm09_model_recommendation = self.original_llm09
-        MAIN.allow_unbounded_generation = self.original_llm10
+        MAIN.select_llm01_input_policy = self.original_llm01
+        MAIN.select_llm02_identity_binding = self.original_llm02
+        MAIN.select_llm04_provenance_filter = self.original_llm04
+        MAIN.select_llm08_tenant_filter = self.original_llm08
+        MAIN.select_llm09_package_policy = self.original_llm09
+        MAIN.select_llm10_resource_budget = self.original_llm10
 
     def test_llm01_same_route_changes_from_upstream_to_block(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day1"
@@ -99,7 +100,7 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(vulnerable.status_code, 200)
         self.assertTrue(vulnerable.json()["upstream_called"])
 
-        MAIN.allow_untrusted_llm01_input = MAIN.enforce_llm01_input_policy
+        MAIN.select_llm01_input_policy = POLICY_GLOBALS["enforce_llm01_input_policy"]
         safe = self.client.post("/api/labs/llm01/workshop/chat", json=body)
         self.assertEqual(safe.status_code, 200)
         self.assertEqual(safe.json()["application_decision"], "block")
@@ -113,7 +114,7 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(vulnerable.status_code, 200)
         self.assertEqual(vulnerable.json()["customer_id"], "C-2002")
 
-        MAIN.trust_llm02_request_body = MAIN.authenticate_llm02_bearer
+        MAIN.select_llm02_identity_binding = POLICY_GLOBALS["authenticate_llm02_bearer"]
         safe = self.client.post(
             "/api/labs/llm02/workshop/chat",
             headers={"Authorization": "Bearer llm02-c2001-demo-token"},
@@ -134,7 +135,7 @@ class SecureCodingApiTest(unittest.TestCase):
         vulnerable = self.client.post("/api/labs/llm04/workshop/chat", json=body)
         self.assertEqual(len(vulnerable.json()["retrieval"]["hits"]), 1)
 
-        MAIN.include_unapproved_documents = MAIN.require_approved_documents
+        MAIN.select_llm04_provenance_filter = POLICY_GLOBALS["require_approved_documents"]
         safe = self.client.post("/api/labs/llm04/workshop/chat", json=body)
         self.assertEqual(safe.json()["retrieval"]["hits"], [])
 
@@ -147,7 +148,7 @@ class SecureCodingApiTest(unittest.TestCase):
         )
         self.assertFalse(vulnerable.json()["filter"]["applied"])
 
-        MAIN.search_all_tenants = MAIN.filter_authenticated_tenant
+        MAIN.select_llm08_tenant_filter = POLICY_GLOBALS["filter_authenticated_tenant"]
         safe = self.client.post(
             "/api/labs/llm08/workshop/search", headers=headers, json=body
         )
@@ -161,7 +162,7 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(vulnerable.status_code, 200)
         self.assertTrue(vulnerable.json()["upstream_called"])
 
-        MAIN.allow_unbounded_generation = MAIN.enforce_llm10_resource_budget
+        MAIN.select_llm10_resource_budget = POLICY_GLOBALS["enforce_llm10_resource_budget"]
         safe = self.client.post("/api/labs/llm10/workshop/chat", json=body)
         self.assertEqual(safe.status_code, 413)
         self.assertFalse(safe.json()["upstream_called"])
@@ -176,7 +177,7 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(vulnerable.status_code, 200)
         self.assertTrue(vulnerable.json()["installer_handoff_called"])
 
-        MAIN.trust_llm09_model_recommendation = MAIN.require_llm09_approved_package
+        MAIN.select_llm09_package_policy = POLICY_GLOBALS["require_llm09_approved_package"]
         safe = self.client.post("/api/labs/llm09/workshop/install", json=body)
         self.assertEqual(safe.status_code, 422)
         self.assertFalse(safe.json()["installer_handoff_called"])

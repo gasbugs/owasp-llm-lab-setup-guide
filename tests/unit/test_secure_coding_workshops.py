@@ -51,16 +51,18 @@ finally:
 
 
 class SecureCodingWorkshopTest(unittest.TestCase):
-    def test_publisher_e2e_builds_once_then_restarts_source_mount(self) -> None:
+    def test_publisher_e2e_builds_once_then_restarts_container_source(self) -> None:
         runner = (ROOT / "tests/e2e/secure-coding/run-workshop.sh").read_text(
             encoding="utf-8"
         )
         workflow = (ROOT / ".github/workflows/build-and-push.yaml").read_text(
             encoding="utf-8"
         )
-        self.assertIn('-v "$ROOT/docker/vuln-rag/app:/app/app:ro,Z"', runner)
-        self.assertIn('-v "$ROOT/docker/vuln-agent/app:/app/app:ro,Z"', runner)
-        self.assertIn('-v "$ROOT/examples/day6/presidio:/app:ro,Z"', runner)
+        self.assertNotIn(':/app/app:ro,Z', runner)
+        self.assertNotIn(':/app:ro,Z', runner)
+        self.assertIn('exec "$CONTAINER" vi --version', runner)
+        self.assertIn('exec "$CONTAINER" test -w "$PAIR_CONTAINER_SOURCE"', runner)
+        self.assertIn('cp "$PAIR_HOST_SOURCE" "$CONTAINER:$PAIR_CONTAINER_SOURCE"', runner)
         self.assertIn('"$CONTAINER_ENGINE" restart "$CONTAINER"', runner)
         self.assertEqual(runner.count('--mode safe >/dev/null'), 1)
         self.assertIn('comment_prefix = "//" if paths[lab].suffix == ".html" else "#"', runner)
@@ -74,6 +76,18 @@ class SecureCodingWorkshopTest(unittest.TestCase):
             "LLM01 LLM02 LLM04 LLM05 LLM06 LLM08 LLM09 LLM10 DAY6",
             workflow,
         )
+
+    def test_workshop_images_include_vi_and_editable_source(self) -> None:
+        rag = (ROOT / "docker/vuln-rag/Dockerfile").read_text(encoding="utf-8")
+        agent = (ROOT / "docker/vuln-agent/Dockerfile").read_text(encoding="utf-8")
+        presidio = (
+            ROOT / "examples/day6/presidio/Containerfile"
+        ).read_text(encoding="utf-8")
+        self.assertIn("vim-tiny", rag)
+        self.assertIn("vim-tiny", agent)
+        self.assertIn("vim-tiny", presidio)
+        self.assertIn("--chmod=0644 secure_coding.py", presidio)
+        self.assertIn("chown 65532:65532 /app", presidio)
 
     def test_llm01_safe_policy_blocks_injection(self) -> None:
         vulnerable = RAG_POLICY.allow_untrusted_llm01_input(

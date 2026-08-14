@@ -55,10 +55,12 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
 
     def test_presidio_has_learner_visible_adjacent_secure_coding_boundary(self) -> None:
         server = read(PRESIDIO / "server.py")
+        secure_coding = read(PRESIDIO / "secure_coding.py")
         containerfile = read(PRESIDIO / "Containerfile")
-        self.assertIn('NODEGOAT-LAB: DAY6', server)
-        self.assertIn('VULNERABLE-ACTIVE', server)
-        self.assertIn('SAFE-ENABLE', server)
+        self.assertIn('NODEGOAT-LAB: DAY6', secure_coding)
+        self.assertIn('VULNERABLE-ACTIVE', secure_coding)
+        self.assertIn('SAFE-ENABLE', secure_coding)
+        self.assertIn('select_personal_data_policy', server)
         self.assertIn('@app.post("/api/labs/secure-coding/scan")', server)
         self.assertIn('secure_coding.py', containerfile)
 

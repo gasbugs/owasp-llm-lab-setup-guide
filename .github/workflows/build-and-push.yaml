@@ -69,7 +69,7 @@ jobs:
       - name: Check adjacent vulnerable and safe coding pairs
         run: python tools/check_secure_coding_pairs.py
 
-      - name: Run all secure-coding source-mount restart E2E
+      - name: Run all secure-coding container-edit restart E2E
         run: |
           set -euo pipefail
           python tests/e2e/secure-coding/fake_ollama.py > /tmp/secure-coding-fake-ollama.log 2>&1 &
