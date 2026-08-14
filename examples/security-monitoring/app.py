@@ -4,16 +4,34 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import re
 import sqlite3
+import threading
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 from fastapi import FastAPI, HTTPException, Query
+from fastapi import Header
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field
+
+try:
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+    from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+except ImportError:  # Unit policy tests do not install the runtime extras.
+    trace = None
 
 from policy_engine import (
     Decision,
@@ -32,8 +50,76 @@ ENABLE_LAB_ENDPOINTS = os.getenv("ENABLE_LAB_ENDPOINTS", "false").lower() in {
 }
 POLICY = load_policy(POLICY_PATH)
 STARTED_AT = time.time()
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rstrip("/")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
+OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").rstrip("/")
+HTTP_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "180"))
+TOKEN_PRINCIPALS = {
+    "llm-monitor-acme-token": {"subject": "acme-observer", "tenant": "acme", "dangerous_tools": []},
+    "llm-monitor-admin-token": {"subject": "acme-operator", "tenant": "acme", "dangerous_tools": ["delete_animal"]},
+}
+CORPUS = (
+    {
+        "document_id": "acme/incident-response.md",
+        "tenant": "acme",
+        "text": "공개 사고 대응 절차는 탐지, 격리, 조사, 복구, 사후 검토 순서로 진행합니다.",
+        "keywords": ("사고", "대응", "절차", "incident", "response"),
+    },
+    {
+        "document_id": "beta/phoenix.md",
+        "tenant": "beta",
+        "text": "Beta Phoenix project launches on 2026-07-01.",
+        "keywords": ("불사조", "phoenix", "경쟁", "beta"),
+    },
+)
+REQUEST_WINDOWS: dict[str, list[float]] = {}
+REQUEST_WINDOW_LOCK = threading.Lock()
+SECURITY_LOGGER = logging.getLogger("llm.security")
 
-app = FastAPI(title="LLM Security Monitoring Lab", version="1.0.0")
+
+def configure_telemetry() -> Any:
+    if trace is None or not OTEL_ENDPOINT:
+        return None
+    resource = Resource.create({"service.name": "llm-security-gateway", "service.version": "2.0.0"})
+    tracer_provider = TracerProvider(resource=resource)
+    tracer_provider.add_span_processor(
+        BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{OTEL_ENDPOINT}/v1/traces"))
+    )
+    trace.set_tracer_provider(tracer_provider)
+
+    logger_provider = LoggerProvider(resource=resource)
+    logger_provider.add_log_record_processor(
+        BatchLogRecordProcessor(OTLPLogExporter(endpoint=f"{OTEL_ENDPOINT}/v1/logs"))
+    )
+    SECURITY_LOGGER.setLevel(logging.INFO)
+    SECURITY_LOGGER.handlers.clear()
+    SECURITY_LOGGER.addHandler(LoggingHandler(level=logging.INFO, logger_provider=logger_provider))
+    SECURITY_LOGGER.propagate = False
+    return trace.get_tracer("llm-security-gateway")
+
+
+TRACER = configure_telemetry()
+
+
+@contextmanager
+def telemetry_span(name: str, attributes: dict[str, Any] | None = None):
+    if TRACER is None:
+        yield None
+        return
+    with TRACER.start_as_current_span(name) as span:
+        for key, value in (attributes or {}).items():
+            if value is not None:
+                span.set_attribute(key, value)
+        yield span
+
+
+def current_trace_id() -> str:
+    if trace is None:
+        return "0" * 32
+    context = trace.get_current_span().get_span_context()
+    return f"{context.trace_id:032x}" if context.is_valid else "0" * 32
+
+app = FastAPI(title="LLM Security Observability Gateway", version="2.0.0")
 
 
 class SecurityEvent(BaseModel):
@@ -55,6 +141,18 @@ class SecurityEvent(BaseModel):
     application_decision: str | None = Field(default=None, max_length=32)
     policy_rule: str | None = Field(default=None, max_length=128)
     attributes: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str = Field(min_length=1, max_length=12000)
+    request_id: str | None = Field(default=None, min_length=3, max_length=128)
+
+
+class OutputCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=50000)
+    request_id: str | None = Field(default=None, min_length=3, max_length=128)
 
 
 def connect() -> sqlite3.Connection:
@@ -129,7 +227,7 @@ def persist(event: SecurityEvent, decision: Decision) -> dict[str, Any]:
         "approval_status": event.approval_status,
         "upstream_called": event.upstream_called,
         "duration_ms": event.duration_ms,
-        "attributes": attributes,
+        "attributes": {**attributes, "trace_id": attributes.get("trace_id") or current_trace_id()},
     }
     with connect() as connection:
         connection.execute(
@@ -148,12 +246,95 @@ def persist(event: SecurityEvent, decision: Decision) -> dict[str, Any]:
                 "upstream_called": (
                     None if event.upstream_called is None else int(event.upstream_called)
                 ),
-                "attributes_json": json.dumps(attributes, ensure_ascii=False, separators=(",", ":")),
+                "attributes_json": json.dumps(record["attributes"], ensure_ascii=False, separators=(",", ":")),
             },
         )
         connection.commit()
-    print(json.dumps({"event": "llm_security_event", **record}, ensure_ascii=False, separators=(",", ":")), flush=True)
+    log_record = {"event": "llm_security_event", **record}
+    serialized = json.dumps(log_record, ensure_ascii=False, separators=(",", ":"))
+    print(serialized, flush=True)
+    if OTEL_ENDPOINT:
+        SECURITY_LOGGER.info(serialized)
     return record
+
+
+def principal_from_authorization(authorization: str | None) -> dict[str, Any]:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="missing bearer token")
+    token = authorization.removeprefix("Bearer ").strip()
+    principal = TOKEN_PRINCIPALS.get(token)
+    if principal is None:
+        raise HTTPException(status_code=403, detail="unknown bearer token")
+    return principal
+
+
+def prompt_risk_score(text: str) -> float:
+    patterns = (
+        r"ignore\s+(?:all\s+)?previous",
+        r"reveal\s+(?:the\s+)?system\s+prompt",
+        r"disregard\s+(?:all\s+)?earlier",
+        r"system\s+emergency\s+override",
+        r"시스템\s*프롬프트.*(?:출력|공개|알려)",
+        r"이전\s*지시.*무시",
+    )
+    return 0.96 if any(re.search(pattern, text, re.I) for pattern in patterns) else 0.05
+
+
+def select_document(message: str) -> dict[str, Any]:
+    lowered = message.lower()
+    ranked = sorted(
+        CORPUS,
+        key=lambda document: sum(keyword in lowered for keyword in document["keywords"]),
+        reverse=True,
+    )
+    return ranked[0]
+
+
+def requested_tool(message: str) -> str | None:
+    lowered = message.lower()
+    if "delete_animal" in lowered or "동물 삭제" in lowered or "g-003 삭제" in lowered:
+        return "delete_animal"
+    return None
+
+
+def request_count(subject: str) -> int:
+    now = time.time()
+    window = int(POLICY["request_limit"].get("window_seconds", 60))
+    with REQUEST_WINDOW_LOCK:
+        recent = [timestamp for timestamp in REQUEST_WINDOWS.get(subject, []) if now - timestamp < window]
+        recent.append(now)
+        REQUEST_WINDOWS[subject] = recent
+        return len(recent)
+
+
+def record_stage(event: SecurityEvent) -> dict[str, Any]:
+    try:
+        decision = evaluate(event.model_dump(), POLICY)
+    except PolicyError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return persist(event, decision)
+
+
+def call_ollama(message: str, context: str) -> tuple[str, float]:
+    started = time.perf_counter()
+    prompt = (
+        "아래 신뢰된 문서만 참고하여 한국어 한 문장으로 답하세요. "
+        "문서에 없는 내용은 모른다고 답하세요.\n\n"
+        f"문서: {context}\n\n질문: {message}"
+    )
+    try:
+        response = httpx.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0}},
+            timeout=HTTP_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        reply = str(response.json().get("response") or "").strip()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail=f"ollama upstream failed: {exc}") from exc
+    if not reply:
+        raise HTTPException(status_code=502, detail="ollama upstream returned an empty response")
+    return reply, round((time.perf_counter() - started) * 1000, 2)
 
 
 def observed_decision(event: SecurityEvent) -> Decision:
@@ -176,11 +357,14 @@ def initialize_database() -> None:
 def healthz() -> dict[str, Any]:
     return {
         "ok": True,
-        "service": "llm-security-monitor",
+        "service": "llm-security-gateway",
+        "version": "2.0.0",
         "policy_version": POLICY["version"],
         "policy_mode": POLICY["mode"],
         "raw_prompt_storage": False,
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
+        "otel_enabled": bool(OTEL_ENDPOINT),
+        "ollama_model": OLLAMA_MODEL,
         "uptime_seconds": round(time.time() - STARTED_AT, 2),
     }
 
@@ -193,6 +377,245 @@ def policy() -> dict[str, Any]:
         "apply_change": "edit the bind-mounted policy file and restart the container",
         "raw_prompt_storage": False,
         "policy": POLICY,
+    }
+
+
+def blocked_response(
+    request_id: str,
+    trace_id: str,
+    record: dict[str, Any],
+    stages: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "request_id": request_id,
+        "trace_id": trace_id,
+        "reply": "요청이 보안 정책에 의해 차단되었습니다.",
+        "application_decision": "block",
+        "blocked_stage": record["stage"],
+        "policy_rule": record["policy_rule"],
+        "upstream_called": False,
+        "model": OLLAMA_MODEL,
+        "stages": stages,
+    }
+
+
+def stage_summary(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "stage": record["stage"],
+        "decision": record["application_decision"],
+        "rule": record["policy_rule"],
+    }
+
+
+@app.post("/api/chat")
+def integrated_chat(
+    payload: ChatRequest,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    principal = principal_from_authorization(authorization)
+    request_id = payload.request_id or f"chat-{uuid.uuid4()}"
+    stages: list[dict[str, Any]] = []
+    started = time.perf_counter()
+
+    with telemetry_span(
+        "llm.security.chat",
+        {
+            "llm.request.id": request_id,
+            "enduser.id": principal["subject"],
+            "llm.tenant": principal["tenant"],
+        },
+    ) as root_span:
+        trace_id = current_trace_id()
+
+        with telemetry_span("llm.security.rate_limit") as span:
+            count = request_count(principal["subject"])
+            rate_record = record_stage(
+                SecurityEvent(
+                    request_id=request_id,
+                    stage="runtime",
+                    event_type="request_window",
+                    window_request_count=count,
+                    actor=principal["subject"],
+                    authenticated_tenant=principal["tenant"],
+                    attributes={"trace_id": trace_id},
+                )
+            )
+            stages.append(stage_summary(rate_record))
+            if span is not None:
+                span.set_attribute("llm.security.decision", rate_record["application_decision"])
+            if rate_record["application_decision"] == "block":
+                if root_span is not None:
+                    root_span.set_attribute("llm.security.blocked_stage", "runtime")
+                return blocked_response(request_id, trace_id, rate_record, stages)
+
+        with telemetry_span("llm.security.input_guardrail") as span:
+            input_record = record_stage(
+                SecurityEvent(
+                    request_id=request_id,
+                    stage="input",
+                    event_type="user_prompt",
+                    text=payload.message,
+                    risk_score=prompt_risk_score(payload.message),
+                    actor=principal["subject"],
+                    authenticated_tenant=principal["tenant"],
+                    attributes={"trace_id": trace_id},
+                )
+            )
+            stages.append(stage_summary(input_record))
+            if span is not None:
+                span.set_attribute("llm.security.decision", input_record["application_decision"])
+                span.set_attribute("llm.security.policy_rule", input_record["policy_rule"])
+            if input_record["application_decision"] == "block":
+                if root_span is not None:
+                    root_span.set_attribute("llm.security.blocked_stage", "input")
+                return blocked_response(request_id, trace_id, input_record, stages)
+
+        with telemetry_span("llm.security.retrieval") as span:
+            document = select_document(payload.message)
+            retrieval_record = record_stage(
+                SecurityEvent(
+                    request_id=request_id,
+                    stage="retrieval",
+                    event_type="vector_hit",
+                    actor=principal["subject"],
+                    authenticated_tenant=principal["tenant"],
+                    resource_tenant=document["tenant"],
+                    attributes={
+                        "trace_id": trace_id,
+                        "document_id": document["document_id"],
+                    },
+                )
+            )
+            stages.append(stage_summary(retrieval_record))
+            if span is not None:
+                span.set_attribute("llm.retrieval.document_id", document["document_id"])
+                span.set_attribute("llm.security.decision", retrieval_record["application_decision"])
+            if retrieval_record["application_decision"] == "block":
+                if root_span is not None:
+                    root_span.set_attribute("llm.security.blocked_stage", "retrieval")
+                return blocked_response(request_id, trace_id, retrieval_record, stages)
+
+        tool_name = requested_tool(payload.message)
+        if tool_name:
+            with telemetry_span("llm.security.tool_authorization") as span:
+                approved = tool_name in principal["dangerous_tools"]
+                tool_record = record_stage(
+                    SecurityEvent(
+                        request_id=request_id,
+                        stage="tool",
+                        event_type="tool_request",
+                        actor=principal["subject"],
+                        authenticated_tenant=principal["tenant"],
+                        tool_name=tool_name,
+                        approval_status="approved" if approved else "missing",
+                        attributes={"trace_id": trace_id},
+                    )
+                )
+                stages.append(stage_summary(tool_record))
+                if span is not None:
+                    span.set_attribute("llm.tool.name", tool_name)
+                    span.set_attribute("llm.security.decision", tool_record["application_decision"])
+                if tool_record["application_decision"] == "block":
+                    if root_span is not None:
+                        root_span.set_attribute("llm.security.blocked_stage", "tool")
+                    return blocked_response(request_id, trace_id, tool_record, stages)
+
+        with telemetry_span("llm.ollama.generate", {"gen_ai.request.model": OLLAMA_MODEL}) as span:
+            try:
+                reply, upstream_duration = call_ollama(payload.message, document["text"])
+                upstream_record = persist(
+                    SecurityEvent(
+                        request_id=request_id,
+                        stage="runtime",
+                        event_type="ollama_call",
+                        actor=principal["subject"],
+                        authenticated_tenant=principal["tenant"],
+                        upstream_called=True,
+                        duration_ms=upstream_duration,
+                        application_decision="allow",
+                        policy_rule="ollama-upstream",
+                        attributes={"trace_id": trace_id, "model": OLLAMA_MODEL},
+                    ),
+                    Decision("allow", "ollama-upstream", "info", "Ollama returned a response"),
+                )
+            except HTTPException as exc:
+                persist(
+                    SecurityEvent(
+                        request_id=request_id,
+                        stage="runtime",
+                        event_type="ollama_call",
+                        actor=principal["subject"],
+                        authenticated_tenant=principal["tenant"],
+                        upstream_called=True,
+                        application_decision="infra",
+                        policy_rule="ollama-upstream-error",
+                        attributes={"trace_id": trace_id},
+                    ),
+                    Decision("infra", "ollama-upstream-error", "high", str(exc.detail)),
+                )
+                if span is not None:
+                    span.record_exception(exc)
+                raise
+            stages.append(stage_summary(upstream_record))
+
+        with telemetry_span("llm.security.output_guardrail") as span:
+            output_record = record_stage(
+                SecurityEvent(
+                    request_id=request_id,
+                    stage="output",
+                    event_type="model_response",
+                    text=reply,
+                    actor=principal["subject"],
+                    authenticated_tenant=principal["tenant"],
+                    upstream_called=True,
+                    attributes={"trace_id": trace_id},
+                )
+            )
+            stages.append(stage_summary(output_record))
+            if span is not None:
+                span.set_attribute("llm.security.decision", output_record["application_decision"])
+            if output_record["application_decision"] == "redact":
+                reply = output_record["sanitized_excerpt"]
+
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        if root_span is not None:
+            root_span.set_attribute("llm.security.decision", "allow")
+            root_span.set_attribute("llm.upstream.called", True)
+        return {
+            "request_id": request_id,
+            "trace_id": trace_id,
+            "reply": reply,
+            "application_decision": output_record["application_decision"],
+            "blocked_stage": None,
+            "policy_rule": output_record["policy_rule"],
+            "upstream_called": True,
+            "model": OLLAMA_MODEL,
+            "duration_ms": duration_ms,
+            "stages": stages,
+        }
+
+
+@app.post("/api/labs/scan-output")
+def scan_output_candidate(payload: OutputCandidate) -> dict[str, Any]:
+    if not ENABLE_LAB_ENDPOINTS:
+        raise HTTPException(status_code=404, detail="lab endpoint disabled")
+    request_id = payload.request_id or f"output-{uuid.uuid4()}"
+    record = record_stage(
+        SecurityEvent(
+            request_id=request_id,
+            stage="output",
+            event_type="model_output_candidate",
+            text=payload.text,
+            attributes={"source": "learner-supplied-candidate"},
+        )
+    )
+    return {
+        "request_id": request_id,
+        "application_decision": record["application_decision"],
+        "policy_rule": record["policy_rule"],
+        "sanitized_text": record["sanitized_excerpt"],
+        "raw_stored": record["raw_stored"],
+        "detected_entities": record["attributes"].get("redacted_entities", []),
     }
 
 
@@ -403,7 +826,16 @@ def metrics() -> str:
         "# TYPE llm_security_event_duration_ms summary",
         f"llm_security_event_duration_ms_sum {float(duration_sum):.2f}",
         f"llm_security_event_duration_ms_count {duration_count}",
+        "# HELP llm_upstream_calls_total Ollama upstream call outcomes.",
+        "# TYPE llm_upstream_calls_total counter",
     ])
+    with connect() as connection:
+        for decision, count in connection.execute(
+            "SELECT application_decision,COUNT(*) FROM events WHERE event_type = 'ollama_call' GROUP BY application_decision ORDER BY application_decision"
+        ):
+            lines.append(
+                f'llm_upstream_calls_total{{decision="{prometheus_escape(decision)}"}} {count}'
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -415,6 +847,8 @@ def reset_events() -> dict[str, Any]:
         deleted = connection.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         connection.execute("DELETE FROM events")
         connection.commit()
+    with REQUEST_WINDOW_LOCK:
+        REQUEST_WINDOWS.clear()
     return {"deleted": deleted}
 
 

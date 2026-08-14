@@ -1,0 +1,131 @@
+name: llm-security-observability
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/llm-security-gateway:2.0
+    container_name: llm-sec-gateway
+    environment:
+      ENABLE_LAB_ENDPOINTS: "true"
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.containers.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      SECURITY_EVENT_DB: /data/security-events.db
+      SECURITY_POLICY_PATH: /app/policy.json
+    extra_hosts:
+      - host.containers.internal:host-gateway
+    ports:
+      - 127.0.0.1:8014:8080
+    volumes:
+      - ${MONITOR_POLICY_PATH:-./policy.json}:/app/policy.json:ro,Z
+      - gateway-events:/data:Z
+    networks: [observability]
+
+  otel-collector:
+    image: docker.io/otel/opentelemetry-collector-contrib:0.132.0
+    container_name: llm-sec-otel
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro,Z
+    ports:
+      - 127.0.0.1:4318:4318
+      - 127.0.0.1:13133:13133
+    depends_on: [loki, tempo]
+    networks: [observability]
+
+  prometheus:
+    image: docker.io/prom/prometheus:v3.5.0
+    container_name: llm-sec-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.listen-address=0.0.0.0:9090
+    ports:
+      - 127.0.0.1:9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
+      - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro,Z
+      - prometheus-data:/prometheus:Z
+    depends_on: [gateway, alertmanager]
+    networks: [observability]
+
+  alertmanager:
+    image: docker.io/prom/alertmanager:v0.28.1
+    container_name: llm-sec-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+    ports:
+      - 127.0.0.1:9093:9093
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,Z
+      - alertmanager-data:/alertmanager:Z
+    networks: [observability]
+
+  loki:
+    image: docker.io/grafana/loki:3.5.3
+    container_name: llm-sec-loki
+    command: ["-config.file=/etc/loki/config.yaml"]
+    ports:
+      - 127.0.0.1:3100:3100
+    volumes:
+      - ./loki-config.yaml:/etc/loki/config.yaml:ro,Z
+      - loki-data:/loki:Z
+    networks: [observability]
+
+  tempo:
+    image: docker.io/grafana/tempo:2.8.2
+    container_name: llm-sec-tempo
+    command: ["-config.file=/etc/tempo/config.yaml"]
+    ports:
+      - 127.0.0.1:3200:3200
+    volumes:
+      - ./tempo.yaml:/etc/tempo/config.yaml:ro,Z
+      - tempo-data:/var/tempo:Z
+    networks: [observability]
+
+  grafana:
+    image: docker.io/grafana/grafana:12.1.0
+    container_name: llm-sec-grafana
+    environment:
+      GF_SERVER_HTTP_ADDR: 0.0.0.0
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    ports:
+      - 127.0.0.1:3001:3000
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro,Z
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro,Z
+      - grafana-data:/var/lib/grafana:Z
+    depends_on: [prometheus, loki, tempo]
+    networks: [observability]
+
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.0-4.8.3-distroless
+    container_name: llm-sec-dcgm
+    profiles: [gpu]
+    devices:
+      - nvidia.com/gpu=all
+    environment:
+      DCGM_EXPORTER_LISTEN: :9400
+      DCGM_EXPORTER_KUBERNETES: "false"
+    ports:
+      - 127.0.0.1:9400:9400
+    networks: [observability]
+
+networks:
+  observability:
+    name: llm-security-observability
+
+volumes:
+  gateway-events:
+  prometheus-data:
+  alertmanager-data:
+  loki-data:
+  tempo-data:
+  grafana-data:

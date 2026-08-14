@@ -1,0 +1,32 @@
+groups:
+  - name: llm-security
+    interval: 5s
+    rules:
+      - alert: LLMBlockingSpike
+        expr: sum(increase(llm_security_decisions_total{decision="block"}[2m])) >= 2
+        for: 0m
+        labels:
+          severity: high
+        annotations:
+          summary: Multiple LLM security requests were blocked
+      - alert: LLMGatewayUnavailable
+        expr: up{job="llm-security-gateway"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: LLM security gateway scrape failed
+      - alert: OllamaUpstreamFailure
+        expr: increase(llm_upstream_calls_total{decision="infra"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Ollama upstream request failed
+      - alert: GPUMemoryPressure
+        expr: 100 * DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_TOTAL > 90
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: NVIDIA GPU framebuffer usage exceeds 90 percent

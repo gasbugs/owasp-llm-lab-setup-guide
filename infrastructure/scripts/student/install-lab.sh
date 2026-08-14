@@ -89,6 +89,7 @@ case "$APT_LOCK_TIMEOUT_SECONDS" in
     ;;
 esac
 if command -v podman >/dev/null 2>&1 && \
+  command -v podman-compose >/dev/null 2>&1 && \
   command -v crun >/dev/null 2>&1 && \
   command -v fuse-overlayfs >/dev/null 2>&1 && \
   command -v slirp4netns >/dev/null 2>&1 && \
@@ -103,7 +104,7 @@ else
     install -y --no-install-recommends \
     curl ca-certificates git jq \
     python3-venv \
-    podman crun fuse-overlayfs slirp4netns uidmap
+      podman podman-compose crun fuse-overlayfs slirp4netns uidmap
 fi
 
 # rootless 설정

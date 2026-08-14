@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -111,6 +112,66 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertNotIn("alice@example.com", excerpt)
         self.assertNotIn("sk-demo-12345", excerpt)
         self.assertEqual(entities, ["DEMO_API_KEY", "EMAIL_ADDRESS"])
+
+    def test_compose_defines_the_complete_observability_stack(self) -> None:
+        compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
+        for service in (
+            "gateway:",
+            "otel-collector:",
+            "prometheus:",
+            "alertmanager:",
+            "loki:",
+            "tempo:",
+            "grafana:",
+            "dcgm-exporter:",
+        ):
+            self.assertIn(service, compose)
+        for binding in (
+            "127.0.0.1:8014:8080",
+            "127.0.0.1:3001:3000",
+            "127.0.0.1:9090:9090",
+            "127.0.0.1:9093:9093",
+        ):
+            self.assertIn(binding, compose)
+        self.assertIn("profiles: [gpu]", compose)
+        self.assertIn("nvidia.com/gpu=all", compose)
+
+    def test_collector_routes_logs_and_traces_to_separate_backends(self) -> None:
+        config = (EXAMPLE / "otel-collector.yaml").read_text(encoding="utf-8")
+        self.assertIn("otlphttp/tempo", config)
+        self.assertIn("otlphttp/loki", config)
+        self.assertIn("traces:", config)
+        self.assertIn("logs:", config)
+
+    def test_gateway_owns_real_request_path_and_server_side_boundaries(self) -> None:
+        source = (EXAMPLE / "app.py").read_text(encoding="utf-8")
+        self.assertIn('@app.post("/api/chat")', source)
+        self.assertIn("principal_from_authorization", source)
+        self.assertIn("prompt_risk_score", source)
+        self.assertIn("select_document", source)
+        self.assertIn("requested_tool", source)
+        self.assertIn("call_ollama", source)
+        self.assertIn("llm.security.output_guardrail", source)
+
+    def test_dashboard_correlates_metrics_logs_traces_and_gpu(self) -> None:
+        dashboard = json.loads(
+            (EXAMPLE / "grafana" / "dashboards" / "llm-security.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        panel_types = {panel["type"] for panel in dashboard["panels"]}
+        self.assertTrue({"stat", "gauge", "timeseries", "logs", "traces"}.issubset(panel_types))
+        serialized = json.dumps(dashboard)
+        self.assertIn("DCGM_FI_DEV_GPU_UTIL", serialized)
+        self.assertIn("llm-security-loki", serialized)
+        self.assertIn("llm-security-tempo", serialized)
+
+    def test_alert_rules_cover_security_upstream_and_gpu_failures(self) -> None:
+        rules = (EXAMPLE / "alert-rules.yml").read_text(encoding="utf-8")
+        self.assertIn("LLMBlockingSpike", rules)
+        self.assertIn("LLMGatewayUnavailable", rules)
+        self.assertIn("OllamaUpstreamFailure", rules)
+        self.assertIn("GPUMemoryPressure", rules)
 
 
 if __name__ == "__main__":

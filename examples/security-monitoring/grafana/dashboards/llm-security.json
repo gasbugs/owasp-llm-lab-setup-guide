@@ -8,36 +8,65 @@
       "title": "Security events",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "sum(llm_security_events_total)", "refId": "A"}],
-      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0}
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0}
     },
     {
       "type": "stat",
       "title": "Blocked requests",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "sum(llm_security_decisions_total{decision=\"block\"})", "refId": "A"}],
-      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0}
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0}
     },
     {
       "type": "stat",
-      "title": "Redacted responses",
+      "title": "Ollama calls",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(llm_security_decisions_total{decision=\"redact\"})", "refId": "A"}],
-      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0}
+      "targets": [{"expr": "sum(llm_upstream_calls_total)", "refId": "A"}],
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0}
+    },
+    {
+      "type": "gauge",
+      "title": "GPU utilization",
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
+      "fieldConfig": {"defaults": {"min": 0, "max": 100, "unit": "percent"}, "overrides": []},
+      "targets": [{"expr": "avg(DCGM_FI_DEV_GPU_UTIL)", "refId": "A"}],
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0}
     },
     {
       "type": "timeseries",
       "title": "Decisions by policy rule",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "llm_security_decisions_total", "legendFormat": "{{decision}} / {{rule}}", "refId": "A"}],
-      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 8}
+      "gridPos": {"h": 9, "w": 16, "x": 0, "y": 5}
+    },
+    {
+      "type": "alertlist",
+      "title": "Active security alerts",
+      "options": {"alertName": "", "dashboardAlerts": false, "groupBy": ["alertname"], "maxItems": 20, "sortOrder": 1, "stateFilter": {"alerting": true, "noData": true, "normal": false, "pending": true}},
+      "gridPos": {"h": 9, "w": 8, "x": 16, "y": 5}
+    },
+    {
+      "type": "logs",
+      "title": "Sanitized security event logs",
+      "datasource": {"type": "loki", "uid": "llm-security-loki"},
+      "targets": [{"expr": "{service_name=\"llm-security-gateway\"} |= \"llm_security_event\"", "refId": "A"}],
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "gridPos": {"h": 11, "w": 12, "x": 0, "y": 14}
+    },
+    {
+      "type": "traces",
+      "title": "End-to-end request traces",
+      "datasource": {"type": "tempo", "uid": "llm-security-tempo"},
+      "targets": [{"queryType": "traceql", "query": "{ resource.service.name = \"llm-security-gateway\" }", "refId": "A"}],
+      "gridPos": {"h": 11, "w": 12, "x": 12, "y": 14}
     }
   ],
   "schemaVersion": 41,
-  "tags": ["llm", "security", "monitoring"],
+  "tags": ["llm", "security", "observability", "gpu"],
   "templating": {"list": []},
-  "time": {"from": "now-15m", "to": "now"},
+  "time": {"from": "now-30m", "to": "now"},
   "timezone": "browser",
-  "title": "LLM Security Monitoring",
+  "title": "LLM Security Operations Center",
   "uid": "llm-security-monitoring",
-  "version": 1
+  "version": 2
 }

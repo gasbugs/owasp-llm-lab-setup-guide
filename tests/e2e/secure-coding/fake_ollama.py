@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -35,7 +36,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - stdlib handler contract
         length = int(self.headers.get("Content-Length", "0"))
         request = json.loads(self.rfile.read(length) or b"{}")
-        if self.path == "/api/chat":
+        if self.path == "/api/generate":
+            response = {
+                "model": request.get("model"),
+                "response": "공개 사고 대응 절차는 탐지, 격리, 조사, 복구, 사후 검토 순서입니다.",
+                "done": True,
+            }
+        elif self.path == "/api/chat":
             response = {
                 "model": request.get("model"),
                 "message": {"role": "assistant", "content": "publisher E2E response"},
@@ -61,4 +68,5 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    ThreadingHTTPServer(("127.0.0.1", 11434), Handler).serve_forever()
+    port = int(os.getenv("FAKE_OLLAMA_PORT", "11434"))
+    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
