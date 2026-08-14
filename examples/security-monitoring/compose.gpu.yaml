@@ -1,13 +1,11 @@
 services:
-  dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.0-4.8.3-distroless
-    container_name: llm-sec-dcgm
-    user: "0"
+  gpu-exporter:
+    image: localhost/llm-security-gateway:2.0
+    container_name: llm-sec-gpu-exporter
+    command: ["python", "/app/gpu_exporter.py"]
     devices:
       - nvidia.com/gpu=all
-    environment:
-      DCGM_EXPORTER_LISTEN: :9400
-      DCGM_EXPORTER_KUBERNETES: "false"
     ports:
       - 127.0.0.1:9400:9400
+    depends_on: [gateway]
     networks: [observability]

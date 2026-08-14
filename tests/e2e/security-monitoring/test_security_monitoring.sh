@@ -162,7 +162,7 @@ wait_json "$ALERTMANAGER_URL/api/v2/alerts" 'any(.[]?; .labels.alertname == "LLM
 wait_json "$GRAFANA_URL/api/search?query=LLM%20Security%20Operations%20Center" 'any(.[]; .uid == "llm-security-monitoring")'
 
 if [ "$WITH_GPU" = "true" ]; then
-  wait_json "$PROMETHEUS_URL/api/v1/query?query=DCGM_FI_DEV_GPU_UTIL" '.status == "success" and (.data.result | length) >= 1'
+  wait_json "$PROMETHEUS_URL/api/v1/query?query=llm_gpu_utilization_percent" '.status == "success" and (.data.result | length) >= 1'
 fi
 
 jq -n \

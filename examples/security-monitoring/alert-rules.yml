@@ -24,7 +24,7 @@ groups:
         annotations:
           summary: Ollama upstream request failed
       - alert: GPUMemoryPressure
-        expr: 100 * DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_TOTAL > 90
+        expr: 100 * llm_gpu_memory_used_mib / llm_gpu_memory_total_mib > 90
         for: 1m
         labels:
           severity: warning

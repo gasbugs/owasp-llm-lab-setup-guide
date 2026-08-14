@@ -29,7 +29,7 @@
       "title": "GPU utilization",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "fieldConfig": {"defaults": {"min": 0, "max": 100, "unit": "percent"}, "overrides": []},
-      "targets": [{"expr": "avg(DCGM_FI_DEV_GPU_UTIL)", "refId": "A"}],
+      "targets": [{"expr": "avg(llm_gpu_utilization_percent)", "refId": "A"}],
       "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0}
     },
     {

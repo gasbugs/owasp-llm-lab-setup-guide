@@ -138,7 +138,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 ### 주요 실습 포트를 SSM으로 localhost에 연결
 
-보안 그룹에서 실습 포트를 외부에 공개하지 않아도 SSM 포트포워딩으로 로컬 브라우저와 `curl`을 연결할 수 있습니다. 다음 명령은 수강생 노트북에서 실행하며, 기본 LLM 서비스뿐 아니라 Module 08의 Grafana(3001), Loki(3100), Tempo(3200), OTLP(4318), 보안 Gateway(8014), Prometheus(9090), Alertmanager(9093), DCGM Exporter(9400)와 Collector health(13133)를 같은 localhost 포트로 전달합니다. 사용하지 않는 포트에는 listener가 없으므로 해당 SSM 세션만 연결되지 않고 나머지 전달은 계속 동작합니다.
+보안 그룹에서 실습 포트를 외부에 공개하지 않아도 SSM 포트포워딩으로 로컬 브라우저와 `curl`을 연결할 수 있습니다. 다음 명령은 수강생 노트북에서 실행하며, 기본 LLM 서비스뿐 아니라 Module 08의 Grafana(3001), Loki(3100), Tempo(3200), OTLP(4318), 보안 Gateway(8014), Prometheus(9090), Alertmanager(9093), GPU Exporter(9400)와 Collector health(13133)를 같은 localhost 포트로 전달합니다. 사용하지 않는 포트에는 listener가 없으므로 해당 SSM 세션만 연결되지 않고 나머지 전달은 계속 동작합니다.
 
 ```bash
 AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \

@@ -4,6 +4,8 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -11,6 +13,7 @@ EXAMPLE = ROOT / "examples" / "security-monitoring"
 sys.path.insert(0, str(EXAMPLE))
 
 from policy_engine import evaluate, load_policy, text_identity  # noqa: E402
+from gpu_exporter import metrics  # noqa: E402
 
 
 class SecurityMonitoringPolicyTests(unittest.TestCase):
@@ -123,7 +126,6 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             "loki:",
             "tempo:",
             "grafana:",
-            "dcgm-exporter:",
         ):
             self.assertIn(service, compose)
         for binding in (
@@ -133,8 +135,11 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             "127.0.0.1:9093:9093",
         ):
             self.assertIn(binding, compose)
-        self.assertIn("profiles: [gpu]", compose)
-        self.assertIn("nvidia.com/gpu=all", compose)
+        gpu = (EXAMPLE / "compose.gpu.yaml").read_text(encoding="utf-8")
+        self.assertIn("gpu-exporter:", gpu)
+        self.assertIn("nvidia.com/gpu=all", gpu)
+        self.assertNotIn("privileged:", gpu)
+        self.assertNotIn("SYS_ADMIN", gpu)
 
     def test_collector_routes_logs_and_traces_to_separate_backends(self) -> None:
         config = (EXAMPLE / "otel-collector.yaml").read_text(encoding="utf-8")
@@ -162,9 +167,19 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         panel_types = {panel["type"] for panel in dashboard["panels"]}
         self.assertTrue({"stat", "gauge", "timeseries", "logs", "traces"}.issubset(panel_types))
         serialized = json.dumps(dashboard)
-        self.assertIn("DCGM_FI_DEV_GPU_UTIL", serialized)
+        self.assertIn("llm_gpu_utilization_percent", serialized)
         self.assertIn("llm-security-loki", serialized)
         self.assertIn("llm-security-tempo", serialized)
+
+    @patch("gpu_exporter.subprocess.run")
+    def test_gpu_exporter_maps_read_only_nvidia_query_to_metrics(self, run) -> None:
+        run.return_value = SimpleNamespace(stdout="0, NVIDIA L4, 17, 2048, 23034, 51\n")
+        output = metrics()
+        self.assertIn('llm_gpu_utilization_percent{gpu="0",model="NVIDIA L4"} 17', output)
+        self.assertIn('llm_gpu_memory_used_mib{gpu="0",model="NVIDIA L4"} 2048', output)
+        command = run.call_args.args[0]
+        self.assertEqual(command[0], "nvidia-smi")
+        self.assertNotIn("shell", run.call_args.kwargs)
 
     def test_alert_rules_cover_security_upstream_and_gpu_failures(self) -> None:
         rules = (EXAMPLE / "alert-rules.yml").read_text(encoding="utf-8")
