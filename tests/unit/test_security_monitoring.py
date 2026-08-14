@@ -192,6 +192,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
     def test_alert_rules_cover_security_upstream_and_gpu_failures(self) -> None:
         rules = (EXAMPLE / "alert-rules.yml").read_text(encoding="utf-8")
         self.assertIn("LLMBlockingSpike", rules)
+        self.assertIn('sum(llm_security_decisions_total{decision="block"}) >= 2', rules)
         self.assertIn("LLMGatewayUnavailable", rules)
         self.assertIn("OllamaUpstreamFailure", rules)
         self.assertIn("GPUMemoryPressure", rules)

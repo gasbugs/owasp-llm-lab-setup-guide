@@ -3,7 +3,7 @@ groups:
     interval: 5s
     rules:
       - alert: LLMBlockingSpike
-        expr: sum(increase(llm_security_decisions_total{decision="block"}[2m])) >= 2
+        expr: sum(llm_security_decisions_total{decision="block"}) >= 2
         for: 0m
         labels:
           severity: high
