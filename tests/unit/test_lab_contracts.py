@@ -200,7 +200,7 @@ class Day5ConsumptionContractTests(unittest.TestCase):
         self.assertEqual(reset["mutation"]["expected_count"], 2)
         self.assertEqual(
             set(reset["documents"]),
-            {"05-llm-operations-infrastructure/02-llm10-unbounded-consumption.md"},
+            {"05-llm-operations-infrastructure/03-llm10-unbounded-consumption.md"},
         )
 
     def test_book_bindings_name_direct_learner_observation_commands(self) -> None:
