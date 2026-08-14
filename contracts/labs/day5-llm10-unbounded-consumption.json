@@ -3,7 +3,7 @@
   "schema_version": 1,
   "lab_id": "day5-llm10-unbounded-consumption",
   "related_lessons": [
-    {"path": "day5/02-llm10-unbounded-consumption.md"}
+    {"path": "05-llm-operations-infrastructure/02-llm10-unbounded-consumption.md"}
   ],
   "policy": {
     "source": "docker/vuln-rag/app/llm.py",
@@ -78,7 +78,7 @@
   ],
   "book_bindings": [
     {
-      "lesson_path": "day5/02-llm10-unbounded-consumption.md",
+      "lesson_path": "05-llm-operations-infrastructure/02-llm10-unbounded-consumption.md",
       "section": "2. 짧은 요청으로 API 기준 응답 확인",
       "observation_id": "day5-llm10-baseline-request",
       "observation_command": "curl -sS --max-time 45 -X POST http://localhost:8013/api/chat",
@@ -86,7 +86,7 @@
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "day5/02-llm10-unbounded-consumption.md",
+      "lesson_path": "05-llm-operations-infrastructure/02-llm10-unbounded-consumption.md",
       "section": "3. 1,200줄 출력을 한 번 요청해 생성량 상한 확인",
       "observation_id": "day5-llm10-output-flood-request",
       "observation_command": "curl -sS --max-time 45 -X POST http://localhost:8013/api/chat",
@@ -94,7 +94,7 @@
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "day5/02-llm10-unbounded-consumption.md",
+      "lesson_path": "05-llm-operations-infrastructure/02-llm10-unbounded-consumption.md",
       "section": "4. 37,028바이트 입력을 한 번 전달해 요청 크기 상한 확인",
       "observation_id": "day5-llm10-large-input-request",
       "observation_command": "jq -n --rawfile message ~/work/llm10-large-input.txt",
@@ -107,7 +107,7 @@
     "reset": {
       "command": "reset-lab llm10",
       "documents": [
-        "day5/02-llm10-unbounded-consumption.md"
+        "05-llm-operations-infrastructure/02-llm10-unbounded-consumption.md"
       ],
       "health_url": "http://localhost:8013/healthz",
       "expected_count": 2,
@@ -131,7 +131,7 @@
       "docker/vuln-rag/"
     ],
     "course": [
-      "day5/02-llm10-unbounded-consumption.md",
+      "05-llm-operations-infrastructure/02-llm10-unbounded-consumption.md",
       "evidence/loop/"
     ],
     "skills": [

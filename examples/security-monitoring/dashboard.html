@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LLM Security Monitoring</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#0b1020;color:#edf2ff;margin:0;padding:24px}
+    h1{margin:0 0 8px}.sub{color:#a8b3cf;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.card{background:#151d33;border:1px solid #2a3657;border-radius:12px;padding:16px}.value{font-size:28px;font-weight:700}.events{margin-top:18px}.event{display:grid;grid-template-columns:150px 110px 110px 1fr;gap:10px;padding:10px;border-bottom:1px solid #2a3657}.block{color:#ff6b7a}.redact{color:#ffc857}.allow{color:#63e6be}code{color:#b8c8ff}@media(max-width:700px){.event{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <h1>LLM Security Monitoring</h1>
+  <div class="sub">Prompt · Retrieval · Agent Tool · Output events / raw prompt storage disabled</div>
+  <div class="grid" id="cards"></div>
+  <div class="card events"><h2>Recent security events</h2><div id="events"></div></div>
+  <script>
+    async function refresh(){
+      const [summary,events]=await Promise.all([fetch('/api/summary').then(r=>r.json()),fetch('/api/events?limit=20').then(r=>r.json())]);
+      const decisions=summary.decisions||{};
+      document.getElementById('cards').innerHTML=[['Total',summary.total_events],['Allow',decisions.allow||0],['Observe',decisions.observe||0],['Redact',decisions.redact||0],['Block',decisions.block||0],['Policy',summary.policy_version]].map(([k,v])=>`<div class="card"><div>${k}</div><div class="value">${v}</div></div>`).join('');
+      document.getElementById('events').innerHTML=events.events.slice().reverse().map(e=>`<div class="event"><code>${e.request_id}</code><span>${e.stage}</span><strong class="${e.application_decision}">${e.application_decision}</strong><span>${e.policy_rule} · ${e.sanitized_excerpt||'(no text)'}</span></div>`).join('');
+    }
+    refresh();setInterval(refresh,3000);
+  </script>
+</body>
+</html>

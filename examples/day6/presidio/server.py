@@ -25,6 +25,7 @@ if GUARD_ENGINE not in {"presidio", "off"}:
 ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
+SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 CORE = PresidioCore()
 
 app = FastAPI(title="Day 6 Microsoft Presidio integration API")
@@ -50,6 +51,25 @@ class ChatRequest(BaseModel):
 
 def emit(event: dict) -> None:
     print(json.dumps(event, ensure_ascii=False, separators=(",", ":")), flush=True)
+    if not SECURITY_MONITOR_URL:
+        return
+    try:
+        httpx.post(
+            f"{SECURITY_MONITOR_URL}/api/events/guardrail",
+            json=event,
+            timeout=2.0,
+        ).raise_for_status()
+    except httpx.HTTPError as exc:
+        print(
+            json.dumps(
+                {
+                    "event": "security_monitor_forward_failed",
+                    "error": type(exc).__name__,
+                },
+                separators=(",", ":"),
+            ),
+            flush=True,
+        )
 
 
 def require_lab_endpoint() -> None:
@@ -104,6 +124,7 @@ async def healthz() -> dict:
         "guard_mode": GUARD_MODE,
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
         "ollama_model": OLLAMA_MODEL,
+        "security_monitoring": bool(SECURITY_MONITOR_URL),
     }
 
 
@@ -121,6 +142,11 @@ async def policy() -> dict:
         "apply_change": "rebuild the image after source changes or recreate it for environment changes",
         "rollback": "recreate the previous image and environment set",
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
+        "security_monitoring": {
+            "enabled": bool(SECURITY_MONITOR_URL),
+            "endpoint": "/api/events/guardrail" if SECURITY_MONITOR_URL else None,
+            "failure_mode": "guardrail enforcement continues when forwarding fails",
+        },
         "entities": settings["analyzer"]["entities"],
         "score_threshold": settings["analyzer"]["score_threshold"],
         "settings": settings,

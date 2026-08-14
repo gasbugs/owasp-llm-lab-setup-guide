@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: LLM Security
+    orgId: 1
+    folder: LLM Security
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards

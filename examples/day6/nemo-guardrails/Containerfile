@@ -13,6 +13,7 @@ RUN apt-get update \
       "nemoguardrails==${NEMO_GUARDRAILS_VERSION}" \
       "fastapi>=0.115,<1" \
       "uvicorn>=0.32,<1" \
+      "httpx>=0.27,<1" \
     && apt-get purge -y --auto-remove gcc g++ python3-dev \
     && rm -rf /var/lib/apt/lists/*
 

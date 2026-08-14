@@ -1,0 +1,43 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Security events",
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
+      "targets": [{"expr": "sum(llm_security_events_total)", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Blocked requests",
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
+      "targets": [{"expr": "sum(llm_security_decisions_total{decision=\"block\"})", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Redacted responses",
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
+      "targets": [{"expr": "sum(llm_security_decisions_total{decision=\"redact\"})", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0}
+    },
+    {
+      "type": "timeseries",
+      "title": "Decisions by policy rule",
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
+      "targets": [{"expr": "llm_security_decisions_total", "legendFormat": "{{decision}} / {{rule}}", "refId": "A"}],
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 8}
+    }
+  ],
+  "schemaVersion": 41,
+  "tags": ["llm", "security", "monitoring"],
+  "templating": {"list": []},
+  "time": {"from": "now-15m", "to": "now"},
+  "timezone": "browser",
+  "title": "LLM Security Monitoring",
+  "uid": "llm-security-monitoring",
+  "version": 1
+}

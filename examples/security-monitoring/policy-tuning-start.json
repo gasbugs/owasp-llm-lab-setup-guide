@@ -1,0 +1,27 @@
+{
+  "version": "2026-08-14-tuning-start",
+  "mode": "enforce",
+  "prompt_injection": {
+    "enabled": true,
+    "risk_threshold": 0.8,
+    "action": "block",
+    "benign_event_types": []
+  },
+  "sensitive_data": {
+    "enabled": true,
+    "entities": ["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "KR_RRN", "DEMO_API_KEY"],
+    "action": "redact"
+  },
+  "rag_tenant_boundary": {"enabled": true, "action": "block"},
+  "agent_approval": {
+    "enabled": true,
+    "dangerous_tools": ["delete_animal", "debug_sql", "send_message"],
+    "action": "block"
+  },
+  "request_limit": {
+    "enabled": true,
+    "window_seconds": 60,
+    "max_requests_per_window": 5,
+    "action": "block"
+  }
+}

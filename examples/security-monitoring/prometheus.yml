@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 2s
+  evaluation_interval: 2s
+
+scrape_configs:
+  - job_name: llm-security-monitor
+    static_configs:
+      - targets: ["llm-security-monitor:8080"]
