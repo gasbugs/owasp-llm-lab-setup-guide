@@ -26,8 +26,11 @@ Raw prompts are not stored. Structured events contain a SHA-256 identity, a reda
 
 ```bash
 export OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M
+export PODMAN_COMPOSE_PROVIDER=podman-compose
 podman compose --file compose.yaml --profile gpu up --detach --build
 ```
+
+Ubuntu 24.04에서 Docker Compose plugin도 함께 설치되어 있으면 `podman compose`가 이를 먼저 선택할 수 있다. `PODMAN_COMPOSE_PROVIDER`는 rootless Podman과 직접 통신하는 `podman-compose`를 선택해 Docker daemon 의존성을 없앤다.
 
 All published ports bind to `127.0.0.1`. The stack assumes Ollama is available on host port `11434` and reaches it through `host.containers.internal`.
 
