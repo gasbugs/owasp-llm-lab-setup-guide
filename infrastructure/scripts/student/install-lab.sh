@@ -95,6 +95,7 @@ if command -v podman >/dev/null 2>&1 && \
   command -v slirp4netns >/dev/null 2>&1 && \
   command -v newuidmap >/dev/null 2>&1 && \
   command -v jq >/dev/null 2>&1 && \
+  dpkg -s golang-github-containernetworking-plugin-dnsname >/dev/null 2>&1 && \
   dpkg -s python3-venv >/dev/null 2>&1; then
   echo "[install-lab] Podman/rootless prerequisites already installed"
 else
@@ -104,7 +105,8 @@ else
     install -y --no-install-recommends \
     curl ca-certificates git jq \
     python3-venv \
-      podman podman-compose crun fuse-overlayfs slirp4netns uidmap
+      podman podman-compose crun fuse-overlayfs slirp4netns uidmap \
+      golang-github-containernetworking-plugin-dnsname
 fi
 
 # rootless 설정

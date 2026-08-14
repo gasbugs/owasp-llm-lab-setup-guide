@@ -148,6 +148,12 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("traces:", config)
         self.assertIn("logs:", config)
 
+    def test_installer_includes_cni_service_discovery(self) -> None:
+        installer = (ROOT / "infrastructure" / "scripts" / "student" / "install-lab.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("golang-github-containernetworking-plugin-dnsname", installer)
+
     def test_gateway_owns_real_request_path_and_server_side_boundaries(self) -> None:
         source = (EXAMPLE / "app.py").read_text(encoding="utf-8")
         self.assertIn('@app.post("/api/chat")', source)
