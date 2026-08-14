@@ -151,7 +151,7 @@ jq -e '.application_decision == "block" and .blocked_stage == "tool" and .upstre
 output=$(curl -fsS --max-time 30 -X POST "$MONITOR_URL/api/labs/scan-output" \
   -H 'Content-Type: application/json' \
   -d '{"request_id":"e2e-output","text":"Contact ops@example.com. DEMO_API_KEY=sk-demo-12345"}')
-jq -e '.application_decision == "redact" and .raw_stored == false and (.sanitized_text | contains("ops@example.com") | not) and (.detected_entities | length) == 2' <<<"$output" >/dev/null
+jq -e '.application_decision == "redact" and .raw_stored == false and (.input_sha256 | length) == 64 and (.sanitized_text | contains("ops@example.com") | not) and (.detected_entities | length) == 2' <<<"$output" >/dev/null
 
 wait_json "$MONITOR_URL/api/traces/e2e-normal" '.event_count == 5 and .stage_order == ["runtime","input","retrieval","runtime","output"]'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_security_decisions_total%7Bdecision%3D%22block%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 3'

@@ -163,6 +163,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("requested_tool", source)
         self.assertIn("call_ollama", source)
         self.assertIn("llm.security.output_guardrail", source)
+        self.assertIn('"input_sha256": record["input_sha256"]', source)
         self.assertIn("def request_trace(request_id:", source)
         self.assertNotIn("def trace(request_id:", source)
 

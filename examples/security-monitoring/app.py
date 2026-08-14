@@ -616,6 +616,7 @@ def scan_output_candidate(payload: OutputCandidate) -> dict[str, Any]:
         "policy_rule": record["policy_rule"],
         "sanitized_text": record["sanitized_excerpt"],
         "raw_stored": record["raw_stored"],
+        "input_sha256": record["input_sha256"],
         "detected_entities": record["attributes"].get("redacted_entities", []),
     }
 
