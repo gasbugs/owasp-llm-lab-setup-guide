@@ -111,7 +111,7 @@ fi
 
 compose up --detach --build
 
-wait_json "$MONITOR_URL/healthz" '.ok == true and .service == "llm-security-gateway" and .otel_enabled == true'
+wait_json "$MONITOR_URL/healthz" '.ok == true and .service == "llm-security-monitor" and .component == "llm-security-gateway" and .otel_enabled == true'
 wait_http "$PROMETHEUS_URL/-/ready"
 wait_http "$ALERTMANAGER_URL/-/ready"
 wait_http "$LOKI_URL/ready"

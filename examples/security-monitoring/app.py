@@ -357,7 +357,8 @@ def initialize_database() -> None:
 def healthz() -> dict[str, Any]:
     return {
         "ok": True,
-        "service": "llm-security-gateway",
+        "service": "llm-security-monitor",
+        "component": "llm-security-gateway",
         "version": "2.0.0",
         "policy_version": POLICY["version"],
         "policy_mode": POLICY["mode"],
