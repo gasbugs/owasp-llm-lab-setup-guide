@@ -6,9 +6,9 @@ EXAMPLE="$SETUP_ROOT/examples/security-monitoring"
 MONITOR_IMAGE="${MONITOR_IMAGE:-localhost/llm-security-monitor:1.0}"
 PROMETHEUS_IMAGE="${PROMETHEUS_IMAGE:-docker.io/prom/prometheus:v3.5.0}"
 GRAFANA_IMAGE="${GRAFANA_IMAGE:-docker.io/grafana/grafana:12.1.0}"
-MONITOR_URL="${MONITOR_URL:-http://127.0.0.1:18093}"
-PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:19090}"
-GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:13000}"
+MONITOR_URL="${MONITOR_URL:-http://127.0.0.1:8014}"
+PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
+GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
 NETWORK="llm-security-monitoring-e2e"
 POLICY_COPY="${TMPDIR:-/tmp}/llm-security-policy-e2e.json"
 
@@ -58,7 +58,7 @@ podman build -t "$MONITOR_IMAGE" "$EXAMPLE"
 podman network create "$NETWORK" >/dev/null
 
 podman run -d --name llm-security-monitor --network "$NETWORK" \
-  -p 127.0.0.1:18093:8080 \
+  -p 127.0.0.1:8014:8080 \
   -e ENABLE_LAB_ENDPOINTS=true \
   -v "$POLICY_COPY:/app/policy.json:ro,Z" \
   "$MONITOR_IMAGE" >/dev/null
@@ -92,15 +92,17 @@ curl -fsS --max-time 10 "$MONITOR_URL/api/traces/e2e-injection" \
 curl -fsS --max-time 10 "$MONITOR_URL/api/anomalies" \
   | jq -e '.anomaly_count == 3 and .block_ratio > 0.7 and any(.anomalies[]; .rule == "elevated-block-ratio")' >/dev/null
 
-podman run -d --name llm-security-prometheus --network "$NETWORK" \
-  -p 127.0.0.1:19090:9090 \
+podman run -d --name llm-security-prometheus --network host \
   -v "$EXAMPLE/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z" \
-  "$PROMETHEUS_IMAGE" >/dev/null
+  "$PROMETHEUS_IMAGE" \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --web.listen-address=127.0.0.1:9090 >/dev/null
 wait_http "$PROMETHEUS_URL/-/ready"
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_security_events_total)" '.status == "success" and (.data.result | length) == 1'
 
-podman run -d --name llm-security-grafana --network "$NETWORK" \
-  -p 127.0.0.1:13000:3000 \
+podman run -d --name llm-security-grafana --network host \
+  -e GF_SERVER_HTTP_ADDR=127.0.0.1 \
+  -e GF_SERVER_HTTP_PORT=3001 \
   -e GF_AUTH_ANONYMOUS_ENABLED=true \
   -e GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer \
   -e GF_AUTH_DISABLE_LOGIN_FORM=true \
