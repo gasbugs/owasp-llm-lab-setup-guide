@@ -110,6 +110,9 @@ jobs:
             CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh "$lab" safe
           done
 
+      - name: Verify container-layer restart and image-baseline recreation
+        run: CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/test_container_layer_reset.sh
+
       - name: Run shared-corpus source regression
         run: python tests/e2e/llm04/test_llm04_shared_corpus.py
 

@@ -103,24 +103,19 @@ class RuntimeContractTest(unittest.TestCase):
         active_units = installer.split("\nunits=(", 1)[1].split(")", 1)[0]
         self.assertNotIn("lab-day", active_units)
 
-    def test_learner_edits_survive_quadlet_managed_container_recreation(self) -> None:
+    def test_secure_coding_uses_container_layer_and_quadlet_reset(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         workflow = read(".github/workflows/build-and-push.yaml")
-        self.assertIn("seed_editable_tree()", installer)
+        self.assertNotIn("seed_editable_tree()", installer)
+        self.assertNotIn("RUNTIME_SOURCE_ROOT=", installer)
+        self.assertNotIn("runtime-src/${rag_unit}/app:/app/app", installer)
+        self.assertNotIn("runtime-src/lab-vuln-agent/app:/app/app", installer)
         self.assertIn(
-            'RUNTIME_SOURCE_ROOT=/home/ubuntu/work/runtime-src',
+            'restart_reason="legacy /app/app source mount still present"',
             installer,
         )
         self.assertIn(
-            "Volume=/home/ubuntu/work/runtime-src/${rag_unit}/app:/app/app:Z",
-            installer,
-        )
-        self.assertIn(
-            "Volume=/home/ubuntu/work/runtime-src/lab-vuln-agent/app:/app/app:Z",
-            installer,
-        )
-        self.assertIn(
-            'restart_reason="learner-editable /app/app source mount missing"',
+            'container_layer_source_files=(',
             installer,
         )
         self.assertIn(
@@ -132,15 +127,11 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
-            'podman exec "$container" test -f "$source_file"',
+            'podman exec "$container" test -w "$source_file"',
             installer,
         )
         self.assertIn(
-            "for attempt in $(seq 1 30); do",
-            installer,
-        )
-        self.assertIn(
-            'if [ "$source_ready" != true ]; then',
+            'grep -qx \'/app/app\'',
             installer,
         )
         self.assertIn(

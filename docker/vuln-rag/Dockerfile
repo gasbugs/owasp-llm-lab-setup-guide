@@ -12,8 +12,8 @@ LABEL owasp.llm.lab.warning="INTENTIONALLY VULNERABLE — DO NOT DEPLOY OUTSIDE 
 WORKDIR /app
 
 # Learner secure-coding workshops edit the adjacent vulnerable/safe call pair
-# inside the running container. install-lab.sh bind-mounts role-specific source
-# so the edit survives a Quadlet-managed `podman restart` recreation.
+# in the running container's writable layer. `podman restart` preserves the
+# edit; Quadlet recreation restores this image's vulnerable baseline.
 RUN apt-get update && apt-get install -y --no-install-recommends vim-tiny \
     && rm -rf /var/lib/apt/lists/*
 
