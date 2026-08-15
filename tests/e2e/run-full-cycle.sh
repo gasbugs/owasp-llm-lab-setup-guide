@@ -81,11 +81,11 @@ reset_mutable_state() {
   log "▶ mutable runtime 기준선 복원"
   local sentinel="E2E_RESET_SENTINEL_${TS}"
   local services=(
-    lab-day1-vuln-rag.service
-    lab-day2-vuln-rag.service
-    lab-day3-vuln-rag.service
-    lab-day4-vuln-rag.service
-    lab-day5-vuln-rag.service
+    lab-prompt-rag.service
+    lab-data-rag.service
+    lab-output-rag.service
+    lab-knowledge-rag.service
+    lab-resource-rag.service
   )
   if ! command -v systemctl >/dev/null 2>&1; then
     log "  ✗ systemctl 없음: Quadlet 서비스를 기준선으로 복원할 수 없음"
@@ -137,7 +137,7 @@ reset_mutable_state() {
     fi
   done
 
-  if ! systemctl --user restart lab-day3-vuln-agent.service; then
+  if ! systemctl --user restart lab-vuln-agent.service; then
     log "  ✗ Agent Quadlet service restart 실패"
     return 1
   fi

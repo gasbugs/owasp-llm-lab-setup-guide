@@ -87,20 +87,26 @@ if id ubuntu >/dev/null 2>&1; then
 set -euo pipefail
 units=(
   lab-ollama
+  lab-prompt-rag
+  lab-data-rag
+  lab-output-rag
+  lab-knowledge-rag
+  lab-resource-rag
+  lab-vuln-agent
+  lab-dvla
+  lab-fake-registry
+  lab-llmgoat
+  lab-portal
+  # Legacy date-based names retained only for migration cleanup.
   lab-day1-vuln-rag
   lab-day2-vuln-rag
   lab-day3-vuln-rag
   lab-day4-vuln-rag
   lab-day5-vuln-rag
   lab-day3-vuln-agent
-  lab-llmgoat
   lab-day3-dvla
   lab-day2-fake-registry
-  lab-portal
   lab-vuln-rag
-  lab-vuln-agent
-  lab-dvla
-  lab-fake-registry
 )
 for unit in "${units[@]}"; do
   systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
@@ -113,6 +119,11 @@ systemctl --user daemon-reload || true
 CLEANSH
 
   rm -f /home/ubuntu/.config/containers/systemd/lab-ollama.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-prompt-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-data-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-output-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-knowledge-rag.container
+  rm -f /home/ubuntu/.config/containers/systemd/lab-resource-rag.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-day1-vuln-rag.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-day2-vuln-rag.container
   rm -f /home/ubuntu/.config/containers/systemd/lab-day3-vuln-rag.container

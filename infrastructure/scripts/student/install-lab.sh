@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.1.9"
+SCRIPT_VERSION="0.2.0"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -238,15 +238,35 @@ QUADLET_FINGERPRINT_BEFORE=$(
 
 echo "[install-lab] writing Quadlet unit files under $QUADLET_DIR"
 
-echo "[install-lab] removing legacy single-day unit files and containers if they exist"
-rm -f "$QUADLET_DIR/lab-vuln-rag.container"
-rm -f "$QUADLET_DIR/lab-vuln-agent.container"
-rm -f "$QUADLET_DIR/lab-dvla.container"
-rm -f "$QUADLET_DIR/lab-fake-registry.container"
-rm -f "$QUADLET_DIR/lab-portal.container"
+echo "[install-lab] removing legacy date-based unit files and containers if they exist"
+legacy_units=(
+  lab-vuln-rag
+  lab-day1-vuln-rag
+  lab-day2-vuln-rag
+  lab-day3-vuln-rag
+  lab-day4-vuln-rag
+  lab-day5-vuln-rag
+  lab-day3-vuln-agent
+  lab-day3-dvla
+  lab-day2-fake-registry
+)
+for unit in "${legacy_units[@]}"; do
+  rm -f "$QUADLET_DIR/$unit.container"
+done
 "${RUN_AS_UBUNTU[@]}" bash <<'LEGACYSH'
 set -euo pipefail
-for unit in lab-vuln-rag lab-vuln-agent lab-dvla lab-fake-registry lab-portal; do
+legacy_units=(
+  lab-vuln-rag
+  lab-day1-vuln-rag
+  lab-day2-vuln-rag
+  lab-day3-vuln-rag
+  lab-day4-vuln-rag
+  lab-day5-vuln-rag
+  lab-day3-vuln-agent
+  lab-day3-dvla
+  lab-day2-fake-registry
+)
+for unit in "${legacy_units[@]}"; do
   systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
   systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
   podman rm -f "$unit" >/dev/null 2>&1 || true
@@ -280,17 +300,25 @@ declare -A RAG_PORTS=(
   [day4]=8012
   [day5]=8013
 )
+declare -A RAG_UNITS=(
+  [day1]=lab-prompt-rag
+  [day2]=lab-data-rag
+  [day3]=lab-output-rag
+  [day4]=lab-knowledge-rag
+  [day5]=lab-resource-rag
+)
 
 for scenario in day1 day2 day3 day4 day5; do
   rag_port="${RAG_PORTS[$scenario]}"
-  cat > "$QUADLET_DIR/lab-${scenario}-vuln-rag.container" <<EOF
+  rag_unit="${RAG_UNITS[$scenario]}"
+  cat > "$QUADLET_DIR/${rag_unit}.container" <<EOF
 [Unit]
-Description=OWASP LLM Lab - ${scenario} Vulnerable RAG
+Description=OWASP LLM Lab - ${scenario} scenario RAG
 After=lab-ollama.container
 Requires=lab-ollama.container
 
 [Container]
-ContainerName=lab-${scenario}-vuln-rag
+ContainerName=${rag_unit}
 Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}
 Network=host
 Environment=DEFAULT_SCENARIO=${scenario}
@@ -309,14 +337,14 @@ WantedBy=default.target
 EOF
 done
 
-cat > "$QUADLET_DIR/lab-day3-vuln-agent.container" <<EOF
+cat > "$QUADLET_DIR/lab-vuln-agent.container" <<EOF
 [Unit]
-Description=OWASP LLM Lab - day3 Vulnerable Agent
+Description=OWASP LLM Lab - Vulnerable Agent
 After=lab-ollama.container
 Requires=lab-ollama.container
 
 [Container]
-ContainerName=lab-day3-vuln-agent
+ContainerName=lab-vuln-agent
 Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-agent:${IMAGE_TAG}
 Network=host
 Environment=OLLAMA_URL=http://localhost:11434
@@ -354,14 +382,14 @@ Restart=always
 WantedBy=default.target
 EOF
 
-cat > "$QUADLET_DIR/lab-day3-dvla.container" <<EOF
+cat > "$QUADLET_DIR/lab-dvla.container" <<EOF
 [Unit]
-Description=OWASP LLM Lab - day3 Damn Vulnerable LLM Agent
+Description=OWASP LLM Lab - Damn Vulnerable LLM Agent
 After=lab-ollama.container
 Requires=lab-ollama.container
 
 [Container]
-ContainerName=lab-day3-dvla
+ContainerName=lab-dvla
 Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-dvla:${IMAGE_TAG}
 Network=host
 Environment=OLLAMA_HOST=http://localhost:11434
@@ -376,12 +404,12 @@ Restart=always
 WantedBy=default.target
 EOF
 
-cat > "$QUADLET_DIR/lab-day2-fake-registry.container" <<'EOF'
+cat > "$QUADLET_DIR/lab-fake-registry.container" <<'EOF'
 [Unit]
-Description=OWASP LLM Lab - day2 Fake Model Registry
+Description=OWASP LLM Lab - Fake Model Registry
 
 [Container]
-ContainerName=lab-day2-fake-registry
+ContainerName=lab-fake-registry
 Image=docker.io/library/python:3.12-slim
 Network=host
 Volume=/home/ubuntu/work/fake-registry:/app:Z
@@ -433,15 +461,15 @@ set -euo pipefail
 echo "[install-lab] reloading systemd user units and reconciling lab services"
 units=(
   lab-ollama
-  lab-day1-vuln-rag
-  lab-day2-vuln-rag
-  lab-day3-vuln-rag
-  lab-day4-vuln-rag
-  lab-day5-vuln-rag
-  lab-day3-vuln-agent
+  lab-prompt-rag
+  lab-data-rag
+  lab-output-rag
+  lab-knowledge-rag
+  lab-resource-rag
+  lab-vuln-agent
   lab-llmgoat
-  lab-day3-dvla
-  lab-day2-fake-registry
+  lab-dvla
+  lab-fake-registry
   lab-portal
 )
 systemctl --user daemon-reload
@@ -455,7 +483,7 @@ for unit in "${units[@]}"; do
 
   image_backed=false
   case "$unit" in
-    lab-day?-vuln-rag|lab-day3-vuln-agent|lab-llmgoat|lab-day3-dvla)
+    lab-prompt-rag|lab-data-rag|lab-output-rag|lab-knowledge-rag|lab-resource-rag|lab-vuln-agent|lab-llmgoat|lab-dvla)
       image_backed=true
       ;;
   esac
@@ -465,9 +493,9 @@ for unit in "${units[@]}"; do
     restart_reason="Quadlet configuration changed"
   elif [ "$REFRESH_IMAGES" = "true" ] && [ "$image_backed" = "true" ]; then
     restart_reason="requested image refresh"
-  elif [ "$unit" = "lab-day3-dvla" ]; then
+  elif [ "$unit" = "lab-dvla" ]; then
     restart_reason="DVLA model configuration refreshed"
-  elif [ "$unit" = "lab-day2-fake-registry" ] && \
+  elif [ "$unit" = "lab-fake-registry" ] && \
     [ "$FAKE_REGISTRY_CHANGED" = "true" ]; then
     restart_reason="fake-registry source refreshed"
   fi
@@ -565,14 +593,14 @@ echo "[install-lab] verifying reconciled service health and requested image refe
 set -euo pipefail
 
 declare -A expected_images=(
-  [lab-day1-vuln-rag]="owasp-llm-vuln-rag"
-  [lab-day2-vuln-rag]="owasp-llm-vuln-rag"
-  [lab-day3-vuln-rag]="owasp-llm-vuln-rag"
-  [lab-day4-vuln-rag]="owasp-llm-vuln-rag"
-  [lab-day5-vuln-rag]="owasp-llm-vuln-rag"
-  [lab-day3-vuln-agent]="owasp-llm-vuln-agent"
+  [lab-prompt-rag]="owasp-llm-vuln-rag"
+  [lab-data-rag]="owasp-llm-vuln-rag"
+  [lab-output-rag]="owasp-llm-vuln-rag"
+  [lab-knowledge-rag]="owasp-llm-vuln-rag"
+  [lab-resource-rag]="owasp-llm-vuln-rag"
+  [lab-vuln-agent]="owasp-llm-vuln-agent"
   [lab-llmgoat]="owasp-llm-llmgoat"
-  [lab-day3-dvla]="owasp-llm-dvla"
+  [lab-dvla]="owasp-llm-dvla"
 )
 
 for container in "${!expected_images[@]}"; do

@@ -6,14 +6,14 @@
 #   docker build -t ghcr.io/gasbugs/owasp-llm-dvla:sha-<commit> .
 #
 # 실행 (본 강의 인프라):
-#   docker run -d --name lab-day3-dvla --network host \
+#   docker run -d --name lab-dvla --network host \
 #     -e OLLAMA_HOST=http://localhost:11434 \
 #     -e OLLAMA_API_BASE=http://localhost:11434 \
 #     -e model_name=ollama-local-llama3 \
 #     ghcr.io/gasbugs/owasp-llm-dvla:sha-<commit>
 #
 # 로컬 검증 (Mac native Ollama):
-#   docker run -d --name lab-day3-dvla -p 8501:8501 \
+#   docker run -d --name lab-dvla -p 8501:8501 \
 #     -e OLLAMA_HOST=http://host.docker.internal:11434 \
 #     -e OLLAMA_API_BASE=http://host.docker.internal:11434 \
 #     -e model_name=ollama-local-llama3 \

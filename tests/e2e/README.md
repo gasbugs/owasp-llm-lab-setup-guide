@@ -16,13 +16,13 @@
 
 | 항목 | 대상 | 런타임 |
 |---|---|---|
-| LLM01 | `http://localhost:8000` | `lab-day1-vuln-rag` |
-| LLM02, LLM04 | `http://localhost:8010` | `lab-day2-vuln-rag` |
-| Day 4 LLM03 | `http://localhost:8002` | `lab-day2-fake-registry` (호환 unit 이름) |
-| LLM05 | `http://localhost:8011` | `lab-day3-vuln-rag` |
-| LLM06 | `http://localhost:8001` | `lab-day3-vuln-agent` |
-| LLM07~LLM09 | `http://localhost:8012` | `lab-day4-vuln-rag` |
-| LLM10 | `http://localhost:8013` | `lab-day5-vuln-rag` |
+| LLM01 | `http://localhost:8000` | `lab-prompt-rag` |
+| LLM02, LLM04 | `http://localhost:8010` | `lab-data-rag` |
+| Day 4 LLM03 | `http://localhost:8002` | `lab-fake-registry` (호환 unit 이름) |
+| LLM05 | `http://localhost:8011` | `lab-output-rag` |
+| LLM06 | `http://localhost:8001` | `lab-vuln-agent` |
+| LLM07~LLM09 | `http://localhost:8012` | `lab-knowledge-rag` |
+| LLM10 | `http://localhost:8013` | `lab-resource-rag` |
 | LLMGoat A01/A02/A04/A06/A08 | `http://localhost:5000` | `lab-llmgoat` |
 
 LLM02 검증은 인증 없는 body `customer_id` 조회, 안전 endpoint의 무인증 `401`, 인증된 body identity 위조 `422`, server-side token map으로 결정된 고객 ID와 model-context allowlist를 한 흐름에서 검사합니다.

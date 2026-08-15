@@ -69,7 +69,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 3. 기본값에서는 user-data 자동 설치가 실행되지 않습니다.
 4. 수강생이 SSM으로 EC2에 접속해 `install-lab.sh`를 직접 실행합니다.
 5. 설치 스크립트가 Podman을 설치하고 실습 컨테이너 이미지를 pull합니다.
-6. `lab-ollama`, `lab-portal`, `lab-day1-vuln-rag`~`lab-day5-vuln-rag`, `lab-day3-vuln-agent`, `lab-llmgoat`, `lab-day3-dvla`, `lab-day2-fake-registry` 컨테이너를 실행합니다.
+6. `lab-ollama`, `lab-portal`, `lab-prompt-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, `lab-vuln-agent`, `lab-llmgoat`, `lab-dvla`, `lab-fake-registry` 컨테이너를 실행합니다.
 7. Podman Quadlet 기반 systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
 
 AMI ID나 SHA를 직접 입력하는 변수는 두지 않습니다. 이름·소유자 조건에 맞는 최신 AMI 조회 결과는 새 EC2를 생성할 때 적용되며, 이미 존재하는 수강생 EC2는 EBS 작업물 보호를 위해 현재 AMI를 유지하고 자동 교체하지 않습니다.

@@ -12,10 +12,10 @@ Read-only labs have no reset step.
 
 | Lab | Exact restart | Raw verification |
 |---|---|---|
-| LLM01-B | `systemctl --user restart lab-day1-vuln-rag.service` | `curl -sS http://localhost:8000/healthz` |
-| LLM04 | `systemctl --user restart lab-day2-vuln-rag.service` | `curl -sS http://localhost:8010/healthz` |
-| LLM05 | `systemctl --user restart lab-day3-vuln-rag.service` | `curl -sS http://localhost:8011/healthz` |
-| LLM06 delete | `systemctl --user restart lab-day3-vuln-agent.service` | `curl -sS http://localhost:8001/healthz` |
+| LLM01-B | `systemctl --user restart lab-prompt-rag.service` | `curl -sS http://localhost:8000/healthz` |
+| LLM04 | `systemctl --user restart lab-data-rag.service` | `curl -sS http://localhost:8010/healthz` |
+| LLM05 | `systemctl --user restart lab-output-rag.service` | `curl -sS http://localhost:8011/healthz` |
+| LLM06 delete | `systemctl --user restart lab-vuln-agent.service` | `curl -sS http://localhost:8001/healthz` |
 | Mutable LLMGoat challenge | `systemctl --user restart lab-llmgoat.service` | `curl -sS http://localhost:5000/healthz` |
 
 LLM10 is the exception because two services require an ordered recovery. The
@@ -35,15 +35,15 @@ Unknown IDs fail before any unit action. The helper never writes to or deletes:
 | Unit | Port | Mutable runtime state | Persistent mount | Minimum reset |
 |---|---:|---|---|---|
 | `lab-ollama.service` | 11434 | loaded model and request queue | `/home/ubuntu/ollama-models:/root/.ollama` | Do not reset for ordinary lessons. `reset-lab llm10` restarts it only after an overload. |
-| `lab-day1-vuln-rag.service` | 8000 | Python `day1._corpus` | none | Restart this exact unit after document injection; no reset for direct/persona chat. |
-| `lab-day2-vuln-rag.service` | 8010 | Python `day2._corpus` | none | Restart this exact unit after poisoning; no reset for LLM02 chat. |
-| `lab-day3-vuln-rag.service` | 8011 | Python `day3._corpus` | none | Restart this exact unit after a stored payload/document. |
-| `lab-day4-vuln-rag.service` | 8012 | Python `day4._tenants`; normal LLM07/08/09 paths only read it | none | No reset for standard lessons. A publisher that calls the admin mutation API can restart this exact unit. |
-| `lab-day5-vuln-rag.service` | 8013 | in-flight uvicorn tasks and Python `day5._corpus` | none | `reset-lab llm10`; it coordinates Day 5 and Ollama. |
-| `lab-day3-vuln-agent.service` | 8001 | Python `ANIMALS` and `DELETED_LOG` | none | Restart this exact unit; it restores `g-003` and clears the deletion log. |
+| `lab-prompt-rag.service` | 8000 | Python `day1._corpus` | none | Restart this exact unit after document injection; no reset for direct/persona chat. |
+| `lab-data-rag.service` | 8010 | Python `day2._corpus` | none | Restart this exact unit after poisoning; no reset for LLM02 chat. |
+| `lab-output-rag.service` | 8011 | Python `day3._corpus` | none | Restart this exact unit after a stored payload/document. |
+| `lab-knowledge-rag.service` | 8012 | Python `day4._tenants`; normal LLM07/08/09 paths only read it | none | No reset for standard lessons. A publisher that calls the admin mutation API can restart this exact unit. |
+| `lab-resource-rag.service` | 8013 | in-flight uvicorn tasks and Python `day5._corpus` | none | `reset-lab llm10`; it coordinates Day 5 and Ollama. |
+| `lab-vuln-agent.service` | 8001 | Python `ANIMALS` and `DELETED_LOG` | none | Restart this exact unit; it restores `g-003` and clears the deletion log. |
 | `lab-llmgoat.service` | 5000 | A04 reviews, A08 vector store, A09 uploaded image and model lock in process memory; A08 export file in the container writable layer | models and cache only | Restart this exact unit. Browser completion badges are a signed client cookie and do not alter challenge fixtures. |
-| `lab-day3-dvla.service` | 8501 | Streamlit conversation/session memory and container-layer `transactions.db` | `/home/ubuntu/work/dvla/llm-config.yaml:/app/llm-config.yaml` | The lesson's SQL tools are read-only. Restart the unit only to clear a session; it does not restore the host YAML. |
-| `lab-day2-fake-registry.service` | 8002 | startup rewrites `/app/data/A.gguf` and `B.gguf` | `/home/ubuntu/work/fake-registry:/app` | Standard LLM03 is read-only. Restart rematerializes A/B fixtures but does not restore a modified host `server.py` or remove other host files. |
+| `lab-dvla.service` | 8501 | Streamlit conversation/session memory and container-layer `transactions.db` | `/home/ubuntu/work/dvla/llm-config.yaml:/app/llm-config.yaml` | The lesson's SQL tools are read-only. Restart the unit only to clear a session; it does not restore the host YAML. |
+| `lab-fake-registry.service` | 8002 | startup rewrites `/app/data/A.gguf` and `B.gguf` | `/home/ubuntu/work/fake-registry:/app` | Standard LLM03 is read-only. Restart rematerializes A/B fixtures but does not restore a modified host `server.py` or remove other host files. |
 | `lab-portal.service` | 8080 | none | `/home/ubuntu/work/portal:/app` | No reset. Restart does not restore a modified host `index.html`. |
 
 All five vulnerable RAG processes use the same image but separate processes.
@@ -54,7 +54,7 @@ The Agent image also exposes read-only `GET /api/admin/state` for publisher E2E
 verification. It returns sorted animal snapshots and the deletion log so the
 validator can prove `g-003` existed, was deleted once, and returned after a
 service restart. Learners do not use that endpoint for reset: they restart
-`lab-day3-vuln-agent.service` and then read the raw `/healthz` output.
+`lab-vuln-agent.service` and then read the raw `/healthz` output.
 
 ## Why LLM10 is one allowlisted command
 
@@ -62,10 +62,10 @@ A client timeout does not prove server-side work stopped. A timed-out Day 5
 request can leave an uvicorn task waiting on the shared Ollama queue. The LLM10
 reset therefore performs this fixed sequence internally:
 
-1. restart `lab-day5-vuln-rag.service` to cancel waiting app tasks;
+1. restart `lab-resource-rag.service` to cancel waiting app tasks;
 2. restart `lab-ollama.service` to clear queued generation;
 3. read and print raw Ollama readiness;
-4. restart `lab-day5-vuln-rag.service` once more;
+4. restart `lab-resource-rag.service` once more;
 5. read and print raw Day 5 `/healthz`.
 
 The learner still runs only `reset-lab llm10`.

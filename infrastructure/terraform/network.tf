@@ -103,7 +103,7 @@ resource "aws_security_group" "student" {
   }
 
   ingress {
-    description = "lab-day3-dvla (8501)"
+    description = "lab-dvla (8501)"
     from_port   = 8501
     to_port     = 8501
     protocol    = "tcp"

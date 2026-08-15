@@ -60,6 +60,41 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("Environment=PORT=${rag_port}", installer)
         self.assertIn("--port ${rag_port}", installer)
 
+    def test_quadlet_container_names_are_role_based_without_dates(self) -> None:
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        expected_rag_units = {
+            "day1": "lab-prompt-rag",
+            "day2": "lab-data-rag",
+            "day3": "lab-output-rag",
+            "day4": "lab-knowledge-rag",
+            "day5": "lab-resource-rag",
+        }
+        for scenario, unit in expected_rag_units.items():
+            self.assertIn(f"[{scenario}]={unit}", installer)
+        for unit in ("lab-vuln-agent", "lab-dvla", "lab-fake-registry"):
+            self.assertIn(f"ContainerName={unit}", installer)
+
+        active_units = installer.split("\nunits=(", 1)[1].split(")", 1)[0]
+        self.assertNotIn("lab-day", active_units)
+
+    def test_user_data_bootstrap_reuses_pinned_runtime_installer(self) -> None:
+        instance = read("infrastructure/terraform/instance.tf")
+        template = read("infrastructure/terraform/user-data.sh.tpl")
+        self.assertIn(
+            "user_data = var.enable_user_data_bootstrap ? local.user_data : null",
+            instance,
+        )
+        self.assertIn(
+            'curl -fsSL "$RAW_URL/infrastructure/scripts/student/install-lab.sh"',
+            template,
+        )
+        self.assertIn('IMAGE_TAG="$IMAGE_TAG"', template)
+        self.assertIn('LAB_SETUP_REPO_RAW_URL="$RAW_URL"', template)
+        self.assertIn(
+            "local.lab_setup_source_revision == trimprefix(var.lab_image_tag, \"sha-\")",
+            instance,
+        )
+
     def test_reinstall_reconciles_images_units_and_downloaded_source(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         self.assertIn('curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py"', installer)
@@ -353,7 +388,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("BASELINE_DOC_COUNTS", full_cycle)
         self.assertIn("E2E_RESET_SENTINEL_", full_cycle)
         self.assertIn('systemctl --user restart "${services[@]}"', full_cycle)
-        self.assertIn("systemctl --user restart lab-day3-vuln-agent.service", full_cycle)
+        self.assertIn("systemctl --user restart lab-vuln-agent.service", full_cycle)
         self.assertIn('/api/admin/state', full_cycle)
         self.assertNotIn("podman restart", full_cycle)
         self.assertNotIn('/api/admin/reset', full_cycle)

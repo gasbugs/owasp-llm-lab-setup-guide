@@ -176,7 +176,7 @@ class StrictShellHarnessContractTest(unittest.TestCase):
         self.assertIn('"$reset_script" llm10', source)
         self.assertNotIn("podman", source)
 
-        day5_restart = "systemctl --user restart lab-day5-vuln-rag.service"
+        day5_restart = "systemctl --user restart lab-resource-rag.service"
         ollama_restart = "systemctl --user restart lab-ollama.service"
         first_day5 = reset.index(day5_restart)
         ollama = reset.index(ollama_restart)

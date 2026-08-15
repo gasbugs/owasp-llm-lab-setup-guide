@@ -67,7 +67,7 @@ class ResetLabTest(unittest.TestCase):
         result, calls = self.run_reset("llm06")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
-            calls, ["--user restart lab-day3-vuln-agent.service"]
+            calls, ["--user restart lab-vuln-agent.service"]
         )
         self.assertIn("LLM06_READY_URL=http://127.0.0.1:8001/healthz", result.stdout)
         self.assertIn('{"ok":true,"tools":["delete_animal"]}', result.stdout)
@@ -75,15 +75,15 @@ class ResetLabTest(unittest.TestCase):
     def test_simple_allowlist_ids_restart_only_their_exact_units(self) -> None:
         cases = {
             "llm01b": (
-                "lab-day1-vuln-rag.service",
+                "lab-prompt-rag.service",
                 "LLM01B_READY_URL=http://127.0.0.1:8000/healthz",
             ),
             "llm04": (
-                "lab-day2-vuln-rag.service",
+                "lab-data-rag.service",
                 "LLM04_READY_URL=http://127.0.0.1:8010/healthz",
             ),
             "llm05": (
-                "lab-day3-vuln-rag.service",
+                "lab-output-rag.service",
                 "LLM05_READY_URL=http://127.0.0.1:8011/healthz",
             ),
             "llmgoat": (
@@ -105,9 +105,9 @@ class ResetLabTest(unittest.TestCase):
         self.assertEqual(
             calls,
             [
-                "--user restart lab-day5-vuln-rag.service",
+                "--user restart lab-resource-rag.service",
                 "--user restart lab-ollama.service",
-                "--user restart lab-day5-vuln-rag.service",
+                "--user restart lab-resource-rag.service",
             ],
         )
         self.assertIn("OLLAMA_READY_URL=http://127.0.0.1:11434/api/tags", result.stdout)

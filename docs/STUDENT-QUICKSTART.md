@@ -130,11 +130,11 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - `llama3.1:8b-instruct-q4_K_M` 생성 모델과 `bge-m3:latest` embedding 모델 pull 및 warm-up
 - LLM08 서버 vector 분석용 `~/work/llm08-analysis-venv` 준비(NumPy만 설치)
 - 실습 포털 실행: `lab-portal`, port `8080`
-- Day별 취약 RAG 앱 실행: `lab-day1-vuln-rag`~`lab-day5-vuln-rag`, ports `8000`, `8010`, `8011`, `8012`, `8013`
-- 취약 Agent 앱 실행: `lab-day3-vuln-agent`, port `8001`
+- 역할별 취약 RAG 앱 실행: `lab-prompt-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, ports `8000`, `8010`, `8011`, `8012`, `8013`
+- 취약 Agent 앱 실행: `lab-vuln-agent`, port `8001`
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
-- DVLA 실행: `lab-day3-dvla`, port `8501`
-- Day 4 LLM03 fake model registry 실행: `lab-day2-fake-registry`, port `8002` (unit 이름은 호환성을 위해 유지)
+- DVLA 실행: `lab-dvla`, port `8501`
+- Day 4 LLM03 fake model registry 실행: `lab-fake-registry`, port `8002`
 - EC2 start 후 자동 재시작을 위한 Podman Quadlet systemd user unit 등록
 - Terraform 기본 설정으로 매일 18:00 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 기존 17:30 모드, 야간 반복 모드 또는 custom cron 선택 가능
 
@@ -203,10 +203,10 @@ curl -s http://localhost:8002/api/v1/models | head
 
 | 실습 | 재시작 명령 | 원본 확인 명령 |
 |---|---|---|
-| LLM01-B | `systemctl --user restart lab-day1-vuln-rag.service` | `curl -sS http://localhost:8000/healthz` |
-| LLM04 | `systemctl --user restart lab-day2-vuln-rag.service` | `curl -sS http://localhost:8010/healthz` |
-| LLM05 | `systemctl --user restart lab-day3-vuln-rag.service` | `curl -sS http://localhost:8011/healthz` |
-| LLM06 삭제 실습 | `systemctl --user restart lab-day3-vuln-agent.service` | `curl -sS http://localhost:8001/healthz` |
+| LLM01-B | `systemctl --user restart lab-prompt-rag.service` | `curl -sS http://localhost:8000/healthz` |
+| LLM04 | `systemctl --user restart lab-data-rag.service` | `curl -sS http://localhost:8010/healthz` |
+| LLM05 | `systemctl --user restart lab-output-rag.service` | `curl -sS http://localhost:8011/healthz` |
+| LLM06 삭제 실습 | `systemctl --user restart lab-vuln-agent.service` | `curl -sS http://localhost:8001/healthz` |
 | LLMGoat 상태 변경 실습 | `systemctl --user restart lab-llmgoat.service` | `curl -sS http://localhost:5000/healthz` |
 
 LLM10은 timeout 뒤 Day 5 앱과 공유 Ollama queue를 정해진 순서로 복구해야

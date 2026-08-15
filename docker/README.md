@@ -18,11 +18,11 @@
 
 | 컨테이너 | scenario | 포트 |
 |---|---|---:|
-| `lab-day1-vuln-rag` | day1 / LLM01 | 8000 |
-| `lab-day2-vuln-rag` | day2 / LLM02·LLM04 | 8010 |
-| `lab-day3-vuln-rag` | day3 / LLM05 | 8011 |
-| `lab-day4-vuln-rag` | day4 / LLM07·LLM09, Day 2 LLM08 공유 | 8012 |
-| `lab-day5-vuln-rag` | day5 / LLM10 | 8013 |
+| `lab-prompt-rag` | day1 / LLM01 | 8000 |
+| `lab-data-rag` | day2 / LLM02·LLM04 | 8010 |
+| `lab-output-rag` | day3 / LLM05 | 8011 |
+| `lab-knowledge-rag` | day4 / LLM07·LLM09, Day 2 LLM08 공유 | 8012 |
+| `lab-resource-rag` | day5 / LLM10 | 8013 |
 
 `/healthz`는 `default_scenario`와 전체 `scenarios` 목록을 반환합니다. 이미지 HEALTHCHECK도 `PORT`를 사용하므로 실제 uvicorn 포트와 일치합니다.
 
@@ -75,7 +75,7 @@ sudo env IMAGE_NAMESPACE=gasbugs IMAGE_TAG="sha-$SETUP_COMMIT" \
   bash infrastructure/scripts/student/install-lab.sh
 
 sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-sudo -u ubuntu podman logs --tail 100 lab-day3-vuln-rag
+sudo -u ubuntu podman logs --tail 100 lab-output-rag
 ```
 
 EC2는 이미지·모델 설치를 위해 인터넷 egress를 사용합니다. 기본 ingress는 `127.0.0.1/32`이고 브라우저/API 접근은 SSM 포트포워딩을 권장합니다.

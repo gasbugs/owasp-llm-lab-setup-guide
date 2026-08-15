@@ -5,7 +5,7 @@
 LLM08 환경은 다음 구성요소를 함께 사용합니다.
 
 - `lab-ollama:11434`: `bge-m3:latest` embedding 생성
-- `lab-day4-vuln-rag:8012`: 인증된 LLM08 lab API와 교육용 인메모리 cosine 검색
+- `lab-knowledge-rag:8012`: 인증된 LLM08 lab API와 교육용 인메모리 cosine 검색
 - `~/work/llm08-analysis-venv`: NumPy 기반 cosine/PCA 분석 환경
 - `examples/llm08/mini_vector_search_app.py`: 학습자가 복사해 공격하고 수정하는 미니 앱
 - `0.0.0.0:18080`: 학습자 미니 앱의 명시적 IPv4 wildcard bind. EC2 내부 검사는 `127.0.0.1:18080` 사용
@@ -278,8 +278,8 @@ test "$(awk -F= '$1 == "OLLAMA_EMBED_MODEL" {print $2}' /etc/lab/env)" \
   = 'bge-m3:latest'
 
 for container in \
-  lab-day1-vuln-rag lab-day2-vuln-rag lab-day3-vuln-rag \
-  lab-day4-vuln-rag lab-day5-vuln-rag; do
+  lab-prompt-rag lab-data-rag lab-output-rag \
+  lab-knowledge-rag lab-resource-rag; do
   test "$(podman inspect --format '{{.ImageName}}' "$container")" \
     = "ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG"
 done
@@ -635,7 +635,7 @@ printf 'EC2_FINAL_STATE=%s\n' "$STATE"
 | GHCR manifest 없음/unauthorized | `podman manifest inspect ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG` | workflow 미완료 또는 package 비공개. EC2를 시작하지 말고 publish 완료 |
 | `/api/embed`가 404 | `/healthz`의 `default_scenario`, `/etc/lab/env`의 `IMAGE_TAG` | 잘못된 포트 또는 구 이미지. Day 4의 pinned image로 재설치 |
 | `/api/embed`가 401 | Authorization header 확인 | `LLM08_TOKEN` 누락/오류. body의 tenant로 대체하지 않음 |
-| `/api/embed`가 502 | `podman logs lab-day4-vuln-rag`, Ollama `/api/tags` | Ollama 미준비, embedding model 누락, backend 응답 계약 위반 |
+| `/api/embed`가 502 | `podman logs lab-knowledge-rag`, Ollama `/api/tags` | Ollama 미준비, embedding model 누락, backend 응답 계약 위반 |
 | `bge-m3:latest` 없음 | `podman exec lab-ollama ollama list` | installer가 끝나지 않았거나 model pull 실패. 설치 log 확인 후 같은 pinned installer 재실행 |
 | analysis venv 없음 | `test -x ~/work/llm08-analysis-venv/bin/python` | 설치가 10단계 전에 실패했거나 구 installer. `/var/log/owasp-llm-lab-install.log` 확인 |
 | scaffold 없음 | `$SETUP_DIR`의 HEAD와 파일 확인 | setup repo가 다른 commit이거나 publish 전 source 사용 |

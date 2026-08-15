@@ -118,25 +118,25 @@ lab_id="$1"
 case "$lab_id" in
   llm01b)
     restart_one \
-      lab-day1-vuln-rag.service \
+      lab-prompt-rag.service \
       LLM01B \
       http://127.0.0.1:8000/healthz
     ;;
   llm04)
     restart_one \
-      lab-day2-vuln-rag.service \
+      lab-data-rag.service \
       LLM04 \
       http://127.0.0.1:8010/healthz
     ;;
   llm05)
     restart_one \
-      lab-day3-vuln-rag.service \
+      lab-output-rag.service \
       LLM05 \
       http://127.0.0.1:8011/healthz
     ;;
   llm06)
     restart_one \
-      lab-day3-vuln-agent.service \
+      lab-vuln-agent.service \
       LLM06 \
       http://127.0.0.1:8001/healthz
     ;;
@@ -150,13 +150,13 @@ case "$lab_id" in
     # A timed-out client can leave both an awaiting uvicorn task and queued
     # Ollama generation. Cancel the app task first, clear the backend queue,
     # then reconnect a fresh Day 5 app process to the ready backend.
-    printf 'RESET_UNIT=%s\n' lab-day5-vuln-rag.service
-    systemctl --user restart lab-day5-vuln-rag.service
+    printf 'RESET_UNIT=%s\n' lab-resource-rag.service
+    systemctl --user restart lab-resource-rag.service
     printf 'RESET_UNIT=%s\n' lab-ollama.service
     systemctl --user restart lab-ollama.service
     wait_for_raw_readiness OLLAMA http://127.0.0.1:11434/api/tags
-    printf 'RESET_UNIT=%s\n' lab-day5-vuln-rag.service
-    systemctl --user restart lab-day5-vuln-rag.service
+    printf 'RESET_UNIT=%s\n' lab-resource-rag.service
+    systemctl --user restart lab-resource-rag.service
     wait_for_raw_readiness LLM10 http://127.0.0.1:8013/healthz
     ;;
   *)

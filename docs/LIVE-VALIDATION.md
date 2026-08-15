@@ -136,16 +136,16 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 
 | 포트 | 서비스 | 계약 |
 |---:|---|---|
-| 8000 | `lab-day1-vuln-rag` | `default_scenario=day1` |
-| 8010 | `lab-day2-vuln-rag` | `default_scenario=day2` |
-| 8011 | `lab-day3-vuln-rag` | `default_scenario=day3` |
-| 8012 | `lab-day4-vuln-rag` | `default_scenario=day4` |
-| 8013 | `lab-day5-vuln-rag` | `default_scenario=day5` |
-| 8001 | `lab-day3-vuln-agent` | `ok=true`, tool catalog 존재 |
-| 8002 | `lab-day2-fake-registry` | `/api/v1/models` JSON |
+| 8000 | `lab-prompt-rag` | `default_scenario=day1` |
+| 8010 | `lab-data-rag` | `default_scenario=day2` |
+| 8011 | `lab-output-rag` | `default_scenario=day3` |
+| 8012 | `lab-knowledge-rag` | `default_scenario=day4` |
+| 8013 | `lab-resource-rag` | `default_scenario=day5` |
+| 8001 | `lab-vuln-agent` | `ok=true`, tool catalog 존재 |
+| 8002 | `lab-fake-registry` | `/api/v1/models` JSON |
 | 8080 | `lab-portal` | HTTP 200 |
 | 5000 | `lab-llmgoat` | web/API |
-| 8501 | `lab-day3-dvla` | Streamlit health |
+| 8501 | `lab-dvla` | Streamlit health |
 | 11434 | `lab-ollama` | `/api/tags` JSON |
 
 RAG health의 canonical JSON shape은 다음과 같습니다.
