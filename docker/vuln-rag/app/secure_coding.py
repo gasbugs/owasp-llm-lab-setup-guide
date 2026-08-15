@@ -44,7 +44,8 @@ def allow_untrusted_llm01_input(_: str) -> PolicyDecision:
 
 def enforce_llm01_input_policy(message: str) -> PolicyDecision:
     injection = re.compile(
-        r"ignore\s+(all\s+)?previous|system\s+prompt|secret[_ -]?flag|"
+        r"ignore\s+(all\s+)?previous|system\s+prompt|"
+        r"secret(?:[_ -]?flag|\s+(?:or|또는)\s+flag)|"
         r"이전\s*지시.*무시|시스템\s*프롬프트|비밀\s*값",
         re.IGNORECASE,
     )
