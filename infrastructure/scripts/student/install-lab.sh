@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.4"
+SCRIPT_VERSION="0.2.5"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -657,10 +657,20 @@ declare -A expected_images=(
 
 for container in "${!expected_images[@]}"; do
   expected="ghcr.io/${IMAGE_NAMESPACE}/${expected_images[$container]}:${IMAGE_TAG}"
-  actual_name=$(podman inspect --format '{{.ImageName}}' "$container")
-  actual_id=$(podman inspect --format '{{.Image}}' "$container")
   expected_id=$(podman image inspect --format '{{.Id}}' "$expected")
-  if [ "$actual_name" != "$expected" ] || [ "$actual_id" != "$expected_id" ]; then
+  image_ready=false
+  for attempt in $(seq 1 30); do
+    if actual_name=$(podman inspect --format '{{.ImageName}}' "$container" 2>/dev/null) &&
+      actual_id=$(podman inspect --format '{{.Image}}' "$container" 2>/dev/null) &&
+      [ "$actual_name" = "$expected" ] && [ "$actual_id" = "$expected_id" ]; then
+      image_ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$image_ready" != true ]; then
+    actual_name=$(podman inspect --format '{{.ImageName}}' "$container" 2>/dev/null || echo unavailable)
+    actual_id=$(podman inspect --format '{{.Image}}' "$container" 2>/dev/null || echo unavailable)
     echo "ERROR: $container runs $actual_name ($actual_id), expected $expected ($expected_id)" >&2
     exit 1
   fi
@@ -675,14 +685,19 @@ declare -A editable_source_files=(
   [lab-vuln-agent]="/app/app/main.py"
 )
 for container in "${!editable_source_files[@]}"; do
-  if ! podman inspect --format '{{range .Mounts}}{{println .Destination}}{{end}}' "$container" \
-    | grep -qx '/app/app'; then
-    echo "ERROR: $container has no learner-editable /app/app source mount" >&2
-    exit 1
-  fi
   source_file="${editable_source_files[$container]}"
-  if ! podman exec "$container" test -f "$source_file"; then
-    echo "ERROR: $container is missing learner-editable source $source_file" >&2
+  source_ready=false
+  for attempt in $(seq 1 30); do
+    if podman inspect --format '{{range .Mounts}}{{println .Destination}}{{end}}' "$container" 2>/dev/null \
+      | grep -qx '/app/app' &&
+      podman exec "$container" test -f "$source_file" 2>/dev/null; then
+      source_ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$source_ready" != true ]; then
+    echo "ERROR: $container did not stabilize with /app/app and learner-editable source $source_file" >&2
     exit 1
   fi
 done

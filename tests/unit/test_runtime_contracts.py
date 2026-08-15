@@ -136,6 +136,14 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
+            "for attempt in $(seq 1 30); do",
+            installer,
+        )
+        self.assertIn(
+            'if [ "$source_ready" != true ]; then',
+            installer,
+        )
+        self.assertIn(
             "docker/ infrastructure/scripts/student/install-lab.sh",
             workflow,
         )
