@@ -13,17 +13,21 @@ Read-only labs have no reset step.
 
 | Lab | Exact restart | Raw verification |
 |---|---|---|
+| LLM01 secure-coding source | `reset-lab llm01` | `curl -sS http://localhost:8000/healthz` |
 | LLM01-B | `reset-lab llm01b` | `curl -sS http://localhost:8000/healthz` |
+| LLM02 secure-coding source | `reset-lab llm02` | `curl -sS http://localhost:8010/healthz` |
 | LLM04 | `reset-lab llm04` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `reset-lab llm05` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 delete | `reset-lab llm06` | `curl -sS http://localhost:8001/healthz` |
-| Mutable LLMGoat challenge | `systemctl --user restart lab-llmgoat.service` | `curl -sS http://localhost:5000/healthz` |
+| LLM08 secure-coding source | `reset-lab llm08` | `curl -sS http://localhost:8012/healthz` |
+| LLM09 secure-coding source | `reset-lab llm09` | `curl -sS http://localhost:8012/healthz` |
+| Mutable LLMGoat challenge | `reset-lab llmgoat` | `curl -sS http://localhost:5000/healthz` |
+| LLM10 source or overload | `reset-lab llm10` | `curl -sS http://localhost:8013/healthz` |
 
-LLM10 is the exception because two services require an ordered recovery. The
-installer places the allowlisted command at `/usr/local/bin/reset-lab`; the
-learner runs `reset-lab llm10` and then reads
-`http://localhost:8013/healthz` raw. Publisher E2E validators may invoke the
-other allowlisted IDs through the same command.
+The installer places the allowlisted command at `/usr/local/bin/reset-lab`.
+LLM10 coordinates two services internally because an overload can leave work
+queued in Ollama; all other IDs recreate or restart only the exact mapped
+runtime shown in the table.
 
 Unknown IDs fail before any unit action. The helper never writes to or deletes:
 
@@ -36,13 +40,13 @@ Unknown IDs fail before any unit action. The helper never writes to or deletes:
 | Unit | Port | Mutable runtime state | Persistent mount | Minimum reset |
 |---|---:|---|---|---|
 | `lab-ollama.service` | 11434 | loaded model and request queue | `/home/ubuntu/ollama-models:/root/.ollama` | Do not reset for ordinary lessons. `reset-lab llm10` restarts it only after an overload. |
-| `lab-prompt-rag` | 8000 | Python `day1._corpus` and editable layer | none | `reset-lab llm01b`; no reset for direct/persona chat. |
-| `lab-data-rag` | 8010 | Python `day2._corpus` and editable layer | none | `reset-lab llm04`; no reset for LLM02 chat. |
-| `lab-output-rag` | 8011 | Python `day3._corpus` and editable layer | none | `reset-lab llm05` after a stored payload/document. |
-| `lab-knowledge-rag` | 8012 | Python `day4._tenants` and editable layer | none | No reset for standard lessons. Publisher mutation tests recreate this container. |
+| `lab-prompt-rag` | 8000 | Python `day1._corpus` and editable layer | none | `reset-lab llm01` after the secure-coding source switch; `reset-lab llm01b` after corpus injection. Both IDs recreate the same published vulnerable baseline. |
+| `lab-data-rag` | 8010 | Python `day2._corpus` and editable layer | none | `reset-lab llm02` after the LLM02 source switch; `reset-lab llm04` after corpus mutation or before repeating LLM04. |
+| `lab-output-rag` | 8011 | Python `day3._corpus` and editable layer | none | `reset-lab llm05` after the renderer source switch or a stored payload/document. |
+| `lab-knowledge-rag` | 8012 | Python `day4._tenants` and editable layer | none | `reset-lab llm08` or `reset-lab llm09` recreates the same baseline before repeating the corresponding secure-coding lesson. |
 | `lab-resource-rag` | 8013 | in-flight uvicorn tasks, Python `day5._corpus`, and editable layer | none | `reset-lab llm10`; it coordinates Day 5 and Ollama. |
-| `lab-vuln-agent` | 8001 | Python `ANIMALS`, `DELETED_LOG`, and editable layer | none | `reset-lab llm06`; it restores `g-003` and clears the deletion log. |
-| `lab-llmgoat.service` | 5000 | A04 reviews, A08 vector store, A09 uploaded image and model lock in process memory; A08 export file in the container writable layer | models and cache only | Restart this exact unit. Browser completion badges are a signed client cookie and do not alter challenge fixtures. |
+| `lab-vuln-agent` | 8001 | Python `ANIMALS`, `DELETED_LOG`, and editable layer | none | `reset-lab llm06`; it restores the vulnerable source, returns `g-003`, and clears the deletion log. |
+| `lab-llmgoat.service` | 5000 | A04 reviews, A08 vector store, A09 uploaded image and model lock in process memory; A08 export file in the container writable layer | models and cache only | `reset-lab llmgoat` restarts this exact unit. Browser completion badges are a signed client cookie and do not alter challenge fixtures. |
 | `lab-dvla.service` | 8501 | Streamlit conversation/session memory and container-layer `transactions.db` | `/home/ubuntu/work/dvla/llm-config.yaml:/app/llm-config.yaml` | The lesson's SQL tools are read-only. Restart the unit only to clear a session; it does not restore the host YAML. |
 | `lab-fake-registry.service` | 8002 | startup rewrites `/app/data/A.gguf` and `B.gguf` | `/home/ubuntu/work/fake-registry:/app` | Standard LLM03 is read-only. Restart rematerializes A/B fixtures but does not restore a modified host `server.py` or remove other host files. |
 | `lab-portal.service` | 8080 | none | `/home/ubuntu/work/portal:/app` | No reset. Restart does not restore a modified host `index.html`. |

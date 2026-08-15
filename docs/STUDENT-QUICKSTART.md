@@ -205,14 +205,19 @@ curl -s http://localhost:8002/api/v1/models | head
 
 | 실습 | 재시작 명령 | 원본 확인 명령 |
 |---|---|---|
+| LLM01 시큐어 코딩 | `reset-lab llm01` | `curl -sS http://localhost:8000/healthz` |
 | LLM01-B | `reset-lab llm01b` | `curl -sS http://localhost:8000/healthz` |
+| LLM02 시큐어 코딩 | `reset-lab llm02` | `curl -sS http://localhost:8010/healthz` |
 | LLM04 | `reset-lab llm04` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `reset-lab llm05` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 삭제 실습 | `reset-lab llm06` | `curl -sS http://localhost:8001/healthz` |
-| LLMGoat 상태 변경 실습 | `systemctl --user restart lab-llmgoat.service` | `curl -sS http://localhost:5000/healthz` |
+| LLM08 시큐어 코딩 | `reset-lab llm08` | `curl -sS http://localhost:8012/healthz` |
+| LLM09 시큐어 코딩 | `reset-lab llm09` | `curl -sS http://localhost:8012/healthz` |
+| LLMGoat 상태 변경 실습 | `reset-lab llmgoat` | `curl -sS http://localhost:5000/healthz` |
+| LLM10 시큐어 코딩·과부하 | `reset-lab llm10` | `curl -sS http://localhost:8013/healthz` |
 
 LLM10은 timeout 뒤 Day 5 앱과 공유 Ollama queue를 정해진 순서로 복구해야
-하므로 이 실습에만 allowlist 명령을 사용합니다.
+하므로 같은 한 줄 명령 안에서 두 서비스를 순서대로 처리합니다.
 
 ```bash
 reset-lab llm10

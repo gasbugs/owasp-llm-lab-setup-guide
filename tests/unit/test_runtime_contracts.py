@@ -77,6 +77,19 @@ class RuntimeContractTest(unittest.TestCase):
             "lab-fake-registry": 8002,
             "lab-portal": 8080,
         }
+        health_urls = {
+            "lab-ollama": "http://localhost:11434/api/tags",
+            "lab-prompt-rag": "http://localhost:8000/healthz",
+            "lab-data-rag": "http://localhost:8010/healthz",
+            "lab-output-rag": "http://localhost:8011/healthz",
+            "lab-knowledge-rag": "http://localhost:8012/healthz",
+            "lab-resource-rag": "http://localhost:8013/healthz",
+            "lab-vuln-agent": "http://localhost:8001/healthz",
+            "lab-llmgoat": "http://localhost:5000/healthz",
+            "lab-dvla": "http://localhost:8501/_stcore/health",
+            "lab-fake-registry": "http://localhost:8002/api/v1/models",
+            "lab-portal": "http://localhost:8080/",
+        }
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
         for service, port in direct_published_services.items():
             self.assertIn(f"[{service}]={port}", installer)
@@ -85,6 +98,9 @@ class RuntimeContractTest(unittest.TestCase):
         for service, port in quadlet_published_services.items():
             self.assertIn(f"[{service}]={port}", installer)
             self.assertIn(f"PublishPort={port}:{port}", installer)
+        for service, url in health_urls.items():
+            with self.subTest(service=service):
+                self.assertIn(url, installer)
         self.assertIn('network_mode=$(podman inspect', installer)
         self.assertIn('[ "$network_mode" = "host" ]', installer)
         self.assertIn('published=$(podman port', installer)

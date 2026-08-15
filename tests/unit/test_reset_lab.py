@@ -156,6 +156,45 @@ class ResetLabTest(unittest.TestCase):
         self.assertIn("systemctl --user restart", source)
         self.assertIn('"$RECREATE_EDITABLE_LAB" "$container"', source)
 
+    def test_reset_documentation_matches_allowlist_and_secure_coding_boundaries(self) -> None:
+        policy = (ROOT / "docs/LAB-RESET-POLICY.md").read_text(encoding="utf-8")
+        quickstart = (ROOT / "docs/STUDENT-QUICKSTART.md").read_text(encoding="utf-8")
+        workshops = (ROOT / "docs/SECURE-CODING-WORKSHOPS.md").read_text(
+            encoding="utf-8"
+        )
+        documented_ids = (
+            "llm01",
+            "llm01b",
+            "llm02",
+            "llm04",
+            "llm05",
+            "llm06",
+            "llm08",
+            "llm09",
+            "llmgoat",
+            "llm10",
+        )
+        secure_coding_ids = (
+            "llm01",
+            "llm02",
+            "llm04",
+            "llm05",
+            "llm06",
+            "llm08",
+            "llm09",
+            "llm10",
+        )
+        for lab_id in documented_ids:
+            with self.subTest(document="policy", lab_id=lab_id):
+                self.assertIn(f"`reset-lab {lab_id}`", policy)
+            with self.subTest(document="quickstart", lab_id=lab_id):
+                self.assertIn(f"`reset-lab {lab_id}`", quickstart)
+        for lab_id in secure_coding_ids:
+            with self.subTest(document="workshops", lab_id=lab_id):
+                self.assertIn(f"`reset-lab {lab_id}`", workshops)
+        self.assertNotIn("no reset for direct/persona chat", policy)
+        self.assertNotIn("no reset for LLM02 chat", policy)
+
     def test_editable_recreation_is_allowlisted_and_preserves_learner_files(self) -> None:
         source = RECREATE_EDITABLE_LAB.read_text(encoding="utf-8")
         self.assertIn('podman rm -f "$container"', source)
