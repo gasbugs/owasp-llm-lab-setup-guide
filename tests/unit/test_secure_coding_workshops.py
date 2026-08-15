@@ -57,12 +57,28 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         endpoint = "/api/labs/llm02/workshop/chat"
         self.assertIn(f'ENDPOINT="$TARGET_URL{endpoint}"', source)
+        self.assertIn('UI_ENDPOINT="$TARGET_URL/api/chat"', source)
+        self.assertIn('phase:"ui-after-secure-coding"', source)
         self.assertNotIn("/api/labs/llm02/vulnerable/chat", source)
         self.assertNotIn("/api/labs/llm02/safe/chat", source)
         self.assertIn('"$RESET_LAB" llm02', source)
         self.assertIn('podman restart "$CONTAINER"', source)
         self.assertIn('verdict:"HIT"', source)
         self.assertIn('verdict:"PASS"', source)
+
+    def test_llm02_workshop_and_ui_share_the_same_policy_runner(self) -> None:
+        source = (ROOT / "docker/vuln-rag/app/main.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("async def run_llm02_policy_chat(", source)
+        self.assertIn(
+            "return await run_llm02_policy_chat(request_body, request)",
+            source,
+        )
+        self.assertIn(
+            "return JSONResponse(await run_llm02_policy_chat(req, request))",
+            source,
+        )
 
     def test_publisher_e2e_builds_once_then_restarts_container_source(self) -> None:
         runner = (ROOT / "tests/e2e/secure-coding/run-workshop.sh").read_text(

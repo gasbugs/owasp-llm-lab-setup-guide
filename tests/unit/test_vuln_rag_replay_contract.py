@@ -18,7 +18,11 @@ class ReplayContractTest(unittest.TestCase):
         self.assertIn('id="replay-last" type="button" disabled', self.text)
 
     def test_last_reply_is_cached_from_api_response(self) -> None:
-        self.assertIn("lastBotReply = data.reply;", self.text)
+        self.assertIn(
+            "const reply = data.reply ?? data.detail ?? `HTTP ${r.status}`;",
+            self.text,
+        )
+        self.assertIn("lastBotReply = reply;", self.text)
 
     def test_replay_uses_checkbox_without_new_fetch(self) -> None:
         handler = self.text.split("replayLast.addEventListener", 1)[1]

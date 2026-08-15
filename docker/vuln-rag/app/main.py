@@ -63,6 +63,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
     scenario: str | None = None
+    customer_id: str | None = None
 
 
 class LLM08SearchRequest(BaseModel):
@@ -313,11 +314,11 @@ async def llm01_secure_coding_workshop(request_body: ChatRequest):
     }
 
 
-@app.post("/api/labs/llm02/workshop/chat")
-async def llm02_secure_coding_workshop(
-    request_body: LLM02WorkshopRequest,
+async def run_llm02_policy_chat(
+    request_body: LLM02WorkshopRequest | ChatRequest,
     request: Request,
-):
+) -> dict:
+    """Apply the same learner-switched identity policy to API and UI chat."""
     require_day2_lab()
 
     try:
@@ -341,7 +342,9 @@ async def llm02_secure_coding_workshop(
         principal=binding.principal,
     )
     result["workshop_policy"] = (
-        "request-body-identity" if binding.mode == "vulnerable" else "server-authenticated-identity"
+        "request-body-identity"
+        if binding.mode == "vulnerable"
+        else "server-authenticated-identity"
     )
     emit_security_event(
         decision=PolicyDecision(
@@ -350,6 +353,14 @@ async def llm02_secure_coding_workshop(
         upstream_called=True,
     )
     return result
+
+
+@app.post("/api/labs/llm02/workshop/chat")
+async def llm02_secure_coding_workshop(
+    request_body: LLM02WorkshopRequest,
+    request: Request,
+):
+    return await run_llm02_policy_chat(request_body, request)
 
 
 @app.post("/api/labs/llm04/workshop/chat")
@@ -692,13 +703,16 @@ async def index(request: Request, scenario: str | None = None):
 
 
 @app.post("/api/chat")
-async def chat(req: ChatRequest):
+async def chat(req: ChatRequest, request: Request):
     """**일부러 취약한** 챗봇 엔드포인트.
 
     시나리오마다 가드 강도가 다르고 RAG 컨텍스트가 다름.
     OWASP LLM01/02/04/05/07/08 실습에 활용.
     """
     selected = get_scenario(req.scenario)
+    if selected.id == "day2":
+        return JSONResponse(await run_llm02_policy_chat(req, request))
+
     llm01_decision: PolicyDecision | None = None
     if selected.id == "day1":
         llm01_decision = select_llm01_input_policy(req.message)

@@ -131,6 +131,8 @@ flowchart LR
 
 안전 endpoint의 request schema에는 `customer_id` 필드가 없습니다. 인증과 고객 객체 인가는 `docker/vuln-rag/app/scenarios/day2.py`의 token map과 `docker/vuln-rag/app/main.py`의 route에서 서버가 결정하며, 모델은 사용자 신원이나 조회 대상을 선택하지 않습니다. 공개 GHCR의 동일 `vuln-rag` 이미지에 취약·안전 경로가 함께 있으므로 수강생은 별도 build 없이 source와 HTTP 결과만 비교합니다.
 
+LLM02의 주석 전환 지점은 workshop에만 적용되는 별도 우회 경로가 아니다. `docker/vuln-rag/app/main.py`의 `run_llm02_policy_chat()`을 workshop endpoint와 실제 UI의 `/api/chat`이 함께 호출한다. 따라서 안전 호출이 활성화된 동안 인증 header가 없는 8010 UI 요청도 고객 DB 조회와 Ollama 호출 전에 차단된다.
+
 ## LLM08 embedding dataflow와 경계
 
 LLM08 수강생 앱 scaffold는 `examples/llm08/mini_vector_search_app.py`에 있습니다. 설치·검증·종료 순서는 [LLM08 embedding lab setup](LLM08-SETUP.md)을 정본으로 사용합니다.

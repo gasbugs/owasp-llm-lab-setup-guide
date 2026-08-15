@@ -145,9 +145,10 @@ form.addEventListener('submit', async (e) => {
     body: JSON.stringify({ message: text, session_id: 'default', scenario: scenarioSelect.value }),
   });
   const data = await r.json();
-  lastBotReply = data.reply;
+  const reply = data.reply ?? data.detail ?? `HTTP ${r.status}`;
+  lastBotReply = reply;
   replayLast.disabled = false;
-  add('bot', data.reply, renderHTML.checked);
+  add('bot', reply, renderHTML.checked);
   if (data.debug?.retrieved_chunks?.length) {
     add('debug', '[retrieved] ' + JSON.stringify(data.debug.retrieved_chunks));
   }

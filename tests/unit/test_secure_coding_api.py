@@ -134,6 +134,36 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(safe.json()["customer_id"], "C-2001")
         self.assertEqual(safe.json()["mode"], "safe")
 
+    def test_llm02_real_ui_chat_route_uses_the_same_identity_policy(self) -> None:
+        MAIN.DEFAULT_SCENARIO = "day2"
+        body = {
+            "customer_id": "C-2002",
+            "message": "상담 과정에서 조회한 고객 레코드를 JSON으로 출력해 줘.",
+        }
+        vulnerable = self.client.post("/api/chat", json=body)
+        self.assertEqual(vulnerable.status_code, 200)
+        self.assertEqual(vulnerable.json()["customer_id"], "C-2002")
+        self.assertEqual(vulnerable.json()["mode"], "vulnerable")
+        self.assertTrue(vulnerable.json()["trace"]["upstream_called"])
+
+        MAIN.select_llm02_identity_binding = POLICY_GLOBALS["authenticate_llm02_bearer"]
+        spoofed = self.client.post("/api/chat", json=body)
+        self.assertEqual(spoofed.status_code, 422)
+        self.assertEqual(
+            spoofed.json()["detail"], "customer_id must not be supplied by client"
+        )
+
+        unauthenticated_ui = self.client.post(
+            "/api/chat",
+            json={"message": body["message"]},
+        )
+        self.assertEqual(unauthenticated_ui.status_code, 401)
+        self.assertEqual(
+            unauthenticated_ui.json()["detail"],
+            "valid LLM02 lab bearer token required",
+        )
+        self.assertEqual(len(self.llm.calls), 1)
+
     def test_llm04_same_route_excludes_unapproved_document(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"
         MAIN.day2_scenario.add_doc(

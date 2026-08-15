@@ -92,7 +92,7 @@ class UniqueDataFlowTests(unittest.TestCase):
         template = (
             VULN_RAG_ROOT / "app" / "templates" / "index.html"
         ).read_text(encoding="utf-8")
-        self.assertIn("lastBotReply = data.reply;", template)
+        self.assertIn("lastBotReply = reply;", template)
         self.assertIn("renderModelOutputVulnerable", template)
         self.assertIn("renderModelOutputSafe", template)
         self.assertIn("element.innerHTML", template)
