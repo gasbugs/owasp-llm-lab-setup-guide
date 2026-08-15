@@ -11,13 +11,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RESET_LAB = ROOT / "infrastructure/scripts/student/reset-lab"
+RECREATE_EDITABLE_LAB = (
+    ROOT / "infrastructure/scripts/student/recreate-editable-lab"
+)
 
 
 class ResetLabTest(unittest.TestCase):
     def run_reset(self, lab_id: str) -> tuple[subprocess.CompletedProcess[str], list[str]]:
         with tempfile.TemporaryDirectory() as directory:
             mock_bin = Path(directory)
-            log = mock_bin / "systemctl.log"
+            log = mock_bin / "actions.log"
             (mock_bin / "id").write_text(
                 "#!/bin/sh\n"
                 "if [ \"${1:-}\" = -u ]; then echo 1000; exit 0; fi\n"
@@ -25,7 +28,11 @@ class ResetLabTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (mock_bin / "systemctl").write_text(
-                "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$MOCK_SYSTEMCTL_LOG\"\n",
+                "#!/bin/sh\nprintf 'systemctl %s\\n' \"$*\" >> \"$MOCK_ACTION_LOG\"\n",
+                encoding="utf-8",
+            )
+            (mock_bin / "recreate-editable-lab").write_text(
+                "#!/bin/sh\nprintf 'recreate %s\\n' \"$*\" >> \"$MOCK_ACTION_LOG\"\n",
                 encoding="utf-8",
             )
             (mock_bin / "curl").write_text(
@@ -39,14 +46,15 @@ class ResetLabTest(unittest.TestCase):
                 "esac\n",
                 encoding="utf-8",
             )
-            for name in ("id", "systemctl", "curl"):
+            for name in ("id", "systemctl", "curl", "recreate-editable-lab"):
                 (mock_bin / name).chmod(0o755)
 
             env = os.environ.copy()
             env.update(
                 {
                     "PATH": f"{mock_bin}:{env['PATH']}",
-                    "MOCK_SYSTEMCTL_LOG": str(log),
+                    "MOCK_ACTION_LOG": str(log),
+                    "RECREATE_EDITABLE_LAB": str(mock_bin / "recreate-editable-lab"),
                     "RESET_LAB_READY_ATTEMPTS": "1",
                     "RESET_LAB_READY_SLEEP_SECONDS": "1",
                     "XDG_RUNTIME_DIR": "/run/user/1000",
@@ -60,14 +68,14 @@ class ResetLabTest(unittest.TestCase):
                 capture_output=True,
                 check=False,
             )
-            calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
-            return result, calls
+            actions = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+            return result, actions
 
     def test_llm06_restarts_exact_agent_unit_and_emits_raw_health(self) -> None:
         result, calls = self.run_reset("llm06")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
-            calls, ["--user restart lab-vuln-agent.service"]
+            calls, ["recreate lab-vuln-agent"]
         )
         self.assertIn("LLM06_READY_URL=http://127.0.0.1:8001/healthz", result.stdout)
         self.assertIn('{"ok":true,"tools":["delete_animal"]}', result.stdout)
@@ -75,27 +83,43 @@ class ResetLabTest(unittest.TestCase):
     def test_simple_allowlist_ids_restart_only_their_exact_units(self) -> None:
         cases = {
             "llm01b": (
-                "lab-prompt-rag.service",
-                "LLM01B_READY_URL=http://127.0.0.1:8000/healthz",
+                "recreate lab-prompt-rag",
+                "LLM01_READY_URL=http://127.0.0.1:8000/healthz",
+            ),
+            "llm01": (
+                "recreate lab-prompt-rag",
+                "LLM01_READY_URL=http://127.0.0.1:8000/healthz",
+            ),
+            "llm02": (
+                "recreate lab-data-rag",
+                "LLM02_LLM04_READY_URL=http://127.0.0.1:8010/healthz",
             ),
             "llm04": (
-                "lab-data-rag.service",
-                "LLM04_READY_URL=http://127.0.0.1:8010/healthz",
+                "recreate lab-data-rag",
+                "LLM02_LLM04_READY_URL=http://127.0.0.1:8010/healthz",
             ),
             "llm05": (
-                "lab-output-rag.service",
+                "recreate lab-output-rag",
                 "LLM05_READY_URL=http://127.0.0.1:8011/healthz",
             ),
+            "llm08": (
+                "recreate lab-knowledge-rag",
+                "LLM08_LLM09_READY_URL=http://127.0.0.1:8012/healthz",
+            ),
+            "llm09": (
+                "recreate lab-knowledge-rag",
+                "LLM08_LLM09_READY_URL=http://127.0.0.1:8012/healthz",
+            ),
             "llmgoat": (
-                "lab-llmgoat.service",
+                "systemctl --user restart lab-llmgoat.service",
                 "LLMGOAT_READY_URL=http://127.0.0.1:5000/healthz",
             ),
         }
-        for lab_id, (unit, ready_line) in cases.items():
+        for lab_id, (action, ready_line) in cases.items():
             with self.subTest(lab_id=lab_id):
                 result, calls = self.run_reset(lab_id)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(calls, [f"--user restart {unit}"])
+                self.assertEqual(calls, [action])
                 self.assertIn(ready_line, result.stdout)
                 self.assertIn('{"ok":true}', result.stdout)
 
@@ -105,9 +129,9 @@ class ResetLabTest(unittest.TestCase):
         self.assertEqual(
             calls,
             [
-                "--user restart lab-resource-rag.service",
-                "--user restart lab-ollama.service",
-                "--user restart lab-resource-rag.service",
+                "recreate lab-resource-rag",
+                "systemctl --user restart lab-ollama.service",
+                "recreate lab-resource-rag",
             ],
         )
         self.assertIn("OLLAMA_READY_URL=http://127.0.0.1:11434/api/tags", result.stdout)
@@ -130,6 +154,18 @@ class ResetLabTest(unittest.TestCase):
         self.assertNotIn("/home/ubuntu/ollama-models", source)
         self.assertNotIn("podman restart", source)
         self.assertIn("systemctl --user restart", source)
+        self.assertIn('"$RECREATE_EDITABLE_LAB" "$container"', source)
+
+    def test_editable_recreation_is_allowlisted_and_preserves_learner_files(self) -> None:
+        source = RECREATE_EDITABLE_LAB.read_text(encoding="utf-8")
+        self.assertIn('podman rm -f "$container"', source)
+        self.assertIn("--restart=always", source)
+        self.assertIn('-p "0.0.0.0:$port:$port"', source)
+        self.assertIn("-p 0.0.0.0:8001:8001", source)
+        self.assertIn("host.containers.internal:11434", source)
+        self.assertNotIn("--network host", source)
+        self.assertNotIn("/home/ubuntu/work", source)
+        self.assertNotIn("/app/app", source)
 
 
 if __name__ == "__main__":

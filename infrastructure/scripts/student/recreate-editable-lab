@@ -1,0 +1,118 @@
+#!/bin/bash
+# Recreate one allowlisted learner-editable container from its published image.
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: recreate-editable-lab <container-name>
+
+Allowlisted container names:
+  lab-prompt-rag
+  lab-data-rag
+  lab-output-rag
+  lab-knowledge-rag
+  lab-resource-rag
+  lab-vuln-agent
+EOF
+}
+
+if [ "$(id -u)" -eq 0 ]; then
+  ubuntu_uid=$(id -u ubuntu)
+  exec runuser -u ubuntu -- env \
+    XDG_RUNTIME_DIR="/run/user/$ubuntu_uid" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$ubuntu_uid/bus" \
+    "$0" "$@"
+fi
+
+if [ "$#" -ne 1 ]; then
+  usage >&2
+  exit 2
+fi
+
+if [ -r /etc/lab/env ]; then
+  # /etc/lab/env is root-owned Bootstrap state containing only runtime names.
+  # Explicit environment values supplied by the installer still take priority.
+  current_namespace="${IMAGE_NAMESPACE:-}"
+  current_tag="${IMAGE_TAG:-}"
+  current_model="${OLLAMA_MODEL:-}"
+  current_embed_model="${OLLAMA_EMBED_MODEL:-}"
+  # shellcheck disable=SC1091
+  source /etc/lab/env
+  IMAGE_NAMESPACE="${current_namespace:-$IMAGE_NAMESPACE}"
+  IMAGE_TAG="${current_tag:-$IMAGE_TAG}"
+  OLLAMA_MODEL="${current_model:-$OLLAMA_MODEL}"
+  OLLAMA_EMBED_MODEL="${current_embed_model:-$OLLAMA_EMBED_MODEL}"
+fi
+
+IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
+OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-bge-m3:latest}"
+
+container="$1"
+case "$container" in
+  lab-prompt-rag)
+    scenario=day1
+    port=8000
+    image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
+    ;;
+  lab-data-rag)
+    scenario=day2
+    port=8010
+    image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
+    ;;
+  lab-output-rag)
+    scenario=day3
+    port=8011
+    image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
+    ;;
+  lab-knowledge-rag)
+    scenario=day4
+    port=8012
+    image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
+    ;;
+  lab-resource-rag)
+    scenario=day5
+    port=8013
+    image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
+    ;;
+  lab-vuln-agent)
+    image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-agent:$IMAGE_TAG"
+    ;;
+  *)
+    echo "ERROR: editable container is not allowlisted: $container" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+podman rm -f "$container" >/dev/null 2>&1 || true
+
+if [ "$container" = lab-vuln-agent ]; then
+  podman run -d \
+    --name "$container" \
+    --network slirp4netns:allow_host_loopback=true \
+    -p 0.0.0.0:8001:8001 \
+    --restart=always \
+    -e "OLLAMA_URL=http://host.containers.internal:11434" \
+    -e "OLLAMA_MODEL=$OLLAMA_MODEL" \
+    "$image"
+else
+  podman run -d \
+    --name "$container" \
+    --network slirp4netns:allow_host_loopback=true \
+    -p "0.0.0.0:$port:$port" \
+    --restart=always \
+    -e "DEFAULT_SCENARIO=$scenario" \
+    -e "SCENARIO=$scenario" \
+    -e "PORT=$port" \
+    -e "OLLAMA_URL=http://host.containers.internal:11434" \
+    -e "OLLAMA_MODEL=$OLLAMA_MODEL" \
+    -e "OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL" \
+    "$image" \
+    uv run uvicorn app.main:app --host 0.0.0.0 --port "$port"
+fi
+
+printf 'RECREATED_CONTAINER=%s IMAGE=%s RESTART_POLICY=always\n' \
+  "$container" "$image"

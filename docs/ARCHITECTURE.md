@@ -153,7 +153,7 @@ flowchart LR
 
 | 경계/endpoint | 노출 범위 | 인증·입력 계약 | 용도 |
 |---|---|---|---|
-| Ollama `POST :11434/api/embed` | EC2 내부 host network | Day 4 backend가 고정 model로 호출 | 실제 embedding 생성 |
+| Ollama `POST :11434/api/embed` | EC2 host에 publish된 포트, 컨테이너에서는 `host.containers.internal` 사용 | Day 4 backend가 고정 model로 호출 | 실제 embedding 생성 |
 | Day 4 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
 | Day 4 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
 | Day 4 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |

@@ -181,7 +181,7 @@ enable_user_data_bootstrap = true
 
 SSM 세션 안에서 실행합니다.
 
-`podman ps`의 `PORTS` 열은 `PublishPort`를 사용하는 Ollama와 LLMGoat에만 mapping을 표시합니다. RAG·Agent·DVLA·fake registry·Portal은 `Network=host`로 EC2의 고정 포트에서 직접 listen하므로 `PORTS` 열이 비어 있는 것이 정상입니다. 아래 localhost 요청이 성공하면 해당 host port는 실제로 열려 있습니다.
+모든 컨테이너는 `Network=host`를 사용하지 않고 격리된 network에서 실행됩니다. `podman ps`의 `PORTS` 열에는 각 앱이 host의 같은 번호에 publish된 mapping이 표시됩니다. RAG·Agent·DVLA가 Ollama를 호출할 때는 컨테이너 내부의 `localhost`가 아니라 `host.containers.internal:11434`를 사용합니다.
 
 ```bash
 sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
@@ -200,15 +200,15 @@ curl -s http://localhost:8002/api/v1/models | head
 ## 9. 상태를 바꾼 실습만 최소 복원
 
 일반 채팅처럼 읽기만 한 실습은 복원하지 않습니다. Python 메모리만 바꾼
-실습은 해당 Quadlet unit을 한 번 재시작하고, 이어서 raw `/healthz`를
-확인합니다. 아래에서 자신이 방금 수행한 실습의 두 명령만 실행합니다.
+실습은 allowlist reset 명령으로 해당 컨테이너만 배포 이미지에서 다시 만들고,
+이어서 raw `/healthz`를 확인합니다. 아래에서 자신이 방금 수행한 실습만 실행합니다.
 
 | 실습 | 재시작 명령 | 원본 확인 명령 |
 |---|---|---|
-| LLM01-B | `systemctl --user restart lab-prompt-rag.service` | `curl -sS http://localhost:8000/healthz` |
-| LLM04 | `systemctl --user restart lab-data-rag.service` | `curl -sS http://localhost:8010/healthz` |
-| LLM05 | `systemctl --user restart lab-output-rag.service` | `curl -sS http://localhost:8011/healthz` |
-| LLM06 삭제 실습 | `systemctl --user restart lab-vuln-agent.service` | `curl -sS http://localhost:8001/healthz` |
+| LLM01-B | `reset-lab llm01b` | `curl -sS http://localhost:8000/healthz` |
+| LLM04 | `reset-lab llm04` | `curl -sS http://localhost:8010/healthz` |
+| LLM05 | `reset-lab llm05` | `curl -sS http://localhost:8011/healthz` |
+| LLM06 삭제 실습 | `reset-lab llm06` | `curl -sS http://localhost:8001/healthz` |
 | LLMGoat 상태 변경 실습 | `systemctl --user restart lab-llmgoat.service` | `curl -sS http://localhost:5000/healthz` |
 
 LLM10은 timeout 뒤 Day 5 앱과 공유 Ollama queue를 정해진 순서로 복구해야

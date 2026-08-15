@@ -80,15 +80,16 @@ require_day_ready() {
 reset_mutable_state() {
   log "▶ mutable runtime 기준선 복원"
   local sentinel="E2E_RESET_SENTINEL_${TS}"
-  local services=(
-    lab-prompt-rag.service
-    lab-data-rag.service
-    lab-output-rag.service
-    lab-knowledge-rag.service
-    lab-resource-rag.service
+  local containers=(
+    lab-prompt-rag
+    lab-data-rag
+    lab-output-rag
+    lab-knowledge-rag
+    lab-resource-rag
   )
-  if ! command -v systemctl >/dev/null 2>&1; then
-    log "  ✗ systemctl 없음: Quadlet 서비스를 기준선으로 복원할 수 없음"
+  local recreate_editable_lab="${RECREATE_EDITABLE_LAB:-$HOME/.local/bin/recreate-editable-lab}"
+  if [ ! -x "$recreate_editable_lab" ]; then
+    log "  ✗ editable container 재생성 명령 없음: $recreate_editable_lab"
     return 1
   fi
 
@@ -105,10 +106,13 @@ reset_mutable_state() {
       return 1
     fi
   done
-  if ! systemctl --user restart "${services[@]}"; then
-    log "  ✗ RAG Quadlet service restart 실패"
-    return 1
-  fi
+  local container
+  for container in "${containers[@]}"; do
+    if ! "$recreate_editable_lab" "$container" >/dev/null; then
+      log "  ✗ RAG container 재생성 실패: $container"
+      return 1
+    fi
+  done
 
   local clean baseline count expected
   for scenario in day1 day2 day3 day4 day5; do
@@ -137,8 +141,8 @@ reset_mutable_state() {
     fi
   done
 
-  if ! systemctl --user restart lab-vuln-agent.service; then
-    log "  ✗ Agent Quadlet service restart 실패"
+  if ! "$recreate_editable_lab" lab-vuln-agent >/dev/null; then
+    log "  ✗ Agent container 재생성 실패"
     return 1
   fi
   for _ in $(seq 1 30); do
@@ -154,7 +158,7 @@ reset_mutable_state() {
       and ([.animals[].animal_id] | index("g-003") != null)
       and .deleted_log == []
     ' "$agent_state" >/dev/null; then
-    log "  ✗ Agent service restart 기준선 확인 실패"
+    log "  ✗ Agent container 재생성 기준선 확인 실패"
     return 1
   fi
   log "  ✓ shared corpus 5개와 Agent 상태 기준선 확인"

@@ -15,6 +15,7 @@ trap cleanup EXIT
 
 start_container() {
   "$CONTAINER_ENGINE" run -d --name "$CONTAINER" \
+    --restart=always \
     --entrypoint sh "$IMAGE" -c 'sleep 300' >/dev/null
 }
 
@@ -29,6 +30,14 @@ assert_vulnerable() {
 
 start_container
 
+restart_policy=$(
+  "$CONTAINER_ENGINE" inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER"
+)
+if [ "$restart_policy" != always ]; then
+  echo "container-layer-reset=FAIL reason=restart-policy-$restart_policy" >&2
+  exit 1
+fi
+
 mounts=$("$CONTAINER_ENGINE" inspect --format \
   '{{range .Mounts}}{{println .Destination}}{{end}}' "$CONTAINER")
 if printf '%s\n' "$mounts" | grep -qx '/app/app'; then
@@ -42,11 +51,21 @@ assert_vulnerable
   -e 's/^    # return enforce_llm01_input_policy(message)  # SAFE-ENABLE$/    return enforce_llm01_input_policy(message)  # SAFE-ENABLE/' \
   "$SOURCE"
 
+container_id_before=$(
+  "$CONTAINER_ENGINE" inspect --format '{{.Id}}' "$CONTAINER"
+)
 "$CONTAINER_ENGINE" restart "$CONTAINER" >/dev/null
+container_id_after=$(
+  "$CONTAINER_ENGINE" inspect --format '{{.Id}}' "$CONTAINER"
+)
+if [ "$container_id_before" != "$container_id_after" ]; then
+  echo 'container-layer-reset=FAIL reason=restart-replaced-container' >&2
+  exit 1
+fi
 "$CONTAINER_ENGINE" exec "$CONTAINER" grep -q \
   '^[[:space:]]*return enforce_llm01_input_policy(message).*SAFE-ENABLE' \
   "$SOURCE"
-echo 'container-layer-restart=PASS mode=safe'
+echo 'container-layer-restart=PASS mode=safe same_id=yes restart_policy=always'
 
 "$CONTAINER_ENGINE" rm -f "$CONTAINER" >/dev/null
 start_container

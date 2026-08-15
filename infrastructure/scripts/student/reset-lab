@@ -16,14 +16,19 @@ usage() {
 Usage: reset-lab <lab-id>
 
 Allowlisted lab IDs:
+  llm01    LLM01 editable source and in-memory RAG corpus
   llm01b   Day 1 in-memory RAG corpus
+  llm02    LLM02 editable source and Day 2 process memory
   llm04    Day 2 in-memory RAG corpus
   llm05    Day 3 in-memory RAG corpus
   llm06    Agent ANIMALS and DELETED_LOG memory
+  llm08    LLM08 editable source and Day 4 process memory
+  llm09    LLM09 editable source and Day 4 process memory
   llmgoat  LLMGoat mutable challenge memory
   llm10    Day 5 app tasks and the shared Ollama request queue
 
-This command only restarts exact systemd user units and reads readiness URLs.
+This command recreates only allowlisted editable containers or restarts exact
+systemd user units, then reads readiness URLs.
 It does not modify learner work, evidence, Capstone source, models, or caches.
 EOF
 }
@@ -62,6 +67,7 @@ done
 uid=$(id -u)
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$uid}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+RECREATE_EDITABLE_LAB="${RECREATE_EDITABLE_LAB:-$HOME/.local/bin/recreate-editable-lab}"
 
 RESET_LAB_READY_ATTEMPTS="${RESET_LAB_READY_ATTEMPTS:-60}"
 RESET_LAB_READY_SLEEP_SECONDS="${RESET_LAB_READY_SLEEP_SECONDS:-2}"
@@ -114,31 +120,50 @@ restart_one() {
   wait_for_raw_readiness "$label" "$url"
 }
 
+recreate_one() {
+  container="$1"
+  label="$2"
+  url="$3"
+  if [ ! -x "$RECREATE_EDITABLE_LAB" ]; then
+    echo "ERROR: editable container runner is unavailable: $RECREATE_EDITABLE_LAB" >&2
+    return 3
+  fi
+  printf 'RESET_CONTAINER=%s\n' "$container"
+  "$RECREATE_EDITABLE_LAB" "$container"
+  wait_for_raw_readiness "$label" "$url"
+}
+
 lab_id="$1"
 case "$lab_id" in
-  llm01b)
-    restart_one \
-      lab-prompt-rag.service \
-      LLM01B \
+  llm01|llm01b)
+    recreate_one \
+      lab-prompt-rag \
+      LLM01 \
       http://127.0.0.1:8000/healthz
     ;;
-  llm04)
-    restart_one \
-      lab-data-rag.service \
-      LLM04 \
+  llm02|llm04)
+    recreate_one \
+      lab-data-rag \
+      LLM02_LLM04 \
       http://127.0.0.1:8010/healthz
     ;;
   llm05)
-    restart_one \
-      lab-output-rag.service \
+    recreate_one \
+      lab-output-rag \
       LLM05 \
       http://127.0.0.1:8011/healthz
     ;;
   llm06)
-    restart_one \
-      lab-vuln-agent.service \
+    recreate_one \
+      lab-vuln-agent \
       LLM06 \
       http://127.0.0.1:8001/healthz
+    ;;
+  llm08|llm09)
+    recreate_one \
+      lab-knowledge-rag \
+      LLM08_LLM09 \
+      http://127.0.0.1:8012/healthz
     ;;
   llmgoat)
     restart_one \
@@ -150,14 +175,17 @@ case "$lab_id" in
     # A timed-out client can leave both an awaiting uvicorn task and queued
     # Ollama generation. Cancel the app task first, clear the backend queue,
     # then reconnect a fresh Day 5 app process to the ready backend.
-    printf 'RESET_UNIT=%s\n' lab-resource-rag.service
-    systemctl --user restart lab-resource-rag.service
+    recreate_one \
+      lab-resource-rag \
+      LLM10_APP \
+      http://127.0.0.1:8013/healthz
     printf 'RESET_UNIT=%s\n' lab-ollama.service
     systemctl --user restart lab-ollama.service
     wait_for_raw_readiness OLLAMA http://127.0.0.1:11434/api/tags
-    printf 'RESET_UNIT=%s\n' lab-resource-rag.service
-    systemctl --user restart lab-resource-rag.service
-    wait_for_raw_readiness LLM10 http://127.0.0.1:8013/healthz
+    recreate_one \
+      lab-resource-rag \
+      LLM10 \
+      http://127.0.0.1:8013/healthz
     ;;
   *)
     echo "ERROR: lab-id is not allowlisted: $lab_id" >&2

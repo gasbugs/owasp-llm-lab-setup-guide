@@ -286,12 +286,15 @@ class Llm08VectorBackendTest(unittest.TestCase):
         installer = (
             ROOT / "infrastructure" / "scripts" / "student" / "install-lab.sh"
         ).read_text(encoding="utf-8")
+        runner = (
+            ROOT / "infrastructure" / "scripts" / "student" / "recreate-editable-lab"
+        ).read_text(encoding="utf-8")
         dockerfile = (VULN_RAG_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
         self.assertIn('f"{self.base_url}/api/embed"', embedding_source)
         self.assertIn('json={"model": self.model, "input": texts}', embedding_source)
         self.assertIn('OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-bge-m3:latest}"', installer)
-        self.assertIn("Environment=OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL", installer)
+        self.assertIn('-e "OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL"', runner)
         self.assertIn('ollama pull "$OLLAMA_EMBED_MODEL"', installer)
         self.assertIn("http://localhost:11434/api/embed", installer)
         self.assertIn("http://localhost:8012/api/embed", installer)

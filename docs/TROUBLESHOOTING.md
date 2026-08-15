@@ -87,7 +87,7 @@ sudo -u ubuntu podman logs lab-data-rag --tail 100
 - 디스크 공간 부족
 - 아직 `install-lab.sh`를 실행하지 않음
 
-Quadlet unit 상태 확인:
+Quadlet으로 관리하는 Ollama와 직접 실행되는 편집 대상 컨테이너 상태 확인:
 
 ```bash
 UBUNTU_UID=$(id -u ubuntu)
@@ -98,7 +98,7 @@ sudo -u ubuntu \
 sudo -u ubuntu \
   XDG_RUNTIME_DIR=/run/user/$UBUNTU_UID \
   DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UBUNTU_UID/bus \
-  systemctl --user status lab-prompt-rag.service
+  podman inspect --format '{{.State.Status}} {{.HostConfig.RestartPolicy.Name}} {{json .NetworkSettings.Ports}}' lab-prompt-rag
 ```
 
 `Failed to enable unit: ... is transient or generated`가 보이면 오래된 설치 스크립트가 Quadlet generated unit에 `enable`을 시도한 것입니다. 최신 `install-lab.sh`를 다시 실행하세요. Quadlet은 `.container` 파일의 `[Install]` 설정을 generator가 처리하므로, generated `.service`에 직접 `enable`을 실행하지 않습니다.

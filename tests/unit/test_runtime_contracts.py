@@ -55,65 +55,72 @@ class RuntimeContractTest(unittest.TestCase):
             self.assertIn("ARG VCS_REF=unknown", dockerfile, image)
             self.assertIn('org.opencontainers.image.revision="$VCS_REF"', dockerfile, image)
 
-    def test_quadlet_sets_same_port_for_each_rag_process(self) -> None:
-        installer = read("infrastructure/scripts/student/install-lab.sh")
-        self.assertIn("Environment=PORT=${rag_port}", installer)
-        self.assertIn("--port ${rag_port}", installer)
+    def test_editable_runner_sets_same_published_port_for_each_rag_process(self) -> None:
+        runner = read("infrastructure/scripts/student/recreate-editable-lab")
+        self.assertIn('-p "0.0.0.0:$port:$port"', runner)
+        self.assertIn('--port "$port"', runner)
 
     def test_every_deployed_service_has_an_explicit_port_exposure_contract(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
-        host_network_services = {
+        direct_published_services = {
             "lab-prompt-rag": 8000,
             "lab-data-rag": 8010,
             "lab-output-rag": 8011,
             "lab-knowledge-rag": 8012,
             "lab-resource-rag": 8013,
             "lab-vuln-agent": 8001,
+        }
+        quadlet_published_services = {
+            "lab-ollama": 11434,
+            "lab-llmgoat": 5000,
             "lab-dvla": 8501,
             "lab-fake-registry": 8002,
             "lab-portal": 8080,
         }
-        published_services = {
-            "lab-ollama": 11434,
-            "lab-llmgoat": 5000,
-        }
-        for service, port in host_network_services.items():
+        runner = read("infrastructure/scripts/student/recreate-editable-lab")
+        for service, port in direct_published_services.items():
             self.assertIn(f"[{service}]={port}", installer)
-        for service, port in published_services.items():
+        self.assertIn('-p "0.0.0.0:$port:$port"', runner)
+        self.assertIn("-p 0.0.0.0:8001:8001", runner)
+        for service, port in quadlet_published_services.items():
             self.assertIn(f"[{service}]={port}", installer)
             self.assertIn(f"PublishPort={port}:{port}", installer)
         self.assertIn('network_mode=$(podman inspect', installer)
+        self.assertIn('[ "$network_mode" = "host" ]', installer)
         self.assertIn('published=$(podman port', installer)
         self.assertIn('has no published host port', installer)
+        self.assertNotIn("\nNetwork=host\n", installer)
+        self.assertNotIn("--network host", runner)
 
     def test_quadlet_container_names_are_role_based_without_dates(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
-        expected_rag_units = {
-            "day1": "lab-prompt-rag",
-            "day2": "lab-data-rag",
-            "day3": "lab-output-rag",
-            "day4": "lab-knowledge-rag",
-            "day5": "lab-resource-rag",
-        }
-        for scenario, unit in expected_rag_units.items():
-            self.assertIn(f"[{scenario}]={unit}", installer)
-        for unit in ("lab-vuln-agent", "lab-dvla", "lab-fake-registry"):
+        runner = read("infrastructure/scripts/student/recreate-editable-lab")
+        for unit in (
+            "lab-prompt-rag",
+            "lab-data-rag",
+            "lab-output-rag",
+            "lab-knowledge-rag",
+            "lab-resource-rag",
+            "lab-vuln-agent",
+        ):
+            self.assertIn(f"  {unit})", runner)
+        for unit in ("lab-dvla", "lab-fake-registry"):
             self.assertIn(f"ContainerName={unit}", installer)
 
         active_units = installer.split("\nunits=(", 1)[1].split(")", 1)[0]
         self.assertNotIn("lab-day", active_units)
 
-    def test_secure_coding_uses_container_layer_and_quadlet_reset(self) -> None:
+    def test_secure_coding_uses_container_layer_and_podman_recreation(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
+        runner = read("infrastructure/scripts/student/recreate-editable-lab")
         workflow = read(".github/workflows/build-and-push.yaml")
         self.assertNotIn("seed_editable_tree()", installer)
         self.assertNotIn("RUNTIME_SOURCE_ROOT=", installer)
         self.assertNotIn("runtime-src/${rag_unit}/app:/app/app", installer)
         self.assertNotIn("runtime-src/lab-vuln-agent/app:/app/app", installer)
-        self.assertIn(
-            'restart_reason="legacy /app/app source mount still present"',
-            installer,
-        )
+        self.assertIn("--restart=always", runner)
+        self.assertIn('podman rm -f "$container"', runner)
+        self.assertIn("host.containers.internal:11434", runner)
         self.assertIn(
             'container_layer_source_files=(',
             installer,
@@ -454,8 +461,8 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("reset_mutable_state", full_cycle)
         self.assertIn("BASELINE_DOC_COUNTS", full_cycle)
         self.assertIn("E2E_RESET_SENTINEL_", full_cycle)
-        self.assertIn('systemctl --user restart "${services[@]}"', full_cycle)
-        self.assertIn("systemctl --user restart lab-vuln-agent.service", full_cycle)
+        self.assertIn('"$recreate_editable_lab" "$container"', full_cycle)
+        self.assertIn('"$recreate_editable_lab" lab-vuln-agent', full_cycle)
         self.assertIn('/api/admin/state', full_cycle)
         self.assertNotIn("podman restart", full_cycle)
         self.assertNotIn('/api/admin/reset', full_cycle)
