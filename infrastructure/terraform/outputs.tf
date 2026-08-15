@@ -8,6 +8,11 @@ output "ami_name" {
   value       = data.aws_ami.lab_base.name
 }
 
+output "availability_zone" {
+  description = "실습 subnet과 g6.xlarge 인스턴스가 생성된 가용 영역"
+  value       = aws_subnet.lab.availability_zone
+}
+
 output "student_role_arns" {
   description = "수강생별 IAM Role ARN"
   value       = { for id in var.student_ids : id => aws_iam_role.student[id].arn }

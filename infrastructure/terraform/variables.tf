@@ -8,6 +8,16 @@ variable "region" {
   }
 }
 
+variable "availability_zone" {
+  description = "g6.xlarge를 생성할 가용 영역. 빈 문자열이면 리전의 첫 available 영역을 사용하며, 용량 부족 시 us-east-1c 같은 값을 명시한다."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.availability_zone == "" || can(regex("^[a-z]{2}-[a-z]+-[0-9]+[a-z]$", var.availability_zone))
+    error_message = "availability_zone은 빈 문자열 또는 us-east-1c 같은 AWS 가용 영역 형식이어야 합니다."
+  }
+}
+
 variable "aws_profile" {
   description = "로컬 AWS CLI profile 이름"
   type        = string

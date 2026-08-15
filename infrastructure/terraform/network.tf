@@ -22,10 +22,14 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+locals {
+  selected_availability_zone = var.availability_zone != "" ? var.availability_zone : data.aws_availability_zones.available.names[0]
+}
+
 resource "aws_subnet" "lab" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.42.10.0/24"
-  availability_zone       = data.aws_availability_zones.available.names[0]
+  availability_zone       = local.selected_availability_zone
   map_public_ip_on_launch = true # 검증 단계 — 인스턴스가 직접 인터넷 접근
 
   tags = {

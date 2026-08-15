@@ -23,6 +23,33 @@ aws service-quotas get-service-quota \
 - AWS Console -> Service Quotas -> EC2
 - `Running On-Demand G and VT instances`를 4 vCPU 이상으로 증설 신청
 
+## Terraform apply에서 g6 가용 영역 용량 부족
+
+증상:
+
+```text
+InsufficientInstanceCapacity
+We currently do not have sufficient g6.xlarge capacity in the Availability Zone you requested
+```
+
+먼저 현재 리전에서 `g6.xlarge` offering이 있는 영역을 확인합니다. 이 결과는 상품 지원 여부이며 실시간 재고 보장은 아닙니다.
+
+```bash
+aws ec2 describe-instance-type-offerings \
+  --profile owasp-llm --region us-east-1 \
+  --location-type availability-zone \
+  --filters Name=instance-type,Values=g6.xlarge \
+  --query 'InstanceTypeOfferings[].Location' --output text
+```
+
+인스턴스 생성이 실패한 Terraform state에서 `terraform.tfvars`의 영역을 다른 offering으로 바꾸고 plan부터 다시 실행합니다.
+
+```hcl
+availability_zone = "us-east-1c"
+```
+
+이미 생성에 성공한 state에서 이 값을 바꾸면 subnet과 EC2 교체가 계획될 수 있습니다. `VcpuLimitExceeded`는 재고가 아니라 계정 quota 문제이므로 이 방법 대신 앞 절의 quota 증액을 사용합니다.
+
 ## SSM 접속 실패
 
 확인:

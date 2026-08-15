@@ -59,6 +59,10 @@ aws_profile = "owasp-llm"
 region      = "us-east-1"
 course_id   = "owasp-llm-2026"
 
+# 기본값은 리전의 첫 available 영역입니다.
+# InsufficientInstanceCapacity가 발생한 경우에만 offering이 있는 다른 영역을 지정합니다.
+# availability_zone = "us-east-1c"
+
 student_ids = ["yourname"]
 
 course_dates = [
@@ -93,7 +97,7 @@ terraform plan
 terraform apply -auto-approve
 ```
 
-성공하면 `ami_id`, `ami_name`, `instance_ids`, `public_ips`, `manual_install_commands`, `start_commands`, `stop_commands`, `ssm_session_commands`가 출력됩니다.
+성공하면 `ami_id`, `ami_name`, `availability_zone`, `instance_ids`, `public_ips`, `manual_install_commands`, `start_commands`, `stop_commands`, `ssm_session_commands`가 출력됩니다.
 
 ## 6. SSM 접속
 
