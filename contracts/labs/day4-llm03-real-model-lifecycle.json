@@ -121,7 +121,7 @@
       "case_id": "unauthorized-sign-rejected",
       "role": "risk",
       "direction": "input",
-      "input": {"kind": "literal", "value": "token-without-sign-capability", "display": "token-without-sign-capability"},
+      "input": {"kind": "literal", "value": "token-without-sign-capability", "display": "비인가 token"},
       "policy": "openbao-transit",
       "expected_decision": "block",
       "required_evidence_fields": ["case", "direction", "scanner", "original_text", "application_decision", "details"],
@@ -151,8 +151,9 @@
   "book_bindings": [
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "2.3 GGUF Parser로 파일 구조·Hash·Tensor 목록 확인",
+      "section": "2. 실제 GGUF를 Parser와 Loader에 전달해 구조·정상 응답 확인",
       "observation_id": "day4-llm03-real-gguf-parser",
+      "observation_command": "jq -c '{case:\"real-gguf-parser\"",
       "case_ids": ["real-gguf-parser"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
@@ -160,48 +161,55 @@
       "lesson_path": "publisher-evidence/day4-llm03-format-regression.md",
       "section": "확장자-only fixture 게시자 회귀",
       "observation_id": "day4-llm03-synthetic-fixture-rejected",
+      "observation_command": "jq -c 'select(.case==\"synthetic-fixture-rejected\")",
       "case_ids": ["synthetic-fixture-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "3.2 LoRA 적용 전 Base 모델에 동일 Trigger를 전달해 기준 응답 확인",
+      "section": "3. 동일 Trigger로 Base와 LoRA 모델 행동 변화 비교",
       "observation_id": "day4-llm03-baseline-inference",
+      "observation_command": "jq -c '{case:\"baseline-inference\"",
       "case_ids": ["baseline-inference"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "3.4 LoRA Adapter 적용 모델에 동일 Trigger를 전달해 응답 변화 확인",
+      "section": "3. 동일 Trigger로 Base와 LoRA 모델 행동 변화 비교",
       "observation_id": "day4-llm03-poisoned-trigger",
+      "observation_command": "jq -c '{case:\"poisoned-trigger\"",
       "case_ids": ["poisoned-trigger"],
       "required_projection_fields": ["case", "input_prompt", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "4.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
+      "section": "4. 배포용 모델 경량화부터 서명 검증·Registry·Ollama 배포까지",
       "observation_id": "day4-llm03-unauthorized-sign-rejected",
+      "observation_command": "curl -sS --max-time 30",
       "case_ids": ["unauthorized-sign-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "4.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
+      "section": "4. 배포용 모델 경량화부터 서명 검증·Registry·Ollama 배포까지",
       "observation_id": "day4-llm03-tampered-signature-rejected",
+      "observation_command": "curl -fsS --max-time 30",
       "case_ids": ["tampered-signature-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "4.6 OpenBao로 최종 Q4에 서명하고 변조·비인가 요청 거부 확인",
+      "section": "4. 배포용 모델 경량화부터 서명 검증·Registry·Ollama 배포까지",
       "observation_id": "day4-llm03-final-signature-valid",
+      "observation_command": "jq '{data:{valid:.data.valid}}'",
       "case_ids": ["final-signature-valid"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "4.9 UI가 실제 호출한 모델 이름·출처·파일 Hash 확인",
+      "section": "4. 배포용 모델 경량화부터 서명 검증·Registry·Ollama 배포까지",
       "observation_id": "day4-llm03-verified-ollama-import",
+      "observation_command": "curl -fsS --max-time 240 http://127.0.0.1:18012/api/chat",
       "case_ids": ["verified-ollama-import"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     }

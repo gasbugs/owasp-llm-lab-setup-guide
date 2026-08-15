@@ -166,7 +166,9 @@ class RuntimeContractTest(unittest.TestCase):
         test_job = workflow.split("  test:\n", 1)[1].split("  build:\n", 1)[0]
         build = workflow.split("  build:\n", 1)[1].split("  promote-latest:\n", 1)[0]
         promote = workflow.split("  promote-latest:\n", 1)[1]
-        self.assertIn("hashicorp/setup-packer@v3.2.0", test_job)
+        self.assertIn("hashicorp/setup-packer@v3.4.0", test_job)
+        self.assertIn("hashicorp/setup-terraform@v4", test_job)
+        self.assertIn("docker/build-push-action@v7", test_job)
         self.assertIn("packer validate -syntax-only", test_job)
         self.assertIn("find infrastructure tests docker", test_job)
         self.assertEqual(test_job.count("call: check"), 5)

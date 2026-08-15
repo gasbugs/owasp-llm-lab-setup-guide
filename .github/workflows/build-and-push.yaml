@@ -35,15 +35,39 @@ jobs:
   test:
     name: Runtime quality gate
     runs-on: ubuntu-latest
+    outputs:
+      runtime_changed: ${{ steps.runtime_changes.outputs.changed }}
     permissions:
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect runtime image source changes
+        id: runtime_changes
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" != "push" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- docker/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -51,17 +75,17 @@ jobs:
         run: python -m pip install --disable-pip-version-check -e docker/vuln-rag
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.6.6"
 
       - name: Set up Packer
-        uses: hashicorp/setup-packer@v3.2.0
+        uses: hashicorp/setup-packer@v3.4.0
         with:
           version: "1.15.3"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Run unit and repository-hygiene tests
         run: python -m unittest discover -s tests/unit -p 'test_*.py' -v
@@ -109,13 +133,13 @@ jobs:
           packer validate -syntax-only infrastructure/packer/ami.pkr.hcl
 
       - name: Check base-gpu Docker build configuration
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/base-gpu
           call: check
 
       - name: Check vuln-rag Docker build configuration
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/vuln-rag
           call: check
@@ -127,7 +151,7 @@ jobs:
             VCS_REF=quality-gate
 
       - name: Check vuln-agent Docker build configuration
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/vuln-agent
           call: check
@@ -136,20 +160,23 @@ jobs:
             VCS_REF=quality-gate
 
       - name: Check llmgoat Docker build configuration
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/llmgoat
           call: check
 
       - name: Check DVLA Docker build configuration
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/dvla
           call: check
 
   build:
     name: Build and publish immutable runtime images
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main' &&
+      needs.test.outputs.runtime_changed == 'true'
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -158,13 +185,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -207,7 +234,7 @@ jobs:
 
       # base-gpu is the immutable parent for vuln-rag and vuln-agent.
       - name: Build & push base-gpu
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/base-gpu
           platforms: linux/amd64
@@ -219,7 +246,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-base-gpu:buildcache,mode=max
 
       - name: Build & push vuln-rag
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/vuln-rag
           platforms: linux/amd64
@@ -232,7 +259,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-rag:buildcache,mode=max
 
       - name: Build & push vuln-agent
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/vuln-agent
           platforms: linux/amd64
@@ -246,7 +273,7 @@ jobs:
 
       # LLMGoat (SECFORCE/LLMGoat, Apache 2.0): cross-platform comparison app.
       - name: Build & push llmgoat
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/llmgoat
           platforms: linux/amd64
@@ -259,7 +286,7 @@ jobs:
 
       # DVLA (ReversecLabs/damn-vulnerable-llm-agent, Apache 2.0): Day 3 comparison app.
       - name: Build & push dvla
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./docker/dvla
           platforms: linux/amd64
@@ -280,10 +307,10 @@ jobs:
 
     steps:
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
