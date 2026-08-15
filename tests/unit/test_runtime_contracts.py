@@ -120,6 +120,14 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
+            'restart_reason="learner-editable /app/app source mount missing"',
+            installer,
+        )
+        self.assertIn(
+            'podman exec "$container" test -f /app/app/secure_coding.py',
+            installer,
+        )
+        self.assertIn(
             "docker/ infrastructure/scripts/student/install-lab.sh",
             workflow,
         )

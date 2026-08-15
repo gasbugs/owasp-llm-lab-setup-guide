@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.2"
+SCRIPT_VERSION="0.2.3"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -541,6 +541,17 @@ for unit in "${units[@]}"; do
     restart_reason="fake-registry source refreshed"
   fi
 
+  if [ -z "$restart_reason" ]; then
+    case "$unit" in
+      lab-prompt-rag|lab-data-rag|lab-output-rag|lab-knowledge-rag|lab-resource-rag|lab-vuln-agent)
+        if ! podman inspect --format '{{range .Mounts}}{{println .Destination}}{{end}}' "$unit" \
+          | grep -qx '/app/app'; then
+          restart_reason="learner-editable /app/app source mount missing"
+        fi
+        ;;
+    esac
+  fi
+
   if [ -n "$restart_reason" ]; then
     echo "[install-lab] restarting $unit.service: $restart_reason"
     systemctl --user restart "$unit.service"
@@ -651,6 +662,26 @@ for container in "${!expected_images[@]}"; do
   expected_id=$(podman image inspect --format '{{.Id}}' "$expected")
   if [ "$actual_name" != "$expected" ] || [ "$actual_id" != "$expected_id" ]; then
     echo "ERROR: $container runs $actual_name ($actual_id), expected $expected ($expected_id)" >&2
+    exit 1
+  fi
+done
+
+editable_source_containers=(
+  lab-prompt-rag
+  lab-data-rag
+  lab-output-rag
+  lab-knowledge-rag
+  lab-resource-rag
+  lab-vuln-agent
+)
+for container in "${editable_source_containers[@]}"; do
+  if ! podman inspect --format '{{range .Mounts}}{{println .Destination}}{{end}}' "$container" \
+    | grep -qx '/app/app'; then
+    echo "ERROR: $container has no learner-editable /app/app source mount" >&2
+    exit 1
+  fi
+  if ! podman exec "$container" test -f /app/app/secure_coding.py; then
+    echo "ERROR: $container is missing /app/app/secure_coding.py" >&2
     exit 1
   fi
 done
