@@ -51,6 +51,19 @@ finally:
 
 
 class SecureCodingWorkshopTest(unittest.TestCase):
+    def test_llm02_live_reset_uses_one_endpoint_and_allowlisted_reset(self) -> None:
+        source = (
+            ROOT / "tests/e2e/llm02/test_llm02_secure_reset.sh"
+        ).read_text(encoding="utf-8")
+        endpoint = "/api/labs/llm02/workshop/chat"
+        self.assertIn(f'ENDPOINT="$TARGET_URL{endpoint}"', source)
+        self.assertNotIn("/api/labs/llm02/vulnerable/chat", source)
+        self.assertNotIn("/api/labs/llm02/safe/chat", source)
+        self.assertIn('"$RESET_LAB" llm02', source)
+        self.assertIn('podman restart "$CONTAINER"', source)
+        self.assertIn('verdict:"HIT"', source)
+        self.assertIn('verdict:"PASS"', source)
+
     def test_publisher_e2e_builds_once_then_restarts_container_source(self) -> None:
         runner = (ROOT / "tests/e2e/secure-coding/run-workshop.sh").read_text(
             encoding="utf-8"
