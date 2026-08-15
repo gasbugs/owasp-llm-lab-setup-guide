@@ -193,6 +193,18 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn("http://localhost:5000/healthz", installer)
+        internal_health = installer.index(
+            "podman exec lab-llmgoat \\\n"
+            "    curl -fsS --max-time 5 http://127.0.0.1:5000/healthz"
+        )
+        publish_refresh = installer.index(
+            "systemctl --user restart lab-llmgoat.service", internal_health
+        )
+        external_health = installer.index(
+            "http://localhost:5000/healthz", publish_refresh
+        )
+        self.assertLess(internal_health, publish_refresh)
+        self.assertLess(publish_refresh, external_health)
         guard_pull = installer.split(
             'podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL"', 1
         )[1].split("fi", 1)[0]

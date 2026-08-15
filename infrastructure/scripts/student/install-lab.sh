@@ -646,6 +646,26 @@ for container in "${!container_layer_source_files[@]}"; do
   echo "[install-lab] secure-coding source ready: $container layer=$source_file mount=none"
 done
 
+# LLMGoat의 첫 기동은 영속 모델 디렉터리를 채우고 모델을 GPU에 올린다.
+# 이 과정이 끝나기 전에 만들어진 rootless port forward는 내부 서버가
+# 준비된 뒤에도 연결을 reset하는 경우가 있으므로, 내부 health를 먼저
+# 확인한 다음 모델이 준비된 상태에서 Quadlet을 한 번 다시 시작한다.
+llmgoat_internal_ready=false
+for _ in $(seq 1 300); do
+  if podman exec lab-llmgoat \
+    curl -fsS --max-time 5 http://127.0.0.1:5000/healthz >/dev/null 2>&1; then
+    llmgoat_internal_ready=true
+    break
+  fi
+  sleep 2
+done
+if [ "$llmgoat_internal_ready" != "true" ]; then
+  echo "ERROR: LLMGoat internal health did not become ready after model initialization" >&2
+  exit 1
+fi
+systemctl --user restart lab-llmgoat.service
+echo "[install-lab] LLMGoat model initialization completed; refreshed rootless port publish"
+
 health_urls=(
   http://localhost:11434/api/tags
   http://localhost:8000/healthz
