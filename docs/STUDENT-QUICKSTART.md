@@ -181,6 +181,8 @@ enable_user_data_bootstrap = true
 
 SSM 세션 안에서 실행합니다.
 
+`podman ps`의 `PORTS` 열은 `PublishPort`를 사용하는 Ollama와 LLMGoat에만 mapping을 표시합니다. RAG·Agent·DVLA·fake registry·Portal은 `Network=host`로 EC2의 고정 포트에서 직접 listen하므로 `PORTS` 열이 비어 있는 것이 정상입니다. 아래 localhost 요청이 성공하면 해당 host port는 실제로 열려 있습니다.
+
 ```bash
 sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 curl -s http://localhost:8080/ | head

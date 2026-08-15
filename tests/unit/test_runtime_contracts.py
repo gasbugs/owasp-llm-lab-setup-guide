@@ -60,6 +60,32 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("Environment=PORT=${rag_port}", installer)
         self.assertIn("--port ${rag_port}", installer)
 
+    def test_every_deployed_service_has_an_explicit_port_exposure_contract(self) -> None:
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        host_network_services = {
+            "lab-prompt-rag": 8000,
+            "lab-data-rag": 8010,
+            "lab-output-rag": 8011,
+            "lab-knowledge-rag": 8012,
+            "lab-resource-rag": 8013,
+            "lab-vuln-agent": 8001,
+            "lab-dvla": 8501,
+            "lab-fake-registry": 8002,
+            "lab-portal": 8080,
+        }
+        published_services = {
+            "lab-ollama": 11434,
+            "lab-llmgoat": 5000,
+        }
+        for service, port in host_network_services.items():
+            self.assertIn(f"[{service}]={port}", installer)
+        for service, port in published_services.items():
+            self.assertIn(f"[{service}]={port}", installer)
+            self.assertIn(f"PublishPort={port}:{port}", installer)
+        self.assertIn('network_mode=$(podman inspect', installer)
+        self.assertIn('published=$(podman port', installer)
+        self.assertIn('has no published host port', installer)
+
     def test_quadlet_container_names_are_role_based_without_dates(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         expected_rag_units = {

@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.1"
+SCRIPT_VERSION="0.2.2"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -684,6 +684,44 @@ for url in "${health_urls[@]}"; do
   fi
 done
 
+# `podman ps`의 PORTS 열은 publish된 포트만 표시한다. Network=host인
+# 서비스는 열이 비어 있어도 EC2 host의 같은 포트에서 직접 listen한다.
+# 설치가 성공하기 전에 각 서비스가 의도한 두 노출 방식 중 하나를
+# 실제로 사용하는지 확인해, 빠진 PublishPort와 잘못된 network mode를 구분한다.
+declare -A host_network_ports=(
+  [lab-prompt-rag]=8000
+  [lab-data-rag]=8010
+  [lab-output-rag]=8011
+  [lab-knowledge-rag]=8012
+  [lab-resource-rag]=8013
+  [lab-vuln-agent]=8001
+  [lab-dvla]=8501
+  [lab-fake-registry]=8002
+  [lab-portal]=8080
+)
+for container in "${!host_network_ports[@]}"; do
+  network_mode=$(podman inspect --format '{{.HostConfig.NetworkMode}}' "$container")
+  if [ "$network_mode" != "host" ]; then
+    echo "ERROR: $container must expose ${host_network_ports[$container]} through Network=host, got $network_mode" >&2
+    exit 1
+  fi
+  echo "[install-lab] port exposure ready: $container network=host host_port=${host_network_ports[$container]}"
+done
+
+declare -A published_ports=(
+  [lab-ollama]=11434
+  [lab-llmgoat]=5000
+)
+for container in "${!published_ports[@]}"; do
+  container_port="${published_ports[$container]}/tcp"
+  published=$(podman port "$container" "$container_port")
+  if [ -z "$published" ]; then
+    echo "ERROR: $container has no published host port for $container_port" >&2
+    exit 1
+  fi
+  echo "[install-lab] port exposure ready: $container published=$published"
+done
+
 # Older vuln-rag images also expose /healthz. Exercise the authenticated LLM08
 # capability so a source/image publication mismatch fails during installation
 # instead of at the beginning of the lesson.
@@ -732,6 +770,13 @@ OWASP LLM Lab 설치가 완료되었습니다.
 
 다음 명령으로 실행 중인 실습 컨테이너를 확인하세요.
   sudo -u ubuntu podman ps
+
+포트 노출 방식:
+  - RAG, Agent, DVLA, fake registry, Portal은 Network=host를 사용하므로
+    podman ps의 PORTS 열이 비어 있어도 아래의 고정 host port에서 동작합니다.
+  - Ollama와 LLMGoat는 격리 network에서 PublishPort를 사용하므로 PORTS 열에
+    11434->11434, 5000->5000 mapping이 표시됩니다.
+  - 설치 과정은 두 방식과 각 localhost health endpoint를 모두 검증했습니다.
 
 주요 서비스:
   - Lab Portal            8080
