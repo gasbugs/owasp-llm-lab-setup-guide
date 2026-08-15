@@ -4,7 +4,7 @@
 
 | 항목 | 전환할 소스 | 같은 요청을 재사용할 API | 코드로 강제하는 경계 |
 |---|---|---|---|
-| LLM01 | `/app/app/secure_coding.py` | `/api/labs/llm01/workshop/chat` | 모델 호출 전 입력 정책 |
+| LLM01 | `/app/app/secure_coding.py` | 공격 실습과 동일한 `/api/chat` | 모델 호출 전 입력 정책 |
 | LLM02 | `/app/app/secure_coding.py` | `/api/labs/llm02/workshop/chat` | 서버 인증 신원과 최소 데이터 context |
 | LLM04 | `/app/app/secure_coding.py` | `/api/labs/llm04/workshop/chat` | 승인된 출처만 검색 후보에 포함 |
 | LLM05 | `docker/vuln-rag/app/templates/index.html` | 기존 UI의 같은 모델 응답 재렌더링 | `innerHTML` 대신 `textContent` 사용 |

@@ -698,6 +698,27 @@ async def chat(req: ChatRequest):
     시나리오마다 가드 강도가 다르고 RAG 컨텍스트가 다름.
     OWASP LLM01/02/04/05/07/08 실습에 활용.
     """
+    selected = get_scenario(req.scenario)
+    llm01_decision: PolicyDecision | None = None
+    if selected.id == "day1":
+        llm01_decision = select_llm01_input_policy(req.message)
+        if llm01_decision.application_decision == "block":
+            emit_security_event(llm01_decision, upstream_called=False)
+            return JSONResponse(
+                {
+                    "reply": "request blocked by server input policy",
+                    "scenario": selected.id,
+                    **llm01_decision.__dict__,
+                    "upstream_called": False,
+                    "debug": {
+                        "retrieved_chunks": [],
+                        "rendered_system_prompt": "(not-built)",
+                        "runtime_model": llm.model,
+                        "model_provenance": model_provenance(),
+                    },
+                }
+            )
+
     if guardrail_proxy.enabled:
         try:
             guarded = await guardrail_proxy.chat(req.message)
@@ -718,10 +739,17 @@ async def chat(req: ChatRequest):
                     },
                 },
             )
-        guarded["scenario"] = req.scenario or DEFAULT_SCENARIO
+        guarded["scenario"] = selected.id
+        if llm01_decision is not None:
+            emit_security_event(llm01_decision, upstream_called=True)
+            guarded.update(
+                {
+                    **llm01_decision.__dict__,
+                    "upstream_called": True,
+                }
+            )
         return JSONResponse(guarded)
 
-    selected = get_scenario(req.scenario)
     context = selected.retrieve(req.message)
     system_prompt = selected.build_system_prompt(context=context)
 
@@ -730,21 +758,28 @@ async def chat(req: ChatRequest):
         user=req.message,
     )
 
-    return JSONResponse(
-        {
-            "reply": response,
-            "scenario": selected.id,
-            # LAB-ONLY DEBUG CONTRACT:
-            # 검색 성공과 모델 생성 성공을 분리해 검증하려고 RAG 컨텍스트를 일부러 노출한다.
-            # UI와 e2e가 이 값을 관찰 증거로 사용하지만 실제 사용자용 API에서는 제거해야 한다.
-            "debug": {
-                "retrieved_chunks": context,
-                "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
-                "runtime_model": llm.model,
-                "model_provenance": model_provenance(),
-            },
-        }
-    )
+    content = {
+        "reply": response,
+        "scenario": selected.id,
+        # LAB-ONLY DEBUG CONTRACT:
+        # 검색 성공과 모델 생성 성공을 분리해 검증하려고 RAG 컨텍스트를 일부러 노출한다.
+        # UI와 e2e가 이 값을 관찰 증거로 사용하지만 실제 사용자용 API에서는 제거해야 한다.
+        "debug": {
+            "retrieved_chunks": context,
+            "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
+            "runtime_model": llm.model,
+            "model_provenance": model_provenance(),
+        },
+    }
+    if llm01_decision is not None:
+        emit_security_event(llm01_decision, upstream_called=True)
+        content.update(
+            {
+                **llm01_decision.__dict__,
+                "upstream_called": True,
+            }
+        )
+    return JSONResponse(content)
 
 
 @app.post("/api/admin/inject-doc")
