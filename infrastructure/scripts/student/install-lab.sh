@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.0"
+SCRIPT_VERSION="0.2.1"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -168,6 +168,45 @@ for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-
   fi
 done
 PULLSH
+
+# Quadlet의 Restart=always는 컨테이너 종료를 감지하면 새 컨테이너를 만들 수 있다.
+# 수강생이 컨테이너 안에서 바꾼 secure-coding source가 그 과정에서 사라지지
+# 않도록 역할별 host source를 이미지에서 추출하고 동일 경로에 bind mount한다.
+echo "[install-lab] preparing restart-persistent learner-editable source"
+RUNTIME_SOURCE_ROOT=/home/ubuntu/work/runtime-src
+install -d -m 0755 -o ubuntu -g ubuntu "$RUNTIME_SOURCE_ROOT"
+
+seed_editable_tree() {
+  local unit="$1"
+  local image="$2"
+  local destination="$RUNTIME_SOURCE_ROOT/$unit/app"
+  local candidate="$RUNTIME_SOURCE_ROOT/.${unit}.next"
+
+  rm -rf "$candidate"
+  install -d -m 0755 -o ubuntu -g ubuntu "$candidate"
+  "${RUN_AS_UBUNTU[@]}" podman run --rm --entrypoint tar \
+    "$image" -C /app -cf - app | tar -C "$candidate" -xf -
+  rm -rf "$destination"
+  install -d -m 0755 -o ubuntu -g ubuntu "$(dirname "$destination")"
+  mv "$candidate/app" "$destination"
+  rmdir "$candidate"
+  chown -R ubuntu:ubuntu "$RUNTIME_SOURCE_ROOT/$unit"
+}
+
+for rag_unit in \
+  lab-prompt-rag \
+  lab-data-rag \
+  lab-output-rag \
+  lab-knowledge-rag \
+  lab-resource-rag; do
+  seed_editable_tree \
+    "$rag_unit" \
+    "ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-rag:${IMAGE_TAG}"
+done
+
+seed_editable_tree \
+  lab-vuln-agent \
+  "ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-agent:${IMAGE_TAG}"
 
 # 7) 시나리오 결정
 echo "[install-lab] enabled scenarios: day1 day2 day3 day4 day5"
@@ -327,6 +366,7 @@ Environment=PORT=${rag_port}
 Environment=OLLAMA_URL=http://localhost:11434
 Environment=OLLAMA_MODEL=$OLLAMA_MODEL
 Environment=OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL
+Volume=/home/ubuntu/work/runtime-src/${rag_unit}/app:/app/app:Z
 Exec=uv run uvicorn app.main:app --host 0.0.0.0 --port ${rag_port}
 
 [Service]
@@ -349,6 +389,7 @@ Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-vuln-agent:${IMAGE_TAG}
 Network=host
 Environment=OLLAMA_URL=http://localhost:11434
 Environment=OLLAMA_MODEL=$OLLAMA_MODEL
+Volume=/home/ubuntu/work/runtime-src/lab-vuln-agent/app:/app/app:Z
 
 [Service]
 Restart=always

@@ -77,6 +77,27 @@ class RuntimeContractTest(unittest.TestCase):
         active_units = installer.split("\nunits=(", 1)[1].split(")", 1)[0]
         self.assertNotIn("lab-day", active_units)
 
+    def test_learner_edits_survive_quadlet_managed_container_recreation(self) -> None:
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        workflow = read(".github/workflows/build-and-push.yaml")
+        self.assertIn("seed_editable_tree()", installer)
+        self.assertIn(
+            'RUNTIME_SOURCE_ROOT=/home/ubuntu/work/runtime-src',
+            installer,
+        )
+        self.assertIn(
+            "Volume=/home/ubuntu/work/runtime-src/${rag_unit}/app:/app/app:Z",
+            installer,
+        )
+        self.assertIn(
+            "Volume=/home/ubuntu/work/runtime-src/lab-vuln-agent/app:/app/app:Z",
+            installer,
+        )
+        self.assertIn(
+            "docker/ infrastructure/scripts/student/install-lab.sh",
+            workflow,
+        )
+
     def test_user_data_bootstrap_reuses_pinned_runtime_installer(self) -> None:
         instance = read("infrastructure/terraform/instance.tf")
         template = read("infrastructure/terraform/user-data.sh.tpl")

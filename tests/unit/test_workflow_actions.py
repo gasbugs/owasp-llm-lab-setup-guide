@@ -26,12 +26,19 @@ class WorkflowActionRuntimeTests(unittest.TestCase):
                     findings.append(f"{path.name}: {action}")
         self.assertEqual(findings, [])
 
-    def test_workflow_only_change_does_not_publish_images(self) -> None:
+    def test_only_runtime_or_installer_changes_publish_images(self) -> None:
         workflow = (
             ROOT / ".github" / "workflows" / "build-and-push.yaml"
         ).read_text(encoding="utf-8")
         self.assertIn("needs.test.outputs.runtime_changed == 'true'", workflow)
-        self.assertIn('git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- docker/', workflow)
+        self.assertIn(
+            'git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- \\',
+            workflow,
+        )
+        self.assertIn(
+            "docker/ infrastructure/scripts/student/install-lab.sh",
+            workflow,
+        )
         self.assertIn("fetch-depth: 0", workflow)
 
 

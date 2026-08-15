@@ -149,6 +149,7 @@ CLEANSH
     rm -rf /home/ubuntu/work/portal
     rm -rf /home/ubuntu/work/embedding-venv
     rm -rf /home/ubuntu/work/llm08-analysis-venv
+    rm -rf /home/ubuntu/work/runtime-src
     install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/work
     echo "Preserved learner source/evidence under /home/ubuntu/work/llm08-mini-app"
   else
