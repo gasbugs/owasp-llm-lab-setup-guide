@@ -148,6 +148,11 @@ class RuntimeContractTest(unittest.TestCase):
             workflow,
         )
 
+    def test_installer_reports_the_current_default_auto_stop_time(self) -> None:
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        self.assertIn("Terraform 기본 설정은 매일 18:00 KST", installer)
+        self.assertNotIn("Terraform 기본 설정은 매일 17:30 KST", installer)
+
     def test_user_data_bootstrap_reuses_pinned_runtime_installer(self) -> None:
         instance = read("infrastructure/terraform/instance.tf")
         template = read("infrastructure/terraform/user-data.sh.tpl")

@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.5"
+SCRIPT_VERSION="0.2.6"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -928,7 +928,7 @@ LLM08 추가 준비:
 주의: public IP 직접 접속은 Terraform allowed_ingress_cidr가 본인 IP/32로 열려 있을 때만 동작합니다.
 
 비용 안전장치:
-  Terraform 기본 설정은 매일 17:30 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다.
-  필요하면 auto_stop_schedule_mode로 야간 반복 모드 또는 custom cron을 선택할 수 있습니다.
+  Terraform 기본 설정은 매일 18:00 KST에 Lambda를 호출해 실행 중인 실습 EC2를 자동 중지합니다.
+  필요하면 auto_stop_schedule_mode로 기존 17:30 모드, 야간 반복 모드 또는 custom cron을 선택할 수 있습니다.
 
 EOF
