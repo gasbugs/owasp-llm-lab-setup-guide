@@ -124,7 +124,15 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
-            'podman exec "$container" test -f /app/app/secure_coding.py',
+            '[lab-prompt-rag]="/app/app/secure_coding.py"',
+            installer,
+        )
+        self.assertIn(
+            '[lab-vuln-agent]="/app/app/main.py"',
+            installer,
+        )
+        self.assertIn(
+            'podman exec "$container" test -f "$source_file"',
             installer,
         )
         self.assertIn(

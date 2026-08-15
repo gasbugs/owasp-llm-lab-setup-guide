@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.3"
+SCRIPT_VERSION="0.2.4"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -666,22 +666,23 @@ for container in "${!expected_images[@]}"; do
   fi
 done
 
-editable_source_containers=(
-  lab-prompt-rag
-  lab-data-rag
-  lab-output-rag
-  lab-knowledge-rag
-  lab-resource-rag
-  lab-vuln-agent
+declare -A editable_source_files=(
+  [lab-prompt-rag]="/app/app/secure_coding.py"
+  [lab-data-rag]="/app/app/secure_coding.py"
+  [lab-output-rag]="/app/app/secure_coding.py"
+  [lab-knowledge-rag]="/app/app/secure_coding.py"
+  [lab-resource-rag]="/app/app/secure_coding.py"
+  [lab-vuln-agent]="/app/app/main.py"
 )
-for container in "${editable_source_containers[@]}"; do
+for container in "${!editable_source_files[@]}"; do
   if ! podman inspect --format '{{range .Mounts}}{{println .Destination}}{{end}}' "$container" \
     | grep -qx '/app/app'; then
     echo "ERROR: $container has no learner-editable /app/app source mount" >&2
     exit 1
   fi
-  if ! podman exec "$container" test -f /app/app/secure_coding.py; then
-    echo "ERROR: $container is missing /app/app/secure_coding.py" >&2
+  source_file="${editable_source_files[$container]}"
+  if ! podman exec "$container" test -f "$source_file"; then
+    echo "ERROR: $container is missing learner-editable source $source_file" >&2
     exit 1
   fi
 done
