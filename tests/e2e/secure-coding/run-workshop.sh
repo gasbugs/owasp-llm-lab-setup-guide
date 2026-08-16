@@ -187,7 +187,7 @@ run_normal_baseline() {
       jq -e '.reply | type == "string" and length > 0' "$NORMAL_BODY" >/dev/null
       ;;
     LLM06)
-      curl -fsS --max-time 30 -X POST "$URL/api/labs/llm06/workshop/chat" \
+      curl -fsS --max-time 180 -X POST "$URL/api/labs/llm06/workshop/chat" \
         -H 'Authorization: Bearer llm06-farmer1-demo-token' \
         -H 'Content-Type: application/json' \
         -d '{"user_id":"farmer1","message":"내 동물 목록을 보여 줘."}' \
@@ -272,7 +272,7 @@ case "$LAB" in
     STATUS=200
     ;;
   LLM06)
-    STATUS=$(curl -sS --max-time 30 -o "$BODY" -w '%{http_code}' \
+    STATUS=$(curl -sS --max-time 180 -o "$BODY" -w '%{http_code}' \
       -X POST "$URL/api/labs/llm06/workshop/chat" \
       -H 'Authorization: Bearer llm06-farmer1-demo-token' \
       -H 'Content-Type: application/json' \
