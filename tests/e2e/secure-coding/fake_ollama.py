@@ -78,6 +78,16 @@ class Handler(BaseHTTPRequestHandler):
                     },
                     ensure_ascii=False,
                 )
+            elif "g-003" in user and "삭제" in user:
+                content = json.dumps(
+                    {"tool": "delete_animal", "args": {"animal_id": "g-003"}},
+                    ensure_ascii=False,
+                )
+            elif "동물 목록" in user:
+                content = json.dumps(
+                    {"tool": "list_animals", "args": {"farmer_id": "farmer1"}},
+                    ensure_ascii=False,
+                )
             elif "LAB-RECOVERY-C2002" in system:
                 content = "SYNTHETIC-910202-XXXXXXX LAB-RECOVERY-C2002"
             else:

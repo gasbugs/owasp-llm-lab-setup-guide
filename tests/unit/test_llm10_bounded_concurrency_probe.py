@@ -18,6 +18,7 @@ class Llm10BoundedConcurrencyProbeTest(unittest.TestCase):
         self.assertIn('"statuses": statuses', text)
         self.assertIn('"http_429": statuses.count(429)', text)
         self.assertIn('"transport_errors": statuses.count(0)', text)
+        self.assertIn('"rate_limit_enforced"', text)
 
     def test_request_classification_preserves_http_and_transport(self) -> None:
         spec = importlib.util.spec_from_file_location("llm10_probe", SOURCE)

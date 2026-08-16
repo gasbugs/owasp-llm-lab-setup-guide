@@ -205,11 +205,18 @@ class SecureCodingApiTest(unittest.TestCase):
         )
         body = {"query": "Phoenix transfer URL"}
         vulnerable = self.client.post("/api/labs/llm08/rag-poisoning/workshop/chat", json=body)
-        self.assertEqual(len(vulnerable.json()["retrieval"]["hits"]), 1)
+        vulnerable_retrieval = vulnerable.json()["retrieval"]
+        self.assertEqual(vulnerable_retrieval["engine"], "ollama-embedding-cosine")
+        self.assertEqual(vulnerable_retrieval["model"], FakeEmbedding.model)
+        self.assertTrue(
+            any(hit["approval_status"] == "unapproved" for hit in vulnerable_retrieval["hits"])
+        )
 
         MAIN.select_llm08_rag_provenance_filter = POLICY_GLOBALS["require_approved_documents"]
         safe = self.client.post("/api/labs/llm08/rag-poisoning/workshop/chat", json=body)
-        self.assertEqual(safe.json()["retrieval"]["hits"], [])
+        self.assertTrue(
+            all(hit["approval_status"] == "approved" for hit in safe.json()["retrieval"]["hits"])
+        )
 
     def test_llm08_rag_ui_route_shares_query_and_policy_with_workshop_route(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"
@@ -320,6 +327,22 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(safe.status_code, 413)
         self.assertFalse(safe.json()["upstream_called"])
         self.assertEqual(len(self.llm.calls), 1)
+
+    def test_llm10_safe_mode_returns_429_before_second_upstream_call(self) -> None:
+        MAIN.DEFAULT_SCENARIO = "day5"
+        MAIN.select_llm10_resource_budget = POLICY_GLOBALS["enforce_llm10_resource_budget"]
+        self.assertTrue(MAIN.llm10_concurrency_gate.acquire())
+        try:
+            limited = self.client.post(
+                "/api/labs/llm10/workshop/chat",
+                json={"message": "rate limit probe"},
+            )
+        finally:
+            MAIN.llm10_concurrency_gate.release()
+        self.assertEqual(limited.status_code, 429)
+        self.assertEqual(limited.json()["blocking_reason"], "concurrent-request-limit-1")
+        self.assertFalse(limited.json()["upstream_called"])
+        self.assertEqual(self.llm.calls, [])
 
     def test_llm09_same_route_blocks_unapproved_package_handoff(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day4"

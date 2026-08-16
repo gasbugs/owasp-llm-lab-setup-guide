@@ -173,6 +173,60 @@ async def llm06_secure_coding_workshop(req: ToolWorkshopReq, request: Request):
     return event
 
 
+@app.post("/api/labs/llm06/workshop/chat")
+async def llm06_natural_language_workshop(req: ChatReq, request: Request):
+    """Turn learner natural language into one real model proposal, then enforce it."""
+    claimed_user = req.user_id or DEFAULT_USER
+    proposal_text = await llm.chat(system=SYSTEM_PROMPT, user=req.message)
+    proposal = extract_tool_call(proposal_text)
+    if proposal is None:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "event": "llm06_tool_policy",
+                "planner_model_called": True,
+                "tool_proposal": None,
+                "tool_called": False,
+                "application_decision": "block",
+                "reason": "model-did-not-propose-a-valid-tool-call",
+            },
+        )
+    tool_name = proposal["tool"]
+    args = proposal["args"]
+    try:
+        execution = execute_candidate_tool(
+            tool_name,
+            args,
+            claimed_user,
+            request.headers.get("authorization"),
+        )
+    except PermissionError as exc:
+        event = {
+            "event": "llm06_tool_policy",
+            "planner_model_called": True,
+            "tool_proposal": proposal,
+            "policy": "server-authentication-and-authorization",
+            "application_decision": "block",
+            "reason": str(exc),
+            "tool_called": False,
+        }
+        print(json.dumps(event, ensure_ascii=False), flush=True)
+        return JSONResponse(status_code=403, content=event)
+    event = {
+        "event": "llm06_tool_policy",
+        "planner_model_called": True,
+        "tool_proposal": proposal,
+        "policy": execution.policy,
+        "application_decision": execution.application_decision,
+        "calling_user": execution.calling_user,
+        "tool": tool_name,
+        "tool_called": True,
+        "result": execution.result,
+    }
+    print(json.dumps(event, ensure_ascii=False), flush=True)
+    return event
+
+
 @app.get("/api/tools")
 async def list_tools():
     """LLM에게 직접 묻지 않고 tool 목록을 노출하는 디버그 엔드포인트(취약)."""

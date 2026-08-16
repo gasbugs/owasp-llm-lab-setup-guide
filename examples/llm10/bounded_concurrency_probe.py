@@ -57,7 +57,9 @@ def main() -> int:
         "classification": (
             "verified_no_rate_limit"
             if statuses.count(200) == args.requests
-            else "rate_limit_or_transport_observed"
+            else "rate_limit_enforced"
+            if statuses.count(429) > 0 and statuses.count(0) == 0
+            else "transport_or_unexpected_status"
         ),
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Literal
 
@@ -47,6 +48,29 @@ llm = LLMClient()
 embedding = EmbeddingClient()
 guardrail_proxy = GuardrailProxy()
 MODEL_PROVENANCE_PATH = os.environ.get("MODEL_PROVENANCE_PATH")
+
+
+class LLM10ConcurrencyGate:
+    """Reject excess safe-mode inference before the Ollama call."""
+
+    def __init__(self, limit: int = 1) -> None:
+        self.limit = limit
+        self._active = 0
+        self._lock = threading.Lock()
+
+    def acquire(self) -> bool:
+        with self._lock:
+            if self._active >= self.limit:
+                return False
+            self._active += 1
+            return True
+
+    def release(self) -> None:
+        with self._lock:
+            self._active = max(0, self._active - 1)
+
+
+llm10_concurrency_gate = LLM10ConcurrencyGate(limit=1)
 
 
 def model_provenance() -> dict | None:
@@ -341,7 +365,19 @@ async def run_llm08_rag_chat(
     mode: Literal["vulnerable", "safe"],
 ) -> dict:
     require_day2_lab()
-    records = day2_scenario.retrieve_documents(request_body.query, mode)
+    try:
+        search = await day2_scenario.vector_retrieve_documents(
+            request_body.query,
+            mode,
+            embedding,
+        )
+    except EmbeddingBackendError as exc:
+        raise HTTPException(
+            status_code=502, detail="embedding backend unavailable"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="invalid embedding result") from exc
+    records = search.pop("documents")
     context = [record.rendered for record in records]
     system_prompt = day2_scenario.build_system_prompt(context)
     reply = await llm.chat(system=system_prompt, user=request_body.query)
@@ -351,15 +387,9 @@ async def run_llm08_rag_chat(
         "lab": "llm08-rag-knowledge-provenance",
         "mode": mode,
         "retrieval": {
+            **search,
             "provenance_filter_applied": mode == "safe",
             "required_approval_status": "approved" if mode == "safe" else None,
-            "hits": [
-                {
-                    "rank": rank,
-                    **day2_scenario.asdict(record),
-                }
-                for rank, record in enumerate(records, 1)
-            ],
         },
         "upstream_called": True,
     }
@@ -501,13 +531,35 @@ async def llm10_secure_coding_workshop(request_body: ChatRequest):
                 "upstream_called": False,
             },
         )
+    concurrency_enforced = decision.policy == "server-resource-budget"
+    if concurrency_enforced and not llm10_concurrency_gate.acquire():
+        limited = PolicyDecision(
+            "llm10",
+            "server-resource-budget",
+            "block",
+            "concurrent-request-limit-1",
+            decision.max_output_tokens,
+        )
+        emit_security_event(limited, upstream_called=False)
+        return JSONResponse(
+            status_code=429,
+            content={
+                "reply": "too many concurrent model requests",
+                **limited.__dict__,
+                "upstream_called": False,
+            },
+        )
     selected = get_scenario("day5")
     context = selected.retrieve(request_body.message)
-    reply = await llm.chat(
-        system=selected.build_system_prompt(context=context),
-        user=request_body.message,
-        num_predict=decision.max_output_tokens,
-    )
+    try:
+        reply = await llm.chat(
+            system=selected.build_system_prompt(context=context),
+            user=request_body.message,
+            num_predict=decision.max_output_tokens,
+        )
+    finally:
+        if concurrency_enforced:
+            llm10_concurrency_gate.release()
     emit_security_event(decision, upstream_called=True)
     return {
         "reply": reply,

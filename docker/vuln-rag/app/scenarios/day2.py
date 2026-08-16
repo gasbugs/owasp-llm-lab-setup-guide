@@ -9,10 +9,11 @@ can run before retrieval context reaches the model.
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 from dataclasses import asdict, dataclass
 from threading import Lock
-from typing import List, Literal
+from typing import List, Literal, Protocol, Sequence
 
 from app.scenarios import Scenario, query_tokens
 
@@ -202,6 +203,22 @@ class KnowledgeDocument:
         return f"[{self.title}] {self.text}"
 
 
+class KnowledgeEmbeddingBackend(Protocol):
+    model: str
+
+    async def embed(self, inputs: Sequence[str]) -> list[list[float]]: ...
+
+
+def _cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
+    if not left or len(left) != len(right):
+        raise ValueError("embedding vectors must have equal non-zero dimensions")
+    left_norm = math.sqrt(sum(value * value for value in left))
+    right_norm = math.sqrt(sum(value * value for value in right))
+    if left_norm == 0.0 or right_norm == 0.0:
+        raise ValueError("embedding vectors must have non-zero norms")
+    return sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
+
+
 _BASELINE_DOCUMENTS = (
     KnowledgeDocument(
         document_id="bank/transfer-official-v3",
@@ -251,6 +268,50 @@ def retrieve_documents(
         for document in candidates
         if any(token in document.rendered.lower() for token in tokens)
     ][:5]
+
+
+async def vector_retrieve_documents(
+    query: str,
+    mode: Literal["vulnerable", "safe"],
+    embedding_backend: KnowledgeEmbeddingBackend,
+    top_k: int = 5,
+) -> dict:
+    """Embed query and provenance-filtered candidates, then rank by cosine score."""
+    if not query.strip():
+        raise ValueError("query must not be empty")
+    candidates = (
+        [document for document in _documents if document.approval_status == "approved"]
+        if mode == "safe"
+        else list(_documents)
+    )
+    vectors = await embedding_backend.embed(
+        [query, *(document.rendered for document in candidates)]
+    )
+    if len(vectors) != len(candidates) + 1:
+        raise ValueError("embedding backend returned an incomplete batch")
+    query_vector = vectors[0]
+    ranked = sorted(
+        (
+            (_cosine_similarity(query_vector, vector), document)
+            for vector, document in zip(vectors[1:], candidates)
+        ),
+        key=lambda item: (-item[0], item[1].document_id),
+    )[:top_k]
+    return {
+        "engine": "ollama-embedding-cosine",
+        "model": embedding_backend.model,
+        "dimensions": len(query_vector),
+        "candidate_count": len(candidates),
+        "hits": [
+            {
+                "rank": rank,
+                "score": round(score, 8),
+                **asdict(document),
+            }
+            for rank, (score, document) in enumerate(ranked, 1)
+        ],
+        "documents": [document for _, document in ranked],
+    }
 
 
 def retrieve(query: str) -> List[str]:
