@@ -15,6 +15,7 @@ AGENT_PORT="${SECURE_CODING_AGENT_PORT:-19081}"
 DAY6_PORT="${SECURE_CODING_DAY6_PORT:-19084}"
 BODY="$(mktemp)"
 NORMAL_BODY="$(mktemp)"
+CONCURRENCY_BODY="$(mktemp)"
 BUILD_LOG="$(mktemp)"
 SOURCE_TOGGLED=false
 
@@ -24,7 +25,7 @@ cleanup() {
     python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
       --lab "$LAB" --mode vulnerable >/dev/null
   fi
-  rm -f "$BODY" "$NORMAL_BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object" "$BODY.html" "$BODY.ui"
+  rm -f "$BODY" "$NORMAL_BODY" "$CONCURRENCY_BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object" "$BODY.html" "$BODY.ui"
 }
 trap cleanup EXIT
 
@@ -296,6 +297,11 @@ case "$LAB" in
     STATUS=$(curl -sS --max-time 180 -o "$BODY" -w '%{http_code}' \
       -X POST "$URL/api/labs/llm10/workshop/chat" \
       -H 'Content-Type: application/json' --data-binary @"$BODY.request")
+    if [ "$MODE" = safe ]; then
+      python3 "$ROOT/examples/llm10/bounded_concurrency_probe.py" \
+        --url "$URL/api/labs/llm10/workshop/chat" --requests 4 --parallel 2 \
+        >"$CONCURRENCY_BODY"
+    fi
     ;;
   DAY6)
     STATUS=$(curl -sS --max-time 30 -o "$BODY" -w '%{http_code}' \
@@ -453,6 +459,11 @@ validate_result() {
         and .max_output_tokens == 128
         and .upstream_called == false
       ' "$BODY" >/dev/null
+      jq -e '
+        .http_429 > 0
+        and .transport_errors == 0
+        and .classification == "rate_limit_enforced"
+      ' "$CONCURRENCY_BODY" >/dev/null
       ;;
     DAY6:vulnerable)
       jq -e --argjson status "$STATUS" '
@@ -481,6 +492,11 @@ printf 'SEMANTIC_ASSERTION lab=%s mode=%s result=PASS\n' "$LAB" "$MODE" >&2
 
 jq -c --arg lab "$LAB" --arg mode "$MODE" --argjson http_status "$STATUS" \
   '. + {e2e_lab:$lab,e2e_mode:$mode,http_status:$http_status}' "$BODY"
+if [ "$LAB:$MODE" = "LLM10:safe" ]; then
+  jq -c --arg lab "$LAB" --arg mode "$MODE" \
+    '. + {e2e_lab:$lab,e2e_mode:$mode,e2e_case:"bounded-concurrency"}' \
+    "$CONCURRENCY_BODY"
+fi
 if [ -f "$BODY.ui" ]; then
   jq -c --arg lab "$LAB" --arg mode "$MODE" \
     --argjson http_status "$UI_STATUS" \
