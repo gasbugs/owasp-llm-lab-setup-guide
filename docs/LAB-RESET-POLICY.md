@@ -16,7 +16,7 @@ Read-only labs have no reset step.
 | LLM01 secure-coding source | `reset-lab llm01` | `curl -sS http://localhost:8000/healthz` |
 | LLM01-B | `reset-lab llm01b` | `curl -sS http://localhost:8000/healthz` |
 | LLM02 secure-coding source | `reset-lab llm02` | `curl -sS http://localhost:8010/healthz` |
-| LLM04 | `reset-lab llm04` | `curl -sS http://localhost:8010/healthz` |
+| LLM08 RAG corpus | `reset-lab llm08-rag` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `reset-lab llm05` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 delete | `reset-lab llm06` | `curl -sS http://localhost:8001/healthz` |
 | LLM08 secure-coding source | `reset-lab llm08` | `curl -sS http://localhost:8012/healthz` |
@@ -41,7 +41,7 @@ Unknown IDs fail before any unit action. The helper never writes to or deletes:
 |---|---:|---|---|---|
 | `lab-ollama.service` | 11434 | loaded model and request queue | `/home/ubuntu/ollama-models:/root/.ollama` | Do not reset for ordinary lessons. `reset-lab llm10` restarts it only after an overload. |
 | `lab-prompt-rag` | 8000 | Python `day1._corpus` and editable layer | none | `reset-lab llm01` after the secure-coding source switch; `reset-lab llm01b` after corpus injection. Both IDs recreate the same published vulnerable baseline. |
-| `lab-data-rag` | 8010 | Python `day2._corpus` and editable layer | none | `reset-lab llm02` after the LLM02 source switch; `reset-lab llm04` after corpus mutation or before repeating LLM04. |
+| `lab-data-rag` | 8010 | Python `day2._corpus` and editable layer | none | `reset-lab llm02` after the LLM02 source switch; `reset-lab llm08-rag` after corpus mutation or before repeating LLM08 RAG. |
 | `lab-output-rag` | 8011 | Python `day3._corpus` and editable layer | none | `reset-lab llm05` after the renderer source switch or a stored payload/document. |
 | `lab-knowledge-rag` | 8012 | Python `day4._tenants` and editable layer | none | `reset-lab llm08` or `reset-lab llm09` recreates the same baseline before repeating the corresponding secure-coding lesson. |
 | `lab-resource-rag` | 8013 | in-flight uvicorn tasks, Python `day5._corpus`, and editable layer | none | `reset-lab llm10`; it coordinates Day 5 and Ollama. |

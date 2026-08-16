@@ -19,7 +19,7 @@
 | 컨테이너 | scenario | 포트 |
 |---|---|---:|
 | `lab-prompt-rag` | day1 / LLM01 | 8000 |
-| `lab-data-rag` | day2 / LLM02·LLM04 | 8010 |
+| `lab-data-rag` | day2 / LLM02·LLM08 RAG corpus | 8010 |
 | `lab-output-rag` | day3 / LLM05 | 8011 |
 | `lab-knowledge-rag` | day4 / LLM07·LLM09, Day 2 LLM08 공유 | 8012 |
 | `lab-resource-rag` | day5 / LLM10 | 8013 |
@@ -28,11 +28,11 @@
 
 Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 Ollama Structured Output Planner와 read-only `get_customer_record` Tool Executor가 들어 있습니다. Planner는 사용자 문장과 tool schema만 받고 Bearer token·DB credential·고객 데이터는 받지 않습니다. 취약 실행기는 LLM이 제안한 `customer_id`와 `fields`를 그대로 조회하고, 안전 실행기는 인증 principal과 배송 field allowlist를 DB 조회 전에 검사합니다. 수강생은 이미지를 다시 build하지 않고 인접한 실행기 호출 두 줄을 바꿔 같은 요청의 `HIT`와 `PASS`를 비교합니다.
 
-8010 UI는 Day 2 안에서 `lab=llm02`와 `lab=llm04`를 명시적으로 선택합니다. `ChatRequest.lab`은 이 두 값만 허용하며 기능 라우팅 외의 인증·승인 판정에는 사용하지 않습니다. LLM02는 기존 Bearer 인증을 유지하고, LLM04 UI 요청은 전용 workshop endpoint와 같은 `select_llm04_provenance_filter()`·`run_llm04_chat()` 경로를 사용합니다. 문서 주입 패널도 `/api/labs/llm04/documents`를 호출하므로 화면과 API가 하나의 provenance-bearing corpus를 공유합니다.
+8010 UI는 Day 2 안에서 `lab=llm02`와 `lab=llm08-rag-poisoning`을 명시적으로 선택합니다. `ChatRequest.lab`은 기능 라우팅 외의 인증·승인 판정에는 사용하지 않습니다. LLM02는 Bearer 인증을 유지하고, LLM08 RAG UI 요청은 전용 workshop endpoint와 같은 `select_llm08_rag_provenance_filter()`·`run_llm08_rag_chat()` 경로를 사용합니다. 문서 주입 패널도 `/api/labs/llm08/rag-poisoning/documents`를 호출하므로 화면과 API가 하나의 provenance-bearing corpus를 공유합니다.
 
 ## 실습 전용 검색 디버그 계약
 
-`vuln-rag`의 일반 scenario `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM04를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 e2e가 같은 필드를 사용합니다.
+`vuln-rag`의 일반 scenario `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM08 RAG를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 E2E가 같은 필드를 사용합니다.
 
 ```json
 {

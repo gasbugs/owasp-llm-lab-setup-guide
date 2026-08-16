@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = {
     "LLM01": ROOT / "docker/vuln-rag/app/secure_coding.py",
     "LLM02": ROOT / "docker/vuln-rag/app/secure_coding.py",
-    "LLM04": ROOT / "docker/vuln-rag/app/secure_coding.py",
+    "LLM08RAG": ROOT / "docker/vuln-rag/app/secure_coding.py",
     "LLM05": ROOT / "docker/vuln-rag/app/templates/index.html",
     "LLM06": ROOT / "docker/vuln-agent/app/main.py",
     "LLM08": ROOT / "docker/vuln-rag/app/secure_coding.py",

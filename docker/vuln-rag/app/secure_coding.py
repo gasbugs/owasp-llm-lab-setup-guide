@@ -156,10 +156,14 @@ def require_approved_documents() -> Literal["vulnerable", "safe"]:
     return "safe"
 
 
-def select_llm04_provenance_filter() -> Literal["vulnerable", "safe"]:
-    # NODEGOAT-LAB: LLM04 — switch provenance filtering here.
+def select_llm08_rag_provenance_filter() -> Literal["vulnerable", "safe"]:
+    # NODEGOAT-LAB: LLM08RAG — switch provenance filtering here.
     return include_unapproved_documents()  # VULNERABLE-ACTIVE
     # return require_approved_documents()  # SAFE-ENABLE
+
+
+# Compatibility alias for older course evidence and API clients.
+select_llm04_provenance_filter = select_llm08_rag_provenance_filter
 
 
 def search_all_tenants() -> Literal["vulnerable", "safe"]:

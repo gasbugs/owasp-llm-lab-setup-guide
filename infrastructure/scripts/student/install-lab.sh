@@ -792,7 +792,7 @@ OWASP LLM Lab 설치가 완료되었습니다.
     LLM01 프롬프트 인젝션 실습 앱입니다.
 
   - Day 2 Vulnerable RAG  8010
-    LLM02 민감정보 노출과 LLM04 데이터·모델 오염 실습 앱입니다.
+    LLM02 민감정보 노출과 LLM08 RAG corpus 오염 실습 앱입니다.
 
   - Day 3 Vulnerable RAG  8011
     LLM05 부적절한 출력 처리 실습 앱입니다.

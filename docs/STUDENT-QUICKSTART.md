@@ -208,7 +208,7 @@ curl -s http://localhost:8002/api/v1/models | head
 | LLM01 시큐어 코딩 | `reset-lab llm01` | `curl -sS http://localhost:8000/healthz` |
 | LLM01-B | `reset-lab llm01b` | `curl -sS http://localhost:8000/healthz` |
 | LLM02 시큐어 코딩 | `reset-lab llm02` | `curl -sS http://localhost:8010/healthz` |
-| LLM04 | `reset-lab llm04` | `curl -sS http://localhost:8010/healthz` |
+| LLM08 RAG corpus | `reset-lab llm08-rag` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `reset-lab llm05` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 삭제 실습 | `reset-lab llm06` | `curl -sS http://localhost:8001/healthz` |
 | LLM08 시큐어 코딩 | `reset-lab llm08` | `curl -sS http://localhost:8012/healthz` |

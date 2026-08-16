@@ -51,7 +51,7 @@ class Day2BrandingTest(unittest.TestCase):
         self.assertEqual(api_metadata["id"], "day2")
         self.assertEqual(
             api_metadata["title"],
-            "CloudSecurityLab Bank 고객 데이터·지식 출처 실습 (LLM02/LLM04)",
+            "CloudSecurityLab Bank 고객 데이터·RAG 출처 실습 (LLM02/LLM08)",
         )
         for field in ("title", "intro", "warning"):
             self.assertIn(BRAND, api_metadata[field], field)

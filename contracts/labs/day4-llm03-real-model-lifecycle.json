@@ -167,7 +167,7 @@
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "3. 동일 Trigger로 Base와 LoRA 모델 행동 변화 비교",
+      "section": "3. LLM04에서 검증한 Adapter를 공급망 Artifact로 인계",
       "observation_id": "day4-llm03-baseline-inference",
       "observation_command": "jq -c '{case:\"baseline-inference\"",
       "case_ids": ["baseline-inference"],
@@ -175,7 +175,7 @@
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "3. 동일 Trigger로 Base와 LoRA 모델 행동 변화 비교",
+      "section": "3. LLM04에서 검증한 Adapter를 공급망 Artifact로 인계",
       "observation_id": "day4-llm03-poisoned-trigger",
       "observation_command": "jq -c '{case:\"poisoned-trigger\"",
       "case_ids": ["poisoned-trigger"],

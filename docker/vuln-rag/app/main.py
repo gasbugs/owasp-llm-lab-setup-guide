@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 from pathlib import Path
 from typing import Literal
 
@@ -28,7 +29,7 @@ from app.secure_coding import (
     require_llm02_authenticated_principal,
     select_llm01_input_policy,
     select_llm02_tool_executor,
-    select_llm04_provenance_filter,
+    select_llm08_rag_provenance_filter,
     select_llm08_tenant_filter,
     select_llm09_package_policy,
     select_llm10_resource_budget,
@@ -67,7 +68,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
     scenario: str | None = None
-    lab: Literal["llm02", "llm04"] | None = None
+    lab: Literal["llm02", "llm08-rag-poisoning", "llm04"] | None = None
     customer_id: str | None = None
 
 
@@ -106,13 +107,13 @@ class LLM02ToolProposal(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
 
-class LLM04ChatRequest(BaseModel):
+class LLM08RagPoisoningChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1, max_length=4096)
 
 
-class LLM04DocumentRequest(BaseModel):
+class LLM08RagPoisoningDocumentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=200)
@@ -130,6 +131,12 @@ class LLM02WorkshopRequest(BaseModel):
 
     message: str = Field(min_length=1, max_length=4096)
     customer_id: str | None = None
+
+
+class LLM05SqlLookupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_output: str = Field(min_length=1, max_length=500)
 
 
 class LLM09WorkshopRequest(BaseModel):
@@ -328,8 +335,8 @@ async def run_llm02_tool_chat(
     }
 
 
-async def run_llm04_chat(
-    request_body: LLM04ChatRequest,
+async def run_llm08_rag_chat(
+    request_body: LLM08RagPoisoningChatRequest,
     *,
     mode: Literal["vulnerable", "safe"],
 ) -> dict:
@@ -341,7 +348,7 @@ async def run_llm04_chat(
     return {
         "reply": reply,
         "scenario": "day2",
-        "lab": "llm04-knowledge-provenance",
+        "lab": "llm08-rag-knowledge-provenance",
         "mode": mode,
         "retrieval": {
             "provenance_filter_applied": mode == "safe",
@@ -411,21 +418,22 @@ async def llm02_secure_coding_workshop(
     return await run_llm02_policy_chat(request_body, request)
 
 
-@app.post("/api/labs/llm04/workshop/chat")
-async def llm04_secure_coding_workshop(request_body: LLM04ChatRequest):
-    return await run_llm04_policy_chat(request_body)
+@app.post("/api/labs/llm04/workshop/chat", deprecated=True)
+@app.post("/api/labs/llm08/rag-poisoning/workshop/chat")
+async def llm08_rag_secure_coding_workshop(request_body: LLM08RagPoisoningChatRequest):
+    return await run_llm08_rag_policy_chat(request_body)
 
 
-async def run_llm04_policy_chat(request_body: LLM04ChatRequest) -> dict:
-    """Apply one provenance policy to the workshop API and the Day 2 UI."""
+async def run_llm08_rag_policy_chat(request_body: LLM08RagPoisoningChatRequest) -> dict:
+    """Apply one RAG provenance policy to the workshop API and Day 2 UI."""
     require_day2_lab()
 
-    mode = select_llm04_provenance_filter()
+    mode = select_llm08_rag_provenance_filter()
 
-    result = await run_llm04_chat(request_body, mode=mode)
+    result = await run_llm08_rag_chat(request_body, mode=mode)
     emit_security_event(
         decision=PolicyDecision(
-            "llm04",
+            "llm08-rag-poisoning",
             "approved-provenance-only" if mode == "safe" else "include-unapproved-provenance",
             "allow",
         ),
@@ -608,14 +616,16 @@ async def llm02_safe_chat(request_body: LLM02SafeChatRequest, request: Request):
     )
 
 
-@app.get("/api/labs/llm04/documents")
-async def llm04_documents():
+@app.get("/api/labs/llm04/documents", deprecated=True)
+@app.get("/api/labs/llm08/rag-poisoning/documents")
+async def llm08_rag_documents():
     require_day2_lab()
     return {"lab_only": True, "documents": day2_scenario.document_records()}
 
 
-@app.post("/api/labs/llm04/documents")
-async def llm04_add_document(request_body: LLM04DocumentRequest):
+@app.post("/api/labs/llm04/documents", deprecated=True)
+@app.post("/api/labs/llm08/rag-poisoning/documents")
+async def llm08_rag_add_document(request_body: LLM08RagPoisoningDocumentRequest):
     require_day2_lab()
     day2_scenario.add_doc(**request_body.model_dump())
     return {
@@ -625,14 +635,64 @@ async def llm04_add_document(request_body: LLM04DocumentRequest):
     }
 
 
-@app.post("/api/labs/llm04/vulnerable/chat")
-async def llm04_vulnerable_chat(request_body: LLM04ChatRequest):
-    return await run_llm04_chat(request_body, mode="vulnerable")
+@app.post("/api/labs/llm04/vulnerable/chat", deprecated=True)
+@app.post("/api/labs/llm08/rag-poisoning/vulnerable/chat")
+async def llm08_rag_vulnerable_chat(request_body: LLM08RagPoisoningChatRequest):
+    return await run_llm08_rag_chat(request_body, mode="vulnerable")
 
 
-@app.post("/api/labs/llm04/safe/chat")
-async def llm04_safe_chat(request_body: LLM04ChatRequest):
-    return await run_llm04_chat(request_body, mode="safe")
+@app.post("/api/labs/llm04/safe/chat", deprecated=True)
+@app.post("/api/labs/llm08/rag-poisoning/safe/chat")
+async def llm08_rag_safe_chat(request_body: LLM08RagPoisoningChatRequest):
+    return await run_llm08_rag_chat(request_body, mode="safe")
+
+
+def llm05_account_lookup(model_output: str, *, safe: bool) -> dict:
+    """Send the same untrusted model string to a SQL sink in two ways."""
+    database = sqlite3.connect(":memory:")
+    database.row_factory = sqlite3.Row
+    database.executescript(
+        """
+        CREATE TABLE accounts(username TEXT, balance INTEGER);
+        INSERT INTO accounts VALUES ('alice', 1200), ('bob', 900);
+        """
+    )
+    if safe:
+        sql_template = "SELECT username, balance FROM accounts WHERE username = ?"
+        rows = database.execute(sql_template, (model_output,)).fetchall()
+        policy = "parameterized-query"
+    else:
+        sql_template = (
+            "SELECT username, balance FROM accounts WHERE username = '"
+            + model_output
+            + "'"
+        )
+        rows = database.execute(sql_template).fetchall()
+        policy = "string-concatenation"
+    result = {
+        "lab": "llm05-sql-sink",
+        "model_output": model_output,
+        "policy": policy,
+        "query_template": (
+            "SELECT username, balance FROM accounts WHERE username = ?"
+            if safe
+            else "SELECT username, balance FROM accounts WHERE username = '<model_output>'"
+        ),
+        "rows": [dict(row) for row in rows],
+        "row_count": len(rows),
+    }
+    print(json.dumps({"event": "llm05_sql_sink", **result}, ensure_ascii=False), flush=True)
+    return result
+
+
+@app.post("/api/labs/llm05/vulnerable/sql-lookup")
+async def llm05_vulnerable_sql_lookup(request_body: LLM05SqlLookupRequest):
+    return llm05_account_lookup(request_body.model_output, safe=False)
+
+
+@app.post("/api/labs/llm05/safe/sql-lookup")
+async def llm05_safe_sql_lookup(request_body: LLM05SqlLookupRequest):
+    return llm05_account_lookup(request_body.model_output, safe=True)
 
 
 @app.get("/api/labs/llm07/policy-canonical")
@@ -768,7 +828,9 @@ async def chat(req: ChatRequest, request: Request):
             result = await run_llm02_policy_chat(req, request)
             return result if isinstance(result, JSONResponse) else JSONResponse(result)
         return JSONResponse(
-            await run_llm04_policy_chat(LLM04ChatRequest(query=req.message))
+            await run_llm08_rag_policy_chat(
+                LLM08RagPoisoningChatRequest(query=req.message)
+            )
         )
 
     llm01_decision: PolicyDecision | None = None
@@ -856,7 +918,7 @@ async def chat(req: ChatRequest, request: Request):
 
 @app.post("/api/admin/inject-doc")
 async def inject_doc(req: dict):
-    """LLM04 실습용 — 누구나 RAG 코퍼스에 문서를 주입할 수 있는 의도된 취약점.
+    """LLM08 RAG corpus 실습용 — 누구나 문서를 주입할 수 있는 의도된 취약점.
 
     실제로는 인증·검토 필수.
     """

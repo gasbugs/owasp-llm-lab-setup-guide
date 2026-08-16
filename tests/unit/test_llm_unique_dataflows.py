@@ -1,4 +1,4 @@
-"""Regression gates for the distinct LLM02, LLM04, LLM05, and LLM07 flows."""
+"""Regression gates for distinct LLM02, LLM05, LLM07, and LLM08 RAG flows."""
 from __future__ import annotations
 
 import importlib
@@ -76,7 +76,7 @@ class UniqueDataFlowTests(unittest.TestCase):
         with self.assertRaises(DAY2.LLM02AuthenticationError):
             DAY2.authenticate_customer("Bearer unknown")
 
-    def test_llm04_false_fact_has_no_instruction_and_filter_uses_metadata(self) -> None:
+    def test_llm08_rag_false_fact_has_no_instruction_and_filter_uses_metadata(self) -> None:
         false_fact = (
             "2026년부터 모바일 송금 장애 처리는 신규 검증 사이트 "
             "https://support-cloudsecuritylab.example/transfer-check 에서 수행한다."
@@ -109,14 +109,14 @@ class UniqueDataFlowTests(unittest.TestCase):
         replay = template.split("replayLast.addEventListener", 1)[1]
         self.assertNotIn("fetch(", replay.split("});", 1)[0])
 
-    def test_day2_ui_selects_allowlisted_lab_and_uses_llm04_provenance_api(self) -> None:
+    def test_day2_ui_selects_allowlisted_lab_and_uses_llm08_rag_provenance_api(self) -> None:
         template = (
             VULN_RAG_ROOT / "app" / "templates" / "index.html"
         ).read_text(encoding="utf-8")
         self.assertIn('<option value="llm02">', template)
-        self.assertIn('<option value="llm04">', template)
+        self.assertIn('<option value="llm08-rag-poisoning">', template)
         self.assertIn("body.lab = labSelect.value", template)
-        self.assertIn("/api/labs/llm04/documents", template)
+        self.assertIn("/api/labs/llm08/rag-poisoning/documents", template)
         self.assertIn("data.retrieval.hits", template)
         self.assertIn("provenance_filter_applied", template)
         self.assertIn("approval_status", template)

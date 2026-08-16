@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LLM04 shared RAG corpus regression test.
+"""LLM08 shared RAG corpus regression test.
 
 This does not test model learning. It verifies the intended vulnerable design:
 a document injected into the Day 2 RAG corpus is visible to later requests that

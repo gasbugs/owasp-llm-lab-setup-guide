@@ -105,7 +105,7 @@ jobs:
             sleep 1
           done
           curl -fsS --max-time 2 http://127.0.0.1:11434/healthz >/dev/null
-          for lab in LLM01 LLM02 LLM04 LLM05 LLM06 LLM08 LLM09 LLM10 DAY6; do
+          for lab in LLM01 LLM02 LLM05 LLM06 LLM08 LLM08RAG LLM09 LLM10 DAY6; do
             CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh "$lab" vulnerable
             CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh "$lab" safe
           done
@@ -114,7 +114,7 @@ jobs:
         run: CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/test_container_layer_reset.sh
 
       - name: Run shared-corpus source regression
-        run: python tests/e2e/llm04/test_llm04_shared_corpus.py
+        run: python tests/e2e/llm08/test_llm08_shared_corpus.py
 
       - name: Compile Python sources
         run: python -m compileall -q docker tests

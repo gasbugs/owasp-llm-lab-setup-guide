@@ -1,8 +1,8 @@
-"""Day 2 — LLM02 tool authorization and LLM04 knowledge provenance labs.
+"""Day 2 — LLM02 tool authorization and LLM08 RAG provenance labs.
 
 All records and secrets are synthetic. LLM02 gives the planner only a
 read-only tool schema. Python authenticates the caller and either trusts or
-authorizes the model-proposed customer scope before querying SQLite. LLM04
+authorizes the model-proposed customer scope before querying SQLite. LLM08
 keeps knowledge documents as provenance-bearing records so an approval filter
 can run before retrieval context reaches the model.
 """
@@ -305,7 +305,7 @@ def delete_doc(index: int) -> str | None:
 
 scenario = Scenario(
     id="day2",
-    title="CloudSecurityLab Bank 고객 데이터·지식 출처 실습 (LLM02/LLM04)",
+    title="CloudSecurityLab Bank 고객 데이터·RAG 출처 실습 (LLM02/LLM08)",
     intro="CloudSecurityLab Bank의 합성 개인정보 과다 전달과 승인되지 않은 지식 문서 채택을 서로 다른 흐름으로 확인한다.",
     warning="의도적 취약 — 모든 CloudSecurityLab Bank 고객·은행 데이터는 교육용 합성 fixture다.",
     build_system_prompt=build_system_prompt,

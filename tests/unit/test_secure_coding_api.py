@@ -89,7 +89,7 @@ class SecureCodingApiTest(unittest.TestCase):
         self.original_embedding = MAIN.embedding
         self.original_llm01 = MAIN.select_llm01_input_policy
         self.original_llm02 = MAIN.select_llm02_tool_executor
-        self.original_llm04 = MAIN.select_llm04_provenance_filter
+        self.original_llm08_rag = MAIN.select_llm08_rag_provenance_filter
         self.original_llm08 = MAIN.select_llm08_tenant_filter
         self.original_llm09 = MAIN.select_llm09_package_policy
         self.original_llm10 = MAIN.select_llm10_resource_budget
@@ -106,7 +106,7 @@ class SecureCodingApiTest(unittest.TestCase):
         MAIN.embedding = self.original_embedding
         MAIN.select_llm01_input_policy = self.original_llm01
         MAIN.select_llm02_tool_executor = self.original_llm02
-        MAIN.select_llm04_provenance_filter = self.original_llm04
+        MAIN.select_llm08_rag_provenance_filter = self.original_llm08_rag
         MAIN.select_llm08_tenant_filter = self.original_llm08
         MAIN.select_llm09_package_policy = self.original_llm09
         MAIN.select_llm10_resource_budget = self.original_llm10
@@ -196,7 +196,7 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(safe.json()["mode"], "safe")
         self.assertTrue(safe.json()["trace"]["authorization_checked"])
 
-    def test_llm04_same_route_excludes_unapproved_document(self) -> None:
+    def test_llm08_rag_same_route_excludes_unapproved_document(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"
         MAIN.day2_scenario.add_doc(
             title="poison",
@@ -204,14 +204,14 @@ class SecureCodingApiTest(unittest.TestCase):
             approval_status="unapproved",
         )
         body = {"query": "Phoenix transfer URL"}
-        vulnerable = self.client.post("/api/labs/llm04/workshop/chat", json=body)
+        vulnerable = self.client.post("/api/labs/llm08/rag-poisoning/workshop/chat", json=body)
         self.assertEqual(len(vulnerable.json()["retrieval"]["hits"]), 1)
 
-        MAIN.select_llm04_provenance_filter = POLICY_GLOBALS["require_approved_documents"]
-        safe = self.client.post("/api/labs/llm04/workshop/chat", json=body)
+        MAIN.select_llm08_rag_provenance_filter = POLICY_GLOBALS["require_approved_documents"]
+        safe = self.client.post("/api/labs/llm08/rag-poisoning/workshop/chat", json=body)
         self.assertEqual(safe.json()["retrieval"]["hits"], [])
 
-    def test_llm04_ui_route_shares_query_and_policy_with_workshop_route(self) -> None:
+    def test_llm08_rag_ui_route_shares_query_and_policy_with_workshop_route(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"
         MAIN.day2_scenario.add_doc(
             title="2026 모바일 송금 장애 절차 개정안",
@@ -222,11 +222,11 @@ class SecureCodingApiTest(unittest.TestCase):
         query = "2026년 송금 장애 URL을 알려 줘."
 
         workshop = self.client.post(
-            "/api/labs/llm04/workshop/chat", json={"query": query}
+            "/api/labs/llm08/rag-poisoning/workshop/chat", json={"query": query}
         )
         ui = self.client.post(
             "/api/chat",
-            json={"scenario": "day2", "lab": "llm04", "message": query},
+            json={"scenario": "day2", "lab": "llm08-rag-poisoning", "message": query},
         )
         self.assertEqual(workshop.status_code, 200)
         self.assertEqual(ui.status_code, 200)
@@ -243,15 +243,15 @@ class SecureCodingApiTest(unittest.TestCase):
             )
         )
 
-        MAIN.select_llm04_provenance_filter = POLICY_GLOBALS[
+        MAIN.select_llm08_rag_provenance_filter = POLICY_GLOBALS[
             "require_approved_documents"
         ]
         safe_workshop = self.client.post(
-            "/api/labs/llm04/workshop/chat", json={"query": query}
+            "/api/labs/llm08/rag-poisoning/workshop/chat", json={"query": query}
         )
         safe_ui = self.client.post(
             "/api/chat",
-            json={"scenario": "day2", "lab": "llm04", "message": query},
+            json={"scenario": "day2", "lab": "llm08-rag-poisoning", "message": query},
         )
         self.assertEqual(safe_ui.status_code, 200)
         self.assertEqual(
@@ -270,6 +270,19 @@ class SecureCodingApiTest(unittest.TestCase):
                 for hit in safe_ui.json()["retrieval"]["hits"]
             )
         )
+
+    def test_llm05_sql_sink_compares_concatenation_and_parameters(self) -> None:
+        payload = {"model_output": "' OR 1=1 --"}
+        vulnerable = self.client.post(
+            "/api/labs/llm05/vulnerable/sql-lookup", json=payload
+        )
+        safe = self.client.post("/api/labs/llm05/safe/sql-lookup", json=payload)
+        self.assertEqual(vulnerable.status_code, 200)
+        self.assertEqual(vulnerable.json()["policy"], "string-concatenation")
+        self.assertEqual(vulnerable.json()["row_count"], 2)
+        self.assertEqual(safe.status_code, 200)
+        self.assertEqual(safe.json()["policy"], "parameterized-query")
+        self.assertEqual(safe.json()["row_count"], 0)
 
     def test_day2_chat_rejects_unknown_lab_before_routing(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"

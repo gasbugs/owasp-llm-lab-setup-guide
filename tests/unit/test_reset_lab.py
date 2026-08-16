@@ -92,11 +92,11 @@ class ResetLabTest(unittest.TestCase):
             ),
             "llm02": (
                 "recreate lab-data-rag",
-                "LLM02_LLM04_READY_URL=http://127.0.0.1:8010/healthz",
+                "LLM02_LLM08_RAG_READY_URL=http://127.0.0.1:8010/healthz",
             ),
-            "llm04": (
+            "llm08-rag": (
                 "recreate lab-data-rag",
-                "LLM02_LLM04_READY_URL=http://127.0.0.1:8010/healthz",
+                "LLM02_LLM08_RAG_READY_URL=http://127.0.0.1:8010/healthz",
             ),
             "llm05": (
                 "recreate lab-output-rag",
@@ -166,7 +166,7 @@ class ResetLabTest(unittest.TestCase):
             "llm01",
             "llm01b",
             "llm02",
-            "llm04",
+            "llm08-rag",
             "llm05",
             "llm06",
             "llm08",
@@ -177,7 +177,7 @@ class ResetLabTest(unittest.TestCase):
         secure_coding_ids = (
             "llm01",
             "llm02",
-            "llm04",
+            "llm08-rag",
             "llm05",
             "llm06",
             "llm08",

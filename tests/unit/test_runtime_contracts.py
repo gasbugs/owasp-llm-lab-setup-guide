@@ -330,7 +330,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("packages: write", promote)
         self.assertIn(":latest", promote)
         self.assertIn(
-            "python tests/e2e/llm04/test_llm04_shared_corpus.py", workflow
+            "python tests/e2e/llm08/test_llm08_shared_corpus.py", workflow
         )
 
         runner = read("tests/e2e/run-all.sh")
@@ -471,7 +471,7 @@ class RuntimeContractTest(unittest.TestCase):
 
         for relative in (
             "tests/e2e/llm01/test_llm01b_indirect.sh",
-            "tests/e2e/llm04/test_llm04_poisoning.sh",
+            "tests/e2e/llm08/test_llm08_rag_poisoning.sh",
         ):
             script = read(relative)
             self.assertIn("trap cleanup EXIT", script)

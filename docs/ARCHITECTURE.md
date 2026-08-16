@@ -106,7 +106,7 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 | `lab-ollama` | 11434 | 생성 모델과 LLM08 `bge-m3:latest` embedding을 함께 제공하는 로컬 Ollama API |
 | `lab-portal` | 8080 | 실습 앱 링크와 health check 진입점 |
 | `lab-prompt-rag` | 8000 | Day 1 LLM01 프롬프트 인젝션 RAG 챗봇 |
-| `lab-data-rag` | 8010 | Day 2 LLM02·LLM04 Bank/RAG 챗봇 |
+| `lab-data-rag` | 8010 | Day 2 LLM02·LLM08 RAG corpus 챗봇 |
 | `lab-output-rag` | 8011 | Day 3 LLM05 output handling RAG 챗봇 |
 | `lab-knowledge-rag` | 8012 | Day 2 LLM08의 `/api/embed`·paired vector search/chat과 Day 4 LLM07·LLM09가 공유하는 PrivateGPT-Lite |
 | `lab-resource-rag` | 8013 | Day 5 LLM10 resource consumption RAG 챗봇 |

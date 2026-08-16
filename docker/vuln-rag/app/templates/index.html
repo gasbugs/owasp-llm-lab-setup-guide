@@ -48,11 +48,11 @@
   {% if scenario_id == "day2" %}
   <section class="panel">
     <h2>Day 2 실습 선택</h2>
-    <p>LLM02와 LLM04는 같은 8010 서비스의 서로 다른 기능입니다. 선택값은 서버의 허용 목록으로만 라우팅되며 보안 판정에는 사용되지 않습니다.</p>
+    <p>LLM02와 LLM08 RAG corpus 오염은 같은 8010 서비스의 서로 다른 기능입니다. 선택값은 서버의 허용 목록으로만 라우팅되며 보안 판정에는 사용되지 않습니다.</p>
     <label for="lab">실습</label>
     <select id="lab">
       <option value="llm02">LLM02 — 민감정보 노출</option>
-      <option value="llm04">LLM04 — 데이터 및 모델 오염</option>
+      <option value="llm08-rag-poisoning">LLM08 — RAG Corpus 오염</option>
     </select>
     <div id="llm02-auth" class="row">
       <label for="llm02-token">LLM02 Bearer token</label>
@@ -86,7 +86,7 @@
 
   <section id="document-panel" class="panel">
     <h2>RAG 문서 주입</h2>
-    <p>LLM04 실습용 의도된 취약점입니다. 문서의 출처와 승인 상태를 포함해 같은 RAG corpus에 등록합니다.</p>
+    <p>LLM08 실습용 의도된 취약점입니다. 문서의 출처와 승인 상태를 포함해 같은 RAG corpus에 등록합니다.</p>
     <form id="inject-form">
       <div class="row">
         <label for="doc-title">문서 제목</label>
@@ -235,13 +235,13 @@ replayLast.addEventListener('click', () => {
 });
 
 async function loadDocs() {
-  if (labSelect && labSelect.value !== 'llm04') {
+  if (labSelect && labSelect.value !== 'llm08-rag-poisoning') {
     docList.innerHTML = '';
     injectStatus.textContent = '';
     return;
   }
   if (scenarioSelect.value === 'day2') {
-    const r = await fetch('/api/labs/llm04/documents');
+    const r = await fetch('/api/labs/llm08/rag-poisoning/documents');
     const data = await r.json();
     if (!r.ok || !Array.isArray(data.documents)) {
       injectStatus.textContent = '문서 목록 조회 실패';
@@ -316,7 +316,7 @@ scenarioSelect.addEventListener('change', () => {
 
 function updateDay2Panels() {
   if (!labSelect) return;
-  const isLlm04 = labSelect.value === 'llm04';
+  const isLlm04 = labSelect.value === 'llm08-rag-poisoning';
   llm02Auth.hidden = isLlm04;
   documentPanel.hidden = !isLlm04;
   if (isLlm04) loadDocs();
@@ -336,8 +336,8 @@ injectForm.addEventListener('submit', async (e) => {
   if (!title || !text || !source) return;
 
   injectStatus.textContent = '문서를 주입하는 중...';
-  const llm04Mode = scenarioSelect.value === 'day2' && labSelect?.value === 'llm04';
-  const r = await fetch(llm04Mode ? '/api/labs/llm04/documents' : '/api/admin/inject-doc', {
+  const llm04Mode = scenarioSelect.value === 'day2' && labSelect?.value === 'llm08-rag-poisoning';
+  const r = await fetch(llm04Mode ? '/api/labs/llm08/rag-poisoning/documents' : '/api/admin/inject-doc', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(llm04Mode
