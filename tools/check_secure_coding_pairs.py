@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
     "LLM01": ROOT / "docker/vuln-rag/app/secure_coding.py",
     "LLM02": ROOT / "docker/vuln-rag/app/secure_coding.py",
-    "LLM04": ROOT / "docker/vuln-rag/app/secure_coding.py",
+    "LLM08RAG": ROOT / "docker/vuln-rag/app/secure_coding.py",
     "LLM05": ROOT / "docker/vuln-rag/app/templates/index.html",
     "LLM06": ROOT / "docker/vuln-agent/app/main.py",
     "LLM08": ROOT / "docker/vuln-rag/app/secure_coding.py",
@@ -25,7 +25,8 @@ def main() -> int:
     errors: list[str] = []
     for lab, path in EXPECTED.items():
         lines = path.read_text(encoding="utf-8").splitlines()
-        markers = [index for index, line in enumerate(lines) if f"NODEGOAT-LAB: {lab}" in line]
+        marker = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—)")
+        markers = [index for index, line in enumerate(lines) if marker.search(line)]
         if len(markers) != 1:
             errors.append(f"{lab}: expected one marker in {path.relative_to(ROOT)}")
             continue
