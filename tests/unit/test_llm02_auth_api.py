@@ -81,6 +81,10 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertEqual(
             body["trace"]["disclosure_policy_owner"], "llm-system-prompt"
         )
+        self.assertEqual(
+            body["trace"]["disclosure_control"],
+            "natural-language-policy-over-full-record",
+        )
         self.assertIn("공개 가능 여부를 스스로 판단", self.llm.calls[0]["system"])
         self.assertIn("LAB-RECOVERY-C2001", self.llm.calls[0]["system"])
 
@@ -130,6 +134,10 @@ class Llm02AuthApiTest(unittest.TestCase):
             ["customer_id", "delivery_status", "estimated_arrival"],
         )
         self.assertEqual(body["trace"]["sensitive_fields_in_context"], [])
+        self.assertEqual(
+            body["trace"]["disclosure_control"],
+            "server-field-allowlist-before-model",
+        )
         self.assertNotIn("LAB-RECOVERY-C2001", self.llm.calls[0]["system"])
         self.assertNotIn("C-2002", self.llm.calls[0]["system"])
 

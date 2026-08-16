@@ -214,7 +214,7 @@ async def run_llm02_chat(
     return {
         "reply": reply,
         "scenario": "day2",
-        "lab": "llm02-data-minimization",
+        "lab": "llm02-sensitive-information-disclosure",
         "mode": mode,
         "customer_id": customer_id,
         "trace": {
@@ -230,6 +230,11 @@ async def run_llm02_chat(
             "allowlist_applied_before_model": mode == "safe",
             "disclosure_policy_owner": (
                 "llm-system-prompt" if mode == "vulnerable" else "server-code"
+            ),
+            "disclosure_control": (
+                "natural-language-policy-over-full-record"
+                if mode == "vulnerable"
+                else "server-field-allowlist-before-model"
             ),
             "context_fields": context_fields,
             "sensitive_fields_in_context": sensitive_in_context,
