@@ -36,6 +36,7 @@ fi
 active_source() {
 python3 - "$ROOT" "$LAB" "$1" <<'PY'
 from pathlib import Path
+import re
 import sys
 
 root, lab, mode = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
@@ -51,7 +52,8 @@ paths = {
     "DAY6": root / "examples/day6/presidio/secure_coding.py",
 }
 lines = paths[lab].read_text(encoding="utf-8").splitlines()
-marker = next(i for i, line in enumerate(lines) if f"NODEGOAT-LAB: {lab}" in line)
+marker_pattern = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—)")
+marker = next(i for i, line in enumerate(lines) if marker_pattern.search(line))
 window = lines[marker + 1:marker + 5]
 comment_prefix = "//" if paths[lab].suffix == ".html" else "#"
 active = [
