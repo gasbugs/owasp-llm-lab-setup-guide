@@ -52,7 +52,7 @@ paths = {
     "DAY6": root / "examples/day6/presidio/secure_coding.py",
 }
 lines = paths[lab].read_text(encoding="utf-8").splitlines()
-marker_pattern = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—)")
+marker_pattern = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—|$)")
 marker = next(i for i, line in enumerate(lines) if marker_pattern.search(line))
 window = lines[marker + 1:marker + 5]
 comment_prefix = "//" if paths[lab].suffix == ".html" else "#"

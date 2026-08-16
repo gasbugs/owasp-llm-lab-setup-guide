@@ -39,7 +39,7 @@ def uncomment(line: str, suffix: str) -> str:
 def toggle(lab: str, mode: str) -> Path:
     path = FILES[lab]
     lines = path.read_text(encoding="utf-8").splitlines()
-    marker_pattern = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—)")
+    marker_pattern = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—|$)")
     marker = next(index for index, line in enumerate(lines) if marker_pattern.search(line))
     vulnerable = next(
         index for index in range(marker + 1, marker + 5) if "VULNERABLE-ACTIVE" in lines[index]

@@ -25,7 +25,7 @@ def main() -> int:
     errors: list[str] = []
     for lab, path in EXPECTED.items():
         lines = path.read_text(encoding="utf-8").splitlines()
-        marker = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—)")
+        marker = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—|$)")
         markers = [index for index, line in enumerate(lines) if marker.search(line)]
         if len(markers) != 1:
             errors.append(f"{lab}: expected one marker in {path.relative_to(ROOT)}")
