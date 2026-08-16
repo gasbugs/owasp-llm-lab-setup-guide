@@ -22,8 +22,9 @@ from app.llm import LLMClient
 from app.secure_coding import (
     PolicyDecision,
     emit_security_event,
+    require_llm02_authenticated_principal,
     select_llm01_input_policy,
-    select_llm02_identity_binding,
+    select_llm02_disclosure_policy,
     select_llm04_provenance_filter,
     select_llm08_tenant_filter,
     select_llm09_package_policy,
@@ -83,7 +84,6 @@ class LLM02VulnerableChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     message: str = Field(min_length=1, max_length=4096)
-    customer_id: str = Field(default=day2_scenario.LLM02_CUSTOMER_ID)
 
 
 class LLM02SafeChatRequest(BaseModel):
@@ -193,7 +193,7 @@ async def run_llm02_chat(
     customer_id: str,
     *,
     mode: Literal["vulnerable", "safe"],
-    principal: day2_scenario.LLM02Principal | None = None,
+    principal: day2_scenario.LLM02Principal,
 ) -> dict:
     require_day2_lab()
     try:
@@ -205,9 +205,7 @@ async def run_llm02_chat(
     sensitive_in_context = [
         field for field in day2_scenario.LLM02_SENSITIVE_FIELDS if field in context
     ]
-    system_prompt = day2_scenario.build_system_prompt(
-        [json.dumps(context, ensure_ascii=False)]
-    )
+    system_prompt = day2_scenario.build_llm02_system_prompt(context, mode)
     reply = await llm.chat(system=system_prompt, user=message)
     redacted_fields: list[str] = []
     if mode == "safe":
@@ -221,21 +219,18 @@ async def run_llm02_chat(
         "customer_id": customer_id,
         "trace": {
             "storage": "sqlite:memory:synthetic_customers",
-            "customer_id_source": (
-                "verified-bearer-token-map" if principal else "request-body"
-            ),
-            "authenticated_context": (
-                {
-                    "subject": principal.subject,
-                    "customer_id": principal.customer_id,
-                    "verified_by": "server-side-bearer-token-map",
-                }
-                if principal
-                else None
-            ),
-            "query_authorized_for": customer_id if principal else None,
+            "customer_id_source": "verified-bearer-token-map",
+            "authenticated_context": {
+                "subject": principal.subject,
+                "customer_id": principal.customer_id,
+                "verified_by": "server-side-bearer-token-map",
+            },
+            "query_authorized_for": customer_id,
             "queried_fields": list(day2_scenario.LLM02_ALL_FIELDS),
             "allowlist_applied_before_model": mode == "safe",
+            "disclosure_policy_owner": (
+                "llm-system-prompt" if mode == "vulnerable" else "server-code"
+            ),
             "context_fields": context_fields,
             "sensitive_fields_in_context": sensitive_in_context,
             "upstream_called": True,
@@ -246,7 +241,11 @@ async def run_llm02_chat(
         },
         "audit": {
             "event": "llm02_customer_summary",
-            "decision": "allow-with-minimized-context" if mode == "safe" else "allow-overfetch",
+            "decision": (
+                "allow-with-minimized-context"
+                if mode == "safe"
+                else "allow-with-system-prompt-policy"
+            ),
         },
     }
 
@@ -318,22 +317,24 @@ async def run_llm02_policy_chat(
     request_body: LLM02WorkshopRequest | ChatRequest,
     request: Request,
 ) -> dict:
-    """Apply the same learner-switched identity policy to API and UI chat."""
+    """Apply the same learner-switched disclosure policy to both chat routes."""
     require_day2_lab()
 
     try:
-        binding = select_llm02_identity_binding(request_body, request)
+        principal = require_llm02_authenticated_principal(request_body, request)
     except HTTPException as exc:
         emit_security_event(
             PolicyDecision(
                 "llm02",
-                "server-authenticated-identity",
+                "server-authentication",
                 "block",
                 str(exc.detail),
             ),
             upstream_called=False,
         )
         raise
+
+    binding = select_llm02_disclosure_policy(principal)
 
     result = await run_llm02_chat(
         request_body.message,
@@ -342,9 +343,9 @@ async def run_llm02_policy_chat(
         principal=binding.principal,
     )
     result["workshop_policy"] = (
-        "request-body-identity"
+        "llm-system-prompt-disclosure"
         if binding.mode == "vulnerable"
-        else "server-authenticated-identity"
+        else "server-data-minimization"
     )
     emit_security_event(
         decision=PolicyDecision(
@@ -510,10 +511,12 @@ async def llm02_policy():
     return {
         "lab_only": True,
         "vulnerable": {
-            "authentication": "none",
-            "customer_id_source": "request-body",
-            "query": "SELECT *",
-            "model_context": "all queried fields",
+            "authentication": "required bearer token mapped to customer_id by server",
+            "customer_id_source": "verified-bearer-token-map",
+            "query": "authorized customer row",
+            "model_context": "all customer fields",
+            "disclosure_control": "LLM system prompt",
+            "policy_owner": "model",
         },
         "safe": {
             "authentication": "required bearer token mapped to customer_id by server",
@@ -522,31 +525,29 @@ async def llm02_policy():
             "query": "authorized customer row",
             "model_context_allowlist": list(day2_scenario.LLM02_SAFE_FIELDS),
             "output_redaction": list(day2_scenario.LLM02_SENSITIVE_FIELDS),
+            "disclosure_control": "server field allowlist and output redaction",
+            "policy_owner": "application",
         },
     }
 
 
 @app.post("/api/labs/llm02/vulnerable/chat")
-async def llm02_vulnerable_chat(request_body: LLM02VulnerableChatRequest):
+async def llm02_vulnerable_chat(
+    request_body: LLM02VulnerableChatRequest,
+    request: Request,
+):
+    principal = require_llm02_authenticated_principal(request_body, request)
     return await run_llm02_chat(
         request_body.message,
-        request_body.customer_id,
+        principal.customer_id,
         mode="vulnerable",
+        principal=principal,
     )
 
 
 @app.post("/api/labs/llm02/safe/chat")
 async def llm02_safe_chat(request_body: LLM02SafeChatRequest, request: Request):
-    try:
-        principal = day2_scenario.authenticate_customer(
-            request.headers.get("authorization")
-        )
-    except day2_scenario.LLM02AuthenticationError as exc:
-        raise HTTPException(
-            status_code=401,
-            detail="valid LLM02 lab bearer token required",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
+    principal = require_llm02_authenticated_principal(request_body, request)
     return await run_llm02_chat(
         request_body.message,
         principal.customer_id,

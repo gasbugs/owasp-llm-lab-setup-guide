@@ -1,4 +1,4 @@
-"""ASGI contracts for LLM02 vulnerable lookup and server-bound identity."""
+"""ASGI contracts for LLM02 prompt-only and server-enforced disclosure."""
 from __future__ import annotations
 
 import importlib
@@ -65,20 +65,32 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.client.close()
         MAIN.llm = self.original_llm
 
-    def test_vulnerable_route_trusts_body_customer_without_authentication(self) -> None:
+    def test_vulnerable_route_authenticates_but_exposes_full_context_to_model(self) -> None:
         response = self.client.post(
             "/api/labs/llm02/vulnerable/chat",
-            json={"customer_id": "C-2002", "message": self.message},
+            headers=self.headers,
+            json={"message": self.message},
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["customer_id"], "C-2002")
-        self.assertEqual(body["trace"]["customer_id_source"], "request-body")
-        self.assertIsNone(body["trace"]["authenticated_context"])
-        self.assertIsNone(body["trace"]["query_authorized_for"])
-        self.assertIn("LAB-RECOVERY-C2002", self.llm.calls[0]["system"])
+        self.assertEqual(body["customer_id"], "C-2001")
+        self.assertEqual(
+            body["trace"]["customer_id_source"], "verified-bearer-token-map"
+        )
+        self.assertEqual(body["trace"]["query_authorized_for"], "C-2001")
+        self.assertEqual(
+            body["trace"]["disclosure_policy_owner"], "llm-system-prompt"
+        )
+        self.assertIn("공개 가능 여부를 스스로 판단", self.llm.calls[0]["system"])
+        self.assertIn("LAB-RECOVERY-C2001", self.llm.calls[0]["system"])
 
-    def test_safe_route_requires_auth_and_rejects_body_identity(self) -> None:
+    def test_both_routes_require_auth_and_reject_body_identity(self) -> None:
+        vulnerable_missing = self.client.post(
+            "/api/labs/llm02/vulnerable/chat",
+            json={"message": self.message},
+        )
+        self.assertEqual(vulnerable_missing.status_code, 401)
+
         missing = self.client.post(
             "/api/labs/llm02/safe/chat",
             json={"message": self.message},

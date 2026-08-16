@@ -65,16 +65,14 @@ def select_llm01_input_policy(message: str) -> PolicyDecision:
     # return enforce_llm01_input_policy(message)  # SAFE-ENABLE
 
 
-def trust_llm02_request_body(request_body: object, _: Request) -> CustomerBinding:
-    customer_id = getattr(request_body, "customer_id", None) or day2_scenario.LLM02_CUSTOMER_ID
-    return CustomerBinding(customer_id, "vulnerable", None)
-
-
-def authenticate_llm02_bearer(request_body: object, request: Request) -> CustomerBinding:
+def require_llm02_authenticated_principal(
+    request_body: object,
+    request: Request,
+) -> day2_scenario.LLM02Principal:
     if getattr(request_body, "customer_id", None) is not None:
         raise HTTPException(status_code=422, detail="customer_id must not be supplied by client")
     try:
-        principal = day2_scenario.authenticate_customer(
+        return day2_scenario.authenticate_customer(
             request.headers.get("authorization")
         )
     except day2_scenario.LLM02AuthenticationError as exc:
@@ -83,16 +81,26 @@ def authenticate_llm02_bearer(request_body: object, request: Request) -> Custome
             detail="valid LLM02 lab bearer token required",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+
+
+def trust_llm02_system_prompt(
+    principal: day2_scenario.LLM02Principal,
+) -> CustomerBinding:
+    return CustomerBinding(principal.customer_id, "vulnerable", principal)
+
+
+def enforce_llm02_server_data_minimization(
+    principal: day2_scenario.LLM02Principal,
+) -> CustomerBinding:
     return CustomerBinding(principal.customer_id, "safe", principal)
 
 
-def select_llm02_identity_binding(
-    request_body: object,
-    request: Request,
+def select_llm02_disclosure_policy(
+    principal: day2_scenario.LLM02Principal,
 ) -> CustomerBinding:
-    # NODEGOAT-LAB: LLM02 — switch identity binding here.
-    return trust_llm02_request_body(request_body, request)  # VULNERABLE-ACTIVE
-    # return authenticate_llm02_bearer(request_body, request)  # SAFE-ENABLE
+    # NODEGOAT-LAB: LLM02 — switch disclosure-policy ownership here.
+    return trust_llm02_system_prompt(principal)  # VULNERABLE-ACTIVE
+    # return enforce_llm02_server_data_minimization(principal)  # SAFE-ENABLE
 
 
 def include_unapproved_documents() -> Literal["vulnerable", "safe"]:

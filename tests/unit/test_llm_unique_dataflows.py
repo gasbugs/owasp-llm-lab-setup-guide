@@ -51,6 +51,17 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertNotIn("resident_id", safe)
         self.assertNotIn("recovery_token", safe)
 
+    def test_llm02_vulnerable_prompt_delegates_disclosure_to_model(self) -> None:
+        context = DAY2.customer_context("C-2001", "vulnerable")
+        prompt = DAY2.build_llm02_system_prompt(context, "vulnerable")
+        self.assertIn("공개 가능 여부를 스스로 판단", prompt)
+        self.assertIn("LAB-RECOVERY-C2001", prompt)
+
+        safe_context = DAY2.customer_context("C-2001", "safe")
+        safe_prompt = DAY2.build_llm02_system_prompt(safe_context, "safe")
+        self.assertIn("서버가 인증과 필드 허용 목록을 이미 적용", safe_prompt)
+        self.assertNotIn("LAB-RECOVERY-C2001", safe_prompt)
+
     def test_llm02_output_redaction_is_independent_defense(self) -> None:
         sanitized, fields = DAY2.redact_sensitive_output(
             "SYNTHETIC-900101-XXXXXXX LAB-RECOVERY-C2001"

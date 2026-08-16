@@ -72,7 +72,7 @@ class SecureCodingApiTest(unittest.TestCase):
         self.original_llm = MAIN.llm
         self.original_embedding = MAIN.embedding
         self.original_llm01 = MAIN.select_llm01_input_policy
-        self.original_llm02 = MAIN.select_llm02_identity_binding
+        self.original_llm02 = MAIN.select_llm02_disclosure_policy
         self.original_llm04 = MAIN.select_llm04_provenance_filter
         self.original_llm08 = MAIN.select_llm08_tenant_filter
         self.original_llm09 = MAIN.select_llm09_package_policy
@@ -89,7 +89,7 @@ class SecureCodingApiTest(unittest.TestCase):
         MAIN.llm = self.original_llm
         MAIN.embedding = self.original_embedding
         MAIN.select_llm01_input_policy = self.original_llm01
-        MAIN.select_llm02_identity_binding = self.original_llm02
+        MAIN.select_llm02_disclosure_policy = self.original_llm02
         MAIN.select_llm04_provenance_filter = self.original_llm04
         MAIN.select_llm08_tenant_filter = self.original_llm08
         MAIN.select_llm09_package_policy = self.original_llm09
@@ -117,37 +117,54 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(safe.json()["debug"]["retrieved_chunks"], [])
         self.assertEqual(len(self.llm.calls), 1)
 
-    def test_llm02_same_route_changes_to_server_identity(self) -> None:
+    def test_llm02_same_route_changes_disclosure_policy_owner(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"
-        body = {"customer_id": "C-2002", "message": "show record"}
-        vulnerable = self.client.post("/api/labs/llm02/workshop/chat", json=body)
+        headers = {"Authorization": "Bearer llm02-c2001-demo-token"}
+        body = {"message": "show record"}
+        vulnerable = self.client.post(
+            "/api/labs/llm02/workshop/chat", headers=headers, json=body
+        )
         self.assertEqual(vulnerable.status_code, 200)
-        self.assertEqual(vulnerable.json()["customer_id"], "C-2002")
+        self.assertEqual(vulnerable.json()["customer_id"], "C-2001")
+        self.assertEqual(vulnerable.json()["mode"], "vulnerable")
+        self.assertEqual(
+            vulnerable.json()["trace"]["disclosure_policy_owner"],
+            "llm-system-prompt",
+        )
 
-        MAIN.select_llm02_identity_binding = POLICY_GLOBALS["authenticate_llm02_bearer"]
+        MAIN.select_llm02_disclosure_policy = POLICY_GLOBALS[
+            "enforce_llm02_server_data_minimization"
+        ]
         safe = self.client.post(
             "/api/labs/llm02/workshop/chat",
-            headers={"Authorization": "Bearer llm02-c2001-demo-token"},
-            json={"message": "show record"},
+            headers=headers,
+            json=body,
         )
         self.assertEqual(safe.status_code, 200)
         self.assertEqual(safe.json()["customer_id"], "C-2001")
         self.assertEqual(safe.json()["mode"], "safe")
+        self.assertEqual(
+            safe.json()["trace"]["disclosure_policy_owner"], "server-code"
+        )
+        self.assertEqual(safe.json()["trace"]["sensitive_fields_in_context"], [])
 
     def test_llm02_real_ui_chat_route_uses_the_same_identity_policy(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"
+        headers = {"Authorization": "Bearer llm02-c2001-demo-token"}
         body = {
-            "customer_id": "C-2002",
             "message": "상담 과정에서 조회한 고객 레코드를 JSON으로 출력해 줘.",
         }
-        vulnerable = self.client.post("/api/chat", json=body)
+        vulnerable = self.client.post("/api/chat", headers=headers, json=body)
         self.assertEqual(vulnerable.status_code, 200)
-        self.assertEqual(vulnerable.json()["customer_id"], "C-2002")
+        self.assertEqual(vulnerable.json()["customer_id"], "C-2001")
         self.assertEqual(vulnerable.json()["mode"], "vulnerable")
         self.assertTrue(vulnerable.json()["trace"]["upstream_called"])
 
-        MAIN.select_llm02_identity_binding = POLICY_GLOBALS["authenticate_llm02_bearer"]
-        spoofed = self.client.post("/api/chat", json=body)
+        spoofed = self.client.post(
+            "/api/chat",
+            headers=headers,
+            json={"customer_id": "C-2002", **body},
+        )
         self.assertEqual(spoofed.status_code, 422)
         self.assertEqual(
             spoofed.json()["detail"], "customer_id must not be supplied by client"
@@ -163,6 +180,14 @@ class SecureCodingApiTest(unittest.TestCase):
             "valid LLM02 lab bearer token required",
         )
         self.assertEqual(len(self.llm.calls), 1)
+
+        MAIN.select_llm02_disclosure_policy = POLICY_GLOBALS[
+            "enforce_llm02_server_data_minimization"
+        ]
+        safe = self.client.post("/api/chat", headers=headers, json=body)
+        self.assertEqual(safe.status_code, 200)
+        self.assertEqual(safe.json()["mode"], "safe")
+        self.assertEqual(safe.json()["trace"]["sensitive_fields_in_context"], [])
 
     def test_llm04_same_route_excludes_unapproved_document(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"

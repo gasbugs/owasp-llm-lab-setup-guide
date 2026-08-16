@@ -147,12 +147,16 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         self.assertEqual(safe.application_decision, "block")
         self.assertEqual(approved.application_decision, "allow")
 
-    def test_llm02_safe_binding_uses_bearer_identity(self) -> None:
+    def test_llm02_authentication_is_shared_and_policy_owner_switches(self) -> None:
         body = Mock(customer_id=None)
         request = Mock(headers={"authorization": "Bearer llm02-c2001-demo-token"})
-        binding = RAG_POLICY.authenticate_llm02_bearer(body, request)
-        self.assertEqual(binding.customer_id, "C-2001")
-        self.assertEqual(binding.mode, "safe")
+        principal = RAG_POLICY.require_llm02_authenticated_principal(body, request)
+        vulnerable = RAG_POLICY.trust_llm02_system_prompt(principal)
+        safe = RAG_POLICY.enforce_llm02_server_data_minimization(principal)
+        self.assertEqual(vulnerable.customer_id, "C-2001")
+        self.assertEqual(vulnerable.mode, "vulnerable")
+        self.assertEqual(safe.customer_id, "C-2001")
+        self.assertEqual(safe.mode, "safe")
 
     def test_llm06_safe_executor_blocks_farmer_admin_tool(self) -> None:
         vulnerable = AGENT_TOOLS.execute_tool_vulnerable(

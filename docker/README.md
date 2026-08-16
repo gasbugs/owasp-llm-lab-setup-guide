@@ -26,7 +26,7 @@
 
 `/healthz`는 `default_scenario`와 전체 `scenarios` 목록을 반환합니다. 이미지 HEALTHCHECK도 `PORT`를 사용하므로 실제 uvicorn 포트와 일치합니다.
 
-Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 두 경로가 함께 들어 있습니다. 취약 endpoint는 인증 없이 request body의 `customer_id`로 SQLite 레코드를 조회하고 전체 필드를 모델 context에 넣습니다. 안전 endpoint는 Bearer token을 서버 측 `customer_id`로 매핑하며 body의 `customer_id`를 schema에서 거부한 뒤, 업무 필드 allowlist와 출력 redaction을 적용합니다. 수강생은 이미지를 직접 빌드하지 않고 정책·Python source와 두 HTTP 응답을 비교합니다.
+Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 두 경로가 함께 들어 있습니다. 두 endpoint 모두 Bearer token을 서버의 `customer_id`에 매핑합니다. 취약 endpoint는 인증 고객의 전체 레코드를 모델 context에 넣은 뒤 공개 범위 판단을 system prompt에 맡기고, 안전 endpoint는 모델 호출 전에 업무 필드 allowlist를 적용한 뒤 출력 redaction을 한 번 더 수행합니다. 수강생은 이미지를 직접 빌드하지 않고 정책·Python source와 두 HTTP 응답을 비교합니다.
 
 ## 실습 전용 검색 디버그 계약
 

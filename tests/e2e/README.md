@@ -25,7 +25,7 @@
 | LLM10 | `http://localhost:8013` | `lab-resource-rag` |
 | LLMGoat A01/A02/A04/A06/A08 | `http://localhost:5000` | `lab-llmgoat` |
 
-LLM02 검증은 인증 없는 body `customer_id` 조회, 안전 endpoint의 무인증 `401`, 인증된 body identity 위조 `422`, server-side token map으로 결정된 고객 ID와 model-context allowlist를 한 흐름에서 검사합니다.
+LLM02 검증은 두 모드 모두 같은 Bearer 인증 고객을 사용합니다. 취약 경로의 전체 레코드와 system prompt 공개 판단, 안전 경로의 model-context allowlist와 출력 redaction, 무인증 `401`, body identity 위조 `422`를 한 흐름에서 검사합니다.
 
 RAG 스크립트는 실행 전 `/healthz`의 `default_scenario`를 확인합니다. 현재 계약은 다음과 같습니다.
 
