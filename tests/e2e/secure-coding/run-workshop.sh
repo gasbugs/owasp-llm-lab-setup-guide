@@ -24,7 +24,7 @@ cleanup() {
     python3 "$ROOT/tools/toggle_secure_coding_lab.py" \
       --lab "$LAB" --mode vulnerable >/dev/null
   fi
-  rm -f "$BODY" "$NORMAL_BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object" "$BODY.html"
+  rm -f "$BODY" "$NORMAL_BODY" "$BUILD_LOG" "$BODY.request" "$BODY.object" "$BODY.html" "$BODY.ui"
 }
 trap cleanup EXIT
 
@@ -243,6 +243,10 @@ case "$LAB" in
       -X POST "$URL/api/labs/llm04/workshop/chat" \
       -H 'Content-Type: application/json' \
       -d '{"query":"2026년 송금 장애 URL을 알려 줘."}')
+    UI_STATUS=$(curl -sS --max-time 180 -o "$BODY.ui" -w '%{http_code}' \
+      -X POST "$URL/api/chat" \
+      -H 'Content-Type: application/json' \
+      -d '{"scenario":"day2","lab":"llm04","message":"2026년 송금 장애 URL을 알려 줘."}')
     ;;
   LLM05)
     curl -fsS --max-time 30 "$URL/" -o "$BODY.html"
@@ -342,6 +346,14 @@ validate_result() {
         and .retrieval.provenance_filter_applied == false
         and any(.retrieval.hits[]?; .approval_status == "unapproved")
       ' "$BODY" >/dev/null
+      jq -e --argjson status "$UI_STATUS" '
+        $status == 200
+        and .retrieval.provenance_filter_applied == false
+        and any(.retrieval.hits[]?; .approval_status == "unapproved")
+      ' "$BODY.ui" >/dev/null
+      diff -u \
+        <(jq -S '{mode,retrieval}' "$BODY") \
+        <(jq -S '{mode,retrieval}' "$BODY.ui") >/dev/null
       ;;
     LLM04:safe)
       jq -e --argjson status "$STATUS" '
@@ -349,6 +361,15 @@ validate_result() {
         and .retrieval.provenance_filter_applied == true
         and all(.retrieval.hits[]?; .approval_status == "approved")
       ' "$BODY" >/dev/null
+      jq -e --argjson status "$UI_STATUS" '
+        $status == 200
+        and .retrieval.provenance_filter_applied == true
+        and all(.retrieval.hits[]?; .approval_status == "approved")
+        and any(.retrieval.hits[]?; .source == "cloudsecuritylab-bank-policy")
+      ' "$BODY.ui" >/dev/null
+      diff -u \
+        <(jq -S '{mode,retrieval}' "$BODY") \
+        <(jq -S '{mode,retrieval}' "$BODY.ui") >/dev/null
       ;;
     LLM05:vulnerable)
       jq -e --argjson status "$STATUS" '
@@ -459,6 +480,12 @@ printf 'SEMANTIC_ASSERTION lab=%s mode=%s result=PASS\n' "$LAB" "$MODE" >&2
 
 jq -c --arg lab "$LAB" --arg mode "$MODE" --argjson http_status "$STATUS" \
   '. + {e2e_lab:$lab,e2e_mode:$mode,http_status:$http_status}' "$BODY"
+if [ -f "$BODY.ui" ]; then
+  jq -c --arg lab "$LAB" --arg mode "$MODE" \
+    --argjson http_status "$UI_STATUS" \
+    '. + {e2e_lab:$lab,e2e_mode:$mode,e2e_case:"ui-chat",http_status:$http_status}' \
+    "$BODY.ui"
+fi
 if [ -f "$BODY.object" ]; then
   jq -c --arg lab "$LAB" --arg mode "$MODE" \
     --argjson http_status "$OBJECT_STATUS" \

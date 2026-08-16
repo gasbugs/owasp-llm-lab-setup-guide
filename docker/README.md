@@ -28,9 +28,11 @@
 
 Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 두 경로가 함께 들어 있습니다. 두 endpoint 모두 Bearer token을 서버의 `customer_id`에 매핑합니다. 취약 endpoint는 인증 고객의 전체 레코드를 모델 context에 넣은 뒤 공개 범위 판단을 system prompt에 맡기고, 안전 endpoint는 모델 호출 전에 업무 필드 allowlist를 적용한 뒤 출력 redaction을 한 번 더 수행합니다. 수강생은 이미지를 직접 빌드하지 않고 정책·Python source와 두 HTTP 응답을 비교합니다.
 
+8010 UI는 Day 2 안에서 `lab=llm02`와 `lab=llm04`를 명시적으로 선택합니다. `ChatRequest.lab`은 이 두 값만 허용하며 기능 라우팅 외의 인증·승인 판정에는 사용하지 않습니다. LLM02는 기존 Bearer 인증을 유지하고, LLM04 UI 요청은 전용 workshop endpoint와 같은 `select_llm04_provenance_filter()`·`run_llm04_chat()` 경로를 사용합니다. 문서 주입 패널도 `/api/labs/llm04/documents`를 호출하므로 화면과 API가 하나의 provenance-bearing corpus를 공유합니다.
+
 ## 실습 전용 검색 디버그 계약
 
-`vuln-rag`의 `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. 이 필드는 오염 문서나 다른 tenant 문서가 실제 검색 단계에서 선택됐는지 확인하여, 검색 실패와 모델 생성 실패를 구분하는 관찰 증거입니다. 브라우저 UI와 e2e도 같은 필드를 사용합니다.
+`vuln-rag`의 일반 scenario `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM04를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 e2e가 같은 필드를 사용합니다.
 
 ```json
 {

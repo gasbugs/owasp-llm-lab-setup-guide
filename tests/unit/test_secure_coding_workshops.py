@@ -80,6 +80,26 @@ class SecureCodingWorkshopTest(unittest.TestCase):
             source,
         )
 
+    def test_llm04_workshop_and_ui_share_the_same_policy_runner(self) -> None:
+        source = (ROOT / "docker/vuln-rag/app/main.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('lab: Literal["llm02", "llm04"] | None', source)
+        self.assertIn("async def run_llm04_policy_chat(", source)
+        self.assertIn(
+            "return await run_llm04_policy_chat(request_body)", source
+        )
+        self.assertIn(
+            "await run_llm04_policy_chat(LLM04ChatRequest(query=req.message))",
+            source,
+        )
+        runner = (ROOT / "tests/e2e/secure-coding/run-workshop.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"$URL/api/chat"', runner)
+        self.assertIn('"lab":"llm04"', runner)
+        self.assertIn('e2e_case:"ui-chat"', runner)
+
     def test_publisher_e2e_builds_once_then_restarts_container_source(self) -> None:
         runner = (ROOT / "tests/e2e/secure-coding/run-workshop.sh").read_text(
             encoding="utf-8"

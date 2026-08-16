@@ -111,6 +111,19 @@ class UniqueDataFlowTests(unittest.TestCase):
         replay = template.split("replayLast.addEventListener", 1)[1]
         self.assertNotIn("fetch(", replay.split("});", 1)[0])
 
+    def test_day2_ui_selects_allowlisted_lab_and_uses_llm04_provenance_api(self) -> None:
+        template = (
+            VULN_RAG_ROOT / "app" / "templates" / "index.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn('<option value="llm02">', template)
+        self.assertIn('<option value="llm04">', template)
+        self.assertIn("body.lab = labSelect.value", template)
+        self.assertIn("/api/labs/llm04/documents", template)
+        self.assertIn("data.retrieval.hits", template)
+        self.assertIn("provenance_filter_applied", template)
+        self.assertIn("approval_status", template)
+        self.assertNotIn("llm02-c2001-demo-token", template)
+
     def test_llm07_policy_has_fragments_but_no_credential_value(self) -> None:
         policy = DAY4.LLM07_POLICY_CANONICAL
         self.assertEqual(policy["policy_id"], "PG-LITE-POLICY-2026-07")

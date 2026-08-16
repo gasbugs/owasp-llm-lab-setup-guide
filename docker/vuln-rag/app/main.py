@@ -64,6 +64,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
     scenario: str | None = None
+    lab: Literal["llm02", "llm04"] | None = None
     customer_id: str | None = None
 
 
@@ -371,6 +372,11 @@ async def llm02_secure_coding_workshop(
 
 @app.post("/api/labs/llm04/workshop/chat")
 async def llm04_secure_coding_workshop(request_body: LLM04ChatRequest):
+    return await run_llm04_policy_chat(request_body)
+
+
+async def run_llm04_policy_chat(request_body: LLM04ChatRequest) -> dict:
+    """Apply one provenance policy to the workshop API and the Day 2 UI."""
     require_day2_lab()
 
     mode = select_llm04_provenance_filter()
@@ -717,7 +723,11 @@ async def chat(req: ChatRequest, request: Request):
     """
     selected = get_scenario(req.scenario)
     if selected.id == "day2":
-        return JSONResponse(await run_llm02_policy_chat(req, request))
+        if req.lab in (None, "llm02"):
+            return JSONResponse(await run_llm02_policy_chat(req, request))
+        return JSONResponse(
+            await run_llm04_policy_chat(LLM04ChatRequest(query=req.message))
+        )
 
     llm01_decision: PolicyDecision | None = None
     if selected.id == "day1":
