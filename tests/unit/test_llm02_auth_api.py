@@ -65,7 +65,7 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.client.close()
         MAIN.llm = self.original_llm
 
-    def test_vulnerable_route_authenticates_but_exposes_full_context_to_model(self) -> None:
+    def test_vulnerable_route_authenticates_but_exposes_shared_context_to_model(self) -> None:
         response = self.client.post(
             "/api/labs/llm02/vulnerable/chat",
             headers=self.headers,
@@ -83,12 +83,15 @@ class Llm02AuthApiTest(unittest.TestCase):
         )
         self.assertEqual(
             body["trace"]["disclosure_control"],
-            "natural-language-policy-over-full-record",
+            "natural-language-policy-over-shared-customer-records",
         )
-        self.assertIn("공개 가능 여부를 스스로 판단", self.llm.calls[0]["system"])
+        self.assertEqual(body["trace"]["customer_ids_in_context"], ["C-2001", "C-2002"])
+        self.assertTrue(body["trace"]["cross_customer_context"])
+        self.assertIn("고객 범위와 공개 가능 여부를 스스로 판단", self.llm.calls[0]["system"])
         self.assertIn("LAB-RECOVERY-C2001", self.llm.calls[0]["system"])
+        self.assertIn("LAB-RECOVERY-C2002", self.llm.calls[0]["system"])
 
-    def test_both_routes_require_auth_and_reject_body_identity(self) -> None:
+    def test_both_routes_require_auth_but_only_safe_rejects_body_identity(self) -> None:
         vulnerable_missing = self.client.post(
             "/api/labs/llm02/vulnerable/chat",
             json={"message": self.message},
@@ -103,13 +106,25 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertEqual(missing.headers["www-authenticate"], "Bearer")
         self.assertEqual(len(self.llm.calls), 0)
 
+        spoofed_vulnerable = self.client.post(
+            "/api/labs/llm02/vulnerable/chat",
+            headers=self.headers,
+            json={"customer_id": "C-2002", "message": self.message},
+        )
+        self.assertEqual(spoofed_vulnerable.status_code, 200)
+        self.assertEqual(spoofed_vulnerable.json()["customer_id"], "C-2002")
+        self.assertEqual(
+            spoofed_vulnerable.json()["trace"]["customer_id_source"],
+            "request-body",
+        )
+
         spoof = self.client.post(
             "/api/labs/llm02/safe/chat",
             headers=self.headers,
             json={"customer_id": "C-2002", "message": self.message},
         )
         self.assertEqual(spoof.status_code, 422)
-        self.assertEqual(len(self.llm.calls), 0)
+        self.assertEqual(len(self.llm.calls), 1)
 
     def test_safe_route_uses_verified_identity_and_minimized_context(self) -> None:
         response = self.client.post(
@@ -134,6 +149,8 @@ class Llm02AuthApiTest(unittest.TestCase):
             ["customer_id", "delivery_status", "estimated_arrival"],
         )
         self.assertEqual(body["trace"]["sensitive_fields_in_context"], [])
+        self.assertEqual(body["trace"]["customer_ids_in_context"], ["C-2001"])
+        self.assertFalse(body["trace"]["cross_customer_context"])
         self.assertEqual(
             body["trace"]["disclosure_control"],
             "server-field-allowlist-before-model",

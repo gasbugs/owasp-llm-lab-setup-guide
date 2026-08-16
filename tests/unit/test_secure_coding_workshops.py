@@ -171,12 +171,26 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         body = Mock(customer_id=None)
         request = Mock(headers={"authorization": "Bearer llm02-c2001-demo-token"})
         principal = RAG_POLICY.require_llm02_authenticated_principal(body, request)
-        vulnerable = RAG_POLICY.trust_llm02_system_prompt(principal)
-        safe = RAG_POLICY.enforce_llm02_server_data_minimization(principal)
+        vulnerable = RAG_POLICY.trust_llm02_request_body_and_model_policy(
+            body, principal
+        )
+        safe = RAG_POLICY.enforce_llm02_authenticated_scope_and_data_minimization(
+            body, principal
+        )
         self.assertEqual(vulnerable.customer_id, "C-2001")
         self.assertEqual(vulnerable.mode, "vulnerable")
         self.assertEqual(safe.customer_id, "C-2001")
         self.assertEqual(safe.mode, "safe")
+
+        spoofed = RAG_POLICY.trust_llm02_request_body_and_model_policy(
+            Mock(customer_id="C-2002"), principal
+        )
+        self.assertEqual(spoofed.customer_id, "C-2002")
+        self.assertEqual(spoofed.customer_id_source, "request-body")
+        with self.assertRaisesRegex(Exception, "customer_id must not be supplied"):
+            RAG_POLICY.enforce_llm02_authenticated_scope_and_data_minimization(
+                Mock(customer_id="C-2002"), principal
+            )
 
     def test_llm06_safe_executor_blocks_farmer_admin_tool(self) -> None:
         vulnerable = AGENT_TOOLS.execute_tool_vulnerable(

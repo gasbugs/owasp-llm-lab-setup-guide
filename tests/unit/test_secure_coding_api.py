@@ -133,7 +133,7 @@ class SecureCodingApiTest(unittest.TestCase):
         )
 
         MAIN.select_llm02_disclosure_policy = POLICY_GLOBALS[
-            "enforce_llm02_server_data_minimization"
+            "enforce_llm02_authenticated_scope_and_data_minimization"
         ]
         safe = self.client.post(
             "/api/labs/llm02/workshop/chat",
@@ -166,9 +166,10 @@ class SecureCodingApiTest(unittest.TestCase):
             headers=headers,
             json={"customer_id": "C-2002", **body},
         )
-        self.assertEqual(spoofed.status_code, 422)
+        self.assertEqual(spoofed.status_code, 200)
+        self.assertEqual(spoofed.json()["customer_id"], "C-2002")
         self.assertEqual(
-            spoofed.json()["detail"], "customer_id must not be supplied by client"
+            spoofed.json()["trace"]["customer_id_source"], "request-body"
         )
 
         unauthenticated_ui = self.client.post(
@@ -180,11 +181,21 @@ class SecureCodingApiTest(unittest.TestCase):
             unauthenticated_ui.json()["detail"],
             "valid LLM02 lab bearer token required",
         )
-        self.assertEqual(len(self.llm.calls), 1)
+        self.assertEqual(len(self.llm.calls), 2)
 
         MAIN.select_llm02_disclosure_policy = POLICY_GLOBALS[
-            "enforce_llm02_server_data_minimization"
+            "enforce_llm02_authenticated_scope_and_data_minimization"
         ]
+        blocked_spoof = self.client.post(
+            "/api/chat",
+            headers=headers,
+            json={"customer_id": "C-2002", **body},
+        )
+        self.assertEqual(blocked_spoof.status_code, 422)
+        self.assertEqual(
+            blocked_spoof.json()["detail"],
+            "customer_id must not be supplied by client",
+        )
         safe = self.client.post("/api/chat", headers=headers, json=body)
         self.assertEqual(safe.status_code, 200)
         self.assertEqual(safe.json()["mode"], "safe")

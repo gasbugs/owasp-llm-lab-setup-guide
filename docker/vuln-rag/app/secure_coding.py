@@ -25,7 +25,9 @@ class PolicyDecision:
 class CustomerBinding:
     customer_id: str
     mode: Literal["vulnerable", "safe"]
-    principal: day2_scenario.LLM02Principal | None
+    principal: day2_scenario.LLM02Principal
+    customer_id_source: Literal["request-body", "verified-bearer-token-map"]
+    requested_customer_id: str | None
 
 
 def emit_security_event(decision: PolicyDecision, *, upstream_called: bool) -> None:
@@ -69,8 +71,7 @@ def require_llm02_authenticated_principal(
     request_body: object,
     request: Request,
 ) -> day2_scenario.LLM02Principal:
-    if getattr(request_body, "customer_id", None) is not None:
-        raise HTTPException(status_code=422, detail="customer_id must not be supplied by client")
+    del request_body
     try:
         return day2_scenario.authenticate_customer(
             request.headers.get("authorization")
@@ -83,24 +84,50 @@ def require_llm02_authenticated_principal(
         ) from exc
 
 
-def trust_llm02_system_prompt(
+def trust_llm02_request_body_and_model_policy(
+    request_body: object,
     principal: day2_scenario.LLM02Principal,
 ) -> CustomerBinding:
-    return CustomerBinding(principal.customer_id, "vulnerable", principal)
+    requested_customer_id = getattr(request_body, "customer_id", None)
+    return CustomerBinding(
+        customer_id=requested_customer_id or principal.customer_id,
+        mode="vulnerable",
+        principal=principal,
+        customer_id_source=(
+            "request-body"
+            if requested_customer_id is not None
+            else "verified-bearer-token-map"
+        ),
+        requested_customer_id=requested_customer_id,
+    )
 
 
-def enforce_llm02_server_data_minimization(
+def enforce_llm02_authenticated_scope_and_data_minimization(
+    request_body: object,
     principal: day2_scenario.LLM02Principal,
 ) -> CustomerBinding:
-    return CustomerBinding(principal.customer_id, "safe", principal)
+    requested_customer_id = getattr(request_body, "customer_id", None)
+    if requested_customer_id is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="customer_id must not be supplied by client",
+        )
+    return CustomerBinding(
+        customer_id=principal.customer_id,
+        mode="safe",
+        principal=principal,
+        customer_id_source="verified-bearer-token-map",
+        requested_customer_id=None,
+    )
 
 
 def select_llm02_disclosure_policy(
+    request_body: object,
     principal: day2_scenario.LLM02Principal,
 ) -> CustomerBinding:
-    # NODEGOAT-LAB: LLM02 — switch disclosure-policy ownership here.
-    return trust_llm02_system_prompt(principal)  # VULNERABLE-ACTIVE
-    # return enforce_llm02_server_data_minimization(principal)  # SAFE-ENABLE
+    # NODEGOAT-LAB: LLM02 — switch customer scope and disclosure ownership here.
+    return trust_llm02_request_body_and_model_policy(request_body, principal)  # VULNERABLE-ACTIVE
+    # return enforce_llm02_authenticated_scope_and_data_minimization(request_body, principal)  # SAFE-ENABLE
 
 
 def include_unapproved_documents() -> Literal["vulnerable", "safe"]:

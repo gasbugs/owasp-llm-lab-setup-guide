@@ -46,7 +46,10 @@ class UniqueDataFlowTests(unittest.TestCase):
         vulnerable = DAY2.customer_context("C-2001", "vulnerable")
         safe = DAY2.customer_context("C-2001", "safe")
         self.assertEqual(record["resident_id"], "SYNTHETIC-900101-XXXXXXX")
-        self.assertIn("recovery_token", vulnerable)
+        self.assertEqual(
+            [item["customer_id"] for item in vulnerable], ["C-2001", "C-2002"]
+        )
+        self.assertTrue(all("recovery_token" in item for item in vulnerable))
         self.assertEqual(tuple(safe), DAY2.LLM02_SAFE_FIELDS)
         self.assertNotIn("resident_id", safe)
         self.assertNotIn("recovery_token", safe)
@@ -54,8 +57,9 @@ class UniqueDataFlowTests(unittest.TestCase):
     def test_llm02_vulnerable_prompt_delegates_disclosure_to_model(self) -> None:
         context = DAY2.customer_context("C-2001", "vulnerable")
         prompt = DAY2.build_llm02_system_prompt(context, "vulnerable")
-        self.assertIn("공개 가능 여부를 스스로 판단", prompt)
+        self.assertIn("고객 범위와 공개 가능 여부를 스스로 판단", prompt)
         self.assertIn("LAB-RECOVERY-C2001", prompt)
+        self.assertIn("LAB-RECOVERY-C2002", prompt)
 
         safe_context = DAY2.customer_context("C-2001", "safe")
         safe_prompt = DAY2.build_llm02_system_prompt(safe_context, "safe")

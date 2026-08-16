@@ -119,18 +119,19 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 
 ```mermaid
 flowchart LR
-  A["Bearer token 검증"] -->|"server-side token map"| C["인증 고객 ID 결정"]
-  C --> DB["합성 SQLite 고객 DB"]
-  DB --> V["취약: 전체 레코드"]
-  V --> P["system prompt가 공개 범위 판단"]
-  DB --> F["안전: 업무 필드 allowlist"]
+  A["Bearer token 검증"] -->|"server-side token map"| C["인증 고객 C-2001"]
+  B["요청 본문 customer_id"] --> V["취약: 본문 ID 신뢰"]
+  C --> V
+  V --> DB["전체 고객 디렉터리 Context"]
+  DB --> P["system prompt가 고객 범위와 공개 여부 판단"]
+  C --> F["안전: 인증 고객 고정 + 업무 필드 allowlist"]
   F --> SM["최소 context를 모델에 전달"]
   SM --> R["응답 marker redaction"]
 ```
 
-두 endpoint의 request schema에는 `customer_id` 필드가 없습니다. 인증과 고객 객체 선택은 `docker/vuln-rag/app/scenarios/day2.py`의 token map과 `docker/vuln-rag/app/main.py`의 route에서 서버가 결정합니다. 차이는 인증이 아니라 공개 정책의 위치입니다. 취약 경로는 전체 레코드와 자연어 정책을 모델에 주고 예외 판단을 맡기며, 안전 경로는 서버가 필드를 줄인 후에만 모델을 호출합니다. 공개 GHCR의 동일 `vuln-rag` 이미지에 두 경로가 함께 있으므로 수강생은 별도 build 없이 source와 HTTP 결과만 비교합니다.
+두 경로 모두 Bearer token은 서버에서 검증한다. 취약 경로는 선택할 고객 ID를 요청 본문에서 다시 받아들이고 전체 고객 디렉터리를 모델 Context에 넣은 뒤 고객 범위와 공개 여부를 자연어 정책에 맡긴다. 안전 경로는 본문의 `customer_id`를 거부하고 token의 고객 ID로 레코드를 고정한 다음 업무 필드만 모델에 전달한다. 공개 GHCR의 동일 `vuln-rag` 이미지에 두 경로가 함께 있으므로 수강생은 별도 build 없이 source와 HTTP 결과만 비교한다.
 
-LLM02의 주석 전환 지점은 workshop에만 적용되는 별도 우회 경로가 아니다. `docker/vuln-rag/app/main.py`의 `run_llm02_policy_chat()`을 workshop endpoint와 `/api/chat`이 함께 호출한다. 안전 호출을 활성화하면 인증 방식은 그대로 유지되며, 두 경로 모두 허용 필드만 Ollama context로 전달한다.
+LLM02의 주석 전환 지점은 workshop에만 적용되는 별도 우회 경로가 아니다. `docker/vuln-rag/app/main.py`의 `run_llm02_policy_chat()`을 workshop endpoint와 `/api/chat`이 함께 호출한다. 안전 호출을 활성화하면 두 경로 모두 client-selected ID를 거부하고 인증 고객의 허용 필드만 Ollama Context로 전달한다.
 
 ## LLM08 embedding dataflow와 경계
 
