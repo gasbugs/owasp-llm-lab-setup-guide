@@ -26,7 +26,7 @@
 
 `/healthz`는 `default_scenario`와 전체 `scenarios` 목록을 반환합니다. 이미지 HEALTHCHECK도 `PORT`를 사용하므로 실제 uvicorn 포트와 일치합니다.
 
-Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 두 경로가 함께 들어 있습니다. 두 endpoint 모두 Bearer token을 검증하지만, 취약 endpoint는 body의 `customer_id`를 다시 신뢰하고 전체 고객 디렉터리를 모델 Context에 넣어 고객 범위와 공개 판단을 system prompt에 맡깁니다. 안전 endpoint는 body ID를 거부하고 인증 고객으로 조회 범위를 고정한 뒤 업무 필드 allowlist와 출력 redaction을 적용합니다. 수강생은 이미지를 직접 빌드하지 않고 정책·Python source와 두 HTTP 응답을 비교합니다.
+Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 Ollama Structured Output Planner와 read-only `get_customer_record` Tool Executor가 들어 있습니다. Planner는 사용자 문장과 tool schema만 받고 Bearer token·DB credential·고객 데이터는 받지 않습니다. 취약 실행기는 LLM이 제안한 `customer_id`와 `fields`를 그대로 조회하고, 안전 실행기는 인증 principal과 배송 field allowlist를 DB 조회 전에 검사합니다. 수강생은 이미지를 다시 build하지 않고 인접한 실행기 호출 두 줄을 바꿔 같은 요청의 `HIT`와 `PASS`를 비교합니다.
 
 8010 UI는 Day 2 안에서 `lab=llm02`와 `lab=llm04`를 명시적으로 선택합니다. `ChatRequest.lab`은 이 두 값만 허용하며 기능 라우팅 외의 인증·승인 판정에는 사용하지 않습니다. LLM02는 기존 Bearer 인증을 유지하고, LLM04 UI 요청은 전용 workshop endpoint와 같은 `select_llm04_provenance_filter()`·`run_llm04_chat()` 경로를 사용합니다. 문서 주입 패널도 `/api/labs/llm04/documents`를 호출하므로 화면과 API가 하나의 provenance-bearing corpus를 공유합니다.
 

@@ -5,7 +5,7 @@ import json
 import re
 import time
 from dataclasses import asdict, dataclass
-from typing import Literal
+from typing import Literal, Protocol
 
 from fastapi import HTTPException, Request
 
@@ -21,13 +21,22 @@ class PolicyDecision:
     max_output_tokens: int | None = None
 
 
+class CustomerToolRequest(Protocol):
+    customer_id: str | None
+    fields: list[str]
+    reason: str
+
+
 @dataclass(frozen=True)
-class CustomerBinding:
-    customer_id: str
+class CustomerToolResult:
     mode: Literal["vulnerable", "safe"]
-    principal: day2_scenario.LLM02Principal
-    customer_id_source: Literal["request-body", "verified-bearer-token-map"]
-    requested_customer_id: str | None
+    customer_id: str
+    fields: tuple[str, ...]
+    record: dict[str, str]
+
+
+class LLM02AuthorizationError(ValueError):
+    """Raised before a customer query when tool scope is not authorized."""
 
 
 def emit_security_event(decision: PolicyDecision, *, upstream_called: bool) -> None:
@@ -84,50 +93,59 @@ def require_llm02_authenticated_principal(
         ) from exc
 
 
-def trust_llm02_request_body_and_model_policy(
-    request_body: object,
+def execute_customer_tool_vulnerable(
+    tool_request: CustomerToolRequest,
     principal: day2_scenario.LLM02Principal,
-) -> CustomerBinding:
-    requested_customer_id = getattr(request_body, "customer_id", None)
-    return CustomerBinding(
-        customer_id=requested_customer_id or principal.customer_id,
+) -> CustomerToolResult:
+    requested_customer_id = tool_request.customer_id
+    requested_fields = tuple(tool_request.fields)
+    target = requested_customer_id or principal.customer_id
+    return CustomerToolResult(
         mode="vulnerable",
-        principal=principal,
-        customer_id_source=(
-            "request-body"
-            if requested_customer_id is not None
-            else "verified-bearer-token-map"
-        ),
-        requested_customer_id=requested_customer_id,
+        customer_id=target,
+        fields=requested_fields,
+        record=day2_scenario.get_customer_record(target, requested_fields),
     )
 
 
-def enforce_llm02_authenticated_scope_and_data_minimization(
-    request_body: object,
+def execute_customer_tool_safe(
+    tool_request: CustomerToolRequest,
     principal: day2_scenario.LLM02Principal,
-) -> CustomerBinding:
-    requested_customer_id = getattr(request_body, "customer_id", None)
-    if requested_customer_id is not None:
-        raise HTTPException(
-            status_code=422,
-            detail="customer_id must not be supplied by client",
-        )
-    return CustomerBinding(
-        customer_id=principal.customer_id,
+) -> CustomerToolResult:
+    requested_customer_id = tool_request.customer_id
+    requested_fields = set(tool_request.fields)
+    target = requested_customer_id or principal.customer_id
+
+    if target != principal.customer_id:
+        raise LLM02AuthorizationError("customer-scope-denied")
+
+    allowed_fields = {
+        "customer_id",
+        "delivery_status",
+        "estimated_arrival",
+    }
+    if requested_fields - allowed_fields:
+        raise LLM02AuthorizationError("field-not-allowed")
+
+    ordered_fields = tuple(tool_request.fields)
+    return CustomerToolResult(
         mode="safe",
-        principal=principal,
-        customer_id_source="verified-bearer-token-map",
-        requested_customer_id=None,
+        customer_id=principal.customer_id,
+        fields=ordered_fields,
+        record=day2_scenario.get_customer_record(
+            principal.customer_id,
+            ordered_fields,
+        ),
     )
 
 
-def select_llm02_disclosure_policy(
-    request_body: object,
+def select_llm02_tool_executor(
+    tool_request: CustomerToolRequest,
     principal: day2_scenario.LLM02Principal,
-) -> CustomerBinding:
-    # NODEGOAT-LAB: LLM02 — switch customer scope and disclosure ownership here.
-    return trust_llm02_request_body_and_model_policy(request_body, principal)  # VULNERABLE-ACTIVE
-    # return enforce_llm02_authenticated_scope_and_data_minimization(request_body, principal)  # SAFE-ENABLE
+) -> CustomerToolResult:
+    # NODEGOAT-LAB: LLM02 — switch authorization of the LLM-proposed tool call here.
+    return execute_customer_tool_vulnerable(tool_request, principal)  # VULNERABLE-ACTIVE
+    # return execute_customer_tool_safe(tool_request, principal)  # SAFE-ENABLE
 
 
 def include_unapproved_documents() -> Literal["vulnerable", "safe"]:

@@ -41,37 +41,31 @@ class UniqueDataFlowTests(unittest.TestCase):
         DAY2.reset_customer_db()
         DAY2.reset_knowledge_corpus()
 
-    def test_llm02_reads_sqlite_and_filters_before_model_context(self) -> None:
+    def test_llm02_reads_only_executor_selected_sqlite_fields(self) -> None:
         record = DAY2.customer_record("C-2001")
-        vulnerable = DAY2.customer_context("C-2001", "vulnerable")
-        safe = DAY2.customer_context("C-2001", "safe")
         self.assertEqual(record["resident_id"], "SYNTHETIC-900101-XXXXXXX")
         self.assertEqual(
-            [item["customer_id"] for item in vulnerable], ["C-2001", "C-2002"]
+            DAY2.get_customer_record(
+                "C-2001", ["delivery_status", "estimated_arrival"]
+            ),
+            {"delivery_status": "배송 중", "estimated_arrival": "2026-09-09"},
         )
-        self.assertTrue(all("recovery_token" in item for item in vulnerable))
-        self.assertEqual(tuple(safe), DAY2.LLM02_SAFE_FIELDS)
-        self.assertNotIn("resident_id", safe)
-        self.assertNotIn("recovery_token", safe)
 
-    def test_llm02_vulnerable_prompt_delegates_disclosure_to_model(self) -> None:
-        context = DAY2.customer_context("C-2001", "vulnerable")
-        prompt = DAY2.build_llm02_system_prompt(context, "vulnerable")
-        self.assertIn("고객 범위와 공개 가능 여부를 스스로 판단", prompt)
-        self.assertIn("LAB-RECOVERY-C2001", prompt)
-        self.assertIn("LAB-RECOVERY-C2002", prompt)
+    def test_llm02_planner_prompt_contains_no_credentials_or_customer_data(self) -> None:
+        prompt = DAY2.build_llm02_planner_prompt()
+        self.assertIn("get_customer_record", prompt)
+        self.assertIn("customer_id는 null", prompt)
+        self.assertNotIn("LAB-RECOVERY", prompt)
+        self.assertNotIn("llm02-c2001-demo-token", prompt)
+        self.assertNotIn("SYNTHETIC-", prompt)
 
-        safe_context = DAY2.customer_context("C-2001", "safe")
-        safe_prompt = DAY2.build_llm02_system_prompt(safe_context, "safe")
-        self.assertIn("서버가 인증과 필드 허용 목록을 이미 적용", safe_prompt)
-        self.assertNotIn("LAB-RECOVERY-C2001", safe_prompt)
-
-    def test_llm02_output_redaction_is_independent_defense(self) -> None:
-        sanitized, fields = DAY2.redact_sensitive_output(
-            "SYNTHETIC-900101-XXXXXXX LAB-RECOVERY-C2001"
+    def test_llm02_answer_prompt_contains_only_queried_record(self) -> None:
+        prompt = DAY2.build_llm02_answer_prompt(
+            {"delivery_status": "배송 중", "estimated_arrival": "2026-09-09"}
         )
-        self.assertEqual(sanitized, "[REDACTED] [REDACTED]")
-        self.assertEqual(set(fields), {"resident_id", "recovery_token"})
+        self.assertIn("배송 중", prompt)
+        self.assertNotIn("resident_id", prompt)
+        self.assertNotIn("C-2002", prompt)
 
     def test_llm02_safe_identity_comes_from_server_token_map(self) -> None:
         principal = DAY2.authenticate_customer("Bearer llm02-c2001-demo-token")

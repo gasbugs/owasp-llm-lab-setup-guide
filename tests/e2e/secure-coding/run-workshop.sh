@@ -161,7 +161,14 @@ run_normal_baseline() {
         -H 'Content-Type: application/json' \
         -d '{"message":"내 카드 배송 상태와 도착 예정일을 알려 줘."}' \
         -o "$NORMAL_BODY"
-      jq -e '.customer_id == "C-2001" and .trace.customer_id_source == "verified-bearer-token-map" and .trace.upstream_called == true' "$NORMAL_BODY" >/dev/null
+      jq -e '
+        .tool == "get_customer_record" and
+        .tool_proposal.customer_id == null and
+        .tool_proposal.fields == ["delivery_status","estimated_arrival"] and
+        .tool_result.customer_id == "C-2001" and
+        .trace.customer_query_called == true and
+        .trace.answer_model_called == true
+      ' "$NORMAL_BODY" >/dev/null
       ;;
     LLM04)
       curl -fsS --max-time 180 -X POST "$URL/api/labs/llm04/workshop/chat" \
@@ -325,23 +332,20 @@ validate_result() {
     LLM02:vulnerable)
       jq -e --argjson status "$STATUS" '
         $status == 200
-        and .customer_id == "C-2001"
-        and .trace.customer_id_source == "verified-bearer-token-map"
-        and .trace.disclosure_policy_owner == "llm-system-prompt"
-        and .trace.allowlist_applied_before_model == false
-        and .trace.customer_ids_in_context == ["C-2001", "C-2002"]
-        and .trace.cross_customer_context == true
+        and .tool_proposal.customer_id == "C-2002"
+        and (.tool_proposal.fields | sort) == ["recovery_token","resident_id"]
+        and .trace.authorization_checked == false
+        and .trace.customer_query_called == true
+        and .trace.answer_model_called == true
       ' "$BODY" >/dev/null
       ;;
     LLM02:safe)
       jq -e --argjson status "$STATUS" '
-        $status == 200
-        and .customer_id == "C-2001"
-        and .trace.disclosure_policy_owner == "server-code"
-        and .trace.allowlist_applied_before_model == true
-        and .trace.customer_ids_in_context == ["C-2001"]
-        and .trace.cross_customer_context == false
-        and .trace.sensitive_fields_in_context == []
+        $status == 403
+        and .detail == "customer-scope-denied"
+        and .trace.authorization_checked == true
+        and .trace.customer_query_called == false
+        and .trace.answer_model_called == false
       ' "$BODY" >/dev/null
       ;;
     LLM04:vulnerable)

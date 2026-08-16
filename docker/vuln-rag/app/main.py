@@ -20,17 +20,18 @@ from app.embedding import EmbeddingBackendError, EmbeddingClient
 from app.guardrails import GuardrailProxy, GuardrailProxyError
 from app.llm import LLMClient
 from app.secure_coding import (
+    LLM02AuthorizationError,
     PolicyDecision,
     emit_security_event,
-    enforce_llm02_authenticated_scope_and_data_minimization,
+    execute_customer_tool_safe,
+    execute_customer_tool_vulnerable,
     require_llm02_authenticated_principal,
     select_llm01_input_policy,
-    select_llm02_disclosure_policy,
+    select_llm02_tool_executor,
     select_llm04_provenance_filter,
     select_llm08_tenant_filter,
     select_llm09_package_policy,
     select_llm10_resource_budget,
-    trust_llm02_request_body_and_model_policy,
 )
 from app.scenarios import SCENARIO_NAMES, list_scenarios
 from app.scenarios import day2 as day2_scenario
@@ -95,6 +96,14 @@ class LLM02SafeChatRequest(BaseModel):
 
     message: str = Field(min_length=1, max_length=4096)
     customer_id: str | None = None
+
+
+class LLM02ToolProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: str | None
+    fields: list[str] = Field(min_length=1, max_length=9)
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class LLM04ChatRequest(BaseModel):
@@ -193,92 +202,129 @@ def require_day2_lab() -> None:
         raise HTTPException(status_code=404, detail="not found")
 
 
-async def run_llm02_chat(
-    message: str,
-    customer_id: str,
+def new_llm02_trace() -> dict:
+    return {
+        "planner_model_called": False,
+        "authorization_checked": False,
+        "customer_query_called": False,
+        "answer_model_called": False,
+        "authenticated_customer_id": None,
+        "requested_customer_id": None,
+        "requested_fields": [],
+        "application_decision": "block",
+        "blocking_reason": None,
+    }
+
+
+def emit_llm02_trace(trace: dict) -> None:
+    """Log policy state without bearer tokens or customer field values."""
+    print(
+        json.dumps(
+            {"event": "llm02_customer_tool", **trace},
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+
+
+async def run_llm02_tool_chat(
+    request_body: LLM02WorkshopRequest | LLM02VulnerableChatRequest | LLM02SafeChatRequest | ChatRequest,
+    request: Request,
     *,
-    mode: Literal["vulnerable", "safe"],
-    principal: day2_scenario.LLM02Principal,
-    customer_id_source: Literal["request-body", "verified-bearer-token-map"],
-    requested_customer_id: str | None,
-) -> dict:
+    executor: Literal["vulnerable", "safe", "selected"],
+) -> dict | JSONResponse:
+    """Authenticate, plan one read-only tool call, authorize, query, then answer."""
     require_day2_lab()
+    trace = new_llm02_trace()
+
     try:
-        context = day2_scenario.customer_context(customer_id, mode)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="synthetic customer not found") from exc
+        principal = require_llm02_authenticated_principal(request_body, request)
+    except HTTPException as exc:
+        trace["blocking_reason"] = "authentication-required"
+        emit_llm02_trace(trace)
+        return JSONResponse(
+            status_code=exc.status_code,
+            headers=exc.headers,
+            content={"detail": exc.detail, "trace": trace},
+        )
 
-    context_records = context if isinstance(context, list) else [context]
-    context_fields = list(dict.fromkeys(
-        field for record in context_records for field in record
-    ))
-    customer_ids_in_context = [
-        record["customer_id"]
-        for record in context_records
-        if "customer_id" in record
-    ]
-    sensitive_in_context = [
-        field
-        for field in day2_scenario.LLM02_SENSITIVE_FIELDS
-        if any(field in record for record in context_records)
-    ]
-    system_prompt = day2_scenario.build_llm02_system_prompt(context, mode)
-    reply = await llm.chat(system=system_prompt, user=message)
-    redacted_fields: list[str] = []
-    if mode == "safe":
-        reply, redacted_fields = day2_scenario.redact_sensitive_output(reply)
+    trace["authenticated_customer_id"] = principal.customer_id
+    body_customer_id = getattr(request_body, "customer_id", None)
+    if executor == "safe" and body_customer_id is not None:
+        trace["requested_customer_id"] = body_customer_id
+        trace["blocking_reason"] = "body-customer-id-forbidden"
+        emit_llm02_trace(trace)
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": "customer_id must not be supplied by client",
+                "trace": trace,
+            },
+        )
 
+    try:
+        raw_proposal = await llm.structured_chat(
+            system=day2_scenario.build_llm02_planner_prompt(),
+            user=request_body.message,
+            schema=LLM02ToolProposal.model_json_schema(),
+        )
+        trace["planner_model_called"] = True
+        proposal = LLM02ToolProposal.model_validate(raw_proposal)
+    except Exception as exc:
+        trace["planner_model_called"] = True
+        trace["blocking_reason"] = "planner-invalid-response"
+        emit_llm02_trace(trace)
+        raise HTTPException(status_code=502, detail="planner returned invalid tool proposal") from exc
+
+    trace["requested_customer_id"] = proposal.customer_id
+    trace["requested_fields"] = proposal.fields
+
+    try:
+        if executor == "vulnerable":
+            result = execute_customer_tool_vulnerable(proposal, principal)
+        elif executor == "safe":
+            trace["authorization_checked"] = True
+            result = execute_customer_tool_safe(proposal, principal)
+        else:
+            result = select_llm02_tool_executor(proposal, principal)
+            trace["authorization_checked"] = result.mode == "safe"
+    except LLM02AuthorizationError as exc:
+        trace["authorization_checked"] = True
+        trace["blocking_reason"] = str(exc)
+        emit_llm02_trace(trace)
+        return JSONResponse(
+            status_code=403,
+            content={"detail": str(exc), "trace": trace},
+        )
+    except KeyError:
+        trace["blocking_reason"] = "customer-not-found"
+        emit_llm02_trace(trace)
+        return JSONResponse(status_code=404, content={"detail": "synthetic customer not found", "trace": trace})
+    except ValueError as exc:
+        trace["blocking_reason"] = "tool-request-invalid"
+        emit_llm02_trace(trace)
+        return JSONResponse(status_code=422, content={"detail": str(exc), "trace": trace})
+
+    trace["customer_query_called"] = True
+    reply = await llm.chat(
+        system=day2_scenario.build_llm02_answer_prompt(result.record),
+        user=request_body.message,
+    )
+    trace["answer_model_called"] = True
+    trace["application_decision"] = "allow"
+    emit_llm02_trace(trace)
     return {
         "reply": reply,
         "scenario": "day2",
         "lab": "llm02-sensitive-information-disclosure",
-        "mode": mode,
-        "customer_id": customer_id,
-        "trace": {
-            "storage": "sqlite:memory:synthetic_customers",
-            "customer_id_source": customer_id_source,
-            "requested_customer_id": requested_customer_id,
-            "authenticated_context": {
-                "subject": principal.subject,
-                "customer_id": principal.customer_id,
-                "verified_by": "server-side-bearer-token-map",
-            },
-            "query_authorized_for": customer_id,
-            "customer_ids_in_context": customer_ids_in_context,
-            "cross_customer_context": any(
-                value != principal.customer_id for value in customer_ids_in_context
-            ),
-            "record_scope": (
-                "shared-customer-directory"
-                if mode == "vulnerable"
-                else "authenticated-customer-only"
-            ),
-            "queried_fields": list(day2_scenario.LLM02_ALL_FIELDS),
-            "allowlist_applied_before_model": mode == "safe",
-            "disclosure_policy_owner": (
-                "llm-system-prompt" if mode == "vulnerable" else "server-code"
-            ),
-            "disclosure_control": (
-                "natural-language-policy-over-shared-customer-records"
-                if mode == "vulnerable"
-                else "server-field-allowlist-before-model"
-            ),
-            "context_fields": context_fields,
-            "sensitive_fields_in_context": sensitive_in_context,
-            "upstream_called": True,
+        "mode": result.mode,
+        "tool": "get_customer_record",
+        "tool_proposal": proposal.model_dump(),
+        "tool_result": {
+            "customer_id": result.customer_id,
+            "fields": list(result.fields),
         },
-        "output_policy": {
-            "redaction_applied": mode == "safe",
-            "redacted_fields": redacted_fields,
-        },
-        "audit": {
-            "event": "llm02_customer_summary",
-            "decision": (
-                "allow-with-minimized-context"
-                if mode == "safe"
-                else "allow-with-system-prompt-policy"
-            ),
-        },
+        "trace": trace,
     }
 
 
@@ -348,58 +394,13 @@ async def llm01_secure_coding_workshop(request_body: ChatRequest):
 async def run_llm02_policy_chat(
     request_body: LLM02WorkshopRequest | ChatRequest,
     request: Request,
-) -> dict:
-    """Apply the same learner-switched disclosure policy to both chat routes."""
-    require_day2_lab()
-
-    try:
-        principal = require_llm02_authenticated_principal(request_body, request)
-    except HTTPException as exc:
-        emit_security_event(
-            PolicyDecision(
-                "llm02",
-                "server-authentication",
-                "block",
-                str(exc.detail),
-            ),
-            upstream_called=False,
-        )
-        raise
-
-    try:
-        binding = select_llm02_disclosure_policy(request_body, principal)
-    except HTTPException as exc:
-        emit_security_event(
-            PolicyDecision(
-                "llm02",
-                "server-customer-binding",
-                "block",
-                str(exc.detail),
-            ),
-            upstream_called=False,
-        )
-        raise
-
-    result = await run_llm02_chat(
-        request_body.message,
-        binding.customer_id,
-        mode=binding.mode,
-        principal=binding.principal,
-        customer_id_source=binding.customer_id_source,
-        requested_customer_id=binding.requested_customer_id,
+) -> dict | JSONResponse:
+    """Use the learner-switched tool executor for both workshop and UI routes."""
+    return await run_llm02_tool_chat(
+        request_body,
+        request,
+        executor="selected",
     )
-    result["workshop_policy"] = (
-        "client-scope-and-llm-disclosure"
-        if binding.mode == "vulnerable"
-        else "server-identity-and-data-minimization"
-    )
-    emit_security_event(
-        decision=PolicyDecision(
-            "llm02", result["workshop_policy"], "allow"
-        ),
-        upstream_called=True,
-    )
-    return result
 
 
 @app.post("/api/labs/llm02/workshop/chat")
@@ -563,23 +564,26 @@ async def llm02_policy():
         "lab_only": True,
         "vulnerable": {
             "authentication": "required bearer token mapped to customer_id by server",
-            "customer_id_source": "request body when supplied, otherwise verified bearer token",
-            "request_body_customer_id": "trusted",
-            "query": "client-selected customer row",
-            "model_context": "all customer records",
-            "disclosure_control": "LLM system prompt",
-            "policy_owner": "model",
+            "planner": "Ollama structured output, temperature=0",
+            "tool": "get_customer_record",
+            "tool_executor": "trusts planner customer_id and fields",
+            "database_query_order": "query before authorization",
+            "policy_owner": "LLM proposal",
         },
         "safe": {
             "authentication": "required bearer token mapped to customer_id by server",
-            "customer_id_source": "verified-bearer-token-map",
             "request_body_customer_id": "forbidden",
-            "query": "authorized customer row",
-            "model_context_allowlist": list(day2_scenario.LLM02_SAFE_FIELDS),
-            "output_redaction": list(day2_scenario.LLM02_SENSITIVE_FIELDS),
-            "disclosure_control": "server field allowlist and output redaction",
+            "customer_scope": "authenticated principal only",
+            "field_allowlist": list(day2_scenario.LLM02_SAFE_FIELDS),
+            "database_query_order": "authorization before query",
             "policy_owner": "application",
         },
+        "planner_receives": ["user message", "read-only tool schema"],
+        "planner_never_receives": [
+            "bearer token",
+            "database credential",
+            "customer records",
+        ],
     }
 
 
@@ -588,31 +592,19 @@ async def llm02_vulnerable_chat(
     request_body: LLM02VulnerableChatRequest,
     request: Request,
 ):
-    principal = require_llm02_authenticated_principal(request_body, request)
-    binding = trust_llm02_request_body_and_model_policy(request_body, principal)
-    return await run_llm02_chat(
-        request_body.message,
-        binding.customer_id,
-        mode="vulnerable",
-        principal=principal,
-        customer_id_source=binding.customer_id_source,
-        requested_customer_id=binding.requested_customer_id,
+    return await run_llm02_tool_chat(
+        request_body,
+        request,
+        executor="vulnerable",
     )
 
 
 @app.post("/api/labs/llm02/safe/chat")
 async def llm02_safe_chat(request_body: LLM02SafeChatRequest, request: Request):
-    principal = require_llm02_authenticated_principal(request_body, request)
-    binding = enforce_llm02_authenticated_scope_and_data_minimization(
-        request_body, principal
-    )
-    return await run_llm02_chat(
-        request_body.message,
-        binding.customer_id,
-        mode="safe",
-        principal=principal,
-        customer_id_source=binding.customer_id_source,
-        requested_customer_id=binding.requested_customer_id,
+    return await run_llm02_tool_chat(
+        request_body,
+        request,
+        executor="safe",
     )
 
 
@@ -773,7 +765,8 @@ async def chat(req: ChatRequest, request: Request):
     selected = get_scenario(req.scenario)
     if selected.id == "day2":
         if req.lab in (None, "llm02"):
-            return JSONResponse(await run_llm02_policy_chat(req, request))
+            result = await run_llm02_policy_chat(req, request)
+            return result if isinstance(result, JSONResponse) else JSONResponse(result)
         return JSONResponse(
             await run_llm04_policy_chat(LLM04ChatRequest(query=req.message))
         )

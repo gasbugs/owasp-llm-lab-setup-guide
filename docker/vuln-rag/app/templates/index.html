@@ -201,6 +201,14 @@ form.addEventListener('submit', async (e) => {
     }));
     add('debug', '[retrieved] ' + JSON.stringify(data.retrieval.hits ?? []));
   }
+  if (data.tool_proposal || data.trace?.blocking_reason) {
+    add('debug', '[llm02-tool] ' + JSON.stringify({
+      tool: data.tool ?? 'get_customer_record',
+      proposal: data.tool_proposal ?? null,
+      result: data.tool_result ?? null,
+      trace: data.trace ?? null,
+    }));
+  }
   if (data.debug?.runtime_model) {
     add('debug', '[model] ' + JSON.stringify({
       runtime_model: data.debug.runtime_model,

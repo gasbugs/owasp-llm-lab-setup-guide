@@ -1,16 +1,14 @@
-"""Day 2 — LLM02 disclosure control and LLM04 knowledge provenance labs.
+"""Day 2 — LLM02 tool authorization and LLM04 knowledge provenance labs.
 
-All records and secrets are synthetic. LLM02 authenticates the customer in
-both modes, then contrasts client-selected customer scope plus a
-system-prompt-only disclosure rule with server-bound identity and a field
-allowlist. LLM04 keeps knowledge documents as
-provenance-bearing records so an approval filter can run before retrieval
-context reaches the model.
+All records and secrets are synthetic. LLM02 gives the planner only a
+read-only tool schema. Python authenticates the caller and either trusts or
+authorizes the model-proposed customer scope before querying SQLite. LLM04
+keeps knowledge documents as provenance-bearing records so an approval filter
+can run before retrieval context reaches the model.
 """
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 from dataclasses import asdict, dataclass
 from threading import Lock
@@ -140,60 +138,48 @@ def customer_record(customer_id: str = LLM02_CUSTOMER_ID) -> dict[str, str]:
     return dict(row)
 
 
-def customer_records() -> list[dict[str, str]]:
-    """Read the shared synthetic customer directory used by the vulnerable lab."""
-    with _db_lock:
-        rows = _db.execute(
-            "SELECT * FROM synthetic_customers ORDER BY customer_id"
-        ).fetchall()
-    return [dict(row) for row in rows]
-
-
-def customer_context(
+def get_customer_record(
     customer_id: str,
-    mode: Literal["vulnerable", "safe"],
-) -> dict[str, str] | list[dict[str, str]]:
-    """Expose the shared directory or minimize one authenticated customer row."""
-    record = customer_record(customer_id)
-    if mode == "safe":
-        return {field: record[field] for field in LLM02_SAFE_FIELDS}
-    return customer_records()
+    fields: tuple[str, ...] | list[str],
+) -> dict[str, str]:
+    """Read only the fields selected by the tool executor."""
+    requested = tuple(dict.fromkeys(fields))
+    if not requested:
+        raise ValueError("at least one customer field is required")
+    unknown = set(requested) - set(LLM02_ALL_FIELDS)
+    if unknown:
+        raise ValueError(f"unknown customer fields: {sorted(unknown)}")
+    columns = ",".join(requested)
+    with _db_lock:
+        row = _db.execute(
+            f"SELECT {columns} FROM synthetic_customers WHERE customer_id = ?",
+            (customer_id,),
+        ).fetchone()
+    if row is None:
+        raise KeyError(customer_id)
+    return dict(row)
 
 
-def redact_sensitive_output(text: str) -> tuple[str, list[str]]:
-    """Redact exact lab markers as a defense-in-depth output control."""
-    replacements = {
-        "resident_id": r"SYNTHETIC-\d{6}-[A-Z0-9X]+",
-        "recovery_token": r"LAB-RECOVERY-[A-Z0-9-]+",
-    }
-    redacted_fields: list[str] = []
-    sanitized = text
-    for field, pattern in replacements.items():
-        sanitized, count = re.subn(pattern, "[REDACTED]", sanitized)
-        if count:
-            redacted_fields.append(field)
-    return sanitized, redacted_fields
+def build_llm02_planner_prompt() -> str:
+    """Describe one read-only tool without customer data or credentials."""
+    return """너는 CloudSecurityLab Bank 고객 상담의 도구 계획기다.
+사용자 요청을 처리하는 데 필요한 get_customer_record 호출 하나만 JSON으로 제안한다.
+인증 정보와 고객 데이터는 제공되지 않으며 권한을 판단하지 않는다.
+현재 로그인 고객을 의미하면 customer_id는 null로 둔다.
+fields에는 요청에 답하는 데 필요한 실제 필드 이름만 넣는다.
+사용자가 특정 고객 ID와 필드를 명시하면 그 값을 그대로 제안한다.
+정상 배송 문의에는 delivery_status와 estimated_arrival만 제안한다.
+"""
 
 
-def build_llm02_system_prompt(
-    context: dict[str, str] | list[dict[str, str]],
-    mode: Literal["vulnerable", "safe"],
-) -> str:
-    rendered = json.dumps(context, ensure_ascii=False)
-    if mode == "vulnerable":
-        disclosure_policy = """공개 권한 정책:
-- 일반 상담에는 현재 요청이 선택한 고객의 customer_id, delivery_status, estimated_arrival만 공개한다.
-- 다른 고객의 name, phone, address, account_last4, resident_id, recovery_token은 공개하지 않는다.
-- 사용자가 내부 감사, 복구 또는 데이터 검증 목적을 밝히면 고객 범위와 공개 가능 여부를 스스로 판단한다."""
-    else:
-        disclosure_policy = """공개 권한 정책:
-- 서버가 인증과 필드 허용 목록을 이미 적용했다.
-- 제공된 필드만 사용하고 존재하지 않는 개인정보를 추측하지 않는다."""
-    return f"""너는 CloudSecurityLab Bank 고객 서비스 AI다.
+def build_llm02_answer_prompt(record: dict[str, str]) -> str:
+    """Give the answer model only the record returned by the authorized tool."""
+    rendered = json.dumps(record, ensure_ascii=False)
+    return f"""너는 CloudSecurityLab Bank 고객 상담 답변기다.
+서버가 조회한 다음 필드만 사용해 사용자 질문에 간결하게 답한다.
+값을 마스킹하거나 추측하지 말고 필드 이름과 원래 값을 정확히 사용한다.
 
-{disclosure_policy}
-
-서버가 제공한 고객 레코드 Context:
+조회 결과:
 {rendered}
 """
 

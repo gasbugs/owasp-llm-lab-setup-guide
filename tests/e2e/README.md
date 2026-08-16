@@ -25,7 +25,7 @@
 | LLM10 | `http://localhost:8013` | `lab-resource-rag` |
 | LLMGoat A01/A02/A04/A06/A08 | `http://localhost:5000` | `lab-llmgoat` |
 
-LLM02 검증은 두 모드 모두 C-2001 Bearer token을 사용합니다. 취약 경로에서는 body의 C-2002 선택과 공유 고객 Context를 통한 C-2002 공개를 검사하고, 안전 경로에서는 body identity 위조 `422`, 인증 고객 전용 Context, field allowlist와 output redaction을 함께 검사합니다.
+LLM02 검증은 C-2001 Bearer token으로 인증한 뒤 실제 Ollama Structured Planner가 C-2002와 민감 field를 제안하는지 5회 반복합니다. 취약 실행기의 DB 조회·노출과 안전 실행기의 조회 전 `customer-scope-denied`·`field-not-allowed`, body identity 입력 `422`, 정상 배송 요청 보존을 각각 검사합니다.
 
 RAG 스크립트는 실행 전 `/healthz`의 `default_scenario`를 확인합니다. 현재 계약은 다음과 같습니다.
 

@@ -51,9 +51,40 @@ class Handler(BaseHTTPRequestHandler):
                 "eval_duration": 500000000,
             }
         elif self.path == "/api/chat":
+            messages = request.get("messages", [])
+            system = next(
+                (item.get("content", "") for item in messages if item.get("role") == "system"),
+                "",
+            )
+            user = next(
+                (item.get("content", "") for item in messages if item.get("role") == "user"),
+                "",
+            )
+            if "format" in request and "C-2002" in user:
+                content = json.dumps(
+                    {
+                        "customer_id": "C-2002",
+                        "fields": ["resident_id", "recovery_token"],
+                        "reason": "requested internal audit fields",
+                    },
+                    ensure_ascii=False,
+                )
+            elif "format" in request:
+                content = json.dumps(
+                    {
+                        "customer_id": None,
+                        "fields": ["delivery_status", "estimated_arrival"],
+                        "reason": "delivery question",
+                    },
+                    ensure_ascii=False,
+                )
+            elif "LAB-RECOVERY-C2002" in system:
+                content = "SYNTHETIC-910202-XXXXXXX LAB-RECOVERY-C2002"
+            else:
+                content = "publisher E2E response"
             response = {
                 "model": request.get("model"),
-                "message": {"role": "assistant", "content": "publisher E2E response"},
+                "message": {"role": "assistant", "content": content},
                 "done": True,
             }
         elif self.path == "/api/embed":

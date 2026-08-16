@@ -115,23 +115,26 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 | `lab-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
 | `lab-fake-registry` | 8002 | Day 4 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
 
-## LLM02 고객 인증과 데이터 최소화 경계
+## LLM02 Planner와 Tool Executor 인가 경계
 
 ```mermaid
 flowchart LR
-  A["Bearer token 검증"] -->|"server-side token map"| C["인증 고객 C-2001"]
-  B["요청 본문 customer_id"] --> V["취약: 본문 ID 신뢰"]
-  C --> V
-  V --> DB["전체 고객 디렉터리 Context"]
-  DB --> P["system prompt가 고객 범위와 공개 여부 판단"]
-  C --> F["안전: 인증 고객 고정 + 업무 필드 allowlist"]
-  F --> SM["최소 context를 모델에 전달"]
-  SM --> R["응답 marker redaction"]
+  A["Bearer token 검증"] -->|"server-side token map"| C["인증 principal C-2001"]
+  U["사용자 문장"] --> P["Ollama Structured Planner"]
+  S["read-only tool schema"] --> P
+  P --> T["customer_id·fields 제안"]
+  T --> V["취약: 제안을 그대로 DB 조회"]
+  C --> F["안전: 고객 범위·field allowlist 검사"]
+  T --> F
+  F -->|"허용"| DB["선택 field만 DB 조회"]
+  F -->|"거부"| X["403, DB 미조회"]
+  V --> DB
+  DB --> R["Answer LLM"]
 ```
 
-두 경로 모두 Bearer token은 서버에서 검증한다. 취약 경로는 선택할 고객 ID를 요청 본문에서 다시 받아들이고 전체 고객 디렉터리를 모델 Context에 넣은 뒤 고객 범위와 공개 여부를 자연어 정책에 맡긴다. 안전 경로는 본문의 `customer_id`를 거부하고 token의 고객 ID로 레코드를 고정한 다음 업무 필드만 모델에 전달한다. 공개 GHCR의 동일 `vuln-rag` 이미지에 두 경로가 함께 있으므로 수강생은 별도 build 없이 source와 HTTP 결과만 비교한다.
+Planner는 사용자 문장과 tool schema만 받으며 Bearer token·DB credential·고객 레코드를 받지 않는다. 취약점은 애플리케이션의 광범위한 DB 권한으로 실행되는 Python Tool Executor가 LLM의 C-2002와 민감 field 제안을 신뢰하는 데 있다. 안전 실행기는 인증 principal과 배송 field allowlist를 검사한 다음에만 DB를 조회한다.
 
-LLM02의 주석 전환 지점은 workshop에만 적용되는 별도 우회 경로가 아니다. `docker/vuln-rag/app/main.py`의 `run_llm02_policy_chat()`을 workshop endpoint와 `/api/chat`이 함께 호출한다. 안전 호출을 활성화하면 두 경로 모두 client-selected ID를 거부하고 인증 고객의 허용 필드만 Ollama Context로 전달한다.
+LLM02의 주석 전환 지점은 workshop에만 적용되는 별도 우회 경로가 아니다. `docker/vuln-rag/app/main.py`의 `run_llm02_policy_chat()`을 workshop endpoint와 `/api/chat`이 함께 호출한다. 안전 호출을 활성화하면 두 경로 모두 같은 Planner 제안을 Python 인가 코드에서 조회 전에 차단한다.
 
 ## LLM08 embedding dataflow와 경계
 

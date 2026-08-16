@@ -76,9 +76,10 @@ class SecureCodingWorkshopTest(unittest.TestCase):
             source,
         )
         self.assertIn(
-            "return JSONResponse(await run_llm02_policy_chat(req, request))",
+            "result = await run_llm02_policy_chat(req, request)",
             source,
         )
+        self.assertIn("return result if isinstance(result, JSONResponse)", source)
 
     def test_llm04_workshop_and_ui_share_the_same_policy_runner(self) -> None:
         source = (ROOT / "docker/vuln-rag/app/main.py").read_text(
@@ -167,30 +168,32 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         self.assertEqual(safe.application_decision, "block")
         self.assertEqual(approved.application_decision, "allow")
 
-    def test_llm02_authentication_is_shared_and_policy_owner_switches(self) -> None:
-        body = Mock(customer_id=None)
+    def test_llm02_authentication_is_shared_and_tool_authorization_switches(self) -> None:
+        body = Mock()
         request = Mock(headers={"authorization": "Bearer llm02-c2001-demo-token"})
         principal = RAG_POLICY.require_llm02_authenticated_principal(body, request)
-        vulnerable = RAG_POLICY.trust_llm02_request_body_and_model_policy(
-            body, principal
+        normal = Mock(
+            customer_id=None,
+            fields=["delivery_status", "estimated_arrival"],
+            reason="delivery",
         )
-        safe = RAG_POLICY.enforce_llm02_authenticated_scope_and_data_minimization(
-            body, principal
-        )
+        vulnerable = RAG_POLICY.execute_customer_tool_vulnerable(normal, principal)
+        safe = RAG_POLICY.execute_customer_tool_safe(normal, principal)
         self.assertEqual(vulnerable.customer_id, "C-2001")
         self.assertEqual(vulnerable.mode, "vulnerable")
         self.assertEqual(safe.customer_id, "C-2001")
         self.assertEqual(safe.mode, "safe")
 
-        spoofed = RAG_POLICY.trust_llm02_request_body_and_model_policy(
-            Mock(customer_id="C-2002"), principal
+        attack = Mock(
+            customer_id="C-2002",
+            fields=["resident_id", "recovery_token"],
+            reason="internal audit",
         )
-        self.assertEqual(spoofed.customer_id, "C-2002")
-        self.assertEqual(spoofed.customer_id_source, "request-body")
-        with self.assertRaisesRegex(Exception, "customer_id must not be supplied"):
-            RAG_POLICY.enforce_llm02_authenticated_scope_and_data_minimization(
-                Mock(customer_id="C-2002"), principal
-            )
+        exposed = RAG_POLICY.execute_customer_tool_vulnerable(attack, principal)
+        self.assertEqual(exposed.customer_id, "C-2002")
+        self.assertIn("recovery_token", exposed.record)
+        with self.assertRaisesRegex(Exception, "customer-scope-denied"):
+            RAG_POLICY.execute_customer_tool_safe(attack, principal)
 
     def test_llm06_safe_executor_blocks_farmer_admin_tool(self) -> None:
         vulnerable = AGENT_TOOLS.execute_tool_vulnerable(

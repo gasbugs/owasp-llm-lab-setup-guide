@@ -1,6 +1,7 @@
 """Ollama HTTP API 얇은 래퍼."""
 from __future__ import annotations
 
+import json
 import os
 import httpx
 
@@ -43,3 +44,31 @@ class LLMClient:
             r.raise_for_status()
             data = r.json()
             return data["message"]["content"]
+
+    async def structured_chat(
+        self,
+        system: str,
+        user: str,
+        schema: dict,
+    ) -> dict:
+        """Ask Ollama for schema-constrained JSON with deterministic sampling."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            r = await client.post(
+                f"{self.base}/api/chat",
+                json={
+                    "model": self.model,
+                    "stream": False,
+                    "format": schema,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "options": {"temperature": 0},
+                },
+            )
+            r.raise_for_status()
+            content = r.json()["message"]["content"]
+            parsed = json.loads(content)
+            if not isinstance(parsed, dict):
+                raise ValueError("structured Ollama response must be an object")
+            return parsed
