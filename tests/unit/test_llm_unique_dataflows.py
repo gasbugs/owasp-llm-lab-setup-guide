@@ -120,6 +120,9 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertIn("data.retrieval.hits", template)
         self.assertIn("provenance_filter_applied", template)
         self.assertIn("approval_status", template)
+        self.assertNotIn('id="doc-approval"', template)
+        self.assertNotIn("approval_status: approvalStatus", template)
+        self.assertIn("승인 상태는 업로드 사용자가 선택할 수 없습니다", template)
         self.assertNotIn("llm02-c2001-demo-token", template)
 
     def test_llm07_policy_has_fragments_but_no_credential_value(self) -> None:

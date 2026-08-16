@@ -100,13 +100,7 @@
         <label for="doc-source">문서 출처</label>
         <input id="doc-source" type="text" value="external-notice" required>
       </div>
-      <div class="row">
-        <label for="doc-approval">승인 상태</label>
-        <select id="doc-approval">
-          <option value="unapproved">unapproved</option>
-          <option value="approved">approved</option>
-        </select>
-      </div>
+      <p>업로드 문서는 서버가 항상 <code>unapproved</code>로 등록합니다. 승인 상태는 업로드 사용자가 선택할 수 없습니다.</p>
       <button type="submit">문서 주입</button>
       <button id="refresh-docs" type="button">목록 새로고침</button>
       <div id="inject-status" class="status"></div>
@@ -129,7 +123,6 @@ const injectForm = document.getElementById('inject-form');
 const docTitle = document.getElementById('doc-title');
 const docText = document.getElementById('doc-text');
 const docSource = document.getElementById('doc-source');
-const docApproval = document.getElementById('doc-approval');
 const injectStatus = document.getElementById('inject-status');
 const refreshDocs = document.getElementById('refresh-docs');
 const docList = document.getElementById('doc-list');
@@ -332,7 +325,6 @@ injectForm.addEventListener('submit', async (e) => {
   const title = docTitle.value.trim();
   const text = docText.value.trim();
   const source = docSource.value.trim();
-  const approvalStatus = docApproval.value;
   if (!title || !text || !source) return;
 
   injectStatus.textContent = '문서를 주입하는 중...';
@@ -341,7 +333,7 @@ injectForm.addEventListener('submit', async (e) => {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(llm04Mode
-      ? { title, text, source, approval_status: approvalStatus }
+      ? { title, text, source }
       : { title, text, scenario: scenarioSelect.value }),
   });
   const data = await r.json();

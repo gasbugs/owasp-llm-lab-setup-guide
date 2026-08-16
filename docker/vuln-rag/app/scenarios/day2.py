@@ -243,14 +243,17 @@ _BASELINE_DOCUMENTS = (
     ),
 )
 _documents: list[KnowledgeDocument] = list(_BASELINE_DOCUMENTS)
+_documents_lock = Lock()
 
 
 def reset_knowledge_corpus() -> None:
-    _documents[:] = _BASELINE_DOCUMENTS
+    with _documents_lock:
+        _documents[:] = _BASELINE_DOCUMENTS
 
 
 def document_records() -> list[dict[str, str]]:
-    return [asdict(document) for document in _documents]
+    with _documents_lock:
+        return [asdict(document) for document in _documents]
 
 
 def retrieve_documents(
@@ -339,10 +342,21 @@ def add_doc(
     revision: str = "1",
     approval_status: Literal["approved", "unapproved"] = "unapproved",
     ingestion_actor: str = "anonymous-lab-user",
-) -> None:
-    document_id = f"upload/{len(_documents) + 1}"
-    _documents.append(
-        KnowledgeDocument(
+) -> dict[str, str]:
+    with _documents_lock:
+        for existing in _documents:
+            if (
+                existing.title == title
+                and existing.text == text
+                and existing.source == source
+                and existing.revision == revision
+                and existing.approval_status == approval_status
+                and existing.ingestion_actor == ingestion_actor
+            ):
+                return asdict(existing)
+
+        document_id = f"upload/{len(_documents) + 1}"
+        document = KnowledgeDocument(
             document_id=document_id,
             title=title,
             text=text,
@@ -351,7 +365,8 @@ def add_doc(
             approval_status=approval_status,
             ingestion_actor=ingestion_actor,
         )
-    )
+        _documents.append(document)
+        return asdict(document)
 
 
 def list_docs() -> List[str]:

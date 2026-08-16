@@ -144,10 +144,6 @@ class LLM08RagPoisoningDocumentRequest(BaseModel):
     text: str = Field(min_length=1, max_length=10000)
     source: str = Field(default="learner-upload", min_length=1, max_length=200)
     revision: str = Field(default="1", min_length=1, max_length=50)
-    approval_status: Literal["approved", "unapproved"] = "unapproved"
-    ingestion_actor: str = Field(
-        default="anonymous-lab-user", min_length=1, max_length=200
-    )
 
 
 class LLM02WorkshopRequest(BaseModel):
@@ -679,11 +675,15 @@ async def llm08_rag_documents():
 @app.post("/api/labs/llm08/rag-poisoning/documents")
 async def llm08_rag_add_document(request_body: LLM08RagPoisoningDocumentRequest):
     require_day2_lab()
-    day2_scenario.add_doc(**request_body.model_dump())
+    document = day2_scenario.add_doc(
+        **request_body.model_dump(),
+        approval_status="unapproved",
+        ingestion_actor="llm08-lab-upload-api",
+    )
     return {
         "ok": True,
         "lab_only": True,
-        "document": day2_scenario.document_records()[-1],
+        "document": document,
     }
 
 
