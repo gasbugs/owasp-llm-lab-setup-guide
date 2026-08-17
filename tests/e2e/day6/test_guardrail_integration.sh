@@ -41,6 +41,19 @@ start_presidio() {
   wait_health http://127.0.0.1:18091/healthz
 }
 
+start_presidio_chained() {
+  mode="$1"
+  labs="$2"
+  podman run -d --replace --name day6-presidio-api \
+    --network slirp4netns:allow_host_loopback=true \
+    -p 127.0.0.1:18091:8013 \
+    -e RUN_MODE=server -e "GUARD_MODE=$mode" -e "ENABLE_LAB_ENDPOINTS=$labs" \
+    -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+    -e "OLLAMA_MODEL=$MODEL" \
+    "$PRESIDIO_IMAGE" >/dev/null
+  wait_health http://127.0.0.1:18091/healthz
+}
+
 start_nemo() {
   mode="$1"
   labs="$2"
@@ -202,6 +215,31 @@ wait_health http://127.0.0.1:18090/healthz
 chat http://127.0.0.1:18090 "$ATTACK" | tee "$WORK/ui-nemo-enforce.json" >/dev/null
 jq -e '.guardrail.engine=="nemo" and .guardrail.decision=="block" and .guardrail.upstream_called==false' \
   "$WORK/ui-nemo-enforce.json" >/dev/null
+
+printf 'SEQUENCE: OWASP app -> NeMo -> Ollama, then add Presidio around the same path\n'
+start_nemo enforce true
+podman run -d --replace --name day6-guardrail-ui \
+  --network slirp4netns:allow_host_loopback=true \
+  -p 127.0.0.1:18090:8000 \
+  -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=nemo \
+  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+  "$UI_IMAGE" >/dev/null
+wait_health http://127.0.0.1:18090/healthz
+chat http://127.0.0.1:18090 "$BENIGN" | tee "$WORK/ui-nemo-first.json" >/dev/null
+jq -e '.guardrail.engine=="nemo" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and .guardrail.stage_order==["input_rail","ollama_main","output_rail"]' \
+  "$WORK/ui-nemo-first.json" >/dev/null
+
+start_presidio_chained enforce true
+podman run -d --replace --name day6-guardrail-ui \
+  --network slirp4netns:allow_host_loopback=true \
+  -p 127.0.0.1:18090:8000 \
+  -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
+  -e PRESIDIO_URL=http://10.0.2.2:18091 \
+  "$UI_IMAGE" >/dev/null
+wait_health http://127.0.0.1:18090/healthz
+chat http://127.0.0.1:18090 "$PII" | tee "$WORK/ui-presidio-after-nemo.json" >/dev/null
+jq -e '.guardrail.engine=="presidio" and .guardrail.decision=="redact" and .guardrail.path=="presidio>nemo>ollama>presidio" and .guardrail.stage_order==["presidio_input","nemo_input","ollama_main","nemo_output","presidio_output"] and .guardrail.inner_guardrail.engine=="nemo" and .guardrail.inner_guardrail.upstream_called==true' \
+  "$WORK/ui-presidio-after-nemo.json" >/dev/null
 
 printf 'LOGS\n'
 podman logs day6-presidio-api

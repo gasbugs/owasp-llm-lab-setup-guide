@@ -12,8 +12,8 @@ CLI가 아니다. 이 저장소가 정상·위험 사례를 반복 검증하려�
 ## 이미지 빌드
 
 ```bash
-podman build -t localhost/day6-presidio:2.2.362 examples/day6/presidio
 podman build -t localhost/day6-nemo-guardrails:0.22.0 examples/day6/nemo-guardrails
+podman build -t localhost/day6-presidio:2.2.362 examples/day6/presidio
 podman build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
 ```
 
@@ -42,15 +42,10 @@ podman run --rm --network slirp4netns:allow_host_loopback=true \
 각각 18091과 18092를 사용한다. 기존 UI는 18090이다. 세 포트는 모두
 `127.0.0.1`에만 bind하며 Security Group ingress를 추가하지 않는다.
 
-```bash
-podman run -d --replace --name day6-presidio-api \
-  --network slirp4netns:allow_host_loopback=true \
-  -p 127.0.0.1:18091:8013 \
-  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
-  -e OLLAMA_URL=http://host.containers.internal:11434 \
-  -e OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
-  localhost/day6-presidio:2.2.362
+먼저 NeMo만 연결해 `OWASP Application → NeMo Guardrails → LLM Model` 경로를
+확인한다.
 
+```bash
 podman run -d --replace --name day6-nemo-guardrails-api \
   --network slirp4netns:allow_host_loopback=true \
   -p 127.0.0.1:18092:8013 \
@@ -58,6 +53,25 @@ podman run -d --replace --name day6-nemo-guardrails-api \
   -e OLLAMA_URL=http://host.containers.internal:11434 \
   -e OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
   localhost/day6-nemo-guardrails:0.22.0
+
+podman run -d --replace --name day6-guardrail-ui \
+  --network slirp4netns:allow_host_loopback=true \
+  -p 127.0.0.1:18090:8000 \
+  -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=nemo \
+  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+  localhost/day6-guardrail-ui:latest
+```
+
+NeMo 경로가 정상 동작한 뒤 Presidio를 앞단에 추가하고 UI를 교체한다. 최종 요청
+경로는 `OWASP Application → Presidio → NeMo Guardrails → LLM Model`이다.
+
+```bash
+podman run -d --replace --name day6-presidio-api \
+  --network slirp4netns:allow_host_loopback=true \
+  -p 127.0.0.1:18091:8013 \
+  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
+  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+  localhost/day6-presidio:2.2.362
 
 podman run -d --replace --name day6-guardrail-ui \
   --network slirp4netns:allow_host_loopback=true \
@@ -85,8 +99,9 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 
 - 브라우저 JavaScript는 기존 UI backend의 `/api/chat`만 호출한다.
 - UI backend가 선택된 guard API로 요청을 전달한다.
-- Presidio에서는 Python이 input PII 분석·비식별화, Ollama, output PII 분석·비식별화 순서를 집행한다.
-- NeMo에서는 NeMo rail 실행기가 input/output rail과 모델 호출 흐름을 조정한다.
+- Presidio에서는 Python이 input PII 분석·비식별화 후 NeMo를 호출하고, 반환값에 output PII 분석·비식별화를 적용한다.
+- NeMo에서는 NeMo rail 실행기가 input rail, LLM 호출, output rail 순서를 조정한다.
+- 최종 왕복 경로는 `Application → Presidio input → NeMo input → LLM → NeMo output → Presidio output → Application`이다.
 - 18090~18092와 11434를 공인 인터페이스나 `0.0.0.0/0` Security Group에 노출하지 않는다.
 - 원격 브라우저는 기존 SSM port forwarding 경로를 사용한다.
 

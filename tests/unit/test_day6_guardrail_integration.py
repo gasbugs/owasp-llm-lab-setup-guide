@@ -78,6 +78,15 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn('supported_entity="KR_RRN"', core)
         self.assertIn('supported_entity="DEMO_API_KEY"', core)
 
+    def test_presidio_can_wrap_the_nemo_model_path(self) -> None:
+        server = read(PRESIDIO / "server.py")
+        self.assertIn('NEMO_GUARD_URL = os.getenv("NEMO_GUARD_URL", "")', server)
+        self.assertIn('f"{NEMO_GUARD_URL}/api/chat"', server)
+        self.assertIn('model_stages = ["nemo_input"]', server)
+        self.assertIn('model_stages.extend(["ollama_main", "nemo_output"])', server)
+        self.assertIn('"presidio>nemo>ollama>presidio"', server)
+        self.assertIn('"inner_guardrail": inner_guardrail', server)
+
     def test_ui_calls_only_its_backend_for_chat(self) -> None:
         proxy = read(UI / "app" / "guardrails.py")
         backend = read(UI / "app" / "main.py")

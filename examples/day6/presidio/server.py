@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Loopback HTTP integration API for Microsoft Presidio and Ollama."""
+"""Loopback HTTP integration API for Presidio around NeMo or Ollama."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ if GUARD_ENGINE not in {"presidio", "off"}:
 ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
+NEMO_GUARD_URL = os.getenv("NEMO_GUARD_URL", "").rstrip("/")
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 CORE = PresidioCore()
 
@@ -101,6 +102,27 @@ async def call_ollama(message: str) -> str:
         return str(response.json()["message"]["content"])
 
 
+async def call_model_path(message: str) -> tuple[str, dict | None, list[str]]:
+    """Send sanitized input through NeMo when its URL is configured."""
+    if not NEMO_GUARD_URL:
+        return await call_ollama(message), None, ["ollama_main"]
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(240.0)) as client:
+        response = await client.post(
+            f"{NEMO_GUARD_URL}/api/chat",
+            json={"message": message},
+        )
+        response.raise_for_status()
+        payload = response.json()
+    guardrail = payload.get("guardrail")
+    if not isinstance(payload.get("reply"), str) or not isinstance(guardrail, dict):
+        raise ValueError("NeMo guardrail returned an invalid contract")
+    model_stages = ["nemo_input"]
+    if guardrail.get("upstream_called") is True:
+        model_stages.extend(["ollama_main", "nemo_output"])
+    return str(payload["reply"]), guardrail, model_stages
+
+
 def base_guardrail(*, decision: str, upstream_called: bool, duration_ms: float) -> dict:
     return {
         "engine": "presidio" if GUARD_ENGINE != "off" else "off",
@@ -124,6 +146,8 @@ async def healthz() -> dict:
         "guard_mode": GUARD_MODE,
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
         "ollama_model": OLLAMA_MODEL,
+        "upstream_path": "nemo>ollama" if NEMO_GUARD_URL else "ollama",
+        "nemo_guard_url": NEMO_GUARD_URL or None,
         "security_monitoring": bool(SECURITY_MONITOR_URL),
     }
 
@@ -150,6 +174,7 @@ async def policy() -> dict:
         "entities": settings["analyzer"]["entities"],
         "score_threshold": settings["analyzer"]["score_threshold"],
         "settings": settings,
+        "upstream_path": "nemo>ollama" if NEMO_GUARD_URL else "ollama",
     }
 
 
@@ -255,7 +280,7 @@ async def chat(request: ChatRequest) -> dict:
                 return {"reply": "privacy guardrail infrastructure unavailable", "guardrail": guardrail}
 
     try:
-        reply = await call_ollama(effective_message)
+        reply, inner_guardrail, model_stages = await call_model_path(effective_message)
     except Exception as exc:
         duration = round((time.perf_counter() - started) * 1000, 2)
         guardrail = base_guardrail(
@@ -317,7 +342,9 @@ async def chat(request: ChatRequest) -> dict:
             "input_checks": input_checks,
             "output_checks": output_checks,
             "blocking_reason": "pii_detected" if pii_detected else None,
-            "stage_order": ["presidio_input", "ollama", "presidio_output"],
+            "stage_order": ["presidio_input", *model_stages, "presidio_output"],
+            "path": "presidio>nemo>ollama>presidio" if NEMO_GUARD_URL else "presidio>ollama>presidio",
+            "inner_guardrail": inner_guardrail,
         }
     )
     emit({"event": "guardrail_chat", "request_id": request_id, **guardrail})
