@@ -189,7 +189,7 @@ chat http://127.0.0.1:18092 "$ATTACK" | tee "$WORK/nemo-enforce-risk.json" >/dev
 jq -e '.guardrail.mode=="enforce" and .guardrail.decision=="block" and .guardrail.upstream_called==false' \
   "$WORK/nemo-enforce-risk.json" >/dev/null
 chat http://127.0.0.1:18092 "$BENIGN" | tee "$WORK/nemo-enforce-benign.json" >/dev/null
-jq -e '.guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.output_checks|length)>0 and .guardrail.stage_order==["input_rail","ollama_main","output_rail"]' \
+jq -e --arg input "$BENIGN" '.reply != $input and .guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.output_checks|length)>0 and .guardrail.stage_order==["input_rail","ollama_main","output_rail"]' \
   "$WORK/nemo-enforce-benign.json" >/dev/null
 
 printf 'HTTP NeMo: output scan, lab gate, loopback bind, existing UI proxy\n'
@@ -226,7 +226,7 @@ podman run -d --replace --name day6-guardrail-ui \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
 chat http://127.0.0.1:18090 "$BENIGN" | tee "$WORK/ui-nemo-first.json" >/dev/null
-jq -e '.guardrail.engine=="nemo" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and .guardrail.stage_order==["input_rail","ollama_main","output_rail"]' \
+jq -e --arg input "$BENIGN" '.reply != $input and .guardrail.engine=="nemo" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and .guardrail.stage_order==["input_rail","ollama_main","output_rail"]' \
   "$WORK/ui-nemo-first.json" >/dev/null
 
 start_presidio_chained enforce true

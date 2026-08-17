@@ -94,6 +94,11 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         for profile in ["input", "output", "integrated"]:
             self.assertIn(expected + "/v1", read(NEMO / "config" / profile / "config.yml"))
 
+    def test_nemo_main_path_keeps_dialog_generation_enabled(self) -> None:
+        core = read(NEMO / "nemo_core.py")
+        self.assertIn('options=log_options(["dialog"])', core)
+        self.assertNotIn("options=log_options([])", core)
+
     def test_ui_calls_only_its_backend_for_chat(self) -> None:
         proxy = read(UI / "app" / "guardrails.py")
         backend = read(UI / "app" / "main.py")

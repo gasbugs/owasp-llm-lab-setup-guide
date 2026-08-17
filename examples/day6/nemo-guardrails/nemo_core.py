@@ -201,7 +201,9 @@ async def run_main_only(text: str) -> tuple[str, dict]:
     generated = require_generation_response(
         await rails.generate_async(
             messages=[{"role": "user", "content": text}],
-            options=log_options([]),
+            # NeMo 0.22 groups main response generation under the dialog
+            # category. An empty list disables generation and echoes the input.
+            options=log_options(["dialog"]),
         )
     )
     return response_content(generated.response), generation_metrics(generated)
