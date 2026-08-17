@@ -36,6 +36,9 @@ class VulnAgentUILayoutTests(unittest.TestCase):
         self.assertIn("@media (max-width: 720px)", self.html)
         self.assertIn(".splitter { display: none; }", self.html)
 
+    def test_chat_uses_the_identity_displayed_by_the_lab_ui(self) -> None:
+        self.assertIn("'Authorization': 'Bearer llm06-farmer1-demo-token'", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()

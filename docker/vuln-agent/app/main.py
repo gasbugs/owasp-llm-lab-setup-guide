@@ -126,6 +126,27 @@ async def chat(req: ChatReq, request: Request):
             )
             result = execution.result
             user_id = execution.calling_user
+        except PermissionError as exc:
+            event = {
+                "event": "llm06_tool_policy",
+                "policy": "server-authentication-and-authorization",
+                "application_decision": "block",
+                "tool": tool_name,
+                "reason": str(exc),
+                "tool_called": False,
+            }
+            print(json.dumps(event, ensure_ascii=False), flush=True)
+            trace.append({"step": step, "tool_result": event})
+            return JSONResponse(
+                status_code=403,
+                content=replace_unpaired_surrogates(
+                    {
+                        "reply": f"요청이 차단되었습니다: {exc}",
+                        "trace": trace,
+                        "user": user_id,
+                    }
+                ),
+            )
         except Exception as e:
             result = f"ERROR: {e}"
         trace.append({"step": step, "tool_result": result})
