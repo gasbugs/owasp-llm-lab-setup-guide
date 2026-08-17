@@ -87,6 +87,21 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn('"presidio>nemo>ollama>presidio"', server)
         self.assertIn('"inner_guardrail": inner_guardrail', server)
 
+    def test_presidio_logs_and_chat_evidence_exclude_content(self) -> None:
+        server = read(PRESIDIO / "server.py")
+        for field in [
+            '"original_text"',
+            '"sanitized_text"',
+            '"input_prompt"',
+            '"model_output"',
+            '"reply"',
+        ]:
+            self.assertIn(field, server)
+        self.assertIn("safe_event = metadata_only(event)", server)
+        self.assertIn("json=safe_event", server)
+        self.assertIn("input_checks.append(scan_metadata(input_result))", server)
+        self.assertIn("output_checks.append(scan_metadata(output_result))", server)
+
     def test_nemo_uses_slirp_gateway_for_loopback_ollama(self) -> None:
         expected = "http://10.0.2.2:11434"
         self.assertIn(expected, read(NEMO / "nemo_core.py"))

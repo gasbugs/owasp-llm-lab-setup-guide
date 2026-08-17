@@ -120,7 +120,7 @@ jq -e '.guardrail.mode=="audit" and .guardrail.decision=="allow" and .guardrail.
   "$WORK/presidio-audit.json" >/dev/null
 start_presidio enforce true
 chat http://127.0.0.1:18091 "$PII" | tee "$WORK/presidio-enforce-risk.json" >/dev/null
-jq -e '.guardrail.mode=="enforce" and .guardrail.decision=="redact" and .guardrail.upstream_called==true and (.guardrail.input_checks[0].sanitized_text | contains("<EMAIL_ADDRESS>"))' \
+jq -e '.guardrail.mode=="enforce" and .guardrail.decision=="redact" and .guardrail.upstream_called==true and .guardrail.input_checks[0].entity_types==["EMAIL_ADDRESS"] and (.guardrail.input_checks[0] | has("original_text") | not) and (.guardrail.input_checks[0] | has("sanitized_text") | not)' \
   "$WORK/presidio-enforce-risk.json" >/dev/null
 chat http://127.0.0.1:18091 "$BENIGN" | tee "$WORK/presidio-enforce-benign.json" >/dev/null
 jq -e '.guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.output_checks|length)==1 and .guardrail.stage_order==["presidio_input","ollama","presidio_output"]' \
@@ -242,7 +242,9 @@ jq -e '.guardrail.engine=="presidio" and .guardrail.decision=="redact" and .guar
   "$WORK/ui-presidio-after-nemo.json" >/dev/null
 
 printf 'LOGS\n'
-podman logs day6-presidio-api
+podman logs day6-presidio-api | tee "$WORK/presidio-api.log"
+! grep -F 'alice@example.com' "$WORK/presidio-api.log"
+! grep -F '4111 1111 1111 1111' "$WORK/presidio-api.log"
 podman logs day6-nemo-guardrails-api
 podman logs day6-guardrail-ui
 printf 'DAY6_GUARDRAIL_INTEGRATION=PASS\n'

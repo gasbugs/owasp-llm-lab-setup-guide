@@ -50,14 +50,45 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
 
 
+LOG_CONTENT_FIELDS = {
+    "input",
+    "input_prompt",
+    "message",
+    "model_output",
+    "original_text",
+    "prompt",
+    "reply",
+    "sanitized_text",
+}
+
+
+def metadata_only(value):
+    """Recursively remove user and model content before logging or forwarding."""
+    if isinstance(value, dict):
+        return {
+            key: metadata_only(item)
+            for key, item in value.items()
+            if key not in LOG_CONTENT_FIELDS
+        }
+    if isinstance(value, list):
+        return [metadata_only(item) for item in value]
+    return value
+
+
+def scan_metadata(result: dict) -> dict:
+    """Return chat-safe scan evidence without raw or sanitized content."""
+    return metadata_only(result)
+
+
 def emit(event: dict) -> None:
-    print(json.dumps(event, ensure_ascii=False, separators=(",", ":")), flush=True)
+    safe_event = metadata_only(event)
+    print(json.dumps(safe_event, ensure_ascii=False, separators=(",", ":")), flush=True)
     if not SECURITY_MONITOR_URL:
         return
     try:
         httpx.post(
             f"{SECURITY_MONITOR_URL}/api/events/guardrail",
-            json=event,
+            json=safe_event,
             timeout=2.0,
         ).raise_for_status()
     except httpx.HTTPError as exc:
@@ -252,7 +283,7 @@ async def chat(request: ChatRequest) -> dict:
     if guard_enabled and CORE.settings.input_enabled:
         try:
             input_result = CORE.scan_input(request.message)
-            input_checks.append(input_result)
+            input_checks.append(scan_metadata(input_result))
             if GUARD_MODE == "enforce":
                 effective_message = str(input_result["sanitized_text"])
         except Exception as exc:
@@ -301,7 +332,7 @@ async def chat(request: ChatRequest) -> dict:
     if guard_enabled and CORE.settings.output_enabled:
         try:
             output_result = CORE.scan_output(effective_message, reply)
-            output_checks.append(output_result)
+            output_checks.append(scan_metadata(output_result))
             if GUARD_MODE == "enforce":
                 reply = str(output_result["sanitized_text"])
         except Exception as exc:
