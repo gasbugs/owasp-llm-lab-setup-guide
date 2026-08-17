@@ -209,7 +209,7 @@ class Day5ConsumptionContractTests(unittest.TestCase):
             for binding in self.contract["book_bindings"]
         }
         self.assertIn("curl -sS --max-time 45", commands["day5-llm10-baseline-request"])
-        self.assertIn("curl -sS --max-time 45", commands["day5-llm10-output-flood-request"])
+        self.assertIn("curl -sS --max-time 150", commands["day5-llm10-output-flood-request"])
         self.assertIn("jq -n --rawfile message", commands["day5-llm10-large-input-request"])
 
     def test_generated_input_evidence_uses_exact_hash_and_byte_count(self) -> None:
