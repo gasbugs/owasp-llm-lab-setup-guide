@@ -36,7 +36,7 @@ start_presidio() {
     --network slirp4netns:allow_host_loopback=true \
     -p 127.0.0.1:18091:8013 \
     -e RUN_MODE=server -e "GUARD_MODE=$mode" -e "ENABLE_LAB_ENDPOINTS=$labs" \
-    -e OLLAMA_URL=http://host.containers.internal:11434 -e "OLLAMA_MODEL=$MODEL" \
+    -e OLLAMA_URL=http://10.0.2.2:11434 -e "OLLAMA_MODEL=$MODEL" \
     "$PRESIDIO_IMAGE" >/dev/null
   wait_health http://127.0.0.1:18091/healthz
 }
@@ -61,7 +61,7 @@ start_nemo() {
     --network slirp4netns:allow_host_loopback=true \
     -p 127.0.0.1:18092:8013 \
     -e RUN_MODE=server -e "GUARD_MODE=$mode" -e "ENABLE_LAB_ENDPOINTS=$labs" \
-    -e OLLAMA_URL=http://host.containers.internal:11434 -e "OLLAMA_MODEL=$MODEL" \
+    -e OLLAMA_URL=http://10.0.2.2:11434 -e "OLLAMA_MODEL=$MODEL" \
     "$NEMO_IMAGE" >/dev/null
   wait_health http://127.0.0.1:18092/healthz
 }
@@ -148,7 +148,7 @@ podman rm -f day6-guardrail-ui >/dev/null
 
 printf 'CLI NeMo: prepared rail suite\n'
 podman run --rm --network slirp4netns:allow_host_loopback=true \
-  -e OLLAMA_URL=http://host.containers.internal:11434 -e "OLLAMA_MODEL=$MODEL" \
+  -e OLLAMA_URL=http://10.0.2.2:11434 -e "OLLAMA_MODEL=$MODEL" \
   "$NEMO_IMAGE" --suite | tee "$WORK/nemo-cli.jsonl"
 jq -se '(map(select(.event=="guardrail_request")) | length)==5' \
   "$WORK/nemo-cli.jsonl" >/dev/null

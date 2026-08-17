@@ -50,7 +50,7 @@ podman run -d --replace --name day6-nemo-guardrails-api \
   --network slirp4netns:allow_host_loopback=true \
   -p 127.0.0.1:18092:8013 \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
-  -e OLLAMA_URL=http://host.containers.internal:11434 \
+  -e OLLAMA_URL=http://10.0.2.2:11434 \
   -e OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
   localhost/day6-nemo-guardrails:0.22.0
 

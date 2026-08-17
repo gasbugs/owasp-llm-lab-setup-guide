@@ -99,7 +99,7 @@ def generation_metrics(response: GenerationResponse) -> dict:
 
 
 def _openai_base_url() -> str:
-    value = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rstrip("/")
+    value = os.getenv("OLLAMA_URL", "http://10.0.2.2:11434").rstrip("/")
     return value if value.endswith("/v1") else value + "/v1"
 
 

@@ -87,6 +87,13 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn('"presidio>nemo>ollama>presidio"', server)
         self.assertIn('"inner_guardrail": inner_guardrail', server)
 
+    def test_nemo_uses_slirp_gateway_for_loopback_ollama(self) -> None:
+        expected = "http://10.0.2.2:11434"
+        self.assertIn(expected, read(NEMO / "nemo_core.py"))
+        self.assertIn(expected, read(NEMO / "server.py"))
+        for profile in ["input", "output", "integrated"]:
+            self.assertIn(expected + "/v1", read(NEMO / "config" / profile / "config.yml"))
+
     def test_ui_calls_only_its_backend_for_chat(self) -> None:
         proxy = read(UI / "app" / "guardrails.py")
         backend = read(UI / "app" / "main.py")

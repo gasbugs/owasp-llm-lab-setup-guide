@@ -3,7 +3,7 @@ models:
     engine: openai
     model: llama3.1:8b-instruct-q4_K_M
     parameters:
-      base_url: http://host.containers.internal:11434/v1
+      base_url: http://10.0.2.2:11434/v1
       api_key: ollama-local
       temperature: 0.0
 

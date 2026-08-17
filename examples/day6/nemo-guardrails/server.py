@@ -37,7 +37,7 @@ GUARD_ENGINE = os.getenv("GUARD_ENGINE", "nemo").strip().lower()
 if GUARD_ENGINE not in {"nemo", "off"}:
     raise RuntimeError("NeMo image supports GUARD_ENGINE=nemo or off")
 ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rstrip("/")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://10.0.2.2:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_MODEL)
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 
