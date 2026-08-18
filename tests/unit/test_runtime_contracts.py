@@ -266,6 +266,13 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("[0-9]{1,3}/32", variables)
         self.assertIn('default     = "127.0.0.1/32"', variables)
 
+    def test_provider_default_tags_are_plan_time_known(self) -> None:
+        terraform = read("infrastructure/terraform/main.tf")
+        provider_tags = terraform.split("provider_default_tags = {", 1)[1].split("}", 1)[0]
+        self.assertIn("tags = local.provider_default_tags", terraform)
+        self.assertNotIn("random_", provider_tags)
+        self.assertNotIn("Deployment", provider_tags)
+
     def test_new_instances_use_latest_matching_ami_without_id_pin(self) -> None:
         instance = read("infrastructure/terraform/instance.tf")
         variables = read("infrastructure/terraform/variables.tf")
