@@ -1,3 +1,8 @@
+output "alert_topic_arn" {
+  description = "비용 알람 SNS topic ARN"
+  value       = aws_sns_topic.alerts.arn
+}
+
 output "ami_id" {
   description = "Terraform이 선택한 base AMI ID"
   value       = data.aws_ami.lab_base.id
@@ -8,42 +13,25 @@ output "ami_name" {
   value       = data.aws_ami.lab_base.name
 }
 
-output "availability_zone" {
-  description = "실습 subnet과 g6.xlarge 인스턴스가 생성된 가용 영역"
-  value       = aws_subnet.lab.availability_zone
+output "auto_stop_schedule" {
+  description = "자동 ASG 축소 스케줄 map. 기본 모드는 daily_1800."
+  value       = var.enable_auto_stop ? local.auto_stop_schedules : null
 }
 
-output "student_role_arns" {
-  description = "수강생별 IAM Role ARN"
-  value       = { for id in var.student_ids : id => aws_iam_role.student[id].arn }
+output "availability_zones" {
+  description = "ASG가 인스턴스를 배치할 수 있는 가용 영역 목록"
+  value       = local.selected_availability_zones
 }
 
-output "instance_ids" {
-  description = "수강생별 EC2 인스턴스 ID"
-  value       = { for id in var.student_ids : id => aws_instance.student[id].id }
+output "autoscaling_group_names" {
+  description = "수강생별 Auto Scaling Group 이름"
+  value       = { for id in var.student_ids : id => aws_autoscaling_group.student[id].name }
 }
 
-output "public_ips" {
-  description = "수강생별 EC2 public IP"
-  value       = { for id in var.student_ids : id => aws_instance.student[id].public_ip }
-}
-
-output "lab_urls" {
-  description = "선택적 public IP 직접 접속 URL. 기본 allowed_ingress_cidr=127.0.0.1/32 상태에서는 열리지 않으며, 본인 IP/32로 제한했을 때만 사용."
+output "instance_lookup_commands" {
+  description = "수강생별 현재 EC2 인스턴스 ID 조회 명령"
   value = {
-    for id in var.student_ids : id => {
-      portal        = "http://${aws_instance.student[id].public_ip}:8080"
-      day1_vuln_rag = "http://${aws_instance.student[id].public_ip}:8000"
-      day2_vuln_rag = "http://${aws_instance.student[id].public_ip}:8010"
-      day3_vuln_rag = "http://${aws_instance.student[id].public_ip}:8011"
-      day4_vuln_rag = "http://${aws_instance.student[id].public_ip}:8012"
-      day5_vuln_rag = "http://${aws_instance.student[id].public_ip}:8013"
-      vuln_agent    = "http://${aws_instance.student[id].public_ip}:8001"
-      fake_registry = "http://${aws_instance.student[id].public_ip}:8002/api/v1/models"
-      llmgoat       = "http://${aws_instance.student[id].public_ip}:5000"
-      dvla          = "http://${aws_instance.student[id].public_ip}:8501"
-      ollama_models = "http://${aws_instance.student[id].public_ip}:11434/api/tags"
-    }
+    for id in var.student_ids : id => "aws ec2 describe-instances --profile ${var.aws_profile} --region ${var.region} --filters Name=tag:Course,Values=${var.course_id} Name=tag:Student,Values=${id} Name=instance-state-name,Values=pending,running --query 'Reservations[].Instances[].InstanceId' --output text"
   }
 }
 
@@ -54,33 +42,35 @@ output "manual_install_commands" {
   }
 }
 
-output "start_commands" {
-  description = "수강생이 본인 인스턴스 시작하는 명령"
+output "public_ip_lookup_commands" {
+  description = "수강생별 현재 EC2 public IP 조회 명령"
   value = {
-    for id in var.student_ids : id => "aws ec2 start-instances --profile ${var.aws_profile} --region ${var.region} --instance-ids ${aws_instance.student[id].id}"
-  }
-}
-
-output "stop_commands" {
-  description = "수강생이 본인 인스턴스 중지하는 명령 (강의 끝나면 매일)"
-  value = {
-    for id in var.student_ids : id => "aws ec2 stop-instances --profile ${var.aws_profile} --region ${var.region} --instance-ids ${aws_instance.student[id].id}"
+    for id in var.student_ids : id => "aws ec2 describe-instances --profile ${var.aws_profile} --region ${var.region} --filters Name=tag:Course,Values=${var.course_id} Name=tag:Student,Values=${id} Name=instance-state-name,Values=pending,running --query 'Reservations[].Instances[].PublicIpAddress' --output text"
   }
 }
 
 output "ssm_session_commands" {
-  description = "수강생이 본인 인스턴스에 SSM 접속하기 위한 명령"
+  description = "현재 ASG 인스턴스 ID를 조회해 SSM 접속하는 명령"
   value = {
-    for id in var.student_ids : id => "aws ssm start-session --profile ${var.aws_profile} --region ${var.region} --target ${aws_instance.student[id].id}"
+    for id in var.student_ids : id => "aws ssm start-session --profile ${var.aws_profile} --region ${var.region} --target $(aws ec2 describe-instances --profile ${var.aws_profile} --region ${var.region} --filters Name=tag:Course,Values=${var.course_id} Name=tag:Student,Values=${id} Name=instance-state-name,Values=running --query 'Reservations[0].Instances[0].InstanceId' --output text)"
   }
 }
 
-output "alert_topic_arn" {
-  description = "비용 알람 SNS topic ARN"
-  value       = aws_sns_topic.alerts.arn
+output "start_commands" {
+  description = "수강생별 ASG desired capacity를 1로 올려 새 인스턴스를 생성하는 명령"
+  value = {
+    for id in var.student_ids : id => "aws autoscaling update-auto-scaling-group --profile ${var.aws_profile} --region ${var.region} --auto-scaling-group-name ${aws_autoscaling_group.student[id].name} --min-size 0 --max-size 1 --desired-capacity 1"
+  }
 }
 
-output "auto_stop_schedule" {
-  description = "자동 EC2 중지 스케줄 map. 기본 모드는 daily_1800."
-  value       = var.enable_auto_stop ? local.auto_stop_schedules : null
+output "stop_commands" {
+  description = "수강생별 ASG desired capacity를 0으로 내려 인스턴스를 삭제하는 명령"
+  value = {
+    for id in var.student_ids : id => "aws autoscaling update-auto-scaling-group --profile ${var.aws_profile} --region ${var.region} --auto-scaling-group-name ${aws_autoscaling_group.student[id].name} --min-size 0 --max-size 1 --desired-capacity 0"
+  }
+}
+
+output "student_role_arns" {
+  description = "수강생별 IAM Role ARN"
+  value       = { for id in var.student_ids : id => aws_iam_role.student[id].arn }
 }

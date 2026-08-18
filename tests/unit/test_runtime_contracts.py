@@ -171,7 +171,7 @@ class RuntimeContractTest(unittest.TestCase):
         instance = read("infrastructure/terraform/instance.tf")
         template = read("infrastructure/terraform/user-data.sh.tpl")
         self.assertIn(
-            "user_data = var.enable_user_data_bootstrap ? local.user_data : null",
+            "user_data     = var.enable_user_data_bootstrap ? base64encode(local.user_data) : null",
             instance,
         )
         self.assertIn(
@@ -280,16 +280,13 @@ class RuntimeContractTest(unittest.TestCase):
         quickstart = read("docs/STUDENT-QUICKSTART.md")
 
         terraform_ami = instance.split('data "aws_ami" "lab_base"', 1)[1].split(
-            'resource "aws_instance" "student"', 1
+            'resource "aws_launch_template" "student"', 1
         )[0]
         self.assertIn("most_recent = true", terraform_ami)
         self.assertIn("owners      = [var.ami_owner_id]", terraform_ami)
         self.assertIn("values = [var.ami_name_pattern]", terraform_ami)
-        self.assertIn("ami                    = data.aws_ami.lab_base.id", instance)
-        self.assertRegex(
-            instance,
-            r"(?s)ignore_changes\s*=\s*\[[^\]]*\bami\b[^\]]*\]",
-        )
+        self.assertIn("image_id      = data.aws_ami.lab_base.id", instance)
+        self.assertIn("create_before_destroy = true", instance)
         self.assertNotRegex(instance, r'(?m)^\s*ami\s*=\s*"ami-[0-9a-f]+"')
         self.assertNotIn('variable "ami_id"', variables)
         self.assertNotIn('variable "golden_ami_id"', variables)
@@ -396,13 +393,14 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("REMAINING_STATE=$(terraform state list)", teardown)
         self.assertIn('if [ -n "$REMAINING_STATE" ]', teardown)
         self.assertNotIn("비용 0/h", teardown)
-        self.assertIn("이 구성은 EIP를 만들지 않아 public IP는 바뀔 수 있음", stop)
-        self.assertIn("이 구성은 EIP를 만들지 않으므로 stop/start 후 public IP는 바뀔 수 있습니다", stop)
+        self.assertIn("root EBS가 삭제됩니다", stop)
+        self.assertIn("가용 용량이 있는 AZ에 새 인스턴스가 생성", stop)
 
     def test_auto_stop_is_ready_before_gpu_instance_and_leaves_no_unmanaged_log(self) -> None:
         auto_stop = read("infrastructure/terraform/auto_stop.tf")
         instance = read("infrastructure/terraform/instance.tf")
-        self.assertIn('variable = "ec2:ResourceTag/Course"', auto_stop)
+        self.assertIn('variable = "autoscaling:ResourceTag/Course"', auto_stop)
+        self.assertIn('"autoscaling:UpdateAutoScalingGroup"', auto_stop)
         self.assertIn('values   = [var.course_id]', auto_stop)
         self.assertIn('resources = ["*"]', auto_stop)
         self.assertIn('resource "aws_cloudwatch_log_group" "auto_stop"', auto_stop)
@@ -410,6 +408,21 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('aws_cloudwatch_log_group.auto_stop', auto_stop)
         self.assertIn('aws_cloudwatch_event_target.auto_stop', instance)
         self.assertIn('aws_lambda_permission.allow_eventbridge_auto_stop', instance)
+
+    def test_asg_uses_all_supported_gpu_zones_and_scales_to_zero(self) -> None:
+        network = read("infrastructure/terraform/network.tf")
+        instance = read("infrastructure/terraform/instance.tf")
+        auto_stop_lambda = read("infrastructure/terraform/lambda/auto_stop.py")
+
+        self.assertIn('data "aws_ec2_instance_type_offerings" "gpu"', network)
+        self.assertIn("selected_availability_zones", network)
+        self.assertIn('resource "aws_autoscaling_group" "student"', instance)
+        self.assertIn("vpc_zone_identifier       = values(aws_subnet.lab)[*].id", instance)
+        self.assertIn("desired_capacity          = 1", instance)
+        self.assertIn("ignore_failed_scaling_activities = true", instance)
+        self.assertIn("ignore_changes = [desired_capacity]", instance)
+        self.assertIn("DesiredCapacity=0", auto_stop_lambda)
+        self.assertNotIn("stop_instances", auto_stop_lambda)
 
     def test_local_build_helper_rejects_implicit_moving_tags(self) -> None:
         script = ROOT / "docker" / "build-and-push.sh"

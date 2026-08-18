@@ -48,7 +48,7 @@ for cmd in aws terraform jq ssh scp ssh-keygen tar; do
   fi
 done
 
-INSTANCE_ID=$(terraform -chdir="$TF_DIR" output -json instance_ids | jq -r --arg student "$STUDENT" '.[$student] // empty')
+INSTANCE_ID=$(AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" STUDENT="$STUDENT" bash "$SCRIPT_DIR/instance-id.sh")
 if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "null" ]; then
   echo "ERROR: cannot find instance id for STUDENT=$STUDENT from $TF_DIR output." >&2
   exit 1

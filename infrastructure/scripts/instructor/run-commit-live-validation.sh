@@ -497,7 +497,18 @@ terminate_instances_direct() {
   local query_file="$WORK_DIR/terminate-query.json"
   local query_error="$WORK_DIR/terminate-query.err"
   local -a instance_ids=()
-  local id seen existing captured_state captured_error
+  local id seen existing captured_state captured_error asg_name
+
+  # Prevent ASG from replacing an instance while the emergency cleanup runs.
+  while IFS= read -r asg_name; do
+    [ -n "$asg_name" ] || continue
+    aws_cli autoscaling update-auto-scaling-group \
+      --auto-scaling-group-name "$asg_name" \
+      --min-size 0 --max-size 1 --desired-capacity 0 \
+      >>"$CONTROL_LOG" 2>&1 || return 1
+  done < <(aws_cli autoscaling describe-auto-scaling-groups \
+    --query "AutoScalingGroups[?Tags[?Key=='Course' && Value=='$COURSE_ID']].AutoScalingGroupName" \
+    --output text | tr '\t' '\n')
 
   if aws_cli ec2 describe-instances \
     --filters "Name=tag:Course,Values=$COURSE_ID" \
@@ -1100,10 +1111,18 @@ if ! terraform -chdir="$TF_DIR" output -json auto_stop_schedule \
   echo "ERROR: Terraform output does not prove the emergency auto-stop schedule" >&2
   exit 1
 fi
-INSTANCE_ID=$(terraform -chdir="$TF_DIR" output -json instance_ids \
-  | jq -er --arg student "$STUDENT" '.[$student]')
+INSTANCE_ID=""
+for _ in $(seq 1 120); do
+  INSTANCE_ID=$(aws_cli ec2 describe-instances \
+    --filters "Name=tag:Course,Values=$COURSE_ID" \
+      "Name=tag:Student,Values=$STUDENT" \
+      "Name=instance-state-name,Values=pending,running" \
+    --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || true)
+  [[ "$INSTANCE_ID" =~ ^i-[0-9a-f]+$ ]] && break
+  sleep 5
+done
 if [[ ! "$INSTANCE_ID" =~ ^i-[0-9a-f]+$ ]]; then
-  echo "ERROR: invalid instance id from Terraform output" >&2
+  echo "ERROR: ASG did not expose a valid instance ID before the bounded deadline" >&2
   exit 1
 fi
 log "Apply complete; waiting for the single EC2 and SSM within bounded deadlines"

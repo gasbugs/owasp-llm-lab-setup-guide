@@ -23,17 +23,40 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  selected_availability_zone = var.availability_zone != "" ? var.availability_zone : data.aws_availability_zones.available.names[0]
+  available_gpu_zones = sort(tolist(setintersection(
+    toset(data.aws_availability_zones.available.names),
+    toset(data.aws_ec2_instance_type_offerings.gpu.locations),
+  )))
+  selected_availability_zones = local.available_gpu_zones
+}
+
+data "aws_ec2_instance_type_offerings" "gpu" {
+  filter {
+    name   = "instance-type"
+    values = [var.instance_type]
+  }
+
+  location_type = "availability-zone"
 }
 
 resource "aws_subnet" "lab" {
+  for_each = { for index, zone in local.selected_availability_zones : zone => index }
+
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.42.10.0/24"
-  availability_zone       = local.selected_availability_zone
+  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, each.value + 10)
+  availability_zone       = each.key
   map_public_ip_on_launch = true # 검증 단계 — 인스턴스가 직접 인터넷 접근
 
   tags = {
-    Name = "${local.name_prefix}-subnet"
+    Name = "${local.name_prefix}-subnet-${each.key}"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = length(local.selected_availability_zones) > 0
+      error_message = "${var.region}에서 ${var.instance_type}을 제공하는 가용 영역을 찾지 못했습니다."
+    }
+
   }
 }
 
@@ -59,7 +82,9 @@ resource "aws_route_table" "lab" {
 }
 
 resource "aws_route_table_association" "lab" {
-  subnet_id      = aws_subnet.lab.id
+  for_each = aws_subnet.lab
+
+  subnet_id      = each.value.id
   route_table_id = aws_route_table.lab.id
 }
 

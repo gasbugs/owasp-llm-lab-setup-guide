@@ -8,16 +8,6 @@ variable "region" {
   }
 }
 
-variable "availability_zone" {
-  description = "g6.xlarge를 생성할 가용 영역. 빈 문자열이면 리전의 첫 available 영역을 사용하며, 용량 부족 시 us-east-1c 같은 값을 명시한다."
-  type        = string
-  default     = ""
-  validation {
-    condition     = var.availability_zone == "" || can(regex("^[a-z]{2}-[a-z]+-[0-9]+[a-z]$", var.availability_zone))
-    error_message = "availability_zone은 빈 문자열 또는 us-east-1c 같은 AWS 가용 영역 형식이어야 합니다."
-  }
-}
-
 variable "aws_profile" {
   description = "로컬 AWS CLI profile 이름"
   type        = string
@@ -145,7 +135,7 @@ variable "allowed_ingress_cidr" {
 }
 
 variable "enable_auto_stop" {
-  description = "true이면 EventBridge가 Lambda를 호출해 Course 태그가 같은 실행 중 EC2를 자동 중지한다."
+  description = "true이면 EventBridge가 Lambda를 호출해 Course 태그가 같은 ASG의 desired capacity를 0으로 낮춘다."
   type        = bool
   default     = true
 }

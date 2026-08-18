@@ -54,43 +54,43 @@ resource "aws_iam_role_policy_attachment" "auto_stop_lambda_basic" {
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-data "aws_iam_policy_document" "auto_stop_lambda_ec2" {
+data "aws_iam_policy_document" "auto_stop_lambda_asg" {
   count = var.enable_auto_stop ? 1 : 0
 
   statement {
     actions = [
-      "ec2:DescribeInstances",
+      "autoscaling:DescribeAutoScalingGroups",
     ]
     resources = ["*"]
   }
 
   statement {
     actions = [
-      "ec2:StopInstances",
+      "autoscaling:UpdateAutoScalingGroup",
     ]
     resources = ["*"]
 
     condition {
       test     = "StringEquals"
-      variable = "ec2:ResourceTag/Course"
+      variable = "autoscaling:ResourceTag/Course"
       values   = [var.course_id]
     }
   }
 }
 
-resource "aws_iam_role_policy" "auto_stop_lambda_ec2" {
+resource "aws_iam_role_policy" "auto_stop_lambda_asg" {
   count = var.enable_auto_stop ? 1 : 0
 
-  name   = "ec2-auto-stop"
+  name   = "asg-auto-stop"
   role   = aws_iam_role.auto_stop_lambda[0].id
-  policy = data.aws_iam_policy_document.auto_stop_lambda_ec2[0].json
+  policy = data.aws_iam_policy_document.auto_stop_lambda_asg[0].json
 }
 
 resource "aws_lambda_function" "auto_stop" {
   count = var.enable_auto_stop ? 1 : 0
 
   function_name    = local.auto_stop_resource_prefix
-  description      = "Stops running EC2 lab instances tagged Course=${var.course_id}"
+  description      = "Scales lab ASGs tagged Course=${var.course_id} to zero"
   role             = aws_iam_role.auto_stop_lambda[0].arn
   handler          = "auto_stop.handler"
   runtime          = "python3.12"
@@ -107,7 +107,7 @@ resource "aws_lambda_function" "auto_stop" {
 
   depends_on = [
     aws_iam_role_policy_attachment.auto_stop_lambda_basic,
-    aws_iam_role_policy.auto_stop_lambda_ec2,
+    aws_iam_role_policy.auto_stop_lambda_asg,
     aws_cloudwatch_log_group.auto_stop,
   ]
 }

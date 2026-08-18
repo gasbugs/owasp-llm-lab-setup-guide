@@ -18,7 +18,7 @@ if ! aws sts get-caller-identity --profile "$AWS_PROFILE" --region "$AWS_REGION"
 fi
 
 ROWS=$(aws ec2 describe-instances --profile "$AWS_PROFILE" --region "$AWS_REGION" \
-  --filters "Name=tag:Student,Values=$STUDENT" "Name=instance-state-name,Values=stopped,stopping,running,pending" \
+  --filters "Name=tag:Student,Values=$STUDENT" "Name=instance-state-name,Values=running,pending" \
   --query "Reservations[].Instances[].[InstanceId,State.Name]" --output text)
 
 COUNT=$(printf "%s\n" "$ROWS" | awk 'NF { count++ } END { print count + 0 }')

@@ -1,16 +1,8 @@
 ################################################################################
-# 수강생별 EC2 인스턴스 — for_each로 수강생 수만큼 1대씩
+# 수강생별 Auto Scaling Group — 여러 AZ 중 가용 용량이 있는 곳에 1대 배치
 #
-# 설계 (1인 1계정 모델):
-#   - On-Demand GPU 인스턴스 1대/수강생
-#   - 수강생이 직접 `aws ec2 start-instances` / `stop-instances`로 ON/OFF
-#   - Stop 시 EC2 시간당 요금 0. EBS 디스크 비용만 발생 (gp3 100GB 기준)
-#   - terminate 안 하므로 EBS·작업물 그대로 보존. 다음 start 시 어제 상태 그대로
-#   - 기본값은 수동 설치. 필요 시 user-data 자동 설치를 명시적으로 켤 수 있음
-#   - 설치 후에는 컨테이너 systemd unit으로 다음 start 시 자동 시작
-#
-# 작업물 추가 보존 (선택):
-#   수강생이 개인 GitHub 작업 repo에 push로 강의 종료 후에도 보존.
+# ASG desired capacity를 0/1로 조정하므로 종료 시 인스턴스와 root EBS는 삭제된다.
+# 다시 시작하면 AMI와 선택적 user-data로 새 인스턴스를 만든다.
 ################################################################################
 
 locals {
@@ -50,49 +42,66 @@ data "aws_ami" "lab_base" {
   }
 }
 
-resource "aws_instance" "student" {
+resource "aws_launch_template" "student" {
   for_each = toset(var.student_ids)
 
-  ami                    = data.aws_ami.lab_base.id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.lab.id
-  vpc_security_group_ids = [aws_security_group.student[each.key].id]
-  iam_instance_profile   = aws_iam_instance_profile.student[each.key].name
+  name_prefix   = "${local.name_prefix}-${each.key}-"
+  image_id      = data.aws_ami.lab_base.id
+  instance_type = var.instance_type
+  user_data     = var.enable_user_data_bootstrap ? base64encode(local.user_data) : null
 
-  associate_public_ip_address = true # IGW 통한 인터넷 직접 (apt/podman/ollama pull)
+  iam_instance_profile {
+    name = aws_iam_instance_profile.student[each.key].name
+  }
 
-  root_block_device {
-    volume_size           = var.root_volume_size
-    volume_type           = "gp3"
-    delete_on_termination = true
-    encrypted             = true
-    tags = {
-      Student = each.key
-      Course  = var.course_id
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups             = [aws_security_group.student[each.key].id]
+  }
+
+  block_device_mappings {
+    device_name = data.aws_ami.lab_base.root_device_name
+
+    ebs {
+      delete_on_termination = true
+      encrypted             = true
+      volume_size           = var.root_volume_size
+      volume_type           = "gp3"
     }
   }
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required" # IMDSv2 only
+    http_tokens                 = "required"
     http_put_response_hop_limit = 2
     instance_metadata_tags      = "enabled"
   }
 
-  monitoring = true
+  monitoring {
+    enabled = true
+  }
 
-  user_data = var.enable_user_data_bootstrap ? local.user_data : null
-  # user-data 입력 변경은 기존 인스턴스를 다시 bootstrap하거나 교체하지 않는다.
-  # commit/image pin은 최초 apply 전에 확정하고, 기존 환경은 수동 재설치하거나 명시적으로 교체한다.
-  user_data_replace_on_change = false
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name    = "${local.name_prefix}-${each.key}"
+      Student = each.key
+      Course  = var.course_id
+    }
+  }
 
-  tags = {
-    Name    = "${local.name_prefix}-${each.key}"
-    Student = each.key
-    Course  = var.course_id
+  tag_specifications {
+    resource_type = "volume"
+    tags = {
+      Name    = "${local.name_prefix}-${each.key}-root"
+      Student = each.key
+      Course  = var.course_id
+    }
   }
 
   lifecycle {
+    create_before_destroy = true
+
     precondition {
       condition = (
         !var.enable_user_data_bootstrap ||
@@ -101,15 +110,49 @@ resource "aws_instance" "student" {
       )
       error_message = "commit-pinned bootstrap은 lab_setup_repo_raw_url의 마지막 경로 commit과 lab_image_tag의 sha- commit이 같아야 합니다."
     }
+  }
+}
 
-    # 인스턴스 stop/start로 state가 바뀌어도 terraform이 재생성하지 않도록
-    ignore_changes = [
-      ami, # 최신 AMI가 갱신되어도 기존 수강생 인스턴스를 자동 교체하지 않음
-    ]
+resource "aws_autoscaling_group" "student" {
+  for_each = toset(var.student_ids)
+
+  name                      = "${local.name_prefix}-asg-${each.key}"
+  min_size                  = 0
+  max_size                  = 1
+  desired_capacity          = 1
+  health_check_type         = "EC2"
+  health_check_grace_period = 300
+  ignore_failed_scaling_activities = true
+  vpc_zone_identifier       = values(aws_subnet.lab)[*].id
+  wait_for_capacity_timeout = "20m"
+
+  launch_template {
+    id      = aws_launch_template.student[each.key].id
+    version = "$Latest"
   }
 
-  # 유료 GPU를 만들기 전에 emergency auto-stop target과 invoke permission을
-  # 먼저 완성한다. enable_auto_stop=false이면 두 컬렉션은 비어 있어 no-op이다.
+  tag {
+    key                 = "Name"
+    value               = "${local.name_prefix}-${each.key}"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Student"
+    value               = each.key
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Course"
+    value               = var.course_id
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    ignore_changes = [desired_capacity]
+  }
+
   depends_on = [
     aws_cloudwatch_event_target.auto_stop,
     aws_lambda_permission.allow_eventbridge_auto_stop,

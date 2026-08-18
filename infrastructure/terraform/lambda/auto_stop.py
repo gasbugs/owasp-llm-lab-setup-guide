@@ -8,36 +8,34 @@ def handler(event, context):
     region = os.environ["AWS_REGION"]
     dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
 
-    ec2 = boto3.client("ec2", region_name=region)
-    response = ec2.describe_instances(
-        Filters=[
-            {"Name": "tag:Course", "Values": [course_id]},
-            {"Name": "instance-state-name", "Values": ["running"]},
-        ]
-    )
-
-    instance_ids = [
-        instance["InstanceId"]
-        for reservation in response["Reservations"]
-        for instance in reservation["Instances"]
+    autoscaling = boto3.client("autoscaling", region_name=region)
+    paginator = autoscaling.get_paginator("describe_auto_scaling_groups")
+    groups = [
+        group
+        for page in paginator.paginate()
+        for group in page["AutoScalingGroups"]
+        if any(
+            tag["Key"] == "Course" and tag["Value"] == course_id
+            for tag in group.get("Tags", [])
+        )
     ]
+    group_names = [group["AutoScalingGroupName"] for group in groups]
 
-    if instance_ids and not dry_run:
-        ec2.stop_instances(InstanceIds=instance_ids)
+    if not dry_run:
+        for group_name in group_names:
+            autoscaling.update_auto_scaling_group(
+                AutoScalingGroupName=group_name,
+                MinSize=0,
+                MaxSize=1,
+                DesiredCapacity=0,
+            )
 
-    print(
-        {
-            "course_id": course_id,
-            "region": region,
-            "dry_run": dry_run,
-            "stopped_instance_ids": instance_ids,
-            "count": len(instance_ids),
-        }
-    )
-
-    return {
+    result = {
         "course_id": course_id,
+        "region": region,
         "dry_run": dry_run,
-        "stopped_instance_ids": instance_ids,
-        "count": len(instance_ids),
+        "scaled_to_zero_groups": group_names,
+        "count": len(group_names),
     }
+    print(result)
+    return result

@@ -6,9 +6,8 @@
 # AWS profile (aws configure --profile owasp-llm 또는 강사 안내 방식)
 aws_profile = "owasp-llm"
 region      = "us-east-1" # 강사가 공지한 리전으로 변경
-# 기본값은 리전의 첫 available 영역이다. g6 용량 부족이 확인된 경우에만
-# 실제 offering이 있는 다른 영역(예: us-east-1c)을 선택한다.
-# availability_zone = "us-east-1c"
+# 기본값은 g6.xlarge를 제공하는 모든 AZ를 ASG에 전달한다.
+# 장애 분석 목적 외에는 단일 AZ를 고정하지 않는다.
 
 # 강의 식별자 — 리소스 이름·태그·비용 알람에 사용
 course_id = "owasp-llm-2026"
