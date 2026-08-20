@@ -12,6 +12,19 @@
 - 강사가 공지한 AWS 리전
 - 비용 알람을 받을 이메일
 
+Ubuntu PC에서 위 도구를 한 번에 준비하려면 다음 선택적 스크립트를 실행할 수
+있습니다. 이 스크립트의 Docker는 로컬 개발용이며, EC2 실습 앱은 7단계의
+`install-lab.sh`가 Podman과 Quadlet으로 구성합니다.
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/setup-workstation-ubuntu.sh
+bash setup-workstation-ubuntu.sh
+cd ~/owasp-llm-lab-setup-guide
+```
+
+macOS와 Windows에서는 이 Ubuntu 전용 스크립트를 실행하지 말고 준비물에 적힌
+도구를 각 운영체제의 공식 설치 방법으로 설치하세요.
+
 ## 1. AWS CLI 설정
 
 ```bash
