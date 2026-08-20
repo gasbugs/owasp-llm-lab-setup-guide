@@ -1,6 +1,22 @@
 # LLM Security Observability Stack
 
-`compose.yaml` is the canonical Module 08 deployment. The LLM application is supplied so learners can concentrate on constructing and inspecting the telemetry pipeline, storage backends, alert delivery, and cross-signal investigation.
+`compose.yaml` is the canonical Module 08 deployment. Learners first inspect the
+application code that emits one structured security log, a distributed trace,
+and bounded Prometheus metrics. They verify each raw signal before following it
+through Alloy and the storage backends. The module ends by building a minimal
+three-panel Grafana dashboard and comparing it with the provisioned
+`grafana/dashboards/llm-security.json` operations dashboard.
+
+## Learner path
+
+```text
+application instrumentation
+  -> raw /metrics and response trace_id
+  -> Alloy collection and processing
+  -> Loki logs + Tempo traces + Mimir metrics
+  -> learner-built Metric/Log/Trace dashboard
+  -> provisioned dashboard JSON with alerts, GPU, RED, and queue health
+```
 
 ## Request path
 
