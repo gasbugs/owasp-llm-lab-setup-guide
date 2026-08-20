@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Shared Microsoft Presidio policy core for the Day 6 CLI and HTTP API."""
+"""Day 6 CLI와 HTTP API가 함께 사용하는 Microsoft Presidio 정책 모듈.
+
+처리 흐름은 다음과 같다.
+
+1. ``AnalyzerEngine``이 원문에서 개인정보(PII)의 종류와 위치를 찾는다.
+2. ``AnonymizerEngine``이 탐지된 구간을 ``<EMAIL_ADDRESS>`` 같은 값으로 바꾼다.
+3. 애플리케이션은 원문이 아니라 반환된 ``sanitized_text``를 다음 계층으로 보낸다.
+
+Presidio는 탐지·비식별화를 제공하는 라이브러리다. 실제 차단 또는 전달 결정은
+이 모듈을 호출하는 애플리케이션이 수행해야 한다.
+"""
 
 from __future__ import annotations
 
@@ -28,6 +38,7 @@ DEFAULT_ENTITIES = (
 
 
 def env_bool(name: str, default: bool) -> bool:
+    """환경변수의 대표적인 참 값을 Python bool로 변환한다."""
     value = os.getenv(name)
     if value is None:
         return default
@@ -36,6 +47,10 @@ def env_bool(name: str, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class PolicySettings:
+    """Presidio 검사에 적용할 변경 불가능한(immutable) 애플리케이션 정책."""
+
+    # Presidio recognizer는 탐지 결과에 0~1 신뢰도 점수를 부여한다.
+    # 이 값보다 낮은 결과는 개인정보로 취급하지 않는다.
     score_threshold: float = 0.5
     language: str = "en"
     input_enabled: bool = True
@@ -44,6 +59,7 @@ class PolicySettings:
 
     @classmethod
     def from_env(cls) -> "PolicySettings":
+        """컨테이너 환경변수를 읽고 잘못된 정책은 시작 단계에서 거부한다."""
         threshold = float(os.getenv("PRESIDIO_SCORE_THRESHOLD", "0.5"))
         if not 0.0 <= threshold <= 1.0:
             raise ValueError("PRESIDIO_SCORE_THRESHOLD must be between 0 and 1")
@@ -63,6 +79,7 @@ class PolicySettings:
         )
 
     def as_public_dict(self) -> dict:
+        """비밀값 없이 현재 정책을 API 응답이나 실습 화면에 공개한다."""
         return {
             "analyzer": {
                 "enabled_for_input": self.input_enabled,
@@ -83,6 +100,8 @@ class PolicySettings:
         }
 
 
+# 같은 정책을 반복 가능하게 확인하기 위한 교육용 정상·PII 테스트 데이터다.
+# 실제 서비스 요청은 아래 CASES가 아니라 scan_input/scan_output으로 전달된다.
 CASES = {
     "input-clean": {
         "direction": "input",
@@ -139,8 +158,13 @@ CASES = {
 
 
 class PresidioCore:
+    """Analyzer, Anonymizer와 프로젝트 사용자 정의 recognizer를 묶은 정책 객체."""
+
     def __init__(self, settings: PolicySettings | None = None) -> None:
         self.settings = settings or PolicySettings.from_env()
+
+        # Presidio의 이메일·전화번호 같은 기본 recognizer 중 일부는 주변 문맥을
+        # 이해하기 위해 NLP 엔진을 사용한다. 여기서는 영어 spaCy 모델을 연결한다.
         nlp_configuration = {
             "nlp_engine_name": "spacy",
             "models": [
@@ -154,10 +178,16 @@ class PresidioCore:
             nlp_engine=nlp_engine,
             supported_languages=[self.settings.language],
         )
+        # Analyzer와 Anonymizer는 역할이 다르다. Analyzer는 위치를 찾고,
+        # Anonymizer는 그 위치에 실제 치환 연산을 적용한다.
         self.anonymizer = AnonymizerEngine()
         self._register_custom_recognizers()
 
     def _register_custom_recognizers(self) -> None:
+        """Presidio 기본 목록에 없는 교육용 엔터티 패턴을 등록한다."""
+
+        # PatternRecognizer는 정규식 기반 확장 지점이다. score는 정규식이
+        # 일치했을 때 부여할 신뢰도이며 전체 정책 threshold와 비교된다.
         self.analyzer.registry.add_recognizer(
             PatternRecognizer(
                 supported_entity="KR_RRN",
@@ -193,23 +223,34 @@ class PresidioCore:
         prompt: str | None = None,
         entities: list[str] | None = None,
     ) -> dict:
+        """한 문자열을 분석·비식별화하고 애플리케이션용 판정 정보를 반환한다.
+
+        ``direction``은 입력과 출력 중 어떤 정책 스위치를 적용할지 결정한다.
+        ``entities``를 생략하면 PolicySettings에 허용된 전체 엔터티를 검사한다.
+        """
         if direction not in {"input", "output"}:
             raise ValueError("direction must be input or output")
         enabled = self.settings.input_enabled if direction == "input" else self.settings.output_enabled
         if not enabled:
             raise ValueError(f"Presidio {direction} analysis disabled by policy")
         selected_entities = [item.upper() for item in entities] if entities else list(self.settings.entities)
+
+        # 호출자가 정책에 없는 엔터티를 임의로 요청하지 못하게 allowlist로 제한한다.
         unknown = sorted(set(selected_entities) - set(self.settings.entities))
         if unknown:
             raise ValueError(f"entities not allowed by policy: {', '.join(unknown)}")
 
         started = time.perf_counter()
+        # analyze()는 문자열을 변경하지 않는다. 각 결과에는 entity_type,
+        # start/end 문자 인덱스와 score가 들어 있다.
         findings = self.analyzer.analyze(
             text=text,
             language=self.settings.language,
             entities=selected_entities,
             score_threshold=self.settings.score_threshold,
         )
+        # 탐지된 엔터티별 치환 규칙을 만든다. 예를 들어 이메일은 원문 대신
+        # <EMAIL_ADDRESS>로 바뀐다. 원래 값을 복원할 수 없는 비식별화 방식이다.
         operators = {
             entity: OperatorConfig("replace", {"new_value": f"<{entity}>"})
             for entity in {finding.entity_type for finding in findings}
@@ -219,6 +260,8 @@ class PresidioCore:
             analyzer_results=findings,
             operators=operators,
         ).text if findings else text
+        # Presidio 객체를 JSON 직렬화 가능한 최소 메타데이터로 변환한다.
+        # start/end는 원문의 위치이므로 원문 자체를 로그에 남기지 않아도 된다.
         detections = [
             {
                 "entity_type": finding.entity_type,
@@ -240,6 +283,8 @@ class PresidioCore:
             "risk_score": max((item["score"] for item in detections), default=0.0),
             "detections": detections,
             "entity_types": sorted({item["entity_type"] for item in detections}),
+            # 이것은 Presidio 자체 결정이 아니라 이 실습 애플리케이션의 정책이다.
+            # PII가 있으면 요청을 버리지 않고 sanitized_text로 계속 처리한다.
             "application_decision": "redact" if findings else "allow",
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         }
@@ -248,6 +293,7 @@ class PresidioCore:
         return result
 
     def scan_input(self, text: str, entities: list[str] | None = None) -> dict:
+        """사용자 입력을 검사한다. 호출자는 반환값의 sanitized_text를 전달한다."""
         return self.scan_text(direction="input", text=text, entities=entities)
 
     def scan_output(
@@ -256,6 +302,7 @@ class PresidioCore:
         model_output: str,
         entities: list[str] | None = None,
     ) -> dict:
+        """모델 출력을 검사해 사용자에게 반환하기 전에 개인정보를 치환한다."""
         return self.scan_text(
             direction="output",
             text=model_output,
@@ -264,6 +311,7 @@ class PresidioCore:
         )
 
     def run_case(self, case_name: str, *, text_override: str | None = None) -> dict:
+        """CASES의 단일 교육용 시나리오를 실행한다."""
         case = CASES[case_name]
         text = text_override if text_override is not None else case["text"]
         if case["direction"] == "input":
@@ -285,6 +333,7 @@ class PresidioCore:
         *,
         text_overrides: dict[str, str] | None = None,
     ) -> tuple[list[dict], dict]:
+        """모든 교육용 시나리오와 allow/redact 집계를 한 번에 반환한다."""
         overrides = text_overrides or {}
         results = [
             self.run_case(case_name, text_override=overrides.get(case_name))
