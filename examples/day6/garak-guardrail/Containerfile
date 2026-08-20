@@ -1,0 +1,12 @@
+FROM python:3.12-slim
+
+ARG GARAK_VERSION=0.15.1
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    XDG_DATA_HOME=/work/.local/share
+
+RUN python -m pip install "garak==${GARAK_VERSION}"
+
+WORKDIR /work
+ENTRYPOINT ["python", "-m", "garak"]

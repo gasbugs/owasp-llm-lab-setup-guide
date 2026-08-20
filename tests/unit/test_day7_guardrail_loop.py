@@ -1,0 +1,44 @@
+"""Static contracts for the learner-facing Day 7 guardrail loop assets."""
+
+from __future__ import annotations
+
+import json
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+class Day7GuardrailLoopTests(unittest.TestCase):
+    def test_promptfoo_targets_application_and_asserts_control_boundaries(self) -> None:
+        source = (ROOT / "examples/day6/promptfoo-guardrail/promptfooconfig.yaml").read_text()
+        self.assertIn('url: "{{env.GUARDRAIL_APP_URL}}/api/chat"', source)
+        self.assertIn("maxRetries: 0", source)
+        self.assertIn('effective_decision === "block"', source)
+        self.assertIn('outer_decision === "redact"', source)
+
+    def test_garak_rest_generator_uses_guarded_application(self) -> None:
+        data = json.loads(
+            (ROOT / "examples/day6/garak-guardrail/rest-generator.json").read_text()
+        )
+        config = data["rest"]["RestGenerator"]
+        self.assertEqual(config["uri"], "http://10.0.2.2:18090/api/chat")
+        self.assertEqual(config["req_template_json_object"], {"message": "$INPUT"})
+        self.assertEqual(config["response_json_field"], "reply")
+
+    def test_server_exposes_policy_identity_and_static_output_contract(self) -> None:
+        source = (ROOT / "examples/day6/presidio/server.py").read_text()
+        for marker in (
+            "policy_version",
+            "test_corpus_version",
+            "model_digest",
+            "system_prompt_sha256",
+            '"/api/labs/validate-output-contract"',
+            'blocking_reason": "output-contract-invalid"',
+        ):
+            self.assertIn(marker, source)
+
+
+if __name__ == "__main__":
+    unittest.main()

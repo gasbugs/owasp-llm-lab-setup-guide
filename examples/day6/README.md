@@ -107,3 +107,19 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 
 검사 결과는 별도 파일 생성 wrapper 없이 `podman logs day6-presidio-api` 또는
 `podman logs day6-nemo-guardrails-api`에서 구조화된 JSON으로 확인한다.
+
+## 회귀시험과 탐색 자산
+
+`promptfoo-guardrail/`은 정상 허용, prompt injection 사전 차단, PII 비식별화를
+애플리케이션 계약으로 고정한다. 앞 차시에서 설치한 Promptfoo runtime을 재사용하며
+새 도구 설치를 반복하지 않는다.
+
+`garak-guardrail/`은 NVIDIA Garak 0.15.1과 공식 REST generator를 사용해 같은
+애플리케이션 endpoint에 제한된 probe를 전달한다. Promptfoo는 이미 알고 있는
+요구사항의 회귀시험이고 Garak은 아직 테스트에 없는 실패 후보를 찾는 탐색 도구다.
+Garak에서 재현된 hit는 최소 입력으로 줄인 뒤 Promptfoo testcase로 승격한다.
+
+Presidio server의 `/api/guardrails/policy`는 정책·test corpus·model·system prompt
+식별자를 공개한다. 학습 전용 `/api/labs/validate-output-contract`는 Pydantic의
+`extra="forbid"` 계약으로 예상하지 못한 필드를 거부한다. 이 endpoint는
+`ENABLE_LAB_ENDPOINTS=true`일 때만 사용할 수 있다.

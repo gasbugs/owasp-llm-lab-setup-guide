@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import time
 import uuid
@@ -27,6 +28,14 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rs
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
 NEMO_GUARD_URL = os.getenv("NEMO_GUARD_URL", "").rstrip("/")
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
+POLICY_VERSION = os.getenv("GUARD_POLICY_VERSION", "day7-guardrails-v1")
+TEST_CORPUS_VERSION = os.getenv("GUARD_TEST_CORPUS_VERSION", "day7-regression-v1")
+MODEL_DIGEST = os.getenv("OLLAMA_MODEL_DIGEST", "runtime-query-required")
+SYSTEM_PROMPT = (
+    "You are a concise privacy training assistant. "
+    "Never invent personal data or credentials."
+)
+SYSTEM_PROMPT_SHA256 = hashlib.sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest()
 CORE = PresidioCore()
 
 app = FastAPI(title="Day 6 Microsoft Presidio integration API")
@@ -48,6 +57,19 @@ class OutputScanRequest(BaseModel):
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     message: str = Field(min_length=1, max_length=20000)
+
+
+class SupportActionCandidate(BaseModel):
+    """The only structured output shape accepted by the workshop application."""
+
+    model_config = ConfigDict(extra="forbid")
+    answer: str = Field(min_length=1, max_length=2000)
+    links: list[str] = Field(default_factory=list, max_length=5)
+
+
+class OutputContractRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model_output: dict
 
 
 LOG_CONTENT_FIELDS = {
@@ -121,8 +143,7 @@ async def call_ollama(message: str) -> str:
                     {
                         "role": "system",
                         "content": (
-                            "You are a concise privacy training assistant. "
-                            "Never invent personal data or credentials."
+                            SYSTEM_PROMPT
                         ),
                     },
                     {"role": "user", "content": message},
@@ -166,6 +187,11 @@ def base_guardrail(*, decision: str, upstream_called: bool, duration_ms: float) 
         "upstream_called": upstream_called,
         "duration_ms": duration_ms,
         "blocking_reason": None,
+        "policy_version": POLICY_VERSION,
+        "test_corpus_version": TEST_CORPUS_VERSION,
+        "model": OLLAMA_MODEL,
+        "model_digest": MODEL_DIGEST,
+        "system_prompt_sha256": SYSTEM_PROMPT_SHA256,
     }
 
 
@@ -180,6 +206,7 @@ async def healthz() -> dict:
         "upstream_path": "nemo>ollama" if NEMO_GUARD_URL else "ollama",
         "nemo_guard_url": NEMO_GUARD_URL or None,
         "security_monitoring": bool(SECURITY_MONITOR_URL),
+        "policy_version": POLICY_VERSION,
     }
 
 
@@ -191,6 +218,19 @@ async def policy() -> dict:
         "framework": FRAMEWORK,
         "framework_version": FRAMEWORK_VERSION,
         "guard_mode": GUARD_MODE,
+        "policy_version": POLICY_VERSION,
+        "test_corpus_version": TEST_CORPUS_VERSION,
+        "runtime_identity": {
+            "model": OLLAMA_MODEL,
+            "model_digest": MODEL_DIGEST,
+            "system_prompt_sha256": SYSTEM_PROMPT_SHA256,
+        },
+        "output_contract": {
+            "source": "examples/day6/presidio/server.py:SupportActionCandidate",
+            "additional_properties": False,
+            "required": ["answer"],
+            "optional": ["links"],
+        },
         "canonical_source": "examples/day6/presidio/presidio_core.py",
         "container_source": "/app/presidio_core.py",
         "runtime_activation": "/app/server.py:chat",
@@ -258,6 +298,43 @@ async def scan_output(request: OutputScanRequest) -> dict:
             "blocking_reason": None if result["valid"] else "output:pii_detected",
         }
     )
+    emit(result)
+    return result
+
+
+@app.post("/api/labs/validate-output-contract")
+async def validate_output_contract(request: OutputContractRequest) -> dict:
+    """Apply the server-owned structured output contract without calling a model."""
+
+    require_lab_endpoint()
+    started = time.perf_counter()
+    try:
+        accepted = SupportActionCandidate.model_validate(request.model_output)
+    except Exception as exc:
+        result = {
+            "event": "output_contract_validation",
+            "guard_engine": "python-pydantic",
+            "policy_version": POLICY_VERSION,
+            "valid": False,
+            "application_decision": "block",
+            "blocking_reason": "output-contract-invalid",
+            "upstream_called": False,
+            "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            "error": type(exc).__name__,
+        }
+        emit(result)
+        return result
+    result = {
+        "event": "output_contract_validation",
+        "guard_engine": "python-pydantic",
+        "policy_version": POLICY_VERSION,
+        "valid": True,
+        "application_decision": "allow",
+        "blocking_reason": None,
+        "upstream_called": False,
+        "sanitized_output": accepted.model_dump(),
+        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
     emit(result)
     return result
 

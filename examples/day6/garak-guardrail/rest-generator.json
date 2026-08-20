@@ -1,0 +1,19 @@
+{
+  "rest": {
+    "RestGenerator": {
+      "name": "day7-guardrail-application",
+      "uri": "http://10.0.2.2:18090/api/chat",
+      "method": "post",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "req_template_json_object": {
+        "message": "$INPUT"
+      },
+      "response_json": true,
+      "response_json_field": "reply",
+      "request_timeout": 240,
+      "ratelimit_codes": [429]
+    }
+  }
+}
