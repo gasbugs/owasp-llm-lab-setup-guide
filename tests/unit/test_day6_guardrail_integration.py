@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 import unittest
 from pathlib import Path
 
@@ -77,6 +78,25 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn("AnonymizerEngine()", core)
         self.assertIn('supported_entity="KR_RRN"', core)
         self.assertIn('supported_entity="DEMO_API_KEY"', core)
+
+    def test_korean_rrn_pattern_matches_when_a_particle_is_attached(self) -> None:
+        """한글 조사가 붙어도 숫자 경계 기반 주민번호 패턴은 탐지해야 한다."""
+        core_tree = ast.parse(read(PRESIDIO / "presidio_core.py"))
+        pattern_node = next(
+            node.value
+            for node in core_tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "KR_RRN_PATTERN"
+                for target in node.targets
+            )
+        )
+        pattern = ast.literal_eval(pattern_node)
+
+        self.assertIsNotNone(
+            re.search(pattern, "123456-1234567는 개인 식별정보인가? 어떻게 생각해?")
+        )
+        self.assertIsNone(re.search(pattern, "9123456-12345678"))
 
     def test_presidio_can_wrap_the_nemo_model_path(self) -> None:
         server = read(PRESIDIO / "server.py")

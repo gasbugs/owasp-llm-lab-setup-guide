@@ -26,6 +26,10 @@ from presidio_anonymizer.entities import OperatorConfig
 FRAMEWORK = "microsoft-presidio"
 FRAMEWORK_VERSION = "2.2.362"
 NLP_MODEL = "en_core_web_sm"
+# ``\b``는 한글도 단어 문자로 취급하므로 ``...1234567는``처럼 조사가
+# 바로 붙으면 경계를 찾지 못한다. 숫자열의 앞뒤만 검사하면 한글 문장에서도
+# 주민번호 부분을 안정적으로 분리할 수 있다.
+KR_RRN_PATTERN = r"(?<!\d)\d{6}-[1-4]\d{6}(?!\d)"
 DEFAULT_ENTITIES = (
     "EMAIL_ADDRESS",
     "PHONE_NUMBER",
@@ -94,7 +98,7 @@ class PolicySettings:
                 "replacement_format": "<ENTITY_TYPE>",
             },
             "custom_recognizers": {
-                "KR_RRN": r"\b\d{6}-[1-4]\d{6}\b",
+                "KR_RRN": KR_RRN_PATTERN,
                 "DEMO_API_KEY": r"\bDEMO_API_KEY=[A-Za-z0-9-]+\b",
             },
         }
@@ -195,7 +199,7 @@ class PresidioCore:
                 patterns=[
                     Pattern(
                         name="kr_rrn_synthetic_training_pattern",
-                        regex=r"\b\d{6}-[1-4]\d{6}\b",
+                        regex=KR_RRN_PATTERN,
                         score=0.85,
                     )
                 ],
