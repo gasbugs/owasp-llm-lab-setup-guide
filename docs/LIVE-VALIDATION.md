@@ -175,7 +175,7 @@ curl -fsS http://localhost:8501/_stcore/health
 curl -fsS http://localhost:11434/api/tags | jq -e '.models | type == "array"'
 ```
 
-`vuln-rag` 이미지의 CMD와 HEALTHCHECK는 모두 `PORT`를 사용하고, Quadlet은 각 unit에 같은 `PORT`와 uvicorn 포트를 주입합니다. 정상 앱이 잘못된 8000 probe 때문에 `unhealthy`가 되는 상태는 허용하지 않습니다.
+`vuln-rag` 이미지의 CMD와 HEALTHCHECK는 모두 `PORT`를 사용하고, Compose는 각 service에 같은 `PORT`와 uvicorn 포트를 주입합니다. 정상 앱이 잘못된 8000 probe 때문에 `unhealthy`가 되는 상태는 허용하지 않습니다.
 
 DVLA wrapper는 upstream `ReversecLabs/damn-vulnerable-llm-agent`의 commit `c0cf9a14adad76e9d6a53c41741f625334bd9971`을 고정해 빌드합니다.
 

@@ -53,31 +53,27 @@ OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-bge-m3:latest}"
 container="$1"
 case "$container" in
   lab-prompt-rag)
-    scenario=day1
-    port=8000
+    service=prompt-rag
     image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
     ;;
   lab-data-rag)
-    scenario=day2
-    port=8010
+    service=data-rag
     image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
     ;;
   lab-output-rag)
-    scenario=day3
-    port=8011
+    service=output-rag
     image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
     ;;
   lab-knowledge-rag)
-    scenario=day4
-    port=8012
+    service=knowledge-rag
     image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
     ;;
   lab-resource-rag)
-    scenario=day5
-    port=8013
+    service=resource-rag
     image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
     ;;
   lab-vuln-agent)
+    service=vuln-agent
     image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-agent:$IMAGE_TAG"
     ;;
   *)
@@ -87,32 +83,19 @@ case "$container" in
     ;;
 esac
 
-podman rm -f "$container" >/dev/null 2>&1 || true
-
-if [ "$container" = lab-vuln-agent ]; then
-  podman run -d \
-    --name "$container" \
-    --network slirp4netns:allow_host_loopback=true \
-    -p 0.0.0.0:8001:8001 \
-    --restart=always \
-    -e "OLLAMA_URL=http://host.containers.internal:11434" \
-    -e "OLLAMA_MODEL=$OLLAMA_MODEL" \
-    "$image"
-else
-  podman run -d \
-    --name "$container" \
-    --network slirp4netns:allow_host_loopback=true \
-    -p "0.0.0.0:$port:$port" \
-    --restart=always \
-    -e "DEFAULT_SCENARIO=$scenario" \
-    -e "SCENARIO=$scenario" \
-    -e "PORT=$port" \
-    -e "OLLAMA_URL=http://host.containers.internal:11434" \
-    -e "OLLAMA_MODEL=$OLLAMA_MODEL" \
-    -e "OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL" \
-    "$image" \
-    uv run uvicorn app.main:app --host 0.0.0.0 --port "$port"
+COMPOSE_DIR="${COMPOSE_DIR:-$HOME/.config/owasp-llm-lab}"
+COMPOSE_FILE="$COMPOSE_DIR/compose.yaml"
+if [ ! -r "$COMPOSE_FILE" ]; then
+  echo "ERROR: Compose definition is unavailable: $COMPOSE_FILE" >&2
+  exit 3
+fi
+if ! command -v podman-compose >/dev/null 2>&1; then
+  echo "ERROR: podman-compose is unavailable" >&2
+  exit 3
 fi
 
-printf 'RECREATED_CONTAINER=%s IMAGE=%s RESTART_POLICY=always\n' \
-  "$container" "$image"
+cd "$COMPOSE_DIR"
+podman-compose up -d --no-deps --force-recreate "$service"
+
+printf 'RECREATED_CONTAINER=%s COMPOSE_SERVICE=%s IMAGE=%s RESTART_POLICY=always\n' \
+  "$container" "$service" "$image"

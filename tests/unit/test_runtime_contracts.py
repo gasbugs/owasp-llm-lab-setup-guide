@@ -55,22 +55,24 @@ class RuntimeContractTest(unittest.TestCase):
             self.assertIn("ARG VCS_REF=unknown", dockerfile, image)
             self.assertIn('org.opencontainers.image.revision="$VCS_REF"', dockerfile, image)
 
-    def test_editable_runner_sets_same_published_port_for_each_rag_process(self) -> None:
+    def test_compose_sets_same_published_port_for_each_rag_process(self) -> None:
+        compose = read("infrastructure/compose/compose.yaml")
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
-        self.assertIn('-p "0.0.0.0:$port:$port"', runner)
-        self.assertIn('--port "$port"', runner)
+        for port in (8000, 8010, 8011, 8012, 8013):
+            self.assertIn(f'"{port}:{port}"', compose)
+            self.assertIn(f'"--port", "{port}"', compose)
+        self.assertIn('podman-compose up -d --no-deps --force-recreate "$service"', runner)
 
     def test_every_deployed_service_has_an_explicit_port_exposure_contract(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
-        direct_published_services = {
+        compose = read("infrastructure/compose/compose.yaml")
+        published_services = {
             "lab-prompt-rag": 8000,
             "lab-data-rag": 8010,
             "lab-output-rag": 8011,
             "lab-knowledge-rag": 8012,
             "lab-resource-rag": 8013,
             "lab-vuln-agent": 8001,
-        }
-        quadlet_published_services = {
             "lab-ollama": 11434,
             "lab-llmgoat": 5000,
             "lab-dvla": 8501,
@@ -90,14 +92,9 @@ class RuntimeContractTest(unittest.TestCase):
             "lab-fake-registry": "http://localhost:8002/api/v1/models",
             "lab-portal": "http://localhost:8080/",
         }
-        runner = read("infrastructure/scripts/student/recreate-editable-lab")
-        for service, port in direct_published_services.items():
+        for service, port in published_services.items():
             self.assertIn(f"[{service}]={port}", installer)
-        self.assertIn('-p "0.0.0.0:$port:$port"', runner)
-        self.assertIn("-p 0.0.0.0:8001:8001", runner)
-        for service, port in quadlet_published_services.items():
-            self.assertIn(f"[{service}]={port}", installer)
-            self.assertIn(f"PublishPort={port}:{port}", installer)
+            self.assertIn(f'"{port}:{port}"', compose)
         for service, url in health_urls.items():
             with self.subTest(service=service):
                 self.assertIn(url, installer)
@@ -105,11 +102,11 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('[ "$network_mode" = "host" ]', installer)
         self.assertIn('published=$(podman port', installer)
         self.assertIn('has no published host port', installer)
-        self.assertNotIn("\nNetwork=host\n", installer)
-        self.assertNotIn("--network host", runner)
+        self.assertNotIn("network_mode: host", compose)
 
-    def test_quadlet_container_names_are_role_based_without_dates(self) -> None:
+    def test_compose_container_names_are_role_based_without_dates(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
+        compose = read("infrastructure/compose/compose.yaml")
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
         for unit in (
             "lab-prompt-rag",
@@ -121,10 +118,9 @@ class RuntimeContractTest(unittest.TestCase):
         ):
             self.assertIn(f"  {unit})", runner)
         for unit in ("lab-dvla", "lab-fake-registry"):
-            self.assertIn(f"ContainerName={unit}", installer)
+            self.assertIn(f"container_name: {unit}", compose)
 
-        active_units = installer.split("\nunits=(", 1)[1].split(")", 1)[0]
-        self.assertNotIn("lab-day", active_units)
+        self.assertNotIn("container_name: lab-day", compose)
 
     def test_secure_coding_uses_container_layer_and_podman_recreation(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
@@ -134,9 +130,8 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertNotIn("RUNTIME_SOURCE_ROOT=", installer)
         self.assertNotIn("runtime-src/${rag_unit}/app:/app/app", installer)
         self.assertNotIn("runtime-src/lab-vuln-agent/app:/app/app", installer)
-        self.assertIn("--restart=always", runner)
-        self.assertIn('podman rm -f "$container"', runner)
-        self.assertIn("host.containers.internal:11434", runner)
+        self.assertIn("--force-recreate", runner)
+        self.assertIn("http://ollama:11434", read("infrastructure/compose/compose.yaml"))
         self.assertIn(
             'container_layer_source_files=(',
             installer,
@@ -158,7 +153,7 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
-            "docker/ infrastructure/scripts/student/install-lab.sh",
+            "docker/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh",
             workflow,
         )
 
@@ -189,10 +184,10 @@ class RuntimeContractTest(unittest.TestCase):
         installer = read("infrastructure/scripts/student/install-lab.sh")
         self.assertIn('curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py"', installer)
         self.assertIn('FAKE_REGISTRY_CHANGED=true', installer)
-        self.assertIn('QUADLET_FINGERPRINT_BEFORE=', installer)
-        self.assertIn('QUADLET_FINGERPRINT_AFTER=', installer)
+        self.assertIn('curl -fsSL "$RAW_URL/infrastructure/compose/compose.yaml"', installer)
+        self.assertIn("podman-compose config", installer)
+        self.assertIn("podman-compose up -d", installer)
         self.assertIn('[ "$REFRESH_IMAGES" = "true" ]', installer)
-        self.assertIn('systemctl --user restart "$unit.service"', installer)
         self.assertIn('LAB_ENV_CANDIDATE=/etc/lab/env.pending', installer)
         self.assertIn('mv -f "$LAB_ENV_CANDIDATE" /etc/lab/env', installer)
         self.assertIn("verifying reconciled service health", installer)
@@ -214,7 +209,7 @@ class RuntimeContractTest(unittest.TestCase):
             "    curl -fsS --max-time 5 http://127.0.0.1:5000/healthz"
         )
         publish_refresh = installer.index(
-            "systemctl --user restart lab-llmgoat.service", internal_health
+            "podman restart lab-llmgoat", internal_health
         )
         external_health = installer.index(
             "http://localhost:5000/healthz", publish_refresh
@@ -225,12 +220,6 @@ class RuntimeContractTest(unittest.TestCase):
             'podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL"', 1
         )[1].split("fi", 1)[0]
         self.assertNotIn("|| true", guard_pull)
-
-        fingerprint_before = installer.split(
-            "QUADLET_FINGERPRINT_BEFORE=$(", 1
-        )[1].split("\n)", 1)[0]
-        self.assertIn('if [ -f "$file" ]; then', fingerprint_before)
-        self.assertNotIn('[ -f "$file" ] &&', fingerprint_before)
 
     def test_installer_waits_for_fresh_ami_package_manager_lock(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
@@ -248,7 +237,8 @@ class RuntimeContractTest(unittest.TestCase):
             "APT_LOCK_TIMEOUT_SECONDS must be a non-negative integer", installer
         )
 
-    def test_legacy_compose_is_absent(self) -> None:
+    def test_single_compose_definition_is_canonical(self) -> None:
+        self.assertTrue((ROOT / "infrastructure" / "compose" / "compose.yaml").exists())
         self.assertFalse((ROOT / "docker" / "docker-compose.yaml").exists())
 
     def test_security_group_only_lists_deployed_app_ports(self) -> None:

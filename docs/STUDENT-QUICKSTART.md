@@ -14,7 +14,7 @@
 
 Ubuntu PC에서 위 도구를 한 번에 준비하려면 다음 선택적 스크립트를 실행할 수
 있습니다. 이 스크립트의 Docker는 로컬 개발용이며, EC2 실습 앱은 7단계의
-`install-lab.sh`가 Podman과 Quadlet으로 구성합니다.
+`install-lab.sh`가 Podman과 단일 Compose 파일로 구성합니다.
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/setup-workstation-ubuntu.sh
@@ -147,7 +147,8 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
 - DVLA 실행: `lab-dvla`, port `8501`
 - Day 4 LLM03 fake model registry 실행: `lab-fake-registry`, port `8002`
-- EC2 start 후 자동 재시작을 위한 Podman Quadlet systemd user unit 등록
+- 단일 Podman Compose 파일로 모든 서비스 실행
+- EC2 재부팅 후 자동 복구를 위한 `restart: always`와 `podman-restart.service` 설정
 - Terraform 기본 설정으로 매일 18:00 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 기존 17:30 모드, 야간 반복 모드 또는 custom cron 선택 가능
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
@@ -193,9 +194,10 @@ enable_user_data_bootstrap = true
 
 SSM 세션 안에서 실행합니다.
 
-모든 컨테이너는 `Network=host`를 사용하지 않고 격리된 network에서 실행됩니다. `podman ps`의 `PORTS` 열에는 각 앱이 host의 같은 번호에 publish된 mapping이 표시됩니다. RAG·Agent·DVLA가 Ollama를 호출할 때는 컨테이너 내부의 `localhost`가 아니라 `host.containers.internal:11434`를 사용합니다.
+모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. `podman ps`의 `PORTS` 열에는 각 앱이 host의 같은 번호에 publish된 mapping이 표시됩니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
 
 ```bash
+sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && podman-compose ps'
 sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 curl -s http://localhost:8080/ | head
 curl -s http://localhost:11434/api/tags | head
@@ -207,6 +209,13 @@ curl -s http://localhost:8013/healthz
 curl -s http://localhost:8001/healthz
 curl -s http://localhost:5000/healthz
 curl -s http://localhost:8002/api/v1/models | head
+```
+
+배포 정의 전체는 `~/.config/owasp-llm-lab/compose.yaml` 한 파일에서 확인할 수 있습니다. 개별 로그와 재시작도 컨테이너 이름으로 수행합니다.
+
+```bash
+sudo -u ubuntu podman logs --tail 100 lab-llmgoat
+sudo -u ubuntu podman restart lab-llmgoat
 ```
 
 ## 9. 상태를 바꾼 실습만 최소 복원
@@ -248,7 +257,7 @@ SSM 포트포워딩이나 수강생이 실행한 미니 앱을 종료하는 일,
 
 ## 10. 설치 자체를 다시 해야 할 때
 
-설치가 중간에 실패했거나 Quadlet 정의 자체가 손상된 경우에만 SSM 세션 안에서
+설치가 중간에 실패했거나 Compose 정의 자체가 손상된 경우에만 SSM 세션 안에서
 클린업 후 설치를 다시 실행합니다. 일반 실습 상태 복원에는 이 절차를 사용하지
 않습니다.
 

@@ -7,7 +7,7 @@
 - Ubuntu 24.04 LTS + 최신 보안 패치
 - NVIDIA Driver + CUDA Toolkit 12.8
 - nvidia-container-toolkit (CDI 모드, `/etc/cdi/nvidia.yaml` 사전 생성)
-- **Podman rootless + Quadlet** (Docker daemon과 Compose 없음)
+- **Podman rootless + Podman Compose** (Docker daemon 없음)
 - AWS CLI v2 + SSM 에이전트
 - 강의용 컨테이너 이미지 (공개 GHCR에서 사전 anonymous podman pull)
 - LLM 모델 weights (`llama3.1:8b-instruct-q4_K_M`, 약 5GB)

@@ -61,7 +61,7 @@ jobs:
           elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           elif git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- \
-            docker/ infrastructure/scripts/student/install-lab.sh; then
+            docker/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"

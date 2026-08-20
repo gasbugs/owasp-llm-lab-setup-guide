@@ -67,7 +67,7 @@ TAG="sha-$SETUP_COMMIT" \
 
 ## EC2 운영
 
-수동 `podman run`이나 Compose 대신 저장소 루트의 설치 스크립트를 사용합니다.
+수동 `podman run` 대신 저장소 루트의 설치 스크립트를 사용합니다. 설치 스크립트가 단일 Compose 정의를 내려받아 실행합니다.
 
 ```bash
 git fetch origin main
@@ -80,7 +80,7 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 sudo -u ubuntu podman logs --tail 100 lab-output-rag
 ```
 
-`podman ps`의 `PORTS` 열이 비어 있는 RAG·Agent·DVLA·fake registry·Portal은 누락된 mapping이 아니라 Quadlet의 `Network=host`를 사용합니다. Ollama와 LLMGoat만 격리 network에서 `PublishPort`를 사용하므로 `11434->11434`, `5000->5000`이 표시됩니다. 설치 스크립트는 각 컨테이너의 network mode 또는 published mapping과 localhost health를 모두 검사합니다.
+모든 서비스는 Compose의 격리된 network를 사용하고 host의 동일 번호에 포트를 publish합니다. 설치 스크립트는 `Network=host` 부재, 각 mapping과 localhost health를 모두 검사합니다. 설치된 정의는 EC2의 `~/.config/owasp-llm-lab/compose.yaml`에서 확인합니다.
 
 EC2는 이미지·모델 설치를 위해 인터넷 egress를 사용합니다. 기본 ingress는 `127.0.0.1/32`이고 브라우저/API 접근은 SSM 포트포워딩을 권장합니다.
 

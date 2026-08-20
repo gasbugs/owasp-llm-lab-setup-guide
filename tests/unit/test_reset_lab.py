@@ -27,8 +27,8 @@ class ResetLabTest(unittest.TestCase):
                 "exec /usr/bin/id \"$@\"\n",
                 encoding="utf-8",
             )
-            (mock_bin / "systemctl").write_text(
-                "#!/bin/sh\nprintf 'systemctl %s\\n' \"$*\" >> \"$MOCK_ACTION_LOG\"\n",
+            (mock_bin / "podman").write_text(
+                "#!/bin/sh\nprintf 'podman %s\\n' \"$*\" >> \"$MOCK_ACTION_LOG\"\n",
                 encoding="utf-8",
             )
             (mock_bin / "recreate-editable-lab").write_text(
@@ -46,7 +46,7 @@ class ResetLabTest(unittest.TestCase):
                 "esac\n",
                 encoding="utf-8",
             )
-            for name in ("id", "systemctl", "curl", "recreate-editable-lab"):
+            for name in ("id", "podman", "curl", "recreate-editable-lab"):
                 (mock_bin / name).chmod(0o755)
 
             env = os.environ.copy()
@@ -111,7 +111,7 @@ class ResetLabTest(unittest.TestCase):
                 "LLM08_LLM09_READY_URL=http://127.0.0.1:8012/healthz",
             ),
             "llmgoat": (
-                "systemctl --user restart lab-llmgoat.service",
+                "podman restart lab-llmgoat",
                 "LLMGOAT_READY_URL=http://127.0.0.1:5000/healthz",
             ),
         }
@@ -123,14 +123,14 @@ class ResetLabTest(unittest.TestCase):
                 self.assertIn(ready_line, result.stdout)
                 self.assertIn('{"ok":true}', result.stdout)
 
-    def test_llm10_uses_day5_ollama_day5_systemd_order(self) -> None:
+    def test_llm10_uses_day5_ollama_day5_compose_order(self) -> None:
         result, calls = self.run_reset("llm10")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             calls,
             [
                 "recreate lab-resource-rag",
-                "systemctl --user restart lab-ollama.service",
+                "podman restart lab-ollama",
                 "recreate lab-resource-rag",
             ],
         )
@@ -152,8 +152,8 @@ class ResetLabTest(unittest.TestCase):
         self.assertNotIn("/home/ubuntu/work", source)
         self.assertNotIn("/home/ubuntu/.LLMGoat", source)
         self.assertNotIn("/home/ubuntu/ollama-models", source)
-        self.assertNotIn("podman restart", source)
-        self.assertIn("systemctl --user restart", source)
+        self.assertIn("podman restart", source)
+        self.assertNotIn("systemctl --user restart", source)
         self.assertIn('"$RECREATE_EDITABLE_LAB" "$container"', source)
 
     def test_reset_documentation_matches_allowlist_and_secure_coding_boundaries(self) -> None:
@@ -197,11 +197,8 @@ class ResetLabTest(unittest.TestCase):
 
     def test_editable_recreation_is_allowlisted_and_preserves_learner_files(self) -> None:
         source = RECREATE_EDITABLE_LAB.read_text(encoding="utf-8")
-        self.assertIn('podman rm -f "$container"', source)
-        self.assertIn("--restart=always", source)
-        self.assertIn('-p "0.0.0.0:$port:$port"', source)
-        self.assertIn("-p 0.0.0.0:8001:8001", source)
-        self.assertIn("host.containers.internal:11434", source)
+        self.assertIn('podman-compose up -d --no-deps --force-recreate "$service"', source)
+        self.assertIn('COMPOSE_DIR="${COMPOSE_DIR:-$HOME/.config/owasp-llm-lab}"', source)
         self.assertNotIn("--network host", source)
         self.assertNotIn("/home/ubuntu/work", source)
         self.assertNotIn("/app/app", source)

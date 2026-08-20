@@ -80,12 +80,12 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 - EC2 metadata와 tag를 읽어 `/etc/lab/env` 작성
 - `/home/ubuntu/work` 생성
-- Podman rootless와 Quadlet 실행 환경 설치
+- Podman rootless와 Podman Compose 실행 환경 설치
 - NVIDIA CDI 파일 생성
 - 공개 GHCR에서 실습 이미지 anonymous pull
 - Ollama와 실습 앱 컨테이너 실행
 - Ollama 모델 pull과 warm-up
-- Podman Quadlet 기반 systemd user unit 등록
+- 단일 Compose 정의 실행과 Podman 재시작 정책 등록
 - Terraform 기본 설정으로 매일 18:00 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 기존 17:30 모드, 야간 반복 모드 또는 custom cron 선택 가능
 
 운영 편의상 자동 설치가 필요하면 `terraform.tfvars`에서 아래 값을 켭니다.

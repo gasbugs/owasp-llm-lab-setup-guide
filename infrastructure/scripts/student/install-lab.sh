@@ -171,17 +171,16 @@ done
 PULLSH
 
 # Secure-coding source stays in each container's writable layer. The six
-# learner-editable containers use Podman's own restart=always policy instead of
-# Quadlet so `podman restart` keeps the same container and edited source.
+# learner-editable containers use Compose restart=always so `podman restart`
+# keeps the same container and edited source.
 # reset-lab removes and recreates an allowlisted container from the vulnerable
 # published image when a clean baseline is required.
 
 # 7) 시나리오 결정
 echo "[install-lab] enabled scenarios: day1 day2 day3 day4 day5"
 
-# 8) 상시 기반 서비스는 Quadlet, 편집 대상은 직접 Podman으로 작성 및 실행
-# podman generate systemd는 deprecated라 기반 서비스는 Quadlet을 직접 사용한다.
-step "9/10" "Quadlet 기반 서비스와 직접 Podman 실습 컨테이너를 준비합니다"
+# 8) 모든 서비스 정의를 하나의 Compose 파일로 설치하고 실행
+step "9/10" "단일 Podman Compose 정의로 모든 실습 컨테이너를 준비합니다"
 mkdir -p /home/ubuntu/.LLMGoat/models /home/ubuntu/.LLMGoat/cache
 chown -R ubuntu:ubuntu /home/ubuntu/.LLMGoat
 if [ -f /home/ubuntu/.LLMGoat/models/gemma-2.gguf ]; then
@@ -245,263 +244,95 @@ EOF
 chown -R ubuntu:ubuntu /home/ubuntu/work/dvla
 
 QUADLET_DIR="/home/ubuntu/.config/containers/systemd"
-install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR"
+COMPOSE_DIR="/home/ubuntu/.config/owasp-llm-lab"
+COMPOSE_FILE="$COMPOSE_DIR/compose.yaml"
+COMPOSE_CANDIDATE="$COMPOSE_DIR/compose.yaml.next"
+install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR" "$COMPOSE_DIR"
 
-editable_units=(
+echo "[install-lab] downloading the single Podman Compose service definition"
+curl -fsSL "$RAW_URL/infrastructure/compose/compose.yaml" -o "$COMPOSE_CANDIDATE"
+install -m 0644 -o ubuntu -g ubuntu "$COMPOSE_CANDIDATE" "$COMPOSE_FILE"
+rm -f "$COMPOSE_CANDIDATE"
+cat > "$COMPOSE_DIR/.env" <<EOF
+IMAGE_NAMESPACE=$IMAGE_NAMESPACE
+IMAGE_TAG=$IMAGE_TAG
+OLLAMA_MODEL=$OLLAMA_MODEL
+OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL
+LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
+EOF
+chown ubuntu:ubuntu "$COMPOSE_DIR/.env"
+
+echo "[install-lab] removing legacy Quadlet units before Compose reconciliation"
+all_units=(
+  lab-ollama
   lab-prompt-rag
   lab-data-rag
   lab-output-rag
   lab-knowledge-rag
   lab-resource-rag
   lab-vuln-agent
-)
-"${RUN_AS_UBUNTU[@]}" bash <<'EDITABLELEGACYSH'
-set -euo pipefail
-for unit in \
-  lab-prompt-rag \
-  lab-data-rag \
-  lab-output-rag \
-  lab-knowledge-rag \
-  lab-resource-rag \
-  lab-vuln-agent; do
-  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
-  systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
-done
-EDITABLELEGACYSH
-for unit in "${editable_units[@]}"; do
-  rm -f "$QUADLET_DIR/$unit.container"
-done
-
-QUADLET_FINGERPRINT_BEFORE=$(
-  for file in "$QUADLET_DIR"/lab-*.container; do
-    if [ -f "$file" ]; then
-      sha256sum "$file"
-    fi
-  done | sort | sha256sum | awk '{print $1}'
-)
-
-echo "[install-lab] writing Quadlet unit files under $QUADLET_DIR"
-
-echo "[install-lab] removing legacy date-based unit files and containers if they exist"
-legacy_units=(
-  lab-vuln-rag
-  lab-day1-vuln-rag
-  lab-day2-vuln-rag
-  lab-day3-vuln-rag
-  lab-day4-vuln-rag
-  lab-day5-vuln-rag
-  lab-day3-vuln-agent
-  lab-day3-dvla
-  lab-day2-fake-registry
-)
-for unit in "${legacy_units[@]}"; do
-  rm -f "$QUADLET_DIR/$unit.container"
-done
-"${RUN_AS_UBUNTU[@]}" bash <<'LEGACYSH'
-set -euo pipefail
-legacy_units=(
-  lab-vuln-rag
-  lab-day1-vuln-rag
-  lab-day2-vuln-rag
-  lab-day3-vuln-rag
-  lab-day4-vuln-rag
-  lab-day5-vuln-rag
-  lab-day3-vuln-agent
-  lab-day3-dvla
-  lab-day2-fake-registry
-)
-for unit in "${legacy_units[@]}"; do
-  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
-  systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
-  podman rm -f "$unit" >/dev/null 2>&1 || true
-done
-LEGACYSH
-
-cat > "$QUADLET_DIR/lab-ollama.container" <<'EOF'
-[Unit]
-Description=OWASP LLM Lab - Ollama
-
-[Container]
-ContainerName=lab-ollama
-Image=docker.io/ollama/ollama:latest
-AddDevice=nvidia.com/gpu=all
-PublishPort=11434:11434
-Volume=/home/ubuntu/ollama-models:/root/.ollama:Z
-Environment=OLLAMA_HOST=0.0.0.0:11434
-Environment=OLLAMA_KEEP_ALIVE=24h
-
-[Service]
-Restart=always
-
-[Install]
-WantedBy=default.target
-EOF
-
-cat > "$QUADLET_DIR/lab-llmgoat.container" <<EOF
-[Unit]
-Description=OWASP LLM Lab - LLMGoat
-
-[Container]
-ContainerName=lab-llmgoat
-Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-llmgoat:${IMAGE_TAG}
-AddDevice=nvidia.com/gpu=all
-PublishPort=5000:5000
-Environment=LLMGOAT_SERVER_HOST=0.0.0.0
-Environment=LLMGOAT_SERVER_PORT=5000
-Environment=LLMGOAT_DEFAULT_MODEL=gemma-2.gguf
-Environment=LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
-Environment=LLMGOAT_N_THREADS=4
-Environment=LLMGOAT_VERBOSE=1
-Volume=/home/ubuntu/.LLMGoat/models:/root/.LLMGoat/models:Z
-Volume=/home/ubuntu/.LLMGoat/cache:/root/.LLMGoat/cache:Z
-
-[Service]
-Restart=always
-
-[Install]
-WantedBy=default.target
-EOF
-
-cat > "$QUADLET_DIR/lab-dvla.container" <<EOF
-[Unit]
-Description=OWASP LLM Lab - Damn Vulnerable LLM Agent
-After=lab-ollama.container
-Requires=lab-ollama.container
-
-[Container]
-ContainerName=lab-dvla
-Image=ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-dvla:${IMAGE_TAG}
-Network=slirp4netns:allow_host_loopback=true
-PublishPort=8501:8501
-Environment=OLLAMA_HOST=http://host.containers.internal:11434
-Environment=OLLAMA_API_BASE=http://host.containers.internal:11434
-Environment=model_name=ollama-local-llama3
-Volume=/home/ubuntu/work/dvla/llm-config.yaml:/app/llm-config.yaml:Z
-
-[Service]
-Restart=always
-
-[Install]
-WantedBy=default.target
-EOF
-
-cat > "$QUADLET_DIR/lab-fake-registry.container" <<'EOF'
-[Unit]
-Description=OWASP LLM Lab - Fake Model Registry
-
-[Container]
-ContainerName=lab-fake-registry
-Image=docker.io/library/python:3.12-slim
-PublishPort=8002:8002
-Volume=/home/ubuntu/work/fake-registry:/app:Z
-Exec=python /app/server.py
-
-[Service]
-Restart=always
-
-[Install]
-WantedBy=default.target
-EOF
-
-cat > "$QUADLET_DIR/lab-portal.container" <<'EOF'
-[Unit]
-Description=OWASP LLM Lab - Portal
-
-[Container]
-ContainerName=lab-portal
-Image=docker.io/library/python:3.12-slim
-PublishPort=8080:8080
-Volume=/home/ubuntu/work/portal:/app:Z
-Exec=python -m http.server 8080 --directory /app
-
-[Service]
-Restart=always
-
-[Install]
-WantedBy=default.target
-EOF
-
-chown -R ubuntu:ubuntu "$QUADLET_DIR"
-
-QUADLET_FINGERPRINT_AFTER=$(
-  for file in "$QUADLET_DIR"/lab-*.container; do
-    [ -f "$file" ] && sha256sum "$file"
-  done | sort | sha256sum | awk '{print $1}'
-)
-QUADLET_CHANGED=false
-if [ "$QUADLET_FINGERPRINT_BEFORE" != "$QUADLET_FINGERPRINT_AFTER" ]; then
-  QUADLET_CHANGED=true
-fi
-
-"${RUN_AS_UBUNTU[@]}" \
-  REFRESH_IMAGES="$REFRESH_IMAGES" \
-  QUADLET_CHANGED="$QUADLET_CHANGED" \
-  FAKE_REGISTRY_CHANGED="$FAKE_REGISTRY_CHANGED" \
-  IMAGE_NAMESPACE="$IMAGE_NAMESPACE" \
-  IMAGE_TAG="$IMAGE_TAG" \
-  OLLAMA_MODEL="$OLLAMA_MODEL" \
-  OLLAMA_EMBED_MODEL="$OLLAMA_EMBED_MODEL" \
-  bash <<'QUADLETSH'
-set -euo pipefail
-echo "[install-lab] reloading systemd user units and reconciling lab services"
-units=(
-  lab-ollama
   lab-llmgoat
   lab-dvla
   lab-fake-registry
   lab-portal
+  lab-vuln-rag
+  lab-day1-vuln-rag
+  lab-day2-vuln-rag
+  lab-day3-vuln-rag
+  lab-day4-vuln-rag
+  lab-day5-vuln-rag
+  lab-day3-vuln-agent
+  lab-day3-dvla
+  lab-day2-fake-registry
 )
-systemctl --user daemon-reload
+for unit in "${all_units[@]}"; do
+  rm -f "$QUADLET_DIR/$unit.container"
+done
+
+"${RUN_AS_UBUNTU[@]}" \
+  COMPOSE_DIR="$COMPOSE_DIR" \
+  REFRESH_IMAGES="$REFRESH_IMAGES" \
+  bash <<'COMPOSESH'
+set -euo pipefail
+units=(
+  lab-ollama
+  lab-prompt-rag
+  lab-data-rag
+  lab-output-rag
+  lab-knowledge-rag
+  lab-resource-rag
+  lab-vuln-agent
+  lab-llmgoat
+  lab-dvla
+  lab-fake-registry
+  lab-portal
+  lab-vuln-rag
+  lab-day1-vuln-rag
+  lab-day2-vuln-rag
+  lab-day3-vuln-rag
+  lab-day4-vuln-rag
+  lab-day5-vuln-rag
+  lab-day3-vuln-agent
+  lab-day3-dvla
+  lab-day2-fake-registry
+)
 for unit in "${units[@]}"; do
+  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
   systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
-  if ! systemctl --user is-active --quiet "$unit.service"; then
-    podman rm -f "$unit" >/dev/null 2>&1 || true
-    systemctl --user start "$unit.service"
-    continue
-  fi
-
-  image_backed=false
-  case "$unit" in
-    lab-llmgoat|lab-dvla)
-      image_backed=true
-      ;;
-  esac
-
-  restart_reason=""
-  if [ "$QUADLET_CHANGED" = "true" ]; then
-    restart_reason="Quadlet configuration changed"
-  elif [ "$REFRESH_IMAGES" = "true" ] && [ "$image_backed" = "true" ]; then
-    restart_reason="requested image refresh"
-  elif [ "$unit" = "lab-dvla" ]; then
-    restart_reason="DVLA model configuration refreshed"
-  elif [ "$unit" = "lab-fake-registry" ] && \
-    [ "$FAKE_REGISTRY_CHANGED" = "true" ]; then
-    restart_reason="fake-registry source refreshed"
-  fi
-
-  if [ -n "$restart_reason" ]; then
-    echo "[install-lab] restarting $unit.service: $restart_reason"
-    systemctl --user restart "$unit.service"
-  else
-    echo "[install-lab] $unit.service already matches requested configuration"
-  fi
 done
+systemctl --user daemon-reload
 
-echo "[install-lab] recreating learner-editable containers with Podman restart policy"
-for unit in \
-  lab-prompt-rag \
-  lab-data-rag \
-  lab-output-rag \
-  lab-knowledge-rag \
-  lab-resource-rag \
-  lab-vuln-agent; do
-  IMAGE_NAMESPACE="$IMAGE_NAMESPACE" \
-  IMAGE_TAG="$IMAGE_TAG" \
-  OLLAMA_MODEL="$OLLAMA_MODEL" \
-  OLLAMA_EMBED_MODEL="$OLLAMA_EMBED_MODEL" \
-    /home/ubuntu/.local/bin/recreate-editable-lab "$unit"
+cd "$COMPOSE_DIR"
+podman-compose config >/dev/null
+for unit in "${units[@]}"; do
+  podman rm -f "$unit" >/dev/null 2>&1 || true
 done
-QUADLETSH
+if [ "$REFRESH_IMAGES" = "true" ]; then
+  podman-compose pull
+fi
+podman-compose up -d
+podman-compose ps
+COMPOSESH
 
 # 10) Ollama 모델 pull 및 warm-up
 step "10/10" "Ollama 모델 pull, warm-up, 선택 도구를 준비합니다"
@@ -649,7 +480,7 @@ done
 # LLMGoat의 첫 기동은 영속 모델 디렉터리를 채우고 모델을 GPU에 올린다.
 # 이 과정이 끝나기 전에 만들어진 rootless port forward는 내부 서버가
 # 준비된 뒤에도 연결을 reset하는 경우가 있으므로, 내부 health를 먼저
-# 확인한 다음 모델이 준비된 상태에서 Quadlet을 한 번 다시 시작한다.
+# 확인한 다음 모델이 준비된 상태에서 컨테이너를 한 번 다시 시작한다.
 llmgoat_internal_ready=false
 for _ in $(seq 1 300); do
   if podman exec lab-llmgoat \
@@ -663,7 +494,7 @@ if [ "$llmgoat_internal_ready" != "true" ]; then
   echo "ERROR: LLMGoat internal health did not become ready after model initialization" >&2
   exit 1
 fi
-systemctl --user restart lab-llmgoat.service
+podman restart lab-llmgoat >/dev/null
 echo "[install-lab] LLMGoat model initialization completed; refreshed rootless port publish"
 
 health_urls=(

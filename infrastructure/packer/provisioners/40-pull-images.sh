@@ -12,7 +12,7 @@ if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
   exit 2
 fi
 
-# 1) 실제 Quadlet 런타임 이미지 pull (rootless)
+# 1) 실제 Compose 런타임 이미지 pull (rootless)
 sudo -u ubuntu -i podman pull docker.io/ollama/ollama:latest
 sudo -u ubuntu -i podman pull docker.io/library/python:3.12-slim
 

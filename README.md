@@ -20,7 +20,8 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 | `infrastructure/terraform/user-data.sh.tpl` | 선택적 자동 설치용 user-data 래퍼. 기본값에서는 비활성화 |
 | `infrastructure/scripts/student/` | 수강생용 preflight, 수동 설치/클린업, instance-id, start, stop, sync 헬퍼 |
 | `infrastructure/packer/` | 선택 사항: 강사용 Golden AMI 빌드 |
-| `docker/` | 이미지 Dockerfile·build helper·취약 앱 소스. 실제 배포 unit은 `install-lab.sh`가 생성하는 Quadlet |
+| `infrastructure/compose/compose.yaml` | 포트·이미지·환경변수·볼륨·GPU·의존관계를 한눈에 보는 단일 서비스 배포 정의 |
+| `docker/` | 이미지 Dockerfile·build helper·취약 앱 소스 |
 | `tests/unit/` | 파서·UI 계약·공개 저장소 PII/secret 회귀 검사 |
 | `tests/e2e/` | 공개 강사용 런타임 실측 검증. 수강생 과제나 채점 기준이 아님 |
 
@@ -75,7 +76,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 4. 수강생이 SSM으로 EC2에 접속해 `install-lab.sh`를 직접 실행합니다.
 5. 설치 스크립트가 Podman을 설치하고 실습 컨테이너 이미지를 pull합니다.
 6. `lab-ollama`, `lab-portal`, `lab-prompt-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, `lab-vuln-agent`, `lab-llmgoat`, `lab-dvla`, `lab-fake-registry` 컨테이너를 실행합니다.
-7. Podman Quadlet 기반 systemd user unit을 등록하여 EC2 stop/start 후에도 컨테이너가 자동 재시작됩니다.
+7. 단일 Podman Compose 정의로 서비스를 실행하고 `restart: always` 정책과 `podman-restart.service`로 EC2 재부팅 후 자동 복구합니다.
 
 AMI ID나 SHA를 직접 입력하는 변수는 두지 않습니다. 이름·소유자 조건에 맞는 최신 AMI 조회 결과는 새 EC2를 생성할 때 적용되며, 이미 존재하는 수강생 EC2는 EBS 작업물 보호를 위해 현재 AMI를 유지하고 자동 교체하지 않습니다.
 

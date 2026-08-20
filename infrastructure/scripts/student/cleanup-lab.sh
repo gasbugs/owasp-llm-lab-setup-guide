@@ -4,8 +4,8 @@
 # 기본 모드:
 #   - 검증된 PID 파일의 LLM08 learner mini app 종료
 #   - lab-* 컨테이너 stop/remove
-#   - Quadlet .container 파일 제거
-#   - generated systemd user unit reload
+#   - Compose 컨테이너와 이전 Quadlet .container 파일 제거
+#   - systemd user unit reload
 #   - 작업물과 모델 캐시는 보존
 #
 # 완전 정리:

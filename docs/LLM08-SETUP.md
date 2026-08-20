@@ -264,7 +264,7 @@ sudo env \
   bash "$SETUP_DIR/infrastructure/scripts/student/install-lab.sh"
 ```
 
-설치 스크립트는 같은 설정으로 다시 실행해도 현재 이미지와 Quadlet을 reconcile하며, 기존 `~/work` 전체를 삭제하지 않습니다. 최종 health까지 통과해야 `/etc/lab/env.pending`이 `/etc/lab/env`로 승격됩니다.
+설치 스크립트는 같은 설정으로 다시 실행해도 현재 이미지와 Compose 서비스를 reconcile하며, 기존 `~/work` 전체를 삭제하지 않습니다. 최종 health까지 통과해야 `/etc/lab/env.pending`이 `/etc/lab/env`로 승격됩니다.
 
 설치 commit과 실제 실행 이미지가 일치하는지 확인합니다.
 

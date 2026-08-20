@@ -1,0 +1,155 @@
+name: owasp-llm-lab
+
+x-rag-common: &rag-common
+  image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-vuln-rag:${IMAGE_TAG:-latest}
+  restart: always
+  environment: &rag-environment
+    OLLAMA_URL: http://ollama:11434
+    OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+    OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3:latest}
+  depends_on:
+    ollama:
+      condition: service_started
+
+services:
+  ollama:
+    container_name: lab-ollama
+    image: docker.io/ollama/ollama:latest
+    restart: always
+    devices:
+      - nvidia.com/gpu=all
+    ports:
+      - "11434:11434"
+    volumes:
+      - /home/ubuntu/ollama-models:/root/.ollama:Z
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: 24h
+
+  prompt-rag:
+    <<: *rag-common
+    container_name: lab-prompt-rag
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *rag-environment
+      DEFAULT_SCENARIO: day1
+      SCENARIO: day1
+      PORT: "8000"
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  data-rag:
+    <<: *rag-common
+    container_name: lab-data-rag
+    ports:
+      - "8010:8010"
+    environment:
+      <<: *rag-environment
+      DEFAULT_SCENARIO: day2
+      SCENARIO: day2
+      PORT: "8010"
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010"]
+
+  output-rag:
+    <<: *rag-common
+    container_name: lab-output-rag
+    ports:
+      - "8011:8011"
+    environment:
+      <<: *rag-environment
+      DEFAULT_SCENARIO: day3
+      SCENARIO: day3
+      PORT: "8011"
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8011"]
+
+  knowledge-rag:
+    <<: *rag-common
+    container_name: lab-knowledge-rag
+    ports:
+      - "8012:8012"
+    environment:
+      <<: *rag-environment
+      DEFAULT_SCENARIO: day4
+      SCENARIO: day4
+      PORT: "8012"
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8012"]
+
+  resource-rag:
+    <<: *rag-common
+    container_name: lab-resource-rag
+    ports:
+      - "8013:8013"
+    environment:
+      <<: *rag-environment
+      DEFAULT_SCENARIO: day5
+      SCENARIO: day5
+      PORT: "8013"
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8013"]
+
+  vuln-agent:
+    container_name: lab-vuln-agent
+    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-vuln-agent:${IMAGE_TAG:-latest}
+    restart: always
+    ports:
+      - "8001:8001"
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+    depends_on:
+      ollama:
+        condition: service_started
+
+  llmgoat:
+    container_name: lab-llmgoat
+    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-llmgoat:${IMAGE_TAG:-latest}
+    restart: always
+    devices:
+      - nvidia.com/gpu=all
+    ports:
+      - "5000:5000"
+    environment:
+      LLMGOAT_SERVER_HOST: 0.0.0.0
+      LLMGOAT_SERVER_PORT: "5000"
+      LLMGOAT_DEFAULT_MODEL: gemma-2.gguf
+      LLMGOAT_N_GPU_LAYERS: ${LLMGOAT_N_GPU_LAYERS:-20}
+      LLMGOAT_N_THREADS: "4"
+      LLMGOAT_VERBOSE: "1"
+    volumes:
+      - /home/ubuntu/.LLMGoat/models:/root/.LLMGoat/models:Z
+      - /home/ubuntu/.LLMGoat/cache:/root/.LLMGoat/cache:Z
+
+  dvla:
+    container_name: lab-dvla
+    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-dvla:${IMAGE_TAG:-latest}
+    restart: always
+    ports:
+      - "8501:8501"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_API_BASE: http://ollama:11434
+      model_name: ollama-local-llama3
+    volumes:
+      - /home/ubuntu/work/dvla/llm-config.yaml:/app/llm-config.yaml:Z
+    depends_on:
+      ollama:
+        condition: service_started
+
+  fake-registry:
+    container_name: lab-fake-registry
+    image: docker.io/library/python:3.12-slim
+    restart: always
+    ports:
+      - "8002:8002"
+    volumes:
+      - /home/ubuntu/work/fake-registry:/app:Z
+    command: ["python", "/app/server.py"]
+
+  portal:
+    container_name: lab-portal
+    image: docker.io/library/python:3.12-slim
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - /home/ubuntu/work/portal:/app:Z
+    command: ["python", "-m", "http.server", "8080", "--directory", "/app"]

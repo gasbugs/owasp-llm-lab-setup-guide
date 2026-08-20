@@ -36,7 +36,7 @@ class WorkflowActionRuntimeTests(unittest.TestCase):
             workflow,
         )
         self.assertIn(
-            "docker/ infrastructure/scripts/student/install-lab.sh",
+            "docker/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh",
             workflow,
         )
         self.assertIn("fetch-depth: 0", workflow)

@@ -17,6 +17,7 @@
 | 경로 | 용도 |
 |---|---|
 | `terraform/` | 다중 AZ VPC, ASG, Launch Template, 보안 그룹, IAM instance profile, Budget 알람 |
+| `compose/compose.yaml` | 11개 실습 컨테이너의 단일 Podman Compose 배포 정의 |
 | `scripts/student/` | 수강생용 preflight, 수동 설치, instance-id, start/stop 및 작업물 보존 안내 헬퍼 |
 
 `scripts/student/upload-capstone.sh`는 런타임이나 e2e의 의존성이 아니라 선택적 SSM 전송 helper입니다. 별도 수강생 패키지 루트에서 실행하며 `TF_DIR`은 이 설정 저장소의 `infrastructure/terraform`을 가리켜야 합니다.

@@ -28,8 +28,8 @@ Allowlisted lab IDs:
   llmgoat  LLMGoat mutable challenge memory
   llm10    Day 5 app tasks and the shared Ollama request queue
 
-This command recreates only allowlisted editable containers or restarts exact
-systemd user units, then reads readiness URLs.
+This command recreates or restarts only allowlisted Compose services, then
+reads readiness URLs.
 It does not modify learner work, evidence, Capstone source, models, or caches.
 EOF
 }
@@ -58,7 +58,7 @@ case "$1" in
     ;;
 esac
 
-for command_name in systemctl curl; do
+for command_name in podman curl; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "ERROR: required command is unavailable: $command_name" >&2
     exit 3
@@ -113,11 +113,11 @@ wait_for_raw_readiness() {
 }
 
 restart_one() {
-  unit="$1"
+  container="$1"
   label="$2"
   url="$3"
-  printf 'RESET_UNIT=%s\n' "$unit"
-  systemctl --user restart "$unit"
+  printf 'RESET_CONTAINER=%s\n' "$container"
+  podman restart "$container"
   wait_for_raw_readiness "$label" "$url"
 }
 
@@ -168,7 +168,7 @@ case "$lab_id" in
     ;;
   llmgoat)
     restart_one \
-      lab-llmgoat.service \
+      lab-llmgoat \
       LLMGOAT \
       http://127.0.0.1:5000/healthz
     ;;
@@ -180,8 +180,8 @@ case "$lab_id" in
       lab-resource-rag \
       LLM10_APP \
       http://127.0.0.1:8013/healthz
-    printf 'RESET_UNIT=%s\n' lab-ollama.service
-    systemctl --user restart lab-ollama.service
+    printf 'RESET_CONTAINER=%s\n' lab-ollama
+    podman restart lab-ollama
     wait_for_raw_readiness OLLAMA http://127.0.0.1:11434/api/tags
     recreate_one \
       lab-resource-rag \
