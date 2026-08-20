@@ -36,6 +36,7 @@ class Day7GuardrailLoopTests(unittest.TestCase):
             "system_prompt_sha256",
             '"/api/labs/validate-output-contract"',
             'blocking_reason": "output-contract-invalid"',
+            'if guardrail.get("decision") == "infra"',
         ):
             self.assertIn(marker, source)
 

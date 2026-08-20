@@ -169,6 +169,8 @@ async def call_model_path(message: str) -> tuple[str, dict | None, list[str]]:
     guardrail = payload.get("guardrail")
     if not isinstance(payload.get("reply"), str) or not isinstance(guardrail, dict):
         raise ValueError("NeMo guardrail returned an invalid contract")
+    if guardrail.get("decision") == "infra":
+        raise RuntimeError("NeMo guardrail failed closed")
     model_stages = ["nemo_input"]
     if guardrail.get("upstream_called") is True:
         model_stages.extend(["ollama_main", "nemo_output"])
