@@ -417,8 +417,11 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('data "aws_ec2_instance_type_offerings" "gpu"', network)
         self.assertIn("selected_availability_zones", network)
         self.assertIn('resource "aws_autoscaling_group" "student"', instance)
-        self.assertIn("vpc_zone_identifier       = values(aws_subnet.lab)[*].id", instance)
-        self.assertIn("desired_capacity          = 1", instance)
+        self.assertRegex(
+            instance,
+            r"vpc_zone_identifier\s+= values\(aws_subnet\.lab\)\[\*\]\.id",
+        )
+        self.assertRegex(instance, r"desired_capacity\s+= 1")
         self.assertIn("ignore_failed_scaling_activities = true", instance)
         self.assertIn("ignore_changes = [desired_capacity]", instance)
         self.assertIn("DesiredCapacity=0", auto_stop_lambda)

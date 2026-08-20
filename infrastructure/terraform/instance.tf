@@ -116,15 +116,15 @@ resource "aws_launch_template" "student" {
 resource "aws_autoscaling_group" "student" {
   for_each = toset(var.student_ids)
 
-  name                      = "${local.name_prefix}-asg-${each.key}"
-  min_size                  = 0
-  max_size                  = 1
-  desired_capacity          = 1
-  health_check_type         = "EC2"
-  health_check_grace_period = 300
+  name                             = "${local.name_prefix}-asg-${each.key}"
+  min_size                         = 0
+  max_size                         = 1
+  desired_capacity                 = 1
+  health_check_type                = "EC2"
+  health_check_grace_period        = 300
   ignore_failed_scaling_activities = true
-  vpc_zone_identifier       = values(aws_subnet.lab)[*].id
-  wait_for_capacity_timeout = "20m"
+  vpc_zone_identifier              = values(aws_subnet.lab)[*].id
+  wait_for_capacity_timeout        = "20m"
 
   launch_template {
     id      = aws_launch_template.student[each.key].id
