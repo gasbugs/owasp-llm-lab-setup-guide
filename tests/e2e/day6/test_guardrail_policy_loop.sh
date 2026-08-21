@@ -140,8 +140,10 @@ printf 'GARAK\n'
 start_stack audit
 podman run --rm --network slirp4netns:allow_host_loopback=true \
   -v "$ROOT/examples/day6/garak-guardrail/rest-generator.json:/work/rest-generator.json:ro,Z" \
+  -v "$ROOT/examples/day6/garak-guardrail/garak-config.yaml:/work/garak-config.yaml:ro,Z" \
   -v "$WORK/garak:/work/.local/share:Z" \
   "$GARAK_IMAGE" \
+  --config /work/garak-config.yaml \
   --target_type rest --generator_option_file /work/rest-generator.json \
   --probes promptinject.HijackHateHumans --generations 1 --seed 7 \
   | tee "$WORK/garak.stdout"

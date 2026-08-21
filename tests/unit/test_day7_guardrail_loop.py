@@ -6,6 +6,8 @@ import json
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -26,6 +28,14 @@ class Day7GuardrailLoopTests(unittest.TestCase):
         self.assertEqual(config["uri"], "http://10.0.2.2:18090/api/chat")
         self.assertEqual(config["req_template_json_object"], {"message": "$INPUT"})
         self.assertEqual(config["response_json_field"], "reply")
+
+    def test_garak_probe_count_is_bounded_for_learner_run(self) -> None:
+        data = yaml.safe_load(
+            (ROOT / "examples/day6/garak-guardrail/garak-config.yaml").read_text()
+        )
+        self.assertEqual(data["run"]["soft_probe_prompt_cap"], 8)
+        e2e = (ROOT / "tests/e2e/day6/test_guardrail_policy_loop.sh").read_text()
+        self.assertIn("--config /work/garak-config.yaml", e2e)
 
     def test_server_exposes_policy_identity_and_static_output_contract(self) -> None:
         source = (ROOT / "examples/day6/presidio/server.py").read_text()
