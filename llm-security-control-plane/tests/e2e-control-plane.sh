@@ -42,6 +42,21 @@ jq -e '.topology | contains("nemo-hub")' "$WORK/application-policy.json" >/dev/n
 jq -e '.runtime_model_lock.valid == true and .assurance_profile == "high-assurance"' \
   "$WORK/hub-policy.json" >/dev/null
 
+hub_without_service_token="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
+  -X POST "$HUB/api/chat" -H 'Content-Type: application/json' \
+  -d '{"message":"status","request_id":"internal-auth-missing","principal":{"subject":"admin","roles":["admin"]}}')"
+spoke_without_service_token="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
+  -X POST http://127.0.0.1:18093/api/analyze -H 'Content-Type: application/json' \
+  -d '{"stage":"input","text":"analyst@example.com","request_id":"spoke-auth-missing"}')"
+body_role_spoof="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
+  -X POST "$APP/api/chat" \
+  -H 'Authorization: Bearer hub-public-reader-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"restricted data","classification":"restricted","purpose":"customer_support","roles":["support_agent"]}')"
+test "$hub_without_service_token" = 401
+test "$spoke_without_service_token" = 401
+test "$body_role_spoof" = 422
+
 chat hub-public-reader-token \
   '{"message":"비밀번호 변경 절차를 간단히 알려 주세요.","classification":"none","purpose":"public_information"}' \
   > "$WORK/normal.json"
@@ -188,3 +203,5 @@ printf 'modes=audit:%s/%s off:%s/%s lab_endpoints_disabled_http=%s\n' \
   "$(jq -r '.upstream_called' "$WORK/off-app-policy.json")" \
   "$lab_status"
 printf 'rail_fail_closed=PASS loopback=PASS metadata_only_logs=PASS legacy_containers_untouched=PASS\n'
+printf 'internal_auth=hub:%s spoke:%s body_role_spoof:%s\n' \
+  "$hub_without_service_token" "$spoke_without_service_token" "$body_role_spoof"
