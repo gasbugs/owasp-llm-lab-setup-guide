@@ -12,6 +12,7 @@ RUN python -m pip install --requirement /tmp/requirements.txt \
     && chmod -R a+rwX /opt/presidio-cache
 
 WORKDIR /app
+COPY --chmod=0444 shared/telemetry.py /app/telemetry.py
 COPY --chmod=0444 versions.lock.yaml /app/versions.lock.yaml
 COPY --chmod=0444 spokes/presidio-privacy/policy.py /app/policy.py
 COPY --chmod=0444 spokes/presidio-privacy/server.py /app/server.py

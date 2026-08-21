@@ -27,6 +27,7 @@ from hub_core import (
     run_output_rails,
     verify_model_lock,
 )
+from telemetry import configure_telemetry
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -66,6 +67,7 @@ app = FastAPI(
     redoc_url=None,
     lifespan=lifespan,
 )
+configure_telemetry(app, "llm-security-nemo-hub")
 
 
 class Principal(BaseModel):

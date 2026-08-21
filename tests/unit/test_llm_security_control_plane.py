@@ -117,6 +117,20 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("main_model.assert_not_awaited()", source)
         self.assertIn('result["reply"], "guardrail infrastructure unavailable"', source)
 
+    def test_all_control_plane_services_share_distributed_tracing(self) -> None:
+        telemetry = (CONTROL / "shared/telemetry.py").read_text()
+        self.assertIn("FastAPIInstrumentor.instrument_app", telemetry)
+        self.assertIn("HTTPXClientInstrumentor().instrument", telemetry)
+        for relative, service_name in (
+            ("application-gateway/server.py", "llm-security-application-gateway"),
+            ("nemo-policy-hub/server.py", "llm-security-nemo-hub"),
+            ("spokes/presidio-privacy/server.py", "llm-security-presidio-spoke"),
+        ):
+            source = (CONTROL / relative).read_text()
+            self.assertIn(f'configure_telemetry(app, "{service_name}")', source)
+        deploy = (CONTROL / "deploy/start-stack.sh").read_text()
+        self.assertIn("OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318", deploy)
+
 
 if __name__ == "__main__":
     unittest.main()

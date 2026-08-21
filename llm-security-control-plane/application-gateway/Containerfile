@@ -6,6 +6,7 @@ COPY application-gateway/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
+COPY --chmod=0444 shared/telemetry.py /app/telemetry.py
 COPY --chmod=0444 versions.lock.yaml /app/versions.lock.yaml
 COPY --chmod=0444 policies/application-policy.yaml /app/policies/application-policy.yaml
 COPY --chmod=0444 application-gateway/policy.py /app/policy.py

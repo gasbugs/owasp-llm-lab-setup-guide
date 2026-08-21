@@ -42,6 +42,10 @@ class PrepareModule08ContractTests(unittest.TestCase):
         self.assertIn("llm_guardrail_decisions_total", self.source)
         self.assertIn("control-plane logs did not reach Loki", self.source)
         self.assertIn('service_name=~"llm-security-.*"', self.source)
+        self.assertIn("distributed control-plane trace did not reach Tempo", self.source)
+        self.assertIn("llm-security-application-gateway", self.source)
+        self.assertIn("llm-security-nemo-hub", self.source)
+        self.assertIn("llm-security-presidio-spoke", self.source)
 
 
 if __name__ == "__main__":

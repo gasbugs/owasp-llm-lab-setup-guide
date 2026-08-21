@@ -10,6 +10,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from policy import PrivacyAnalyzer
+from telemetry import configure_telemetry
 
 
 INTERNAL_TOKEN = os.getenv("PRESIDIO_INTERNAL_TOKEN", "")
@@ -19,6 +20,7 @@ if not INTERNAL_TOKEN:
 
 ANALYZER = PrivacyAnalyzer()
 app = FastAPI(title="Presidio privacy spoke", docs_url=None, redoc_url=None)
+configure_telemetry(app, "llm-security-presidio-spoke")
 
 
 class AnalyzeRequest(BaseModel):

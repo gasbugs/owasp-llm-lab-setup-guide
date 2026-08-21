@@ -15,6 +15,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY --chmod=0444 shared/telemetry.py /app/telemetry.py
 COPY --chmod=0444 versions.lock.yaml /app/versions.lock.yaml
 COPY --chmod=0444 policies/nemo-policy.yaml /app/policies/nemo-policy.yaml
 COPY --chmod=0444 nemo-policy-hub/hub_core.py /app/hub_core.py

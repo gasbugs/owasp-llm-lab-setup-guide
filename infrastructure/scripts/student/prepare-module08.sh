@@ -53,6 +53,8 @@ normal=$(curl -fsS --max-time 360 -X POST "$APP/api/chat" \
   -d '{"message":"비밀번호 변경 절차를 간단히 알려 주세요.","classification":"none","purpose":"public_information"}')
 jq -e '.application_decision == "allow" and .upstream_called == true' \
   >/dev/null <<<"$normal" || fail "normal control-plane request failed"
+trace_id=$(jq -r '.trace_id // ""' <<<"$normal")
+test "${#trace_id}" = 32 || fail "Application did not return a 32-character trace ID"
 
 injection=$(curl -fsS --max-time 360 -X POST "$APP/api/chat" \
   -H 'Authorization: Bearer hub-public-reader-token' \
@@ -61,6 +63,29 @@ injection=$(curl -fsS --max-time 360 -X POST "$APP/api/chat" \
 jq -e '.application_decision == "block" and .upstream_called == false' \
   >/dev/null <<<"$injection" || fail "injection was not blocked before Ollama"
 pass "normal allowed and injection blocked"
+
+trace_result='{}'
+for _ in $(seq 1 30); do
+  trace_result=$(curl -sS "http://127.0.0.1:3200/api/traces/$trace_id")
+  jq -e '
+    [.batches[].resource.attributes[]?
+      | select(.key == "service.name")
+      | .value.stringValue] as $services
+    | ($services | index("llm-security-application-gateway")) != null
+      and ($services | index("llm-security-nemo-hub")) != null
+      and ($services | index("llm-security-presidio-spoke")) != null
+  ' >/dev/null <<<"$trace_result" && break
+  sleep 2
+done
+jq -e '
+  [.batches[].resource.attributes[]?
+    | select(.key == "service.name")
+    | .value.stringValue] as $services
+  | ($services | index("llm-security-application-gateway")) != null
+    and ($services | index("llm-security-nemo-hub")) != null
+    and ($services | index("llm-security-presidio-spoke")) != null
+' >/dev/null <<<"$trace_result" || fail "distributed control-plane trace did not reach Tempo"
+pass "Application, NeMo hub and Presidio spoke share one Tempo trace"
 
 curl -fsS http://127.0.0.1:8014/metrics \
   | grep -q 'llm_guardrail_decisions_total.*engine="nemo"' \

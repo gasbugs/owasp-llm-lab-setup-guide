@@ -24,6 +24,7 @@ NETWORK_ARGS=(--network slirp4netns:allow_host_loopback=true)
 PRESIDIO_URL=http://10.0.2.2:18093
 NEMO_HUB_URL=http://10.0.2.2:18094
 MONITOR_ARGS=()
+OTEL_ARGS=()
 OLLAMA_URL=http://10.0.2.2:11434
 if podman network exists llm-security-observability; then
   NETWORK_ARGS=(--network llm-security-observability)
@@ -34,6 +35,7 @@ if podman network exists llm-security-observability; then
     -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080
     -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_INGEST_TOKEN"
   )
+  OTEL_ARGS=(-e OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318)
 fi
 
 podman run -d --replace --name llm-security-presidio-spoke \
@@ -41,6 +43,7 @@ podman run -d --replace --name llm-security-presidio-spoke \
   -p 127.0.0.1:18093:8013 \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
+  "${OTEL_ARGS[@]}" \
   -v "$PRESIDIO_POLICY_FILE:/app/policy.py:ro,Z" \
   "localhost/llm-security-presidio-privacy-spoke:$IMAGE_VERSION" >/dev/null
 
@@ -53,6 +56,7 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "ASSURANCE_PROFILE=$ASSURANCE_PROFILE" \
   -e "ENABLE_LAB_ENDPOINTS=$ENABLE_LAB_ENDPOINTS" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
+  "${OTEL_ARGS[@]}" \
   -e "PRESIDIO_URL=$PRESIDIO_URL" \
   --add-host host.containers.internal:host-gateway \
   -e "OLLAMA_URL=$OLLAMA_URL" \
@@ -67,6 +71,7 @@ podman run -d --replace --name llm-security-application-gateway \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   -e "NEMO_HUB_URL=$NEMO_HUB_URL" \
+  "${OTEL_ARGS[@]}" \
   "${MONITOR_ARGS[@]}" \
   -v "$APPLICATION_POLICY_FILE:/app/policies/application-policy.yaml:ro,Z" \
   -v "$ROOT/application-gateway/policy.py:/app/policy.py:ro,Z" \

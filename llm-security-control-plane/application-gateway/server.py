@@ -20,6 +20,7 @@ from policy import (
     authorize_retrieval,
     public_policy,
 )
+from telemetry import configure_telemetry, current_trace_id
 
 
 NEMO_HUB_URL = os.getenv("NEMO_HUB_URL", "http://10.0.2.2:18094").rstrip("/")
@@ -31,6 +32,7 @@ if not APPLICATION_INTERNAL_TOKEN:
     raise RuntimeError("APPLICATION_INTERNAL_TOKEN is required")
 
 app = FastAPI(title="LLM security application gateway", docs_url=None, redoc_url=None)
+configure_telemetry(app, "llm-security-application-gateway")
 
 
 class ChatRequest(BaseModel):
@@ -222,6 +224,7 @@ async def chat(
     )
     result = {
         "request_id": request_id,
+        "trace_id": current_trace_id(),
         "reply": hub["reply"],
         "application_decision": guardrail["decision"],
         "blocking_reason": guardrail.get("blocking_reason"),
