@@ -17,7 +17,7 @@ MONITOR_DIR=$REPO_ROOT/examples/security-monitoring
 MODEL=${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
 TELEMETRY_TOKEN=${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}
 export TELEMETRY_INGEST_TOKEN=$TELEMETRY_TOKEN
-OBSERVABILITY_CONTRACT=module08-guardrails-v1
+OBSERVABILITY_CONTRACT=module08-guardrails-v2
 COMPOSE=(podman compose --file "$MONITOR_DIR/compose.yaml")
 if command -v nvidia-smi >/dev/null 2>&1; then
   COMPOSE+=(--file "$MONITOR_DIR/compose.gpu.yaml")
@@ -48,7 +48,7 @@ container_ready() {
 has_monitor_contract() {
   local name=$1
   podman inspect "$name" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-    | grep -q '^MODULE08_OBSERVABILITY_CONTRACT=module08-guardrails-v1$' \
+    | grep -q '^MODULE08_OBSERVABILITY_CONTRACT=module08-guardrails-v2$' \
     || return 1
   podman inspect "$name" --format '{{.HostConfig.LogConfig.Type}}' 2>/dev/null \
     | grep -q '^k8s-file$'
@@ -95,11 +95,11 @@ else
   else
     podman run -d --replace --name day6-nemo-guardrails-api \
       --log-driver=k8s-file \
-      --network slirp4netns:allow_host_loopback=true \
+      --network llm-security-observability \
       -p 127.0.0.1:18092:8013 \
       -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
-      -e OLLAMA_URL=http://10.0.2.2:11434 -e "OLLAMA_MODEL=$MODEL" \
-      -e SECURITY_MONITOR_URL=http://10.0.2.2:8014 \
+      -e OLLAMA_URL=http://host.containers.internal:11434 -e "OLLAMA_MODEL=$MODEL" \
+      -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080 \
       -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_TOKEN" \
       -e "MODULE08_OBSERVABILITY_CONTRACT=$OBSERVABILITY_CONTRACT" \
       localhost/day6-nemo-guardrails:0.22.0 >/dev/null
@@ -112,12 +112,12 @@ else
   else
     podman run -d --replace --name day6-presidio-api \
       --log-driver=k8s-file \
-      --network slirp4netns:allow_host_loopback=true \
+      --network llm-security-observability \
       -p 127.0.0.1:18091:8013 \
       -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
       -e GUARD_POLICY_VERSION=day7-guardrails-v1 \
-      -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
-      -e SECURITY_MONITOR_URL=http://10.0.2.2:8014 \
+      -e NEMO_GUARD_URL=http://day6-nemo-guardrails-api:8013 \
+      -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080 \
       -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_TOKEN" \
       -e "MODULE08_OBSERVABILITY_CONTRACT=$OBSERVABILITY_CONTRACT" \
       localhost/day6-presidio:2.2.362 >/dev/null
@@ -128,10 +128,10 @@ else
   else
     podman run -d --replace --name day6-guardrail-ui \
       --log-driver=k8s-file \
-      --network slirp4netns:allow_host_loopback=true \
+      --network llm-security-observability \
       -p 127.0.0.1:18090:8000 \
       -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
-      -e PRESIDIO_URL=http://10.0.2.2:18091 \
+      -e PRESIDIO_URL=http://day6-presidio-api:8013 \
       localhost/day6-guardrail-ui:latest >/dev/null
   fi
 fi

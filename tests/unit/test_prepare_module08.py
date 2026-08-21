@@ -25,10 +25,12 @@ class PrepareModule08ContractTests(unittest.TestCase):
             "day6-nemo-guardrails-api",
             "day6-presidio-api",
             "day6-guardrail-ui",
-            "SECURITY_MONITOR_URL=http://10.0.2.2:8014",
+            "SECURITY_MONITOR_URL=http://llm-sec-gateway:8080",
             "TELEMETRY_INGEST_TOKEN",
         ):
             self.assertIn(value, self.source)
+        self.assertIn("--network llm-security-observability", self.source)
+        self.assertIn("NEMO_GUARD_URL=http://day6-nemo-guardrails-api:8013", self.source)
 
     def test_script_verifies_behavior_and_content_safety(self) -> None:
         self.assertIn('decision=="redact"', self.source)
