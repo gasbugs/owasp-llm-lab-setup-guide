@@ -4,7 +4,8 @@ ARG NEMO_GUARDRAILS_VERSION=0.22.0
 
 ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    XDG_CACHE_HOME=/opt/nemo-cache
 
 # annoy가 네이티브 확장을 빌드하므로 compiler와 Python header가 필요하다.
 RUN apt-get update \
@@ -14,12 +15,14 @@ RUN apt-get update \
       "fastapi>=0.115,<1" \
       "uvicorn>=0.32,<1" \
       "httpx>=0.27,<1" \
+    && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2', cache_dir='/opt/nemo-cache').embed(['cache warmup']))" \
+    && chmod -R a+rwX /opt/nemo-cache \
     && apt-get purge -y --auto-remove gcc g++ python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY config /app/config
-COPY nemo_core.py run_demo.py server.py entrypoint.py /app/
+COPY --chmod=0555 config /app/config
+COPY --chmod=0444 nemo_core.py run_demo.py server.py entrypoint.py /app/
 
 USER 65532:65532
 EXPOSE 8013

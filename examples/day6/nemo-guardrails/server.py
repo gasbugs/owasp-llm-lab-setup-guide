@@ -17,8 +17,10 @@ from nemo_core import (
     FRAMEWORK,
     FRAMEWORK_VERSION,
     run_input_only,
+    run_dialog,
     run_main_only,
     run_output_only,
+    run_retrieval,
     run_suite,
 )
 
@@ -62,6 +64,16 @@ class OutputScanRequest(BaseModel):
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     message: str = Field(min_length=1, max_length=20000)
+
+
+class DialogRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str = Field(min_length=1, max_length=20000)
+
+
+class RetrievalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    chunks: list[str] = Field(min_length=1, max_length=20)
 
 
 def emit(event: dict) -> None:
@@ -132,6 +144,10 @@ async def policy() -> dict:
         "guard_mode": GUARD_MODE,
         "canonical_sources": [
             "/app/config/integrated/config.yml",
+            "/app/config/dialog/flows.co",
+            "/app/config/dialog/config.py",
+            "/app/config/retrieval/flows.co",
+            "/app/config/retrieval/config.py",
             "/app/nemo_core.py",
         ],
         "runtime_activation": "/app/server.py:chat",
@@ -145,7 +161,12 @@ async def policy() -> dict:
         },
         "model": OLLAMA_MODEL,
         "ollama_url": OLLAMA_URL,
-        "rails": {"input": ["self check input"], "output": ["self check output"]},
+        "rails": {
+            "input": ["self check input"],
+            "dialog": ["Colang topic flow", "get_security_contact"],
+            "retrieval": ["mask retrieval with Presidio"],
+            "output": ["self check output"],
+        },
     }
 
 
@@ -209,6 +230,50 @@ async def labs_suite() -> dict:
         emit(result)
     emit(summary)
     return {"results": results, "summary": summary}
+
+
+@app.post("/api/labs/dialog")
+async def labs_dialog(request: DialogRequest) -> dict:
+    """Exercise a Colang flow and a read-only custom action."""
+
+    require_lab_endpoint()
+    started = time.perf_counter()
+    reply, activated, metrics = await run_dialog(request.message)
+    result = {
+        "event": "guard_dialog",
+        "guard_engine": "nemo",
+        "rail_type": "dialog",
+        "reply": reply,
+        "activated_rails": activated,
+        "metrics": metrics,
+        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
+    emit(result)
+    return result
+
+
+@app.post("/api/labs/retrieval")
+async def labs_retrieval(request: RetrievalRequest) -> dict:
+    """Mask PII in RAG chunks before they enter the generation prompt."""
+
+    require_lab_endpoint()
+    started = time.perf_counter()
+    source = "\n\n".join(request.chunks)
+    sanitized, activated, metrics = await run_retrieval(source)
+    result = {
+        "event": "guard_retrieval",
+        "guard_engine": "nemo",
+        "rail_type": "retrieval",
+        "provider": "microsoft-presidio-http-action",
+        "chunk_count": len(request.chunks),
+        "sanitized_context": sanitized,
+        "pii_removed": sanitized != source,
+        "activated_rails": activated,
+        "metrics": metrics,
+        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
+    emit({key: value for key, value in result.items() if key != "sanitized_context"})
+    return result
 
 
 @app.post("/api/chat")

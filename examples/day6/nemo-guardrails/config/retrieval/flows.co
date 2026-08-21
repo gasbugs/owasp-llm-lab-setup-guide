@@ -1,0 +1,12 @@
+define user inspect retrieved context
+  "검색 문서를 검사해 주세요."
+
+define bot confirm retrieval inspection
+  "검색 문서를 검사했습니다."
+
+define flow inspect retrieved context
+  user inspect retrieved context
+  bot confirm retrieval inspection
+
+define subflow mask retrieval with Presidio
+  $relevant_chunks = execute mask_retrieval_with_presidio(text=$relevant_chunks)

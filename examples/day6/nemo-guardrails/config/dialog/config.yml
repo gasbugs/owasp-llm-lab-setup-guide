@@ -1,0 +1,32 @@
+models:
+  - type: main
+    engine: openai
+    model: llama3.1:8b-instruct-q4_K_M
+    parameters:
+      base_url: http://10.0.2.2:11434/v1
+      api_key: ollama-local
+      temperature: 0.0
+
+instructions:
+  - type: general
+    content: |
+      You are a concise security support assistant.
+      Follow the defined Colang flows before generating a free-form answer.
+
+rails:
+  dialog:
+    single_call:
+      enabled: false
+    user_messages:
+      embeddings_only: true
+      embeddings_only_similarity_threshold: 0.7
+      embeddings_only_fallback_intent: general question
+
+core:
+  embedding_search_provider:
+    name: default
+    parameters:
+      embedding_engine: FastEmbed
+      embedding_model: all-MiniLM-L6-v2
+      embedding_parameters:
+        cache_dir: /opt/nemo-cache

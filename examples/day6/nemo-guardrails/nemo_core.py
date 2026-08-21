@@ -72,6 +72,9 @@ def activated_rails(response: GenerationResponse) -> tuple[list[dict], str | Non
                 "type": rail_type,
                 "name": rail.name,
                 "decisions": rail.decisions,
+                "actions": [
+                    action.action_name for action in rail.executed_actions
+                ],
                 "stop": rail.stop,
                 "duration_ms": round((rail.duration or 0) * 1000, 2),
             }
@@ -222,3 +225,36 @@ async def run_output_only(prompt: str, model_output: str) -> tuple[str, list[dic
     )
     records, blocked_stage = activated_rails(generated)
     return response_content(generated.response), records, blocked_stage, generation_metrics(generated)
+
+
+async def run_dialog(text: str) -> tuple[str, list[dict], dict]:
+    """Run the Colang dialog flow and its registered read-only custom action."""
+
+    rails = rails_for("dialog")
+    generated = require_generation_response(
+        await rails.generate_async(
+            messages=[{"role": "user", "content": text}],
+            options=log_options(["dialog"]),
+        )
+    )
+    records, _blocked_stage = activated_rails(generated)
+    return response_content(generated.response), records, generation_metrics(generated)
+
+
+async def run_retrieval(text: str) -> tuple[str, list[dict], dict]:
+    """Run only the retrieval rail against application-supplied RAG chunks."""
+
+    rails = rails_for("retrieval")
+    generated = require_generation_response(
+        await rails.generate_async(
+            messages=[
+                {"role": "context", "content": {"lab_retrieval_chunks": text}},
+                {"role": "user", "content": "검색 문서를 검사해 주세요."},
+            ],
+            options=log_options(),
+        )
+    )
+    records, _blocked_stage = activated_rails(generated)
+    output_data = generated.output_data or {}
+    sanitized = str(output_data.get("relevant_chunks", text))
+    return sanitized, records, generation_metrics(generated)

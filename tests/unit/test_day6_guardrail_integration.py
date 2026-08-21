@@ -141,6 +141,30 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn('options=log_options(["dialog"])', core)
         self.assertNotIn("options=log_options([])", core)
 
+    def test_nemo_dialog_uses_colang_and_read_only_custom_action(self) -> None:
+        server = read(NEMO / "server.py")
+        flows = read(NEMO / "config" / "dialog" / "flows.co")
+        actions = read(NEMO / "config" / "dialog" / "config.py")
+        self.assertIn('@app.post("/api/labs/dialog")', server)
+        self.assertIn("define flow security contact lookup", flows)
+        self.assertIn("execute get_security_contact()", flows)
+        self.assertIn("define flow block state changing transfer", flows)
+        self.assertIn('app.register_action(get_security_contact, "get_security_contact")', actions)
+        self.assertNotIn("transfer_money", actions)
+
+    def test_nemo_retrieval_rail_delegates_pii_to_presidio(self) -> None:
+        server = read(NEMO / "server.py")
+        config = read(NEMO / "config" / "retrieval" / "config.yml")
+        flows = read(NEMO / "config" / "retrieval" / "flows.co")
+        actions = read(NEMO / "config" / "retrieval" / "config.py")
+        self.assertIn('@app.post("/api/labs/retrieval")', server)
+        self.assertIn("mask retrieval with Presidio", config)
+        self.assertIn("execute mask_retrieval_with_presidio", flows)
+        self.assertIn('f"{PRESIDIO_URL}/api/scan"', actions)
+        self.assertIn("sanitized_text", actions)
+        self.assertIn('app.register_action(retrieve_lab_chunks, "retrieve_relevant_chunks")', actions)
+        self.assertIn("cache_dir: /opt/nemo-cache", config)
+
     def test_ui_calls_only_its_backend_for_chat(self) -> None:
         proxy = read(UI / "app" / "guardrails.py")
         backend = read(UI / "app" / "main.py")
@@ -151,6 +175,9 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn("fetch('/api/chat'", template)
         self.assertNotIn("host.containers.internal", template)
         self.assertNotIn("11434", template)
+        self.assertIn("innerGuardrail?.decision === 'block'", template)
+        self.assertIn("innerGuardrail.upstream_called", template)
+        self.assertIn("innerGuardrail?.blocking_reason", template)
         for field in [
             "engine",
             "mode",

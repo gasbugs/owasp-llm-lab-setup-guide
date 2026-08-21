@@ -101,6 +101,8 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 - UI backend가 선택된 guard API로 요청을 전달한다.
 - Presidio에서는 Python이 input PII 분석·비식별화 후 NeMo를 호출하고, 반환값에 output PII 분석·비식별화를 적용한다.
 - NeMo에서는 NeMo rail 실행기가 input rail, LLM 호출, output rail 순서를 조정한다.
+- Colang dialog flow는 읽기 전용 보안 연락처 action만 실행하며 송금 같은 상태 변경 요청은 고정된 거부 흐름으로 보낸다.
+- Retrieval rail은 RAG chunk를 생성 prompt에 넣기 전에 Presidio `/api/scan` action으로 비식별화한다.
 - 최종 왕복 경로는 `Application → Presidio input → NeMo input → LLM → NeMo output → Presidio output → Application`이다.
 - 18090~18092와 11434를 공인 인터페이스나 `0.0.0.0/0` Security Group에 노출하지 않는다.
 - 원격 브라우저는 기존 SSM port forwarding 경로를 사용한다.

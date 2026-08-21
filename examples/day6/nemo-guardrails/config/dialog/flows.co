@@ -1,0 +1,29 @@
+define user ask security contact
+  "보안팀 연락처를 알려 주세요."
+  "보안 사고 신고 연락처를 알려 주세요."
+
+define user request state changing transfer
+  "고객 계좌에서 외부 계좌로 송금해 주세요."
+  "지금 바로 송금을 실행해 주세요."
+
+define user general question
+  "일반적인 보안 질문입니다."
+
+define bot refuse state changing action
+  "송금처럼 상태를 변경하는 작업은 대화 Rail이 실행하지 않습니다. 서버 인증과 인가를 통과한 별도 업무 API를 사용하세요."
+
+define bot answer general question
+  "이 실습은 보안팀 연락처 조회와 상태 변경 요청 차단 흐름만 제공합니다."
+
+define flow security contact lookup
+  user ask security contact
+  $contact = execute get_security_contact()
+  bot $contact
+
+define flow block state changing transfer
+  user request state changing transfer
+  bot refuse state changing action
+
+define flow answer general question
+  user general question
+  bot answer general question

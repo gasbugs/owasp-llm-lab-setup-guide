@@ -209,15 +209,26 @@ form.addEventListener('submit', async (e) => {
     }));
   }
   if (data.guardrail) {
+    const innerGuardrail = data.guardrail.inner_guardrail ?? null;
+    const effectiveDecision = innerGuardrail?.decision === 'block'
+      ? 'block'
+      : data.guardrail.decision;
+    const mainModelCalled = innerGuardrail
+      ? innerGuardrail.upstream_called
+      : data.guardrail.upstream_called;
+    const effectiveReason = innerGuardrail?.blocking_reason
+      ?? data.guardrail.blocking_reason;
     guardEngine.textContent = data.guardrail.engine ?? '-';
     guardMode.textContent = data.guardrail.mode ?? '-';
-    guardDecision.textContent = data.guardrail.decision ?? '-';
-    guardUpstream.textContent = String(data.guardrail.upstream_called ?? '-');
+    guardDecision.textContent = effectiveDecision ?? '-';
+    guardUpstream.textContent = String(mainModelCalled ?? '-');
     guardDuration.textContent = `${data.guardrail.duration_ms ?? '-'} ms`;
-    guardReason.textContent = data.guardrail.blocking_reason ?? '-';
+    guardReason.textContent = effectiveReason ?? '-';
     guardChecks.textContent = 'input/output checks: ' + JSON.stringify({
       input: data.guardrail.input_checks ?? [],
       output: data.guardrail.output_checks ?? [],
+      inner_input: innerGuardrail?.input_checks ?? [],
+      inner_output: innerGuardrail?.output_checks ?? [],
     }, null, 2);
   }
 });
