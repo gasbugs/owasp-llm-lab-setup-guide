@@ -1,5 +1,6 @@
 server:
   http_listen_port: 3200
+  log_level: info
 
 distributor:
   receivers:
@@ -8,21 +9,17 @@ distributor:
         http:
           endpoint: 0.0.0.0:4318
 
-ingester:
-  trace_idle_period: 5s
-  max_block_duration: 5m
-
-compactor:
-  compaction:
-    block_retention: 24h
-
 metrics_generator:
   registry:
     collection_interval: 5s
+    external_labels:
+      source: tempo
+      cluster: module08
   storage:
     path: /var/tempo/generator/wal
+    remote_write_add_org_id_header: false
     remote_write:
-      - url: http://mimir:9009/api/v1/push
+      - url: http://prometheus:9090/api/v1/write
         send_exemplars: true
 
 overrides:
@@ -34,7 +31,7 @@ storage:
   trace:
     backend: local
     local:
-      path: /var/tempo/traces
+      path: /var/tempo/blocks
     wal:
       path: /var/tempo/wal
 

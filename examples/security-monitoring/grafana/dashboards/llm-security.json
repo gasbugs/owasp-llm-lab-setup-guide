@@ -6,7 +6,7 @@
     {
       "type": "timeseries",
       "title": "Presidio and NeMo guardrail decisions",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [
         {"expr": "sum by (engine, direction, decision) (rate(llm_guardrail_decisions_total[5m]))", "legendFormat": "{{engine}} / {{direction}} / {{decision}}", "refId": "A"}
       ],
@@ -15,7 +15,7 @@
     {
       "type": "timeseries",
       "title": "Guardrail p95 latency and model calls",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [
         {"expr": "histogram_quantile(0.95, sum by (le, engine, direction) (rate(llm_guardrail_duration_seconds_bucket[5m])))", "legendFormat": "p95 {{engine}} / {{direction}}", "refId": "A"},
         {"expr": "sum by (engine) (rate(llm_guardrail_model_calls_total[5m]))", "legendFormat": "model calls {{engine}}", "refId": "B"}
@@ -25,7 +25,7 @@
     {
       "type": "stat",
       "title": "Chat request rate",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "sum(rate(llm_chat_requests_total[5m]))", "legendFormat": "requests/s", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
       "gridPos": {"h": 5, "w": 4, "x": 0, "y": 0}
@@ -33,14 +33,14 @@
     {
       "type": "stat",
       "title": "Blocked in the last 5m",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "sum(increase(llm_chat_requests_total{outcome=\"block\"}[5m]))", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 4, "y": 0}
     },
     {
       "type": "stat",
       "title": "Chat p95 latency",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(llm_chat_request_duration_seconds_bucket[5m])))", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
       "gridPos": {"h": 5, "w": 4, "x": 8, "y": 0}
@@ -48,14 +48,14 @@
     {
       "type": "stat",
       "title": "Generated tokens",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "sum(increase(llm_gen_ai_tokens_total{kind=\"output\"}[30m]))", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 12, "y": 0}
     },
     {
       "type": "gauge",
       "title": "GPU utilization",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "fieldConfig": {"defaults": {"min": 0, "max": 100, "unit": "percent"}, "overrides": []},
       "targets": [{"expr": "avg(llm_gpu_utilization_percent)", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 16, "y": 0}
@@ -63,22 +63,22 @@
     {
       "type": "stat",
       "title": "Telemetry and alert services up",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
-      "targets": [{"expr": "sum(up{job=~\"alloy|mimir|loki|tempo|alertmanager|alert-webhook\"})", "refId": "A"}],
-      "fieldConfig": {"defaults": {"min": 0, "max": 6}, "overrides": []},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
+      "targets": [{"expr": "sum(up{job=~\"alloy|loki|tempo|alertmanager|alert-webhook\"})", "refId": "A"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 5}, "overrides": []},
       "gridPos": {"h": 5, "w": 4, "x": 20, "y": 0}
     },
     {
       "type": "timeseries",
       "title": "Request outcomes and blocked stages",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "sum by (outcome, blocked_stage) (rate(llm_chat_requests_total[5m]))", "legendFormat": "{{outcome}} / {{blocked_stage}}", "refId": "A"}],
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
     },
     {
       "type": "timeseries",
       "title": "Trace-derived RED metrics",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [
         {"expr": "sum by (span_name, status_code) (rate(traces_spanmetrics_calls_total[5m]))", "legendFormat": "{{span_name}} / {{status_code}}", "refId": "A"}
       ],
@@ -87,14 +87,14 @@
     {
       "type": "table",
       "title": "Active Prometheus alerts",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [{"expr": "ALERTS{alertstate=\"firing\"}", "format": "table", "instant": true, "refId": "A"}],
       "gridPos": {"h": 7, "w": 24, "x": 0, "y": 13}
     },
     {
       "type": "timeseries",
       "title": "Telemetry loss and exporter queue pressure",
-      "datasource": {"type": "prometheus", "uid": "llm-security-mimir"},
+      "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [
         {"expr": "sum(increase(otelcol_receiver_failed_log_records_total[5m])) + sum(increase(otelcol_receiver_failed_spans_total[5m]))", "legendFormat": "OTLP receiver failures", "refId": "A"},
         {"expr": "sum(increase(loki_write_dropped_entries_total[5m]))", "legendFormat": "Loki entries dropped", "refId": "B"},

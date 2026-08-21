@@ -1,24 +1,17 @@
 apiVersion: 1
 
 datasources:
-  - name: Mimir
+  - name: Prometheus
     type: prometheus
-    uid: llm-security-mimir
+    uid: llm-security-prometheus
     access: proxy
-    url: http://mimir:9009/prometheus
+    url: http://prometheus:9090
     isDefault: true
     editable: false
     jsonData:
       exemplarTraceIdDestinations:
         - name: trace_id
           datasourceUid: llm-security-tempo
-
-  - name: Prometheus Diagnostics
-    type: prometheus
-    uid: llm-security-prometheus
-    access: proxy
-    url: http://prometheus:9090
-    editable: false
 
   - name: Loki
     type: loki
@@ -47,11 +40,11 @@ datasources:
         filterByTraceID: true
         filterBySpanID: false
       serviceMap:
-        datasourceUid: llm-security-mimir
+        datasourceUid: llm-security-prometheus
       nodeGraph:
         enabled: true
       tracesToMetrics:
-        datasourceUid: llm-security-mimir
+        datasourceUid: llm-security-prometheus
         spanStartTimeShift: -2m
         spanEndTimeShift: 2m
         tags:

@@ -133,7 +133,6 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             "retrieval:",
             "alloy:",
             "prometheus:",
-            "mimir:",
             "alertmanager:",
             "alert-webhook:",
             "loki:",
@@ -147,7 +146,6 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             "0.0.0.0:3001:3000",
             "0.0.0.0:9090:9090",
             "0.0.0.0:9093:9093",
-            "0.0.0.0:9009:9009",
             "0.0.0.0:12345:12345",
         ):
             self.assertIn(binding, compose)
@@ -163,7 +161,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("name: llm-security-observability", compose)
         self.assertNotIn("name: llm-security-telemetry", compose)
         self.assertNotIn("name: llm-security-application", compose)
-        self.assertGreaterEqual(compose.count("networks: [observability]"), 10)
+        self.assertGreaterEqual(compose.count("networks: [observability]"), 9)
 
     def test_grafana_does_not_download_plugins_at_startup(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
@@ -247,7 +245,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertTrue({"stat", "gauge", "timeseries", "logs", "traces"}.issubset(panel_types))
         serialized = json.dumps(dashboard)
         self.assertIn("llm_gpu_utilization_percent", serialized)
-        self.assertIn("llm-security-mimir", serialized)
+        self.assertIn("llm-security-prometheus", serialized)
+        self.assertNotIn("llm-security-mimir", serialized)
         self.assertIn("llm-security-loki", serialized)
         self.assertIn("llm-security-tempo", serialized)
         self.assertIn("All container stdout and stderr", serialized)
@@ -270,11 +269,13 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
     def test_alert_rules_cover_security_upstream_and_gpu_failures(self) -> None:
         rules = (EXAMPLE / "alert-rules.yml").read_text(encoding="utf-8")
         self.assertIn("LLMBlockingSpike", rules)
+        self.assertIn("Module08LearnerDrill", rules)
+        self.assertIn("expr: vector(0)", rules)
         self.assertIn('increase(llm_chat_requests_total{outcome="block"}[5m])', rules)
         self.assertIn("LLMGatewayUnavailable", rules)
         self.assertIn("LLMObservabilityPipelineUnavailable", rules)
         self.assertIn("AlertDeliveryStalled", rules)
-        self.assertIn("MimirRemoteWriteFailure", rules)
+        self.assertNotIn("MimirRemoteWriteFailure", rules)
         self.assertIn("TelemetryDataDropped", rules)
         self.assertIn("AlloyExporterQueuePressure", rules)
         self.assertIn("OllamaUpstreamFailure", rules)
@@ -285,11 +286,13 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("http://alert-webhook:8099/api/alerts", config)
         self.assertIn("send_resolved: true", config)
 
-    def test_prometheus_remote_writes_metrics_and_exemplars_to_mimir(self) -> None:
+    def test_prometheus_is_metric_store_and_remote_write_receiver(self) -> None:
+        compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
         config = (EXAMPLE / "prometheus.yml").read_text(encoding="utf-8")
-        self.assertIn("http://mimir:9009/api/v1/push", config)
-        self.assertIn("send_exemplars: true", config)
-        for job in ("alloy", "mimir", "loki", "tempo", "alertmanager", "alert-webhook", "grafana"):
+        self.assertIn("--web.enable-remote-write-receiver", compose)
+        self.assertNotIn("remote_write:", config)
+        self.assertNotIn("mimir", config.lower())
+        for job in ("alloy", "loki", "tempo", "alertmanager", "alert-webhook", "grafana"):
             self.assertIn(f"job_name: {job}", config)
 
     def test_gpu_target_name_matches_publisher_e2e(self) -> None:
@@ -301,10 +304,16 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn('.labels.job == "nvidia-gpu"', e2e)
 
     def test_tempo_generates_span_metrics_and_service_graphs(self) -> None:
+        compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
         config = (EXAMPLE / "tempo.yaml").read_text(encoding="utf-8")
+        self.assertIn("docker.io/grafana/tempo:3.0.2", compose)
+        self.assertIn('command: ["-target=all",', compose)
         self.assertIn("service-graphs", config)
         self.assertIn("span-metrics", config)
-        self.assertIn("http://mimir:9009/api/v1/push", config)
+        self.assertIn("http://prometheus:9090/api/v1/write", config)
+        self.assertIn("remote_write_add_org_id_header: false", config)
+        self.assertNotIn("ingester:", config)
+        self.assertNotIn("compactor:", config)
 
 
 if __name__ == "__main__":

@@ -69,6 +69,7 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=24h
       - --web.listen-address=0.0.0.0:9090
+      - --web.enable-remote-write-receiver
       - --enable-feature=exemplar-storage
     ports:
       - 0.0.0.0:9090:9090
@@ -76,18 +77,6 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
       - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro,Z
       - prometheus-data:/prometheus:Z
-    networks: [observability]
-    security_opt: [no-new-privileges]
-
-  mimir:
-    image: docker.io/grafana/mimir:3.0.6
-    container_name: llm-sec-mimir
-    command: ["-config.file=/etc/mimir/mimir.yaml"]
-    ports:
-      - 0.0.0.0:9009:9009
-    volumes:
-      - ./mimir.yaml:/etc/mimir/mimir.yaml:ro,Z
-      - mimir-data:/data:Z
     networks: [observability]
     security_opt: [no-new-privileges]
 
@@ -128,9 +117,9 @@ services:
     security_opt: [no-new-privileges]
 
   tempo:
-    image: docker.io/grafana/tempo:2.8.2
+    image: docker.io/grafana/tempo:3.0.2
     container_name: llm-sec-tempo
-    command: ["-config.file=/etc/tempo/config.yaml"]
+    command: ["-target=all", "-config.file=/etc/tempo/config.yaml"]
     ports:
       - 0.0.0.0:3200:3200
     volumes:
@@ -171,7 +160,6 @@ volumes:
   gateway-events:
   alloy-data:
   prometheus-data:
-  mimir-data:
   alertmanager-data:
   loki-data:
   tempo-data:

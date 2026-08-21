@@ -7,7 +7,6 @@ COMPOSE_FILE="$EXAMPLE/compose.yaml"
 MONITOR_URL="${MONITOR_URL:-http://127.0.0.1:8014}"
 RETRIEVAL_URL="${RETRIEVAL_URL:-http://127.0.0.1:8015}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
-MIMIR_URL="${MIMIR_URL:-http://127.0.0.1:9009}"
 ALERTMANAGER_URL="${ALERTMANAGER_URL:-http://127.0.0.1:9093}"
 WEBHOOK_URL="${WEBHOOK_URL:-http://127.0.0.1:8099}"
 ALLOY_URL="${ALLOY_URL:-http://127.0.0.1:12345}"
@@ -161,7 +160,7 @@ export OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
 export OLLAMA_URL="${OLLAMA_URL:-http://host.containers.internal:11434}"
 
 compose build gateway
-backend_services=(retrieval alloy prometheus mimir alertmanager alert-webhook loki tempo grafana)
+backend_services=(retrieval alloy prometheus alertmanager alert-webhook loki tempo grafana)
 if [ "$WITH_GPU" = "true" ]; then
   backend_services+=(gpu-exporter)
 fi
@@ -174,7 +173,6 @@ fi
 wait_json "$RETRIEVAL_URL/healthz" '.ok == true and .service == "llm-security-retrieval" and .otel_enabled == true and .corpus_documents == 2'
 wait_http "$ALLOY_URL/-/ready"
 wait_http "$PROMETHEUS_URL/-/ready"
-wait_http "$MIMIR_URL/ready"
 wait_http "$ALERTMANAGER_URL/-/ready"
 wait_json "$WEBHOOK_URL/healthz" '.ok == true and .service == "module08-alert-receiver"'
 wait_http "$LOKI_URL/ready"
@@ -183,7 +181,7 @@ wait_json "$GRAFANA_URL/api/health" '.database == "ok"'
 compose up --detach gateway
 wait_json "$MONITOR_URL/healthz" '.ok == true and .service == "llm-security-monitor" and .component == "llm-security-gateway" and .otel_enabled == true'
 wait_json "$MONITOR_URL/readyz" '.ready == true and .checks.sqlite == true and .checks.ollama == true and .checks.retrieval == true and .checks.otel_configured == true'
-wait_json "$PROMETHEUS_URL/api/v1/targets" '.data.activeTargets as $targets | ["llm-security-gateway","llm-security-retrieval","alloy","prometheus","mimir","alertmanager","alert-webhook","loki","tempo","grafana"] | all(.[]; . as $job | any($targets[]; .labels.job == $job and .health == "up"))'
+wait_json "$PROMETHEUS_URL/api/v1/targets" '.data.activeTargets as $targets | ["llm-security-gateway","llm-security-retrieval","alloy","prometheus","alertmanager","alert-webhook","loki","tempo","grafana"] | all(.[]; . as $job | any($targets[]; .labels.job == $job and .health == "up"))'
 if [ "$WITH_GPU" = "true" ]; then
   wait_json "$PROMETHEUS_URL/api/v1/targets" 'any(.data.activeTargets[]; .labels.job == "nvidia-gpu" and .health == "up")'
 fi
@@ -265,10 +263,9 @@ wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_chat_requests_total%7Boutc
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_gen_ai_tokens_total%7Bkind%3D%22output%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_decisions_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 2'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_model_calls_total%7Bengine%3D%22nemo%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 1'
-wait_json "$MIMIR_URL/prometheus/api/v1/query?query=sum(llm_chat_requests_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 4'
 wait_json "$TEMPO_URL/api/traces/$trace_id" '([.batches[].scopeSpans[].spans[].name] | index("llm.security.chat") != null and index("POST /retrieve") != null and index("llm.ollama.generate") != null and index("llm.security.output_guardrail") != null) and ([.batches[].resource.attributes[] | select(.key == "service.name") | .value.stringValue] | index("llm-security-gateway") != null and index("llm-security-retrieval") != null)'
-wait_json "$MIMIR_URL/prometheus/api/v1/query?query=sum(traces_spanmetrics_calls_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
-wait_json "$MIMIR_URL/prometheus/api/v1/query?query=sum(traces_service_graph_request_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
+wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_spanmetrics_calls_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
+wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_service_graph_request_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 # Prometheus는 아직 한 번도 실패하지 않은 counter를 빈 vector로 반환할 수 있다.
 # 각 항을 0으로 보정해 "미생성=실패 없음" 계약을 명시한다.
 wait_json "$PROMETHEUS_URL/api/v1/query?query=(sum(otelcol_receiver_failed_log_records_total)%20or%20vector(0))%2B(sum(otelcol_receiver_failed_spans_total)%20or%20vector(0))%2B(sum(loki_write_dropped_entries_total)%20or%20vector(0))" '.status == "success" and (.data.result[0].value[1] | tonumber) == 0'
@@ -295,10 +292,10 @@ wait_alert
 wait_json "$ALERTMANAGER_URL/api/v2/alerts" 'any(.[]?; .labels.alertname == "LLMBlockingSpike")'
 wait_webhook_alert LLMBlockingSpike firing
 wait_json "$GRAFANA_URL/api/search?query=LLM%20Security%20Observability%20Center" 'any(.[]; .uid == "llm-security-monitoring")'
-wait_json "$GRAFANA_URL/api/datasources" 'any(.[]; .uid == "llm-security-mimir") and any(.[]; .uid == "llm-security-loki") and any(.[]; .uid == "llm-security-tempo")'
+wait_json "$GRAFANA_URL/api/datasources" 'any(.[]; .uid == "llm-security-prometheus") and any(.[]; .uid == "llm-security-loki") and any(.[]; .uid == "llm-security-tempo")'
 
 if [ "$WITH_GPU" = "true" ]; then
-  wait_json "$MIMIR_URL/prometheus/api/v1/query?query=llm_gpu_utilization_percent" '.status == "success" and (.data.result | length) >= 1'
+  wait_json "$PROMETHEUS_URL/api/v1/query?query=llm_gpu_utilization_percent" '.status == "success" and (.data.result | length) >= 1'
 fi
 
 if [ "$RUN_FAILURE_DRILL" = "true" ]; then
@@ -315,7 +312,7 @@ jq -n \
   --arg gpu "$WITH_GPU" \
   '{suite:"security-observability",status:"PASS",actual_chat:"PASS",
     input_block:"PASS",tenant_block:"PASS",tool_block:"PASS",
-    output_redaction:"PASS",prometheus:"PASS",mimir:"PASS",alloy:"PASS",
+    output_redaction:"PASS",prometheus:"PASS",alloy:"PASS",
     container_logs:"PASS",loki:"PASS",tempo:"PASS",span_metrics:"PASS",
     telemetry_delivery_health:"PASS",
     bounded_log_labels:"PASS",alert_delivery:"PASS",alert_resolved:"PASS",

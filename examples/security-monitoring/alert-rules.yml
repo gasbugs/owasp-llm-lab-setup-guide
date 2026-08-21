@@ -14,6 +14,17 @@ groups:
           summary: Multiple LLM requests were blocked in five minutes
           runbook: Inspect the matching policy rule in Loki and follow its trace in Tempo
 
+      # Learners toggle only this deterministic rule while observing the full
+      # Prometheus -> Alertmanager -> webhook firing/resolved lifecycle.
+      - alert: Module08LearnerDrill
+        expr: vector(0)
+        for: 0m
+        labels:
+          severity: info
+        annotations:
+          summary: Module 08 learner alert lifecycle drill
+          runbook: Restore vector(0) after the firing notification is observed
+
       - alert: LLMHighBlockRatio
         expr: llm:chat_block_ratio_5m > 0.5 and sum(increase(llm_chat_requests_total[5m])) >= 5
         for: 1m
@@ -33,7 +44,7 @@ groups:
           runbook: Check gateway container state and its nearest stdout logs
 
       - alert: LLMObservabilityPipelineUnavailable
-        expr: up{job=~"alloy|mimir|loki|tempo|alertmanager|alert-webhook"} == 0
+        expr: up{job=~"alloy|loki|tempo|alertmanager|alert-webhook"} == 0
         for: 30s
         labels:
           severity: critical
@@ -49,15 +60,6 @@ groups:
         annotations:
           summary: Firing alerts have not reached the webhook receiver recently
           runbook: Inspect Alertmanager notification errors and receiver connectivity
-
-      - alert: MimirRemoteWriteFailure
-        expr: increase(prometheus_remote_storage_samples_failed_total[5m]) > 0
-        for: 0m
-        labels:
-          severity: critical
-        annotations:
-          summary: Prometheus failed to remote-write samples to Mimir
-          runbook: Check the Prometheus remote-write queue and Mimir ingestion logs
 
       - alert: TelemetryDataDropped
         expr: sum(increase(otelcol_receiver_failed_log_records_total[5m])) + sum(increase(otelcol_receiver_failed_spans_total[5m])) + sum(increase(loki_write_dropped_entries_total[5m])) > 0

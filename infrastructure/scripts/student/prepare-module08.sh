@@ -15,13 +15,10 @@ esac
 REPO_ROOT=${SETUP_REPO:-$HOME/owasp-llm-lab-setup-guide}
 MONITOR_DIR=$REPO_ROOT/examples/security-monitoring
 MODEL=${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+BASE_GPU_IMAGE=localhost/owasp-llm-base-gpu:module08
 TELEMETRY_TOKEN=${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}
 export TELEMETRY_INGEST_TOKEN=$TELEMETRY_TOKEN
 OBSERVABILITY_CONTRACT=module08-guardrails-v2
-COMPOSE=(podman compose --file "$MONITOR_DIR/compose.yaml")
-if command -v nvidia-smi >/dev/null 2>&1; then
-  COMPOSE+=(--file "$MONITOR_DIR/compose.gpu.yaml")
-fi
 
 pass() { printf '[PASS] %s\n' "$*"; }
 reuse() { printf '[REUSE] %s\n' "$*"; }
@@ -66,15 +63,9 @@ if [ "$MODE" = verify ]; then
   curl -fsS http://127.0.0.1:8014/healthz >/dev/null \
     || fail "Module 08 gateway is not ready"
 else
-  cd "$MONITOR_DIR"
-  "${COMPOSE[@]}" up --detach --build
-  for _ in $(seq 1 60); do
-    curl -fsS http://127.0.0.1:8014/healthz >/dev/null 2>&1 && break
-    sleep 2
-  done
   curl -fsS http://127.0.0.1:8014/healthz >/dev/null \
-    || fail "Module 08 gateway did not become ready"
-  pass "Module 08 observability stack"
+    || fail "Module 08 stack is not ready; finish the layered Compose deployment first"
+  pass "existing Module 08 observability stack"
 
   if [ "$MODE" = repair ] || ! has_monitor_contract day6-nemo-guardrails-api; then
     podman build -t localhost/day6-nemo-guardrails:0.22.0 \
@@ -85,7 +76,9 @@ else
       "$REPO_ROOT/examples/day6/presidio"
   fi
   if [ "$MODE" = repair ] || ! podman image exists localhost/day6-guardrail-ui:latest; then
-    podman build -t localhost/day6-guardrail-ui:latest "$REPO_ROOT/docker/vuln-rag"
+    podman build -t "$BASE_GPU_IMAGE" "$REPO_ROOT/docker/base-gpu"
+    podman build --build-arg "BASE_IMAGE=$BASE_GPU_IMAGE" \
+      -t localhost/day6-guardrail-ui:latest "$REPO_ROOT/docker/vuln-rag"
   fi
 
   if container_ready day6-nemo-guardrails-api 18092 \

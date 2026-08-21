@@ -10,10 +10,6 @@ alerting:
     - static_configs:
         - targets: ["alertmanager:9093"]
 
-remote_write:
-  - url: http://mimir:9009/api/v1/push
-    send_exemplars: true
-
 scrape_configs:
   - job_name: llm-security-gateway
     static_configs:
@@ -34,10 +30,6 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["prometheus:9090"]
-
-  - job_name: mimir
-    static_configs:
-      - targets: ["mimir:9009"]
 
   - job_name: loki
     static_configs:

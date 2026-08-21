@@ -19,6 +19,7 @@ class PrepareModule08ContractTests(unittest.TestCase):
         self.assertIn("podman container exists", self.source)
         self.assertIn("[REUSE]", self.source)
         self.assertNotIn("down --volumes", self.source)
+        self.assertNotIn('"${COMPOSE[@]}" up --detach --build', self.source)
 
     def test_script_connects_the_existing_guardrail_chain(self) -> None:
         for value in (
@@ -31,6 +32,12 @@ class PrepareModule08ContractTests(unittest.TestCase):
             self.assertIn(value, self.source)
         self.assertIn("--network llm-security-observability", self.source)
         self.assertIn("NEMO_GUARD_URL=http://day6-nemo-guardrails-api:8013", self.source)
+
+    def test_project_owned_guardrail_images_build_from_current_checkout(self) -> None:
+        self.assertIn("docker/base-gpu", self.source)
+        self.assertIn('BASE_GPU_IMAGE=localhost/owasp-llm-base-gpu:module08', self.source)
+        self.assertIn('--build-arg "BASE_IMAGE=$BASE_GPU_IMAGE"', self.source)
+        self.assertNotIn("ghcr.io/gasbugs/owasp-llm-base-gpu", self.source)
 
     def test_script_verifies_behavior_and_content_safety(self) -> None:
         self.assertIn('decision=="redact"', self.source)
