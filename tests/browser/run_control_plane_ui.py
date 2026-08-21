@@ -24,7 +24,7 @@ def submit(page, message: str, timeout_ms: int) -> dict:
         "() => document.querySelector('#raw').textContent.trim().startsWith('{')",
         timeout=timeout_ms,
     )
-    return json.loads(page.locator("#raw").inner_text())
+    return json.loads(page.locator("#raw").text_content() or "")
 
 
 def main() -> int:
