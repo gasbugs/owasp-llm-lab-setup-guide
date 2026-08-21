@@ -174,7 +174,9 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
     def test_alloy_collects_container_logs_and_routes_otlp_signals(self) -> None:
         config = (EXAMPLE / "alloy" / "config.alloy").read_text(encoding="utf-8")
         self.assertIn('discovery.docker "podman"', config)
-        self.assertIn('regex         = "/llm-sec-.*"', config)
+        self.assertIn("day6-presidio-api", config)
+        self.assertIn("day6-nemo-guardrails-api", config)
+        self.assertIn("day6-guardrail-ui", config)
         self.assertIn('action        = "keep"', config)
         self.assertIn('loki.source.docker "podman"', config)
         self.assertIn('targets       = discovery.relabel.container_logs.output', config)
@@ -221,6 +223,11 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("def initialize_bounded_metric_series()", source)
         self.assertIn('("block", "input")', source)
         self.assertIn("TELEMETRY_INGEST_TOKEN", source)
+        self.assertIn("llm_guardrail_decisions_total", source)
+        self.assertIn("llm_guardrail_duration_seconds", source)
+        self.assertIn("llm_guardrail_model_calls_total", source)
+        self.assertIn("def bounded_guardrail_label", source)
+        self.assertIn('else "other"', source)
 
     def test_retrieval_service_is_instrumented_and_does_not_log_queries(self) -> None:
         source = (EXAMPLE / "retrieval_service.py").read_text(encoding="utf-8")
@@ -244,6 +251,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("llm-security-tempo", serialized)
         self.assertIn("All container stdout and stderr", serialized)
         self.assertIn("Telemetry loss and exporter queue pressure", serialized)
+        self.assertIn("Presidio and NeMo guardrail decisions", serialized)
+        self.assertIn("llm_guardrail_decisions_total", serialized)
         self.assertIn("otelcol_exporter_queue_size", serialized)
         self.assertEqual(dashboard["refresh"], "5s")
 

@@ -17,7 +17,7 @@ discovery.relabel "container_logs" {
   // Keep this lab's containers only so unrelated exercises never enter Loki.
   rule {
     source_labels = ["__meta_docker_container_name"]
-    regex         = "/llm-sec-.*"
+    regex         = "/(llm-sec-.*|day6-guardrail-ui|day6-presidio-api|day6-nemo-guardrails-api)"
     action        = "keep"
   }
 

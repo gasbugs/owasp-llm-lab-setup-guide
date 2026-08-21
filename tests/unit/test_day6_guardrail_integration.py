@@ -107,6 +107,13 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn('"presidio>nemo>ollama>presidio"', server)
         self.assertIn('"inner_guardrail": inner_guardrail', server)
 
+    def test_guardrails_authenticate_monitor_forwarding(self) -> None:
+        for server_path in [PRESIDIO / "server.py", NEMO / "server.py"]:
+            server = read(server_path)
+            with self.subTest(server=server_path.relative_to(ROOT)):
+                self.assertIn("TELEMETRY_INGEST_TOKEN", server)
+                self.assertIn('headers={"X-Telemetry-Token": TELEMETRY_INGEST_TOKEN}', server)
+
     def test_presidio_logs_and_chat_evidence_exclude_content(self) -> None:
         server = read(PRESIDIO / "server.py")
         for field in [

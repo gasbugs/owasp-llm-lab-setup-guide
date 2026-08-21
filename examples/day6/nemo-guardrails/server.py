@@ -40,6 +40,9 @@ ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://10.0.2.2:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_MODEL)
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
+TELEMETRY_INGEST_TOKEN = os.getenv(
+    "TELEMETRY_INGEST_TOKEN", "module08-telemetry-ingest"
+)
 
 app = FastAPI(title="Day 6 NeMo Guardrails integration API")
 
@@ -68,6 +71,7 @@ def emit(event: dict) -> None:
     try:
         httpx.post(
             f"{SECURITY_MONITOR_URL}/api/events/guardrail",
+            headers={"X-Telemetry-Token": TELEMETRY_INGEST_TOKEN},
             json=event,
             timeout=2.0,
         ).raise_for_status()

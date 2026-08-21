@@ -28,6 +28,9 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rs
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
 NEMO_GUARD_URL = os.getenv("NEMO_GUARD_URL", "").rstrip("/")
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
+TELEMETRY_INGEST_TOKEN = os.getenv(
+    "TELEMETRY_INGEST_TOKEN", "module08-telemetry-ingest"
+)
 POLICY_VERSION = os.getenv("GUARD_POLICY_VERSION", "day7-guardrails-v1")
 TEST_CORPUS_VERSION = os.getenv("GUARD_TEST_CORPUS_VERSION", "day7-regression-v1")
 MODEL_DIGEST = os.getenv("OLLAMA_MODEL_DIGEST", "runtime-query-required")
@@ -110,6 +113,7 @@ def emit(event: dict) -> None:
     try:
         httpx.post(
             f"{SECURITY_MONITOR_URL}/api/events/guardrail",
+            headers={"X-Telemetry-Token": TELEMETRY_INGEST_TOKEN},
             json=safe_event,
             timeout=2.0,
         ).raise_for_status()

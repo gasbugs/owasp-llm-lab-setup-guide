@@ -19,6 +19,10 @@ scrape_configs:
     static_configs:
       - targets: ["gateway:8080"]
 
+  # Presidio and NeMo forward authenticated decision events to the gateway.
+  # The resulting bounded guardrail metrics are exposed by this same endpoint,
+  # so no loopback-only Day 7 API port needs to be opened to Prometheus.
+
   - job_name: llm-security-retrieval
     static_configs:
       - targets: ["retrieval:8081"]

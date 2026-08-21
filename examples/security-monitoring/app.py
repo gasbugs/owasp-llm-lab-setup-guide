@@ -118,6 +118,30 @@ TOOL_AUTHORIZATIONS = Counter(
     "Agent tool authorization outcomes.",
     ["tool", "decision"],
 )
+GUARDRAIL_DECISIONS = Counter(
+    "llm_guardrail_decisions_total",
+    "Observed Presidio and NeMo guardrail decisions.",
+    ["engine", "direction", "decision"],
+)
+GUARDRAIL_DURATION = Histogram(
+    "llm_guardrail_duration_seconds",
+    "Observed guardrail processing duration.",
+    ["engine", "direction"],
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 240),
+)
+GUARDRAIL_MODEL_CALLS = Counter(
+    "llm_guardrail_model_calls_total",
+    "Guard model calls reported by the observed guardrail.",
+    ["engine"],
+)
+GUARDRAIL_ENGINE_LABELS = {"presidio", "nemo"}
+GUARDRAIL_DIRECTION_LABELS = {"input", "output", "chat"}
+GUARDRAIL_DECISION_LABELS = {"allow", "block", "redact", "infra", "observe"}
+
+
+def bounded_guardrail_label(value: Any, allowed: set[str]) -> str:
+    candidate = str(value).lower()
+    return candidate if candidate in allowed else "other"
 
 
 def initialize_bounded_metric_series() -> None:
@@ -865,12 +889,33 @@ def collect_guardrail_event(
         or payload.get("message")
         or ""
     )
-    decision = (
+    decision = bounded_guardrail_label(
         payload.get("application_decision")
         or payload.get("policy_decision")
         or payload.get("decision")
-        or "observe"
+        or "observe",
+        GUARDRAIL_DECISION_LABELS,
     )
+    engine = bounded_guardrail_label(
+        payload.get("engine")
+        or payload.get("guard_engine")
+        or payload.get("framework")
+        or "unknown",
+        GUARDRAIL_ENGINE_LABELS,
+    )
+    direction = bounded_guardrail_label(
+        payload.get("direction") or "chat", GUARDRAIL_DIRECTION_LABELS
+    )
+    duration_ms = float(payload.get("duration_ms") or 0.0)
+    GUARDRAIL_DECISIONS.labels(
+        engine=engine, direction=direction, decision=decision
+    ).inc()
+    GUARDRAIL_DURATION.labels(engine=engine, direction=direction).observe(
+        duration_ms / 1000.0
+    )
+    guard_model_calls = int(payload.get("guard_model_calls") or 0)
+    if guard_model_calls > 0:
+        GUARDRAIL_MODEL_CALLS.labels(engine=engine).inc(guard_model_calls)
     reason = payload.get("blocking_reason") or payload.get("blocked_stage")
     event = SecurityEvent(
         request_id=request_id,
@@ -880,12 +925,14 @@ def collect_guardrail_event(
         risk_score=float(payload.get("risk_score") or (1.0 if reason else 0.0)),
         detected_entities=[str(item) for item in payload.get("entity_types", [])],
         upstream_called=payload.get("upstream_called"),
-        duration_ms=float(payload.get("duration_ms") or 0.0),
+        duration_ms=duration_ms,
         application_decision=str(decision),
         policy_rule=str(reason or "guardrail-observation"),
         attributes={
-            "guard_engine": payload.get("guard_engine") or payload.get("framework"),
+            "guard_engine": engine,
             "guard_mode": payload.get("guard_mode") or payload.get("mode"),
+            "direction": direction,
+            "guard_model_calls": guard_model_calls,
         },
     )
     return persist(event, observed_decision(event))

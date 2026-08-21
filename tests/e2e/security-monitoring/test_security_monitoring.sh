@@ -227,6 +227,20 @@ output=$(curl -fsS --max-time 30 -X POST "$MONITOR_URL/api/labs/scan-output" \
   -d '{"request_id":"e2e-output","text":"Contact ops@example.com. DEMO_API_KEY=sk-demo-12345"}')
 jq -e '.application_decision == "redact" and .raw_stored == false and (.input_hmac_sha256 | length) == 64 and (.sanitized_text | contains("ops@example.com") | not) and (.detected_entities | length) == 2' <<<"$output" >/dev/null
 
+# Module 07 services use this authenticated contract to forward metadata-only
+# decisions. These deterministic events validate ingestion and bounded metrics
+# without requiring the probabilistic NeMo model in the default E2E.
+curl -fsS --max-time 10 -X POST "$MONITOR_URL/api/events/guardrail" \
+  -H 'X-Telemetry-Token: module08-telemetry-ingest' \
+  -H 'Content-Type: application/json' \
+  -d '{"event":"guardrail_chat","request_id":"e2e-presidio","engine":"presidio","direction":"input","decision":"redact","entity_types":["EMAIL_ADDRESS"],"duration_ms":12.5,"upstream_called":true}' \
+  | jq -e '.application_decision == "redact" and .raw_stored == false' >/dev/null
+curl -fsS --max-time 10 -X POST "$MONITOR_URL/api/events/guardrail" \
+  -H 'X-Telemetry-Token: module08-telemetry-ingest' \
+  -H 'Content-Type: application/json' \
+  -d '{"event":"guardrail_chat","request_id":"e2e-nemo","engine":"nemo","direction":"input","decision":"block","blocking_reason":"input:self check input","duration_ms":21.5,"upstream_called":false,"guard_model_calls":1}' \
+  | jq -e '.application_decision == "block" and .raw_stored == false' >/dev/null
+
 wait_json_with_auth() {
   local url="$1"
   local expression="$2"
@@ -245,14 +259,19 @@ wait_json_with_auth() {
 }
 
 wait_json_with_auth "$MONITOR_URL/api/traces/e2e-normal" '.event_count == 5 and .stage_order == ["runtime","input","retrieval","runtime","output"]'
-wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_security_decisions_total%7Bdecision%3D%22block%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 3'
+# 세 Gateway 차단에, 위에서 수집한 NeMo 차단 한 건이 더해진다.
+wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_security_decisions_total%7Bdecision%3D%22block%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 4'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_chat_requests_total%7Boutcome%3D%22block%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 3'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_gen_ai_tokens_total%7Bkind%3D%22output%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
+wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_decisions_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 2'
+wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_model_calls_total%7Bengine%3D%22nemo%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 1'
 wait_json "$MIMIR_URL/prometheus/api/v1/query?query=sum(llm_chat_requests_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 4'
 wait_json "$TEMPO_URL/api/traces/$trace_id" '([.batches[].scopeSpans[].spans[].name] | index("llm.security.chat") != null and index("POST /retrieve") != null and index("llm.ollama.generate") != null and index("llm.security.output_guardrail") != null) and ([.batches[].resource.attributes[] | select(.key == "service.name") | .value.stringValue] | index("llm-security-gateway") != null and index("llm-security-retrieval") != null)'
 wait_json "$MIMIR_URL/prometheus/api/v1/query?query=sum(traces_spanmetrics_calls_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 wait_json "$MIMIR_URL/prometheus/api/v1/query?query=sum(traces_service_graph_request_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
-wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(otelcol_receiver_failed_log_records_total)%2Bsum(otelcol_receiver_failed_spans_total)%2Bsum(loki_write_dropped_entries_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 0'
+# Prometheus는 아직 한 번도 실패하지 않은 counter를 빈 vector로 반환할 수 있다.
+# 각 항을 0으로 보정해 "미생성=실패 없음" 계약을 명시한다.
+wait_json "$PROMETHEUS_URL/api/v1/query?query=(sum(otelcol_receiver_failed_log_records_total)%20or%20vector(0))%2B(sum(otelcol_receiver_failed_spans_total)%20or%20vector(0))%2B(sum(loki_write_dropped_entries_total)%20or%20vector(0))" '.status == "success" and (.data.result[0].value[1] | tonumber) == 0'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=max(otelcol_exporter_queue_capacity)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 2048'
 wait_loki_logs
 wait_loki_container_logs
