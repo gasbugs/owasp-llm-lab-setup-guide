@@ -139,7 +139,7 @@ chat http://127.0.0.1:18091 "$PII" | tee "$WORK/presidio-enforce-risk.json" >/de
 jq -e '.guardrail.mode=="enforce" and .guardrail.decision=="redact" and .guardrail.upstream_called==true and .guardrail.input_checks[0].entity_types==["EMAIL_ADDRESS"] and (.guardrail.input_checks[0] | has("original_text") | not) and (.guardrail.input_checks[0] | has("sanitized_text") | not)' \
   "$WORK/presidio-enforce-risk.json" >/dev/null
 chat http://127.0.0.1:18091 "$BENIGN" | tee "$WORK/presidio-enforce-benign.json" >/dev/null
-jq -e '.guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.output_checks|length)==1 and .guardrail.stage_order==["presidio_input","ollama","presidio_output"]' \
+jq -e '.guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.output_checks|length)==1 and .guardrail.stage_order==["presidio_input","ollama_main","presidio_output"]' \
   "$WORK/presidio-enforce-benign.json" >/dev/null
 
 printf 'HTTP Presidio: lab gate, loopback bind, existing UI proxy\n'
