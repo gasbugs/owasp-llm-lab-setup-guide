@@ -29,6 +29,19 @@ wait_health() {
   return 1
 }
 
+wait_policy_mode() {
+  url="$1"
+  expected="$2"
+  for _ in $(seq 1 90); do
+    if curl -fsS --max-time 3 "$url/api/guardrails/policy" 2>/dev/null \
+      | jq -e --arg expected "$expected" '.guard_mode == $expected' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
 start_presidio() {
   mode="$1"
   labs="$2"
@@ -39,6 +52,7 @@ start_presidio() {
     -e OLLAMA_URL=http://10.0.2.2:11434 -e "OLLAMA_MODEL=$MODEL" \
     "$PRESIDIO_IMAGE" >/dev/null
   wait_health http://127.0.0.1:18091/healthz
+  wait_policy_mode http://127.0.0.1:18091 "$mode"
 }
 
 start_presidio_chained() {
@@ -52,6 +66,7 @@ start_presidio_chained() {
     -e "OLLAMA_MODEL=$MODEL" \
     "$PRESIDIO_IMAGE" >/dev/null
   wait_health http://127.0.0.1:18091/healthz
+  wait_policy_mode http://127.0.0.1:18091 "$mode"
 }
 
 start_nemo() {
@@ -64,6 +79,7 @@ start_nemo() {
     -e OLLAMA_URL=http://10.0.2.2:11434 -e "OLLAMA_MODEL=$MODEL" \
     "$NEMO_IMAGE" >/dev/null
   wait_health http://127.0.0.1:18092/healthz
+  wait_policy_mode http://127.0.0.1:18092 "$mode"
 }
 
 chat() {

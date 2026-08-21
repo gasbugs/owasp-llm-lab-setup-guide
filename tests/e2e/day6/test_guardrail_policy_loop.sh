@@ -22,6 +22,19 @@ wait_health() {
   return 1
 }
 
+wait_policy_mode() {
+  local url="$1"
+  local expected="$2"
+  for _ in $(seq 1 120); do
+    if curl -fsS --max-time 3 "$url/api/guardrails/policy" 2>/dev/null \
+      | jq -e --arg expected "$expected" '.guard_mode == $expected' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
 start_stack() {
   local nemo_mode="$1"
   podman run -d --replace --name day6-nemo-guardrails-api \
@@ -31,6 +44,7 @@ start_stack() {
     -e OLLAMA_URL=http://10.0.2.2:11434 -e "OLLAMA_MODEL=$MODEL" \
     "$NEMO_IMAGE" >/dev/null
   wait_health http://127.0.0.1:18092/healthz
+  wait_policy_mode http://127.0.0.1:18092 "$nemo_mode"
 
   podman run -d --replace --name day6-presidio-api \
     --network slirp4netns:allow_host_loopback=true \
@@ -128,7 +142,7 @@ podman run --rm --network slirp4netns:allow_host_loopback=true \
   -v "$WORK/garak:/work/.local/share:Z" \
   "$GARAK_IMAGE" \
   --target_type rest --generator_option_file /work/rest-generator.json \
-  --probes promptinject.HijackHateHumansMini --generations 1 --seed 7 \
+  --probes promptinject.HijackHateHumans --generations 1 --seed 7 \
   | tee "$WORK/garak.stdout"
 find "$WORK/garak" -type f -name '*.report.jsonl' -print -quit | grep -q .
 
