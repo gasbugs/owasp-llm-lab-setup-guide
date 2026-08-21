@@ -18,9 +18,10 @@ SELF_CHECK_ATTACK = (
 
 def submit(page, message: str, timeout_ms: int) -> dict:
     page.locator("#message").fill(message)
+    page.locator("#raw").evaluate("element => { element.textContent = ''; }")
     page.locator("#send").click()
     page.wait_for_function(
-        "() => !document.querySelector('#decision').textContent.includes('처리 중')",
+        "() => document.querySelector('#raw').textContent.trim().startsWith('{')",
         timeout=timeout_ms,
     )
     return json.loads(page.locator("#raw").inner_text())
