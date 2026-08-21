@@ -26,7 +26,7 @@ client -> gateway -> input policy -> internal retrieval service
 
 internal bridge: gateway/retrieval -> Alloy, Prometheus -> all metrics,
                  Alloy/Prometheus -> LGTM, Alertmanager -> webhook
-host boundary:   every published port -> 127.0.0.1 only
+host boundary:   published ports -> learner public IPv4 /32 security group
 ```
 
 The gateway derives tenant and dangerous-tool permissions from the bearer-token map. A request body cannot select authorization attributes. A request blocked at input, retrieval, or tool authorization returns `upstream_called=false` and never reaches Ollama.
@@ -51,15 +51,15 @@ Alloy performs two separate jobs from one configuration: it receives structured 
 
 ## Data and trust boundaries
 
-- All host-published ports bind to `127.0.0.1`; the stack is reached through the existing SSM forwarding path.
+- Host-published ports listen on the EC2 interface and are reachable only from the learner public IPv4 `/32` allowed by the security group. Never allow `0.0.0.0/0`.
 - Raw prompts are not stored. The structured event contains a keyed HMAC identity, a sanitized excerpt, decision, rule, stage, request ID, and trace ID.
 - Request IDs and trace IDs remain log fields or exemplars, not metric or Loki stream labels, to avoid unbounded cardinality.
 - Prometheus, Mimir, Loki, and Tempo retain lab data for 24 hours. Named volumes survive the learner stop command.
 - A read-only bind option does not make the Podman API read-only. The lab limits impact with a rootless socket and a container-name allowlist. Production deployments should prefer journal/file collection or an authenticated allowlist socket proxy.
-- Anonymous Grafana access and default lab tokens are safe only behind the loopback boundary. Production deployments require real identity, authorization, secret rotation, TLS, and backend multi-tenancy.
+- Anonymous Grafana access and default lab tokens are acceptable only in this temporary lab behind a learner-owned `/32` security-group rule. Production deployments require real identity, authorization, secret rotation, TLS, and backend multi-tenancy.
 - Alloy queues are memory-backed and each backend is a single lab process. A production design needs persistent buffering, object storage, replication, access control, capacity planning, backup, and tested recovery objectives.
 - Grafana's bundled plugin preinstallation and update checks are disabled so the lab does not silently download code at startup. Only the built-in data sources used by the provisioned dashboard are required.
-- The rootless Podman 4.9 lab uses one private bridge because its CNI DNS does not reliably fall through between multiple network DNS zones. External exposure is still restricted by loopback-only publishing. A production Kubernetes deployment should separate application, telemetry, and backend planes with directional NetworkPolicy instead of treating this lab bridge as network isolation.
+- The rootless Podman 4.9 lab uses one private bridge because its CNI DNS does not reliably fall through between multiple network DNS zones. External exposure is restricted by the learner-owned `/32` security-group rule. A production Kubernetes deployment should separate application, telemetry, and backend planes with directional NetworkPolicy instead of treating this lab bridge as network isolation.
 
 ## Start on the GPU host
 

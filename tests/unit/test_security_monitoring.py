@@ -142,18 +142,19 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         ):
             self.assertIn(service, compose)
         for binding in (
-            "127.0.0.1:8014:8080",
-            "127.0.0.1:8015:8081",
-            "127.0.0.1:3001:3000",
-            "127.0.0.1:9090:9090",
-            "127.0.0.1:9093:9093",
-            "127.0.0.1:9009:9009",
-            "127.0.0.1:12345:12345",
+            "0.0.0.0:8014:8080",
+            "0.0.0.0:8015:8081",
+            "0.0.0.0:3001:3000",
+            "0.0.0.0:9090:9090",
+            "0.0.0.0:9093:9093",
+            "0.0.0.0:9009:9009",
+            "0.0.0.0:12345:12345",
         ):
             self.assertIn(binding, compose)
         gpu = (EXAMPLE / "compose.gpu.yaml").read_text(encoding="utf-8")
         self.assertIn("gpu-exporter:", gpu)
         self.assertIn("nvidia.com/gpu=all", gpu)
+        self.assertIn("0.0.0.0:9400:9400", gpu)
         self.assertNotIn("privileged:", gpu)
         self.assertNotIn("SYS_ADMIN", gpu)
 

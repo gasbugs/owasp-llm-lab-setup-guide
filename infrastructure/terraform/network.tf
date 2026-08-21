@@ -119,6 +119,18 @@ resource "aws_security_group" "student" {
     }
   }
 
+  dynamic "ingress" {
+    for_each = local.module08_observability_ports
+
+    content {
+      description = "Module 08 observability port ${ingress.value} from student IP"
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = [var.allowed_ingress_cidr]
+    }
+  }
+
   ingress {
     description = "lab-llmgoat (5000)"
     from_port   = 5000

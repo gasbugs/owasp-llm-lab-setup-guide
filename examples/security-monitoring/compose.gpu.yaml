@@ -6,6 +6,6 @@ services:
     devices:
       - nvidia.com/gpu=all
     ports:
-      - 127.0.0.1:9400:9400
+      - 0.0.0.0:9400:9400
     networks: [observability]
     security_opt: [no-new-privileges]

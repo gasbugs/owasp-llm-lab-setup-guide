@@ -23,7 +23,7 @@ services:
     extra_hosts:
       - host.containers.internal:host-gateway
     ports:
-      - 127.0.0.1:8014:8080
+      - 0.0.0.0:8014:8080
     volumes:
       - ${MONITOR_POLICY_PATH:-./policy.json}:/app/policy.json:ro,Z
       - gateway-events:/data:Z
@@ -38,7 +38,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:-module08-retrieval-service-token}
     ports:
-      - 127.0.0.1:8015:8081
+      - 0.0.0.0:8015:8081
     networks: [observability]
     security_opt: [no-new-privileges]
 
@@ -52,8 +52,8 @@ services:
       - --disable-reporting
       - /etc/alloy/config.alloy
     ports:
-      - 127.0.0.1:12345:12345
-      - 127.0.0.1:4318:4318
+      - 0.0.0.0:12345:12345
+      - 0.0.0.0:4318:4318
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro,Z
       - ${XDG_RUNTIME_DIR:-/run/user/1000}/podman/podman.sock:/var/run/docker.sock:ro
@@ -71,7 +71,7 @@ services:
       - --web.listen-address=0.0.0.0:9090
       - --enable-feature=exemplar-storage
     ports:
-      - 127.0.0.1:9090:9090
+      - 0.0.0.0:9090:9090
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
       - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro,Z
@@ -84,7 +84,7 @@ services:
     container_name: llm-sec-mimir
     command: ["-config.file=/etc/mimir/mimir.yaml"]
     ports:
-      - 127.0.0.1:9009:9009
+      - 0.0.0.0:9009:9009
     volumes:
       - ./mimir.yaml:/etc/mimir/mimir.yaml:ro,Z
       - mimir-data:/data:Z
@@ -99,7 +99,7 @@ services:
       - --storage.path=/alertmanager
       - --web.listen-address=0.0.0.0:9093
     ports:
-      - 127.0.0.1:9093:9093
+      - 0.0.0.0:9093:9093
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,Z
       - alertmanager-data:/alertmanager:Z
@@ -111,7 +111,7 @@ services:
     container_name: llm-sec-alert-webhook
     command: ["uvicorn", "alert_receiver:app", "--host", "0.0.0.0", "--port", "8099", "--no-access-log"]
     ports:
-      - 127.0.0.1:8099:8099
+      - 0.0.0.0:8099:8099
     networks: [observability]
     security_opt: [no-new-privileges]
 
@@ -120,7 +120,7 @@ services:
     container_name: llm-sec-loki
     command: ["-config.file=/etc/loki/config.yaml"]
     ports:
-      - 127.0.0.1:3100:3100
+      - 0.0.0.0:3100:3100
     volumes:
       - ./loki-config.yaml:/etc/loki/config.yaml:ro,Z
       - loki-data:/loki:Z
@@ -132,7 +132,7 @@ services:
     container_name: llm-sec-tempo
     command: ["-config.file=/etc/tempo/config.yaml"]
     ports:
-      - 127.0.0.1:3200:3200
+      - 0.0.0.0:3200:3200
     volumes:
       - ./tempo.yaml:/etc/tempo/config.yaml:ro,Z
       - tempo-data:/var/tempo:Z
@@ -154,7 +154,7 @@ services:
       GF_PLUGINS_PREINSTALL_DISABLED: "true"
       GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
     ports:
-      - 127.0.0.1:3001:3000
+      - 0.0.0.0:3001:3000
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro,Z
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro,Z

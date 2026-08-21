@@ -249,12 +249,14 @@ class RuntimeContractTest(unittest.TestCase):
         )
         network = read("infrastructure/terraform/network.tf")
         self.assertIn("for_each = local.lab_app_ports", network)
+        self.assertIn("for_each = local.module08_observability_ports", network)
         self.assertIn("cidr_blocks = [var.allowed_ingress_cidr]", network)
         self.assertIn('protocol    = "tcp"', network)
         self.assertNotIn("5050", read("infrastructure/terraform/network.tf"))
         variables = read("infrastructure/terraform/variables.tf")
         self.assertIn("[0-9]{1,3}/32", variables)
-        self.assertIn('default     = "127.0.0.1/32"', variables)
+        self.assertNotIn('default     = "127.0.0.1/32"', variables)
+        self.assertIn('var.allowed_ingress_cidr != "127.0.0.1/32"', variables)
 
     def test_provider_default_tags_are_plan_time_known(self) -> None:
         terraform = read("infrastructure/terraform/main.tf")

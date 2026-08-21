@@ -35,10 +35,9 @@ course_dates = [
 #   ami_owner_id     = "self"
 #   ami_name_pattern = "owasp-llm-lab-*"
 
-# 실습 웹 포트 직접 접속 허용 CIDR.
-# 기본 권장: SSM 포트포워딩만 사용하려면 127.0.0.1/32 그대로 둔다.
-# 브라우저 직접 접속이 꼭 필요할 때만 본인 공인 IP/32로 바꾼다.
-allowed_ingress_cidr = "127.0.0.1/32"
+# `curl -sS https://checkip.amazonaws.com`으로 확인한 본인 공인 IPv4/32를 지정한다.
+# 실습 서비스는 이 주소에서만 직접 접근한다. 0.0.0.0/0 금지.
+allowed_ingress_cidr = "203.0.113.10/32"
 
 # 비용 알람. 금액은 강사가 공지한 최신 비용 기준으로 조정한다.
 daily_budget_usd  = 20

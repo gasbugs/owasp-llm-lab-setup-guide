@@ -122,15 +122,16 @@ variable "root_volume_size" {
 }
 
 variable "allowed_ingress_cidr" {
-  description = "실습 웹 포트 직접 접근 허용 CIDR. 기본값은 외부 직접 접속을 사실상 닫고 SSM 포트포워딩을 사용한다. 직접 접속이 필요할 때만 본인 IP/32로 변경."
+  description = "실습 서비스에 직접 접근할 실습자 본인의 공인 IPv4 /32 CIDR"
   type        = string
-  default     = "127.0.0.1/32"
   validation {
     condition = (
       can(cidrhost(var.allowed_ingress_cidr, 0)) &&
-      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/32$", var.allowed_ingress_cidr))
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/32$", var.allowed_ingress_cidr)) &&
+      var.allowed_ingress_cidr != "127.0.0.1/32" &&
+      var.allowed_ingress_cidr != "0.0.0.0/32"
     )
-    error_message = "allowed_ingress_cidr는 127.0.0.1/32 또는 본인 공인 IPv4/32만 허용합니다."
+    error_message = "allowed_ingress_cidr에는 loopback이나 전체 공개 주소가 아닌 본인 공인 IPv4/32를 지정해야 합니다."
   }
 }
 
