@@ -5,6 +5,7 @@ PRESIDIO_INTERNAL_TOKEN="${PRESIDIO_INTERNAL_TOKEN:-control-plane-nemo-to-presid
 APPLICATION_INTERNAL_TOKEN="${APPLICATION_INTERNAL_TOKEN:-control-plane-app-to-nemo}"
 GUARD_MODE="${GUARD_MODE:-enforce}"
 ASSURANCE_PROFILE="${ASSURANCE_PROFILE:-high-assurance}"
+ENABLE_LAB_ENDPOINTS="${ENABLE_LAB_ENDPOINTS:-true}"
 
 podman run -d --replace --name llm-security-presidio-spoke \
   --network slirp4netns:allow_host_loopback=true \
@@ -19,7 +20,7 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "GUARD_MODE=$GUARD_MODE" \
   -e "ASSURANCE_PROFILE=$ASSURANCE_PROFILE" \
-  -e ENABLE_LAB_ENDPOINTS=true \
+  -e "ENABLE_LAB_ENDPOINTS=$ENABLE_LAB_ENDPOINTS" \
   -e PRESIDIO_URL=http://10.0.2.2:18093 \
   -e OLLAMA_URL=http://10.0.2.2:11434 \
   localhost/llm-security-nemo-policy-hub:1.0.0 >/dev/null
