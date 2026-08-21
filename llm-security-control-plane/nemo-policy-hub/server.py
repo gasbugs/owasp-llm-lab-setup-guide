@@ -35,6 +35,7 @@ def env_bool(name: str, default: bool) -> bool:
     return default if value is None else value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+# 모드와 Profile은 시작 시 확정한다. 잘못된 값은 조용히 기본값으로 낮추지 않는다.
 GUARD_MODE = os.getenv("GUARD_MODE", "enforce").strip().lower()
 if GUARD_MODE not in {"off", "audit", "enforce"}:
     raise RuntimeError("GUARD_MODE must be off, audit, or enforce")
@@ -101,12 +102,14 @@ class OutputCandidateRequest(BaseModel):
 
 
 def require_internal_token(authorization: str | None) -> None:
+    # Browser나 사용자가 Hub를 직접 호출하지 못하도록 Application service token을 검증한다.
     scheme, _, token = (authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not hmac.compare_digest(token, APPLICATION_INTERNAL_TOKEN):
         raise HTTPException(status_code=401, detail="application service token required")
 
 
 def require_ready() -> None:
+    # 이름이 같은 다른 모델이 실행되는 것을 막기 위해 digest lock이 유효해야 한다.
     if not RUNTIME["model_lock"].get("valid"):
         raise HTTPException(status_code=503, detail="Ollama model digest lock mismatch")
 
@@ -116,6 +119,7 @@ def emit_metadata(event: dict) -> None:
 
 
 async def analyze_privacy(stage: str, text: str, request_id: str) -> dict:
+    # 읽기 전용 Spoke 호출만 제한적으로 재시도한다. 계약 오류도 성공으로 취급하지 않는다.
     last_error: Exception | None = None
     for _attempt in range(int(POLICY["execution"]["spoke_read_retry_count"]) + 1):
         try:
@@ -184,6 +188,7 @@ async def evaluate_output(
     allowed_exact_sources: list[str] | None = None,
 ) -> tuple[str, list[dict], str | None]:
     stages: list[dict] = []
+    # 생성 결과도 신뢰할 수 없는 입력이다. Browser로 보내기 전에 의미 검사부터 수행한다.
     output_rails = await run_output_rails(prompt, candidate, ASSURANCE_PROFILE)
     stages.append(
         stage_record(
@@ -197,6 +202,7 @@ async def evaluate_output(
     if not output_rails["valid"]:
         return candidate, stages, f"output:{output_rails['blocking_rail']}"
 
+    # 의미 검사를 통과한 후보만 Presidio에 전달해 PII를 탐지·비식별화한다.
     privacy = await analyze_privacy("output", candidate, request_id)
     exact_sources = allowed_exact_sources or []
     detected_values = [

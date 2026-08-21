@@ -15,6 +15,7 @@ from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 
 
+# 프로젝트 전용 합성 주민등록번호 형식이다. 실제 주민번호를 fixture로 쓰지 않는다.
 KR_RRN_PATTERN = r"(?<!\d)\d{6}-[1-4]\d{6}(?!\d)"
 DEFAULT_ENTITIES = (
     "EMAIL_ADDRESS",
@@ -29,6 +30,7 @@ DEFAULT_ENTITIES = (
 
 @dataclass(frozen=True)
 class PrivacyPolicy:
+    # 임계값과 Entity 목록은 탐지 범위를 정하지만 최종 차단 여부는 결정하지 않는다.
     language: str = "en"
     score_threshold: float = 0.5
     entities: tuple[str, ...] = DEFAULT_ENTITIES
@@ -53,6 +55,7 @@ class PrivacyAnalyzer:
         self._register_project_recognizers()
 
     def _register_project_recognizers(self) -> None:
+        # Presidio 기본 Recognizer에 없는 교육용 Entity를 명시적으로 등록한다.
         self.analyzer.registry.add_recognizer(
             PatternRecognizer(
                 supported_entity="KR_RRN",
@@ -75,6 +78,7 @@ class PrivacyAnalyzer:
         )
 
     def analyze(self, *, stage: str, text: str, request_id: str) -> dict:
+        # 같은 Analyzer를 input·retrieval·output 경계에서 재사용하되 stage를 기록한다.
         if stage not in {"input", "retrieval", "output"}:
             raise ValueError("stage must be input, retrieval, or output")
         started = time.perf_counter()
@@ -106,6 +110,8 @@ class PrivacyAnalyzer:
             if findings
             else text
         )
+        # Spoke는 원문 허용·차단을 결정하지 않는다. 탐지 근거와 비식별화 후보만
+        # Hub에 반환하고 최종 application decision은 상위 계층이 집행한다.
         return {
             "request_id": request_id,
             "spoke": "presidio-privacy",

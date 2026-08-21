@@ -1,6 +1,8 @@
 schema_version: 1
 policy_id: application-data-boundary-v1
 
+# 데이터 등급마다 필요한 역할과 사용 목적을 함께 만족해야 한다.
+# LLM이나 Guardrail의 자연어 판단으로 이 표를 우회하지 않는다.
 classifications:
   public:
     required_roles: [public_reader, internal_analyst, support_agent]
@@ -12,9 +14,12 @@ classifications:
     required_roles: [support_agent]
     allowed_purposes: [customer_support]
   prohibited:
+    # 금지 데이터는 저장과 모델 전송을 모두 허용하지 않는다.
     storage: forbidden
     model_transmission: forbidden
 
+# 각 보안 결정을 어느 계층이 소유하는지 고정한다.
+# 특히 인증·인가와 최종 집행은 Application 책임이다.
 security_ownership:
   application:
     - authentication

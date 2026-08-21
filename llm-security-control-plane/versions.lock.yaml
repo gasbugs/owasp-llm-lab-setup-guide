@@ -1,16 +1,19 @@
 schema_version: 1
 release: 1.0.0
 
+# Base Image는 tag뿐 아니라 digest도 고정해 같은 이름의 다른 바이트 실행을 막는다.
 runtime:
   python_image: docker.io/library/python:3.12-slim
   python_image_digest: sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
 
+# 회귀·탐색 도구 버전이 바뀌면 판정과 fixture 수가 달라질 수 있으므로 함께 잠근다.
 test_tools:
   node_image: docker.io/library/node:24-bookworm-slim
   node_image_digest: sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
   promptfoo: 0.121.20
   garak: 0.15.1
 
+# 세 서비스 이미지를 다시 만들 때 재현할 Python dependency 정본이다.
 python_packages:
   fastapi: 0.141.1
   httpx: 0.28.1
@@ -25,6 +28,7 @@ python_packages:
   opentelemetry: 1.36.0
   opentelemetry_instrumentation: 0.57b0
 
+# NeMo Hub는 시작할 때 실제 Ollama digest와 아래 값을 비교한다.
 ollama_models:
   main:
     tag: llama3.1:8b-instruct-q4_K_M
@@ -33,6 +37,7 @@ ollama_models:
     tag: llama-guard3:8b
     digest: 46f211c3d8662823ea4956d1a9e92b2924f84cbd0a0f88b64eaadb59fe58b99d
 
+# 정책 변경은 기존 tag를 덮어쓰지 않고 새 release와 image tag로 승격한다.
 images:
   application_gateway: localhost/llm-security-application-gateway:1.0.0
   nemo_policy_hub: localhost/llm-security-nemo-policy-hub:1.0.0

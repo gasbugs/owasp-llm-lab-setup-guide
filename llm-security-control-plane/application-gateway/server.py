@@ -36,6 +36,7 @@ configure_telemetry(app, "llm-security-application-gateway")
 
 
 class ChatRequest(BaseModel):
+    # extra="forbid"는 공격자가 정의되지 않은 권한·Tenant 필드를 끼워 넣지 못하게 한다.
     model_config = ConfigDict(extra="forbid")
     message: str = Field(min_length=1, max_length=20000)
     classification: str = Field(default="none", pattern="^(none|public|internal|restricted)$")
@@ -124,6 +125,7 @@ async def chat(
     request_id = str(uuid.uuid4())
     application_stages: list[dict] = []
 
+    # 1) 인증은 모델을 호출하기 전에 Application이 결정한다.
     try:
         principal = authenticate(authorization)
         application_stages.append(
@@ -132,6 +134,8 @@ async def chat(
     except AuthenticationError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
+    # 2) 인증된 Principal의 역할·목적·데이터 등급으로 RAG 접근을 인가한다.
+    # 차단 시 NeMo Hub와 Main Model은 호출되지 않는다.
     try:
         retrieval = authorize_retrieval(principal, request.classification, request.purpose)
         application_stages.append(
@@ -171,6 +175,7 @@ async def chat(
         emit_metadata({"event": "application_chat", **result, "reply": None})
         return result
 
+    # 3) 원본 Bearer Token 대신 검증된 Principal과 인가된 Retrieval만 Hub에 전달한다.
     payload = {
         "message": request.message,
         "request_id": request_id,
@@ -198,6 +203,8 @@ async def chat(
         emit_metadata({"event": "application_chat", **result, "reply": None})
         return result
 
+    # 4) 내부 서비스 응답도 신뢰하지 않는다. request_id와 필수 계약을 검증하고
+    # 계약이 깨지면 응답을 사용자에게 전달하지 않고 fail closed 한다.
     guardrail = hub.get("guardrail")
     if (
         hub.get("request_id") != request_id
@@ -216,6 +223,7 @@ async def chat(
         emit_metadata({"event": "application_chat", **result, "reply": None})
         return result
 
+    # 5) Hub의 판정을 Application 최종 응답 경계에서 한 번 더 집행한다.
     application_stages.append(
         {
             "stage": "application_final_enforcement",
