@@ -26,6 +26,10 @@ jq -e '.outputs[0].text == "System status is green. {demo-api-key}"' \
 
 curl -fsS "$BASE_URL/healthz" | jq -e '.ok == true and .provider == "amazon-bedrock"'
 curl -fsS "$BASE_URL/api/policy" | jq -e '.guardrail_id != null and .guardrail_version != null'
+curl -fsS -X POST "$BASE_URL/api/embed" \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"LLM 보안 가드레일 정책을 임베딩 벡터로 변환합니다."}' \
+  | jq -e '.model == "amazon.titan-embed-text-v2:0" and .dimensions == 1024 and (.embedding | length == 1024)'
 curl -fsS -X POST "$BASE_URL/api/guarded-chat" \
   -H 'Content-Type: application/json' \
   -d '{"mode":"direct","message":"가드레일의 역할을 한 문장으로 설명해 주세요."}' \

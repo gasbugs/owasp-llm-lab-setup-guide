@@ -18,6 +18,10 @@ log = logging.getLogger("bedrock-guardrail-gateway")
 
 REGION = os.getenv("AWS_REGION", "us-east-1")
 MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
+EMBEDDING_MODEL_ID = os.getenv(
+    "BEDROCK_EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"
+)
+EMBEDDING_DIMENSIONS = int(os.getenv("BEDROCK_EMBEDDING_DIMENSIONS", "1024"))
 GUARDRAIL_ID = os.getenv("BEDROCK_GUARDRAIL_ID", "")
 GUARDRAIL_VERSION = os.getenv("BEDROCK_GUARDRAIL_VERSION", "")
 
@@ -32,6 +36,10 @@ app = FastAPI(title="Bedrock Guardrail Gateway")
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     mode: str = Field(default="guarded", pattern="^(direct|guarded)$")
+
+
+class EmbedRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=50000)
 
 
 class OpenAIMessage(BaseModel):
@@ -62,6 +70,8 @@ def healthz():
         "ok": True,
         "provider": "amazon-bedrock",
         "model": MODEL_ID,
+        "embedding_model": EMBEDDING_MODEL_ID,
+        "embedding_dimensions": EMBEDDING_DIMENSIONS,
         "guardrail_configured": bool(GUARDRAIL_ID and GUARDRAIL_VERSION),
     }
 
@@ -71,11 +81,48 @@ def policy():
     return {
         "provider": "amazon-bedrock",
         "model": MODEL_ID,
+        "embedding_model": EMBEDDING_MODEL_ID,
+        "embedding_dimensions": EMBEDDING_DIMENSIONS,
         "guardrail_id": GUARDRAIL_ID or None,
         "guardrail_version": GUARDRAIL_VERSION or None,
         "modes": ["direct", "guarded"],
         "learner_endpoint": "/api/guarded-chat",
         "compatibility_endpoints": ["/v1/chat/completions", "/api/chat"],
+        "embedding_endpoint": "/api/embed",
+    }
+
+
+@app.post("/api/embed")
+def embed(request: EmbedRequest):
+    started = time.perf_counter()
+    try:
+        response = client.invoke_model(
+            modelId=EMBEDDING_MODEL_ID,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps(
+                {
+                    "inputText": request.text,
+                    "dimensions": EMBEDDING_DIMENSIONS,
+                    "normalize": True,
+                }
+            ),
+        )
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code", "BedrockError")
+        raise HTTPException(status_code=502, detail=code) from error
+
+    payload = json.loads(response["body"].read())
+    vector = payload.get("embedding", [])
+    if len(vector) != EMBEDDING_DIMENSIONS:
+        raise HTTPException(status_code=502, detail="embedding-dimension-mismatch")
+    return {
+        "provider": "amazon-bedrock",
+        "model": EMBEDDING_MODEL_ID,
+        "dimensions": len(vector),
+        "input_text_token_count": payload.get("inputTextTokenCount"),
+        "embedding": vector,
+        "latency_ms": round((time.perf_counter() - started) * 1000),
     }
 
 

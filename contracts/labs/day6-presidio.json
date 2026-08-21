@@ -3,7 +3,7 @@
   "schema_version": 1,
   "lab_id": "day6-presidio",
   "related_lessons": [
-    {"path": "08-llm-guardrails/04-presidio-input-output-controls.md"}
+    {"path": "08-llm-guardrails/08-presidio-input-output-controls.md"}
   ],
   "policy": {
     "source": "examples/day6/presidio/presidio_core.py",
@@ -119,10 +119,10 @@
     }
   ],
   "book_bindings": [
-    {"lesson_path": "08-llm-guardrails/04-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "08-llm-guardrails/04-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "08-llm-guardrails/04-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-custom-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "08-llm-guardrails/04-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]}
+    {"lesson_path": "08-llm-guardrails/08-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "08-llm-guardrails/08-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "08-llm-guardrails/08-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-custom-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "08-llm-guardrails/08-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]}
   ],
   "state": {
     "mutation_type": "process",
@@ -133,7 +133,7 @@
   },
   "watch_paths": {
     "setup": ["contracts/labs/day6-presidio.json", "examples/day6/presidio/", "docker/vuln-rag/", "tools/lab_contract.py", "tools/run_lab_contract.py"],
-    "course": ["08-llm-guardrails/04-presidio-input-output-controls.md", "evidence/"],
+    "course": ["08-llm-guardrails/08-presidio-input-output-controls.md", "evidence/"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py"]
   }
 }
