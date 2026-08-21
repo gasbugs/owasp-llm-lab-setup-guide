@@ -93,6 +93,10 @@ curl -fsS --max-time 360 -X POST "$HUB/api/labs/output-candidate" \
 jq -e '.guardrail.decision == "allow" and .reply == "Contact <EMAIL_ADDRESS> for support." and any(.guardrail.stages[]; .stage == "presidio_output" and .decision == "redact")' \
   "$WORK/output-pii.json" >/dev/null
 
+ss -ltn | grep -F '127.0.0.1:18093' >/dev/null
+ss -ltn | grep -F '127.0.0.1:18094' >/dev/null
+ss -ltn | grep -F '127.0.0.1:18095' >/dev/null
+
 podman stop llm-security-presidio-spoke >/dev/null
 chat hub-public-reader-token \
   '{"message":"비밀번호 변경 절차를 알려 주세요.","classification":"none","purpose":"public_information"}' \
@@ -106,10 +110,6 @@ podman logs llm-security-presidio-spoke > "$WORK/presidio.log" 2>&1 || true
 ! grep -F 'Ignore previous instructions' "$WORK/application.log" "$WORK/hub.log" "$WORK/presidio.log"
 ! grep -F 'sk-demo-12345' "$WORK/application.log" "$WORK/hub.log" "$WORK/presidio.log"
 grep -F 'request_id' "$WORK/application.log" "$WORK/hub.log" "$WORK/presidio.log" >/dev/null
-
-ss -ltn | grep -F '127.0.0.1:18093' >/dev/null
-ss -ltn | grep -F '127.0.0.1:18094' >/dev/null
-ss -ltn | grep -F '127.0.0.1:18095' >/dev/null
 
 printf 'normal=%s upstream=%s guard_calls=%s\n' \
   "$(jq -r '.application_decision' "$WORK/normal.json")" \
