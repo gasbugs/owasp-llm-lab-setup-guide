@@ -74,7 +74,7 @@ printf 'START enforce stack\n'
 start_stack enforce
 
 printf 'POLICY\n'
-curl -fsS http://127.0.0.1:18091/api/guardrails/policy \
+curl -fsS --max-time 30 http://127.0.0.1:18091/api/guardrails/policy \
   | tee "$WORK/policy.json"
 jq -e '.policy_version=="day7-guardrails-v1" and .upstream_path=="nemo>ollama" and .output_contract.additional_properties==false' \
   "$WORK/policy.json" >/dev/null
@@ -95,13 +95,13 @@ jq -e '.guardrail.inner_guardrail.decision=="block" and .guardrail.inner_guardra
   "$WORK/injection.json" >/dev/null
 
 printf 'OUTPUT contract\n'
-curl -fsS -X POST http://127.0.0.1:18091/api/labs/validate-output-contract \
+curl -fsS --max-time 30 -X POST http://127.0.0.1:18091/api/labs/validate-output-contract \
   -H 'Content-Type: application/json' \
   -d '{"model_output":{"answer":"비밀번호 변경 페이지를 이용하세요.","links":["/account/password"]}}' \
   | tee "$WORK/output-contract-allow.json"
 jq -e '.valid==true and .application_decision=="allow"' "$WORK/output-contract-allow.json" >/dev/null
 
-curl -fsS -X POST http://127.0.0.1:18091/api/labs/validate-output-contract \
+curl -fsS --max-time 30 -X POST http://127.0.0.1:18091/api/labs/validate-output-contract \
   -H 'Content-Type: application/json' \
   -d '{"model_output":{"answer":"완료","links":[],"admin_command":"DELETE FROM users"}}' \
   | tee "$WORK/output-contract-block.json"
