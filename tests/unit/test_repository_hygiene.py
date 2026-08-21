@@ -63,7 +63,7 @@ class RepositoryHygieneTest(unittest.TestCase):
 
     def test_terraform_example_uses_neutral_contact_placeholders(self) -> None:
         text = TFVARS_EXAMPLE.read_text(encoding="utf-8")
-        self.assertRegex(text, r'allowed_ingress_cidr\s*=\s*"127\.0\.0\.1/32"')
+        self.assertRegex(text, r'allowed_ingress_cidr\s*=\s*"203\.0\.113\.10/32"')
         self.assertRegex(text, r'alert_email\s*=\s*"[A-Za-z0-9._%+-]+@example\.com"')
 
     def test_no_likely_secrets_in_public_text_files(self) -> None:
