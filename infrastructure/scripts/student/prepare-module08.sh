@@ -65,11 +65,20 @@ pass "normal allowed and injection blocked"
 curl -fsS http://127.0.0.1:8014/metrics \
   | grep -q 'llm_guardrail_decisions_total.*engine="nemo"' \
   || fail "NeMo decision metric did not reach Module 08"
+curl -fsS http://127.0.0.1:8014/metrics \
+  | grep -q 'llm_guardrail_decisions_total.*engine="presidio"' \
+  || fail "Presidio decision metric did not reach Module 08"
 pass "bounded NeMo and Presidio decision metrics available"
 
-loki_result=$(curl -fsS --get http://127.0.0.1:3100/loki/api/v1/query_range \
-  --data-urlencode 'query={service_name=~"llm-security-.*"}' \
-  --data-urlencode 'limit=100')
+loki_result='{}'
+for _ in $(seq 1 30); do
+  loki_result=$(curl -fsS --get http://127.0.0.1:3100/loki/api/v1/query_range \
+    --data-urlencode 'query={service_name=~"llm-security-.*"}' \
+    --data-urlencode 'limit=100')
+  jq -e '([.data.result[].stream.service_name] | unique | length) >= 3' \
+    >/dev/null <<<"$loki_result" && break
+  sleep 2
+done
 jq -e '([.data.result[].stream.service_name] | unique | length) >= 3' \
   >/dev/null <<<"$loki_result" || fail "control-plane logs did not reach Loki"
 pass "Application, NeMo hub and Presidio spoke logs available in Loki"
