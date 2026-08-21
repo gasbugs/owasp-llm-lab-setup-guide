@@ -86,6 +86,7 @@ jq -e '
     and ($services | index("llm-security-presidio-spoke")) != null
 ' >/dev/null <<<"$trace_result" || fail "distributed control-plane trace did not reach Tempo"
 pass "Application, NeMo hub and Presidio spoke share one Tempo trace"
+printf '[TRACE] control_plane_trace_id=%s\n' "$trace_id"
 
 curl -fsS http://127.0.0.1:8014/metrics \
   | grep -q 'llm_guardrail_decisions_total.*engine="nemo"' \
