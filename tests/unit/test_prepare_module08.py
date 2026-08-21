@@ -40,6 +40,8 @@ class PrepareModule08ContractTests(unittest.TestCase):
         self.assertIn("llm_guardrail_decisions_total", self.source)
         self.assertIn("healthy but not connected to Module 08 observability", self.source)
         self.assertIn("--log-driver=k8s-file", self.source)
+        self.assertIn("container logs did not reach Loki", self.source)
+        self.assertIn("raw PII found in Loki", self.source)
 
 
 if __name__ == "__main__":

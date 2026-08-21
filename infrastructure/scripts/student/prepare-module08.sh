@@ -183,4 +183,24 @@ curl -fsS http://127.0.0.1:8014/metrics \
   || fail "guardrail decision metrics did not reach Module 08"
 pass "guardrail metrics available at Module 08 gateway"
 
+loki_query='{service_name=~"day6-(presidio-api|nemo-guardrails-api)"}'
+for _ in $(seq 1 30); do
+  loki_result=$(curl -fsS --get http://127.0.0.1:3100/loki/api/v1/query_range \
+    --data-urlencode "query=$loki_query" --data-urlencode 'limit=20')
+  jq -e '([.data.result[].values[]?] | length) > 0' <<<"$loki_result" >/dev/null \
+    && break
+  sleep 1
+done
+jq -e '([.data.result[].stream.service_name] | unique | length) == 2 and
+       ([.data.result[].values[]?] | length) > 0' <<<"$loki_result" >/dev/null \
+  || fail "Presidio and NeMo container logs did not reach Loki"
+pass "Presidio and NeMo container logs available in Loki"
+
+pii_loki_result=$(curl -fsS --get http://127.0.0.1:3100/loki/api/v1/query_range \
+  --data-urlencode "query={service_name=\"day6-presidio-api\"} |= \"$PII\"" \
+  --data-urlencode 'limit=20')
+jq -e '([.data.result[].values[]?] | length) == 0' <<<"$pii_loki_result" >/dev/null \
+  || fail "raw PII found in Loki"
+pass "raw PII absent from Loki"
+
 printf '[READY] Module 07 guardrails are connected to Module 08 observability\n'
