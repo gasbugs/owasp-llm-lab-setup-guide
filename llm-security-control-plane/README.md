@@ -31,7 +31,8 @@ NeMo는 LLM 처리 단계의 허브이며 Presidio, Llama Guard, Self-check와 O
 ## 명시적 버전 관리
 
 `versions.lock.yaml`은 Python base digest, 직접 설치하는 Python package, Ollama model
-tag와 digest, 세 이미지의 semantic version을 고정한다. NeMo Hub는 시작할 때 Ollama
+tag와 digest, 세 이미지의 semantic version, Promptfoo·Garak과 테스트용 Node image
+digest를 고정한다. NeMo Hub는 시작할 때 Ollama
 `/api/tags`와 lock을 비교하며 digest가 다르면 `/healthz`를 실패시키고 `/api/chat`을
 503으로 닫는다. `latest`나 자동 downgrade는 사용하지 않는다.
 

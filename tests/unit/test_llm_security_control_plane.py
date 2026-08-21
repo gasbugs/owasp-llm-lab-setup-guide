@@ -33,6 +33,9 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertEqual(len(model["digest"]), 64)
         for image in lock["images"].values():
             self.assertTrue(image.endswith(":1.0.0"))
+        self.assertEqual(lock["test_tools"]["promptfoo"], "0.121.20")
+        self.assertEqual(lock["test_tools"]["garak"], "0.15.1")
+        self.assertEqual(len(lock["test_tools"]["node_image_digest"]), 71)
 
     def test_hub_policy_is_sequential_and_never_downgrades(self) -> None:
         policy = yaml.safe_load((CONTROL / "policies/nemo-policy.yaml").read_text())
@@ -92,6 +95,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("{{env.CONTROL_PLANE_APP_URL}}/api/chat", promptfoo)
         self.assertIn("Bearer hub-public-reader-token", promptfoo)
         self.assertIn("maxConcurrency: 1", promptfoo)
+        self.assertIn("GARAK-PROMOTED", promptfoo)
         generator = json.loads(
             (CONTROL / "tests/garak/rest-generator.json").read_text()
         )["rest"]["RestGenerator"]
