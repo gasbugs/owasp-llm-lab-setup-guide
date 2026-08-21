@@ -1,7 +1,11 @@
-"""Presidio privacy detection spoke.
+"""Presidio 개인정보 탐지 Spoke의 정책 정본.
 
-This module deliberately does not decide allow, block, redact, or sanitize.
-It reports detections and a sanitized candidate to the NeMo policy hub.
+처음에는 ``DEFAULT_ENTITIES``와 ``PrivacyPolicy``에서 탐지 대상과 임계값을
+확인한다. 다음으로 ``_register_project_recognizers``에서 프로젝트 전용 형식을,
+마지막으로 ``analyze``에서 input·retrieval·output을 검사하는 흐름을 읽는다.
+
+이 모듈은 탐지 결과와 비식별화 후보만 NeMo Hub에 반환한다. allow·block·redact
+중 무엇을 적용할지는 이곳이 아니라 NeMo와 Application이 최종 결정한다.
 """
 
 from __future__ import annotations

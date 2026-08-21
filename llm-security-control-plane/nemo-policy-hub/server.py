@@ -1,7 +1,12 @@
-"""NeMo policy hub HTTP API.
+"""Guardrail 검사 순서와 Model 호출을 관리하는 NeMo Policy Hub.
 
-Authentication and RAG authorization remain Application responsibilities.
-The hub owns guardrail ordering, model calls, and guardrail enforcement.
+처음에는 ``GUARD_MODE``와 ``ASSURANCE_PROFILE``에서 집행 강도와 Rail 묶음을
+확인한다. 다음으로 ``analyze_privacy``와 ``/api/chat``에서 Presidio 입력 검사 →
+Llama Guard·Self-check → Main Model → 출력 검사 순서를 읽는다. 내부 Service
+Token과 Model digest가 맞지 않으면 요청을 닫는다.
+
+사용자 인증과 RAG 등급 인가는 Application 책임이다. 이 Hub는 이미 인증·인가된
+Principal과 Retrieval Context만 받아 Guardrail 순서와 Model 호출을 집행한다.
 """
 
 from __future__ import annotations

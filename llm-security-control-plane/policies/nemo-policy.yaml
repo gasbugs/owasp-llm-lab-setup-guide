@@ -1,6 +1,14 @@
 schema_version: 1
 policy_id: nemo-hub-policy-v1
 
+# 처음 읽는 순서
+# 1. execution: 검사를 병렬 실행하거나 실패 시 약한 경로로 우회하는지 본다.
+# 2. profiles: 선택한 Profile에서 어떤 Rail을 켜는지 본다.
+# 3. stages: 입력부터 최종 응답까지 실제 검사 순서를 본다.
+# 4. prohibited_entities와 self_check: 구체적인 차단 조건을 본다.
+# Rail은 한 단계의 검사이고, Profile은 함께 사용할 Rail 묶음이다.
+# 예: high-assurance는 Llama Guard와 Self-check를 모두 통과해야 Main Model을 호출한다.
+
 # 성능을 위해 검사를 병렬·추측 실행하지 않는다. 앞 단계가 통과한 뒤
 # 다음 단계를 실행하며, Spoke 장애 시 더 약한 정책으로 자동 전환하지 않는다.
 execution:

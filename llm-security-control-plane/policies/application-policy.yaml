@@ -1,6 +1,12 @@
 schema_version: 1
 policy_id: application-data-boundary-v1
 
+# 처음 읽는 순서
+# 1. classifications: 데이터 등급마다 누가(Role), 어떤 업무 목적(Purpose)으로 읽을 수 있는지 본다.
+# 2. security_ownership: 그 판단을 Application·NeMo·Presidio 중 누가 집행하는지 본다.
+# Role은 사용자의 권한 묶음, Purpose는 요청의 업무 목적, Classification은 데이터 민감도다.
+# 예: public_reader가 restricted 데이터를 요청하면 모델 호출 전에 Application이 거부한다.
+
 # 데이터 등급마다 필요한 역할과 사용 목적을 함께 만족해야 한다.
 # LLM이나 Guardrail의 자연어 판단으로 이 표를 우회하지 않는다.
 classifications:

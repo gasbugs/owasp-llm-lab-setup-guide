@@ -1,4 +1,11 @@
-"""Browser-facing Application Gateway for the NeMo hub-and-spoke lab."""
+"""사용자 요청의 인증·인가와 최종 응답을 집행하는 Application Gateway.
+
+처음에는 ``ChatRequest``에서 사용자가 보낼 수 있는 필드를 확인하고, 이어서
+``/api/chat``에서 인증 → RAG 등급 인가 → NeMo Hub 호출 → 응답 계약 검증 순서로
+읽는다. 사용자가 보낸 Tenant나 Role을 신뢰하지 않고 Bearer Token에 서버가
+연결한 Principal만 사용한다. NeMo가 검사 결과를 반환해도 Browser에 무엇을
+보낼지 최종 결정하는 계층은 이 Application이다.
+"""
 
 from __future__ import annotations
 

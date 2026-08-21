@@ -1,6 +1,13 @@
 schema_version: 1
 release: 1.0.0
 
+# 처음 읽는 순서
+# 1. runtime과 python_packages: API 서비스가 실행되는 공통 환경을 본다.
+# 2. ollama_models: Main Model과 Llama Guard의 tag·digest를 본다.
+# 3. images: 세 서비스 Image가 같은 release인지 본다.
+# 4. test_tools: Promptfoo와 Garak 테스트 결과를 재현할 버전을 본다.
+# tag는 사람이 읽는 이름이고 digest는 실제 Image·Model 바이트를 식별하는 값이다.
+
 # Base Image는 tag뿐 아니라 digest도 고정해 같은 이름의 다른 바이트 실행을 막는다.
 runtime:
   python_image: docker.io/library/python:3.12-slim
