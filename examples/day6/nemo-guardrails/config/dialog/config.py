@@ -6,7 +6,7 @@ from nemoguardrails.actions import action
 async def get_security_contact() -> str:
     """Return a synthetic, read-only contact used by the course."""
 
-    return "보안팀 연락처: security@example.invalid"
+    return "보안팀 연락처: security@example.com"
 
 
 def init(app: LLMRails) -> None:

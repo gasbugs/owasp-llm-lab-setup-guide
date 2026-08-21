@@ -213,7 +213,7 @@ curl -fsS --max-time 240 -X POST http://127.0.0.1:18092/api/labs/dialog \
   -H 'Content-Type: application/json' \
   -d '{"message":"보안팀 연락처를 알려 주세요."}' \
   | tee "$WORK/nemo-dialog-contact.json" >/dev/null
-jq -e '.rail_type=="dialog" and (.reply | contains("security@example.invalid")) and any(.activated_rails[]?.actions[]?; .=="get_security_contact")' \
+jq -e '.rail_type=="dialog" and (.reply | contains("security@example.com")) and any(.activated_rails[]?.actions[]?; .=="get_security_contact")' \
   "$WORK/nemo-dialog-contact.json" >/dev/null
 curl -fsS --max-time 240 -X POST http://127.0.0.1:18092/api/labs/dialog \
   -H 'Content-Type: application/json' \

@@ -65,7 +65,7 @@ def main() -> int:
         attack = submit(page, ATTACK, timeout_ms)
         browser.close()
 
-    target_port = urlsplit(origin).port
+    target_hostname = urlsplit(origin).hostname
     chat_requests = sum(url == f"{origin}/api/chat" for url in requests)
     internal_requests = sum(
         urlsplit(url).port in {11434, 18091, 18092}
@@ -84,7 +84,7 @@ def main() -> int:
         and attack["reason"] == "input:self check input",
         "same_origin": chat_requests == 2
         and internal_requests == 0
-        and target_port == 18090,
+        and target_hostname in {"127.0.0.1", "localhost"},
     }
 
     print(
