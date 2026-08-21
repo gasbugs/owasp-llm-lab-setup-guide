@@ -30,8 +30,10 @@ jobs:
           USE_REAL_OLLAMA: "false"
           RUN_FAILURE_DRILL: "true"
         run: |
-          bash tests/e2e/security-monitoring/test_security_monitoring.sh
-          bash tests/e2e/security-monitoring/test_security_monitoring.sh
+          bash tests/e2e/security-monitoring/test_security_monitoring.sh 2>&1 | tee /tmp/module09-e2e-1.log
+          bash tests/e2e/security-monitoring/test_security_monitoring.sh 2>&1 | tee /tmp/module09-e2e-2.log
+          ! grep -E '(^|[[:space:]])(Error:|INFRA:|Traceback)' \
+            /tmp/module09-e2e-1.log /tmp/module09-e2e-2.log
 
       - name: Preserve Podman diagnostics on failure
         if: failure()
