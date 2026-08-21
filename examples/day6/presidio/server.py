@@ -17,6 +17,7 @@ from presidio_core import FRAMEWORK, FRAMEWORK_VERSION, PresidioCore, env_bool
 from secure_coding import select_personal_data_policy
 
 
+# Mode는 탐지 결과를 실제 응답에 집행할지 결정한다. 잘못된 값은 시작 시 거부한다.
 GUARD_MODE = os.getenv("GUARD_MODE", "enforce").strip().lower()
 if GUARD_MODE not in {"off", "audit", "enforce"}:
     raise RuntimeError("GUARD_MODE must be off, audit, or enforce")
@@ -75,6 +76,7 @@ class OutputContractRequest(BaseModel):
     model_output: dict
 
 
+# 사용자·모델 원문은 구조화 로그와 Module 08 전달 이벤트에서 제거한다.
 LOG_CONTENT_FIELDS = {
     "input",
     "input_prompt",
@@ -106,6 +108,8 @@ def scan_metadata(result: dict) -> dict:
 
 
 def emit(event: dict) -> None:
+    # 로컬 로그와 원격 모니터링에 동일한 metadata-only 사건을 전달한다.
+    # 모니터링 장애는 로그로 남기되 이미 수행 중인 가드레일 집행을 약화시키지 않는다.
     safe_event = metadata_only(event)
     print(json.dumps(safe_event, ensure_ascii=False, separators=(",", ":")), flush=True)
     if not SECURITY_MONITOR_URL:
@@ -136,6 +140,7 @@ def require_lab_endpoint() -> None:
 
 
 async def call_ollama(message: str) -> str:
+    # Presidio 검사를 통과한 문자열만 Main Model 요청의 user content로 사용한다.
     async with httpx.AsyncClient(timeout=httpx.Timeout(180.0)) as client:
         response = await client.post(
             f"{OLLAMA_URL}/api/chat",
@@ -160,6 +165,8 @@ async def call_ollama(message: str) -> str:
 
 async def call_model_path(message: str) -> tuple[str, dict | None, list[str]]:
     """Send sanitized input through NeMo when its URL is configured."""
+    # NeMo URL이 없을 때만 Ollama를 직접 호출한다. URL이 있으면 NeMo 계약과
+    # infra 판정을 검증하고 Main Model이 실제 호출된 stage만 기록한다.
     if not NEMO_GUARD_URL:
         return await call_ollama(message), None, ["ollama_main"]
 
@@ -257,6 +264,7 @@ async def policy() -> dict:
 
 @app.post("/api/scan")
 async def scan(request: ScanRequest) -> dict:
+    # 임의 입력을 검사하는 독립 API다. 이 endpoint 자체는 Model을 호출하지 않는다.
     try:
         result = CORE.scan_input(request.text, request.entities)
     except ValueError as exc:
@@ -276,6 +284,7 @@ async def scan(request: ScanRequest) -> dict:
 
 @app.post("/api/labs/secure-coding/scan")
 async def secure_coding_scan(request: ScanRequest) -> dict:
+    # 취약·안전 호출을 전환해 같은 입력의 raw passthrough와 redaction을 비교한다.
     require_lab_endpoint()
 
     result = select_personal_data_policy(request.text, CORE.scan_input)
@@ -286,6 +295,7 @@ async def secure_coding_scan(request: ScanRequest) -> dict:
 
 @app.post("/api/scan-output")
 async def scan_output(request: OutputScanRequest) -> dict:
+    # 이미 생성됐다고 가정한 Model 출력 후보를 Browser 전달 전에 별도로 검사한다.
     require_lab_endpoint()
     try:
         result = CORE.scan_output(
@@ -363,6 +373,7 @@ async def chat(request: ChatRequest) -> dict:
     input_checks: list[dict] = []
     effective_message = request.message
 
+    # 1) 입력 Rail: Enforce에서는 원문 대신 sanitized_text만 다음 계층으로 전달한다.
     if guard_enabled and CORE.settings.input_enabled:
         try:
             input_result = CORE.scan_input(request.message)
@@ -370,6 +381,7 @@ async def chat(request: ChatRequest) -> dict:
             if GUARD_MODE == "enforce":
                 effective_message = str(input_result["sanitized_text"])
         except Exception as exc:
+            # Analyzer 장애를 원문 통과로 처리하지 않는다. Enforce에서는 Model 호출 전에 닫는다.
             duration = round((time.perf_counter() - started) * 1000, 2)
             guardrail = base_guardrail(
                 decision="infra",
@@ -393,6 +405,7 @@ async def chat(request: ChatRequest) -> dict:
             if GUARD_MODE == "enforce":
                 return {"reply": "privacy guardrail infrastructure unavailable", "guardrail": guardrail}
 
+    # 2) Model 경로: 입력 검사가 완료된 effective_message만 NeMo 또는 Ollama에 전달한다.
     try:
         reply, inner_guardrail, model_stages = await call_model_path(effective_message)
     except Exception as exc:
@@ -412,6 +425,7 @@ async def chat(request: ChatRequest) -> dict:
         return {"reply": "upstream model unavailable", "guardrail": guardrail}
 
     output_checks: list[dict] = []
+    # 3) 출력 Rail: Model 응답도 신뢰하지 않고 사용자에게 반환하기 전에 다시 검사한다.
     if guard_enabled and CORE.settings.output_enabled:
         try:
             output_result = CORE.scan_output(effective_message, reply)
@@ -419,6 +433,7 @@ async def chat(request: ChatRequest) -> dict:
             if GUARD_MODE == "enforce":
                 reply = str(output_result["sanitized_text"])
         except Exception as exc:
+            # 출력 검사가 실패하면 검사되지 않은 Model 원문을 사용자에게 보내지 않는다.
             duration = round((time.perf_counter() - started) * 1000, 2)
             guardrail = base_guardrail(
                 decision="infra",
@@ -443,6 +458,7 @@ async def chat(request: ChatRequest) -> dict:
             if GUARD_MODE == "enforce":
                 return {"reply": "privacy output could not be inspected", "guardrail": guardrail}
 
+    # 4) 최종 집행: 입력·출력 중 하나라도 PII를 찾으면 Enforce 판정은 redact다.
     pii_detected = any(not item.get("valid", True) for item in [*input_checks, *output_checks])
     decision = "redact" if pii_detected and GUARD_MODE == "enforce" else "allow"
     duration = round((time.perf_counter() - started) * 1000, 2)

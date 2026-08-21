@@ -30,6 +30,8 @@ NLP_MODEL = "en_core_web_sm"
 # 바로 붙으면 경계를 찾지 못한다. 숫자열의 앞뒤만 검사하면 한글 문장에서도
 # 주민번호 부분을 안정적으로 분리할 수 있다.
 KR_RRN_PATTERN = r"(?<!\d)\d{6}-[1-4]\d{6}(?!\d)"
+# 이 목록은 호출자가 임의의 Entity를 검사하도록 허용하는 목록이 아니라,
+# 애플리케이션 정책이 검사 대상으로 승인한 Entity allowlist다.
 DEFAULT_ENTITIES = (
     "EMAIL_ADDRESS",
     "PHONE_NUMBER",
@@ -64,6 +66,8 @@ class PolicySettings:
     @classmethod
     def from_env(cls) -> "PolicySettings":
         """컨테이너 환경변수를 읽고 잘못된 정책은 시작 단계에서 거부한다."""
+        # 임계값 범위를 벗어나거나 Entity 목록이 비어 있으면 약한 기본 정책으로
+        # 자동 전환하지 않고 컨테이너 시작을 실패시킨다.
         threshold = float(os.getenv("PRESIDIO_SCORE_THRESHOLD", "0.5"))
         if not 0.0 <= threshold <= 1.0:
             raise ValueError("PRESIDIO_SCORE_THRESHOLD must be between 0 and 1")
@@ -84,6 +88,7 @@ class PolicySettings:
 
     def as_public_dict(self) -> dict:
         """비밀값 없이 현재 정책을 API 응답이나 실습 화면에 공개한다."""
+        # 원문 입력이나 탐지된 값은 공개하지 않고 활성 정책과 Pattern만 반환한다.
         return {
             "analyzer": {
                 "enabled_for_input": self.input_enabled,
