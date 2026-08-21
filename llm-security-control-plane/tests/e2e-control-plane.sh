@@ -145,6 +145,8 @@ jq -e '.application_decision == "allow" and .upstream_called == true and .guardr
   "$WORK/standard-normal.json" >/dev/null
 jq -e '.application_decision == "allow" and .upstream_called == true' \
   "$WORK/standard-app-policy.json" >/dev/null
+jq '{application_decision,upstream_called,blocking_reason,guard_model_calls:.guardrail.guard_model_calls}' \
+  "$WORK/standard-app-policy.json"
 
 ASSURANCE_PROFILE=high-assurance GUARD_MODE=audit \
   bash "$ROOT/deploy/start-stack.sh" >/dev/null
