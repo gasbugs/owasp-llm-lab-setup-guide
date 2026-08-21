@@ -1,0 +1,41 @@
+name: Module 09 Podman E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "examples/security-monitoring/**"
+      - "tests/e2e/security-monitoring/**"
+      - ".github/workflows/module09-podman-e2e.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  podman-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Podman Compose and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman podman-compose jq
+
+      - name: Run the complete observability E2E twice
+        env:
+          WITH_GPU: "false"
+          USE_REAL_OLLAMA: "false"
+          RUN_FAILURE_DRILL: "true"
+        run: |
+          bash tests/e2e/security-monitoring/test_security_monitoring.sh
+          bash tests/e2e/security-monitoring/test_security_monitoring.sh
+
+      - name: Preserve Podman diagnostics on failure
+        if: failure()
+        run: |
+          podman ps --all
+          podman images
+          test ! -f /tmp/podman-system-service.log || tail -200 /tmp/podman-system-service.log

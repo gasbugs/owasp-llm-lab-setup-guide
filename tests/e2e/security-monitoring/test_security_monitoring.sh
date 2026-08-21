@@ -152,7 +152,15 @@ wait_webhook_alert() {
 }
 
 cleanup
-systemctl --user start podman.socket >/dev/null
+if ! systemctl --user start podman.socket >/dev/null 2>&1; then
+  # GitHub-hosted runners do not expose a user systemd bus. Start the same
+  # rootless API socket directly so Alloy can discover container stdout.
+  export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/podman-runtime-$UID}"
+  mkdir -p "$XDG_RUNTIME_DIR/podman"
+  podman system service --time=0 \
+    "unix://$XDG_RUNTIME_DIR/podman/podman.sock" \
+    >"${TMPDIR:-/tmp}/podman-system-service.log" 2>&1 &
+fi
 cp "$EXAMPLE/policy.json" "$POLICY_COPY"
 export MONITOR_POLICY_PATH="$POLICY_COPY"
 export OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
