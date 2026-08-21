@@ -19,6 +19,11 @@ profiles:
   high-assurance:
     input_rails: [llama_guard, self_check]
     output_rails: [llama_guard, self_check]
+  # bedrock-managed는 Nova Lite 기반 Self-check와 AWS Bedrock Guardrail을 조합한다.
+  # 별도의 로컬 Llama Guard model을 호출하지 않는다.
+  bedrock-managed:
+    input_rails: [self_check]
+    output_rails: [self_check]
 
 # 정책 실행의 정본 순서다. 인증·인가·RAG 선택은 Application이 먼저 끝내고,
 # Main Model은 모든 입력 검사가 통과한 뒤에만 호출한다.
@@ -30,7 +35,7 @@ stages:
   - llama_guard_input
   - self_check_input
   - presidio_retrieval
-  - ollama_main
+  - bedrock_or_ollama_main
   - llama_guard_output
   - self_check_output
   - presidio_output

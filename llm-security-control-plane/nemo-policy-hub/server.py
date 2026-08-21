@@ -21,6 +21,7 @@ from hub_core import (
     LLAMA_GUARD_MODEL,
     MAIN_DIGEST,
     MAIN_MODEL,
+    MODEL_PROVIDER,
     POLICY,
     call_main_model,
     run_input_rails,
@@ -41,7 +42,7 @@ if GUARD_MODE not in {"off", "audit", "enforce"}:
     raise RuntimeError("GUARD_MODE must be off, audit, or enforce")
 ASSURANCE_PROFILE = os.getenv("ASSURANCE_PROFILE", "high-assurance").strip().lower()
 if ASSURANCE_PROFILE not in POLICY["profiles"]:
-    raise RuntimeError("ASSURANCE_PROFILE must be standard or high-assurance")
+    raise RuntimeError("ASSURANCE_PROFILE must name a configured policy profile")
 APPLICATION_INTERNAL_TOKEN = os.getenv("APPLICATION_INTERNAL_TOKEN", "")
 PRESIDIO_INTERNAL_TOKEN = os.getenv("PRESIDIO_INTERNAL_TOKEN", "")
 if not APPLICATION_INTERNAL_TOKEN or not PRESIDIO_INTERNAL_TOKEN:
@@ -381,8 +382,43 @@ async def chat(
             context_for_model = "\n\n".join(request.retrieval.chunks)
 
         upstream_called = True
-        reply = await call_main_model(message_for_model, context_for_model)
-        stages.append(stage_record("ollama_main", "ollama", "called", model=MAIN_MODEL))
+        model_result = await call_main_model(
+            message_for_model,
+            context_for_model,
+            apply_provider_guardrail=GUARD_MODE != "off",
+        )
+        if isinstance(model_result, str):
+            model_result = {
+                "reply": model_result,
+                "provider": MODEL_PROVIDER,
+                "stop_reason": "stop",
+                "decision": "allow",
+                "usage": {},
+            }
+        reply = model_result["reply"]
+        stages.append(
+            stage_record(
+                "bedrock_main" if MODEL_PROVIDER == "amazon-bedrock" else "ollama_main",
+                MODEL_PROVIDER,
+                model_result["decision"],
+                model=MAIN_MODEL,
+                stop_reason=model_result["stop_reason"],
+                usage=model_result["usage"],
+            )
+        )
+
+        if model_result["decision"] == "block" and GUARD_MODE == "enforce":
+            result = result_record(
+                request_id=request.request_id,
+                reply=reply,
+                decision="block",
+                blocking_reason="bedrock:guardrail_intervened",
+                upstream_called=True,
+                stages=stages,
+                started=started,
+            )
+            emit_metadata({"event": "hub_chat", **result["guardrail"], "request_id": request.request_id})
+            return result
 
         final_reply = reply
         blocking_reason = None

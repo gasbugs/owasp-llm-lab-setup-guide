@@ -21,11 +21,21 @@ with open(LOCK_PATH, encoding="utf-8") as handle:
 with open(POLICY_PATH, encoding="utf-8") as handle:
     POLICY = yaml.safe_load(handle)
 
-MAIN_MODEL = VERSION_LOCK["ollama_models"]["main"]["tag"]
+MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama").strip().lower()
+if MODEL_PROVIDER not in {"ollama", "amazon-bedrock"}:
+    raise RuntimeError("MODEL_PROVIDER must be ollama or amazon-bedrock")
+MAIN_MODEL = (
+    os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
+    if MODEL_PROVIDER == "amazon-bedrock"
+    else VERSION_LOCK["ollama_models"]["main"]["tag"]
+)
 MAIN_DIGEST = VERSION_LOCK["ollama_models"]["main"]["digest"]
 LLAMA_GUARD_MODEL = VERSION_LOCK["ollama_models"]["llama_guard"]["tag"]
 LLAMA_GUARD_DIGEST = VERSION_LOCK["ollama_models"]["llama_guard"]["digest"]
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://10.0.2.2:11434").rstrip("/")
+MODEL_GATEWAY_URL = os.getenv(
+    "MODEL_GATEWAY_URL",
+    os.getenv("OLLAMA_URL", "http://10.0.2.2:11434"),
+).rstrip("/")
 
 
 LLAMA_GUARD_INPUT_PROMPT = """Task: Check whether the User content is unsafe.
@@ -53,7 +63,7 @@ The first line must be exactly safe or unsafe. If unsafe, put violated categorie
 
 
 def _openai_base_url() -> str:
-    return OLLAMA_URL + "/v1"
+    return MODEL_GATEWAY_URL + "/v1"
 
 
 def _base_config() -> dict:
@@ -211,7 +221,11 @@ async def run_output_rails(prompt: str, candidate: str, assurance_profile: str) 
     }
 
 
-async def call_main_model(message: str, context: str | None) -> str:
+async def call_main_model(
+    message: str,
+    context: str | None,
+    apply_provider_guardrail: bool = True,
+) -> dict:
     user_content = message
     if context:
         user_content = (
@@ -220,10 +234,11 @@ async def call_main_model(message: str, context: str | None) -> str:
         )
     async with httpx.AsyncClient(timeout=httpx.Timeout(180.0)) as client:
         response = await client.post(
-            f"{OLLAMA_URL}/api/chat",
+            f"{MODEL_GATEWAY_URL}/api/chat",
             json={
                 "model": MAIN_MODEL,
                 "stream": False,
+                "guardrail": MODEL_PROVIDER == "amazon-bedrock" and apply_provider_guardrail,
                 "options": {"temperature": 0.0, "num_predict": 180},
                 "messages": [
                     {
@@ -239,12 +254,31 @@ async def call_main_model(message: str, context: str | None) -> str:
         )
         response.raise_for_status()
         payload = response.json()
-    return str(payload["message"]["content"])
+    stop_reason = str(payload.get("done_reason", "stop"))
+    return {
+        "reply": str(payload["message"]["content"]),
+        "provider": MODEL_PROVIDER,
+        "stop_reason": stop_reason,
+        "decision": "block" if stop_reason == "guardrail_intervened" else "allow",
+        "usage": payload.get("usage", {}),
+    }
 
 
 async def verify_model_lock() -> dict:
+    if MODEL_PROVIDER == "amazon-bedrock":
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            response = await client.get(f"{MODEL_GATEWAY_URL}/healthz")
+            response.raise_for_status()
+            payload = response.json()
+        valid = payload.get("provider") == "amazon-bedrock" and payload.get("model") == MAIN_MODEL
+        return {
+            "valid": valid,
+            "provider": MODEL_PROVIDER,
+            "model": MAIN_MODEL,
+            "guardrail_configured": bool(payload.get("guardrail_configured")),
+        }
     async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
-        response = await client.get(f"{OLLAMA_URL}/api/tags")
+        response = await client.get(f"{MODEL_GATEWAY_URL}/api/tags")
         response.raise_for_status()
         payload = response.json()
     models = {item["name"]: item["digest"] for item in payload.get("models", [])}

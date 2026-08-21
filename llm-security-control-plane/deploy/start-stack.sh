@@ -26,6 +26,8 @@ NEMO_HUB_URL=http://10.0.2.2:18094
 MONITOR_ARGS=()
 OTEL_ARGS=()
 OLLAMA_URL=http://10.0.2.2:11434
+MODEL_PROVIDER="${MODEL_PROVIDER:-ollama}"
+BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}"
 if podman network exists llm-security-observability; then
   NETWORK_ARGS=(--network llm-security-observability)
   PRESIDIO_URL=http://llm-security-presidio-spoke:8013
@@ -37,6 +39,7 @@ if podman network exists llm-security-observability; then
   )
   OTEL_ARGS=(-e OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318)
 fi
+MODEL_GATEWAY_URL="${MODEL_GATEWAY_URL:-$OLLAMA_URL}"
 
 podman run -d --replace --name llm-security-presidio-spoke \
   "${NETWORK_ARGS[@]}" \
@@ -60,6 +63,9 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "PRESIDIO_URL=$PRESIDIO_URL" \
   --add-host host.containers.internal:host-gateway \
   -e "OLLAMA_URL=$OLLAMA_URL" \
+  -e "MODEL_PROVIDER=$MODEL_PROVIDER" \
+  -e "MODEL_GATEWAY_URL=$MODEL_GATEWAY_URL" \
+  -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
   -v "$NEMO_POLICY_FILE:/app/policies/nemo-policy.yaml:ro,Z" \
   -v "$ROOT/versions.lock.yaml:/app/versions.lock.yaml:ro,Z" \
   -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
