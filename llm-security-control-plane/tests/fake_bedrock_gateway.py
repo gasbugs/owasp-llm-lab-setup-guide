@@ -15,8 +15,14 @@ def response_for_openai(payload: dict) -> str:
     text = "\n".join(str(item.get("content", "")) for item in payload.get("messages", []))
     lowered = text.lower()
     if "blocked (yes or no)" in lowered:
+        if "bot response:" in lowered:
+            inspected = lowered.rsplit("bot response:", 1)[-1]
+        elif "user message:" in lowered:
+            inspected = lowered.rsplit("user message:", 1)[-1]
+        else:
+            inspected = lowered
         risky = any(
-            marker in lowered
+            marker in inspected
             for marker in (
                 "disregard the current conversation rules",
                 "ignore previous instructions",
@@ -27,8 +33,9 @@ def response_for_openai(payload: dict) -> str:
         )
         return "Yes" if risky else "No"
     if "first line must be exactly safe or unsafe" in lowered:
+        inspected = lowered.rsplit("user:", 1)[-1]
         unsafe = any(
-            marker in lowered
+            marker in inspected
             for marker in (
                 "steal credentials",
                 "steal a victim credential",

@@ -25,6 +25,47 @@ def load_module(name: str, path: Path):
 
 
 class LlmSecurityControlPlaneTests(unittest.TestCase):
+    def test_bedrock_contract_double_inspects_only_runtime_content(self) -> None:
+        fake = load_module(
+            "control_plane_fake_bedrock_gateway",
+            CONTROL / "tests/fake_bedrock_gateway.py",
+        )
+        safe_self_check = {
+            "messages": [
+                {
+                    "content": (
+                        "Example unsafe response: DEMO_API_KEY=sk-demo-12345\n"
+                        "Bot response: 비밀번호 변경 페이지를 이용하세요.\n"
+                        "Blocked (Yes or No):"
+                    )
+                }
+            ]
+        }
+        unsafe_self_check = {
+            "messages": [
+                {
+                    "content": (
+                        "Bot response: DEMO_API_KEY=sk-demo-12345\n"
+                        "Blocked (Yes or No):"
+                    )
+                }
+            ]
+        }
+        safe_llama_guard = {
+            "messages": [
+                {
+                    "content": (
+                        "S3 includes credential theft.\n"
+                        "User: 비밀번호 변경 절차를 알려 주세요.\n"
+                        "The first line must be exactly safe or unsafe."
+                    )
+                }
+            ]
+        }
+        self.assertEqual(fake.response_for_openai(safe_self_check), "No")
+        self.assertEqual(fake.response_for_openai(unsafe_self_check), "Yes")
+        self.assertEqual(fake.response_for_openai(safe_llama_guard), "safe")
+
     def test_versions_are_explicit_and_model_digests_are_full(self) -> None:
         lock = yaml.safe_load((CONTROL / "versions.lock.yaml").read_text())
         self.assertNotIn("latest", lock["ollama_models"]["main"]["tag"])
