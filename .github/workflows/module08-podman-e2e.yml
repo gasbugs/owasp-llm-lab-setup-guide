@@ -1,0 +1,56 @@
+name: Module 08 Podman E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "llm-security-control-plane/**"
+      - ".github/workflows/module08-podman-e2e.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  podman-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Podman and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman jq
+
+      - name: Build the real control-plane images
+        run: bash llm-security-control-plane/deploy/build-images.sh
+
+      - name: Start the deterministic Bedrock contract gateway
+        run: |
+          podman run --detach --name module08-bedrock-contract \
+            --publish 127.0.0.1:18097:8080 \
+            --volume "$PWD/llm-security-control-plane/tests/fake_bedrock_gateway.py:/app/server.py:ro,Z" \
+            docker.io/library/python:3.12-slim python /app/server.py
+
+      - name: Run the complete control-plane E2E without intermediate errors
+        env:
+          MODEL_PROVIDER: amazon-bedrock
+          BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
+          MODEL_GATEWAY_URL: http://host.containers.internal:18097
+        run: |
+          bash llm-security-control-plane/tests/e2e-control-plane.sh 2>&1 | tee /tmp/module08-e2e.log
+          ! grep -E '(^|[[:space:]])(Error:|INFRA:|Traceback)' /tmp/module08-e2e.log
+
+      - name: Preserve Podman diagnostics on failure
+        if: failure()
+        run: |
+          podman ps --all
+          podman logs module08-bedrock-contract || true
+
+      - name: Remove test resources
+        if: always()
+        run: |
+          podman rm --force module08-bedrock-contract \
+            llm-security-application-gateway llm-security-nemo-hub \
+            llm-security-presidio-spoke 2>/dev/null || true
