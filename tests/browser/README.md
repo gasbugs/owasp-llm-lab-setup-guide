@@ -1,5 +1,18 @@
 # Day 3 and LLMGoat browser validation
 
+The same pinned Playwright environment also validates the NeMo hub control-plane
+UI. Start the new stack, forward port 18095, and run:
+
+```bash
+python tests/browser/run_control_plane_ui.py \
+  --url http://127.0.0.1:18095 \
+  --browser-channel chromium
+```
+
+The check submits one normal prompt and one application-specific override. It
+also fails if browser JavaScript contacts Ollama, Presidio, or the NeMo Hub
+directly instead of the same-origin Application `/api/chat` endpoint.
+
 This harness records three mandatory UI observations that API-only tests cannot
 prove:
 

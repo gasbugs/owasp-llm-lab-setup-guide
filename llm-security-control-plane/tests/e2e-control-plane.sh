@@ -27,6 +27,13 @@ if [ "${BUILD_IMAGES:-false}" = true ]; then
   bash "$ROOT/deploy/build-images.sh"
 fi
 
+podman run --rm --network none \
+  -e APPLICATION_INTERNAL_TOKEN=control-plane-app-to-nemo \
+  -e PRESIDIO_INTERNAL_TOKEN=control-plane-nemo-to-presidio \
+  -v "$ROOT/tests/test_fail_closed.py:/tmp/test_fail_closed.py:ro,Z" \
+  --entrypoint python localhost/llm-security-nemo-policy-hub:1.0.0 \
+  /tmp/test_fail_closed.py >/dev/null
+
 bash "$ROOT/deploy/start-stack.sh"
 
 curl -fsS "$APP/api/security/policy" > "$WORK/application-policy.json"
@@ -180,4 +187,4 @@ printf 'modes=audit:%s/%s off:%s/%s lab_endpoints_disabled_http=%s\n' \
   "$(jq -r '.application_decision' "$WORK/off-app-policy.json")" \
   "$(jq -r '.upstream_called' "$WORK/off-app-policy.json")" \
   "$lab_status"
-printf 'loopback=PASS metadata_only_logs=PASS legacy_containers_untouched=PASS\n'
+printf 'rail_fail_closed=PASS loopback=PASS metadata_only_logs=PASS legacy_containers_untouched=PASS\n'

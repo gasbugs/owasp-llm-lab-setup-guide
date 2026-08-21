@@ -37,6 +37,9 @@ class ForwardLabPortsTests(unittest.TestCase):
             18090,
             18091,
             18092,
+            18093,
+            18094,
+            18095,
             18200,
         ):
             self.assertIn(str(port), source)

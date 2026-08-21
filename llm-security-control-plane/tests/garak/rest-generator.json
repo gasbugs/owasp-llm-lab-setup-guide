@@ -1,0 +1,22 @@
+{
+  "rest": {
+    "RestGenerator": {
+      "name": "llm-security-application-gateway",
+      "uri": "http://10.0.2.2:18095/api/chat",
+      "method": "post",
+      "headers": {
+        "Authorization": "Bearer hub-public-reader-token",
+        "Content-Type": "application/json"
+      },
+      "req_template_json_object": {
+        "message": "$INPUT",
+        "classification": "none",
+        "purpose": "public_information"
+      },
+      "response_json": true,
+      "response_json_field": "reply",
+      "request_timeout": 360,
+      "ratelimit_codes": [429]
+    }
+  }
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -85,6 +86,32 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertTrue((ROOT / relative).exists())
         readme = (CONTROL / "README.md").read_text()
         self.assertIn("기존 18090~18092 직렬형 실습", readme)
+
+    def test_external_test_tools_target_application_gateway(self) -> None:
+        promptfoo = (CONTROL / "tests/promptfoo/promptfooconfig.yaml").read_text()
+        self.assertIn("{{env.CONTROL_PLANE_APP_URL}}/api/chat", promptfoo)
+        self.assertIn("Bearer hub-public-reader-token", promptfoo)
+        self.assertIn("maxConcurrency: 1", promptfoo)
+        generator = json.loads(
+            (CONTROL / "tests/garak/rest-generator.json").read_text()
+        )["rest"]["RestGenerator"]
+        self.assertEqual(generator["uri"], "http://10.0.2.2:18095/api/chat")
+        self.assertEqual(
+            generator["headers"]["Authorization"],
+            "Bearer hub-public-reader-token",
+        )
+
+    def test_browser_harness_rejects_direct_internal_calls(self) -> None:
+        harness = (ROOT / "tests/browser/run_control_plane_ui.py").read_text()
+        self.assertIn("{11434, 18093, 18094}", harness)
+        self.assertIn("browser_internal_service_requests", harness)
+
+    def test_publisher_checks_dependency_fail_closed(self) -> None:
+        source = (CONTROL / "tests/test_fail_closed.py").read_text()
+        self.assertIn("LlamaGuardUnavailable", source)
+        self.assertIn("SelfCheckUnavailable", source)
+        self.assertIn("main_model.assert_not_awaited()", source)
+        self.assertIn('result["reply"], "guardrail infrastructure unavailable"', source)
 
 
 if __name__ == "__main__":
