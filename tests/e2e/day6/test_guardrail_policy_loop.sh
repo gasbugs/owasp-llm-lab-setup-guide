@@ -134,7 +134,7 @@ podman run --rm --network slirp4netns:allow_host_loopback=true \
   /work/runtime/node_modules/.bin/promptfoo eval \
   -c /work/suite/promptfooconfig.yaml --no-cache \
   | tee "$WORK/promptfoo.stdout"
-grep -E '3 passed|100% pass' "$WORK/promptfoo.stdout" >/dev/null
+grep -E '4 passed|100% pass' "$WORK/promptfoo.stdout" >/dev/null
 
 printf 'GARAK\n'
 start_stack audit

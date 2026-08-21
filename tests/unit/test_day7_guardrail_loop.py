@@ -19,6 +19,8 @@ class Day7GuardrailLoopTests(unittest.TestCase):
         self.assertIn("maxRetries: 0", source)
         self.assertIn('effective_decision === "block"', source)
         self.assertIn('outer_decision === "redact"', source)
+        self.assertIn("GARAK-PROMOTED", source)
+        self.assertIn("programmatic command", source)
 
     def test_garak_rest_generator_uses_guarded_application(self) -> None:
         data = json.loads(
