@@ -48,7 +48,10 @@ container_ready() {
 has_monitor_contract() {
   local name=$1
   podman inspect "$name" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-    | grep -q '^MODULE08_OBSERVABILITY_CONTRACT=module08-guardrails-v1$'
+    | grep -q '^MODULE08_OBSERVABILITY_CONTRACT=module08-guardrails-v1$' \
+    || return 1
+  podman inspect "$name" --format '{{.HostConfig.LogConfig.Type}}' 2>/dev/null \
+    | grep -q '^k8s-file$'
 }
 
 if [ "$MODE" = verify ]; then
@@ -56,6 +59,12 @@ if [ "$MODE" = verify ]; then
     name=${spec%:*}; port=${spec#*:}
     container_ready "$name" "$port" || fail "$name is not ready"
   done
+  for name in day6-nemo-guardrails-api day6-presidio-api; do
+    has_monitor_contract "$name" \
+      || fail "$name is healthy but not connected to Module 08 observability"
+  done
+  curl -fsS http://127.0.0.1:8014/healthz >/dev/null \
+    || fail "Module 08 gateway is not ready"
 else
   cd "$MONITOR_DIR"
   "${COMPOSE[@]}" up --detach --build
@@ -85,6 +94,7 @@ else
     reuse "day6-nemo-guardrails-api"
   else
     podman run -d --replace --name day6-nemo-guardrails-api \
+      --log-driver=k8s-file \
       --network slirp4netns:allow_host_loopback=true \
       -p 127.0.0.1:18092:8013 \
       -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
@@ -101,6 +111,7 @@ else
     reuse "day6-presidio-api"
   else
     podman run -d --replace --name day6-presidio-api \
+      --log-driver=k8s-file \
       --network slirp4netns:allow_host_loopback=true \
       -p 127.0.0.1:18091:8013 \
       -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
@@ -116,6 +127,7 @@ else
     reuse "day6-guardrail-ui"
   else
     podman run -d --replace --name day6-guardrail-ui \
+      --log-driver=k8s-file \
       --network slirp4netns:allow_host_loopback=true \
       -p 127.0.0.1:18090:8000 \
       -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
@@ -166,11 +178,9 @@ if podman logs day6-presidio-api 2>&1 | grep -Fq "$PII"; then
 fi
 pass "raw PII absent from Presidio logs"
 
-if [ "$MODE" != verify ]; then
-  curl -fsS http://127.0.0.1:8014/metrics \
-    | grep -q '^llm_guardrail_decisions_total' \
-    || fail "guardrail decision metrics did not reach Module 08"
-  pass "guardrail metrics available at Module 08 gateway"
-fi
+curl -fsS http://127.0.0.1:8014/metrics \
+  | grep -q '^llm_guardrail_decisions_total' \
+  || fail "guardrail decision metrics did not reach Module 08"
+pass "guardrail metrics available at Module 08 gateway"
 
 printf '[READY] Module 07 guardrails are connected to Module 08 observability\n'

@@ -36,6 +36,8 @@ class PrepareModule08ContractTests(unittest.TestCase):
         self.assertIn('upstream_called==false', self.source)
         self.assertIn("raw PII found in Presidio logs", self.source)
         self.assertIn("llm_guardrail_decisions_total", self.source)
+        self.assertIn("healthy but not connected to Module 08 observability", self.source)
+        self.assertIn("--log-driver=k8s-file", self.source)
 
 
 if __name__ == "__main__":
