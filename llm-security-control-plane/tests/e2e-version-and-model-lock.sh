@@ -9,8 +9,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-jq '.ollama_models.main.digest = "sha256:intentionally-wrong-for-lock-test"' \
-  "$ROOT/versions.lock.yaml" > "$WORK/versions.lock.yaml"
+awk '
+  /^  main:$/ { in_main=1 }
+  in_main && /^    digest:/ {
+    print "    digest: sha256:intentionally-wrong-for-lock-test"
+    in_main=0
+    next
+  }
+  { print }
+' "$ROOT/versions.lock.yaml" > "$WORK/versions.lock.yaml"
 
 podman run -d --replace --name llm-security-nemo-hub-lock-canary \
   --network slirp4netns:allow_host_loopback=true \
