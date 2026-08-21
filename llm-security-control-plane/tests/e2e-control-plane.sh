@@ -12,7 +12,22 @@ cleanup() {
     llm-security-presidio-spoke >/dev/null 2>&1 || true
   rm -rf "$WORK"
 }
-trap cleanup EXIT
+
+on_exit() {
+  rc=$?
+  trap - EXIT
+  if [ "$rc" -ne 0 ]; then
+    echo "control-plane-e2e failed; captured JSON follows" >&2
+    for evidence in "$WORK"/*.json; do
+      [ -f "$evidence" ] || continue
+      printf '\n--- %s ---\n' "$(basename "$evidence")" >&2
+      jq . "$evidence" >&2 || true
+    done
+  fi
+  cleanup
+  exit "$rc"
+}
+trap on_exit EXIT
 
 chat() {
   token="$1"
