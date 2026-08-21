@@ -40,6 +40,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
+prepare_compose_resources() {
+  local project="llm-security-observability"
+  local volume
+  podman network exists "$project" || podman network create "$project" >/dev/null
+  for volume in gateway-events alloy-data prometheus-data alertmanager-data \
+      loki-data tempo-data grafana-data; do
+    podman volume exists "${project}_${volume}" || podman volume create \
+      --label "io.podman.compose.project=$project" \
+      --label "com.docker.compose.project=$project" \
+      "${project}_${volume}" >/dev/null
+  done
+}
+
 wait_json() {
   local url="$1"
   local expression="$2"
@@ -161,6 +174,7 @@ if ! systemctl --user start podman.socket >/dev/null 2>&1; then
     "unix://$XDG_RUNTIME_DIR/podman/podman.sock" \
     >"${TMPDIR:-/tmp}/podman-system-service.log" 2>&1 &
 fi
+prepare_compose_resources
 cp "$EXAMPLE/policy.json" "$POLICY_COPY"
 export MONITOR_POLICY_PATH="$POLICY_COPY"
 export OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
