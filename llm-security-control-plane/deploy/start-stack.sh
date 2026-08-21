@@ -2,6 +2,15 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -n "${POLICY_WORKSPACE:-}" ]; then
+  APPLICATION_POLICY_FILE="$POLICY_WORKSPACE/application-policy.yaml"
+  NEMO_POLICY_FILE="$POLICY_WORKSPACE/nemo-policy.yaml"
+  PRESIDIO_POLICY_FILE="$POLICY_WORKSPACE/presidio-policy.py"
+else
+  APPLICATION_POLICY_FILE="$ROOT/policies/application-policy.yaml"
+  NEMO_POLICY_FILE="$ROOT/policies/nemo-policy.yaml"
+  PRESIDIO_POLICY_FILE="$ROOT/spokes/presidio-privacy/policy.py"
+fi
 
 PRESIDIO_INTERNAL_TOKEN="${PRESIDIO_INTERNAL_TOKEN:-control-plane-nemo-to-presidio}"
 APPLICATION_INTERNAL_TOKEN="${APPLICATION_INTERNAL_TOKEN:-control-plane-app-to-nemo}"
@@ -30,7 +39,7 @@ podman run -d --replace --name llm-security-presidio-spoke \
   -p 127.0.0.1:18093:8013 \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
-  -v "$ROOT/spokes/presidio-privacy/policy.py:/app/policy.py:ro,Z" \
+  -v "$PRESIDIO_POLICY_FILE:/app/policy.py:ro,Z" \
   "localhost/llm-security-presidio-privacy-spoke:$IMAGE_VERSION" >/dev/null
 
 podman run -d --replace --name llm-security-nemo-hub \
@@ -44,7 +53,7 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   -e "PRESIDIO_URL=$PRESIDIO_URL" \
   -e OLLAMA_URL=http://10.0.2.2:11434 \
-  -v "$ROOT/policies/nemo-policy.yaml:/app/policies/nemo-policy.yaml:ro,Z" \
+  -v "$NEMO_POLICY_FILE:/app/policies/nemo-policy.yaml:ro,Z" \
   -v "$ROOT/versions.lock.yaml:/app/versions.lock.yaml:ro,Z" \
   -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
   "localhost/llm-security-nemo-policy-hub:$IMAGE_VERSION" >/dev/null
@@ -56,7 +65,7 @@ podman run -d --replace --name llm-security-application-gateway \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   -e "NEMO_HUB_URL=$NEMO_HUB_URL" \
   "${MONITOR_ARGS[@]}" \
-  -v "$ROOT/policies/application-policy.yaml:/app/policies/application-policy.yaml:ro,Z" \
+  -v "$APPLICATION_POLICY_FILE:/app/policies/application-policy.yaml:ro,Z" \
   -v "$ROOT/application-gateway/policy.py:/app/policy.py:ro,Z" \
   -v "$ROOT/application-gateway/server.py:/app/server.py:ro,Z" \
   "localhost/llm-security-application-gateway:$IMAGE_VERSION" >/dev/null
