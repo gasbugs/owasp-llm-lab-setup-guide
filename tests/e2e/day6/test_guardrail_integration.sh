@@ -271,11 +271,44 @@ podman run -d --replace --name day6-guardrail-ui \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
   -e PRESIDIO_URL=http://10.0.2.2:18091 \
+  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+  -e CLASSIFIED_RAG_INTERNAL_TOKEN=day7-classified-rag-internal \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
 chat http://127.0.0.1:18090 "$PII" | tee "$WORK/ui-presidio-after-nemo.json" >/dev/null
 jq -e '.guardrail.engine=="presidio" and .guardrail.decision=="redact" and .guardrail.path=="presidio>nemo>ollama>presidio" and .guardrail.stage_order==["presidio_input","nemo_input","ollama_main","nemo_output","presidio_output"] and .guardrail.inner_guardrail.engine=="nemo" and .guardrail.inner_guardrail.upstream_called==true' \
   "$WORK/ui-presidio-after-nemo.json" >/dev/null
+
+printf 'CLASSIFIED RAG: Application authorization before NeMo, detect without redaction\n'
+curl -fsS --max-time 240 -X POST \
+  http://127.0.0.1:18090/api/labs/guardrails/classified-rag \
+  -H 'Authorization: Bearer rag-public-reader-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"공개 보안 연락처","classification":"public"}' \
+  | tee "$WORK/classified-rag-public.json" >/dev/null
+jq -e '.selected_rag=="public-rag" and .pii_detected==true and .entity_types==["EMAIL_ADDRESS"] and .redaction_applied==false and .application_decision=="allow_unredacted" and .context=="Public security contact: security@example.com." and .nemo_called==true and .upstream_model_called==false' \
+  "$WORK/classified-rag-public.json" >/dev/null
+
+status="$(curl -sS --max-time 30 -o "$WORK/classified-rag-denied.json" -w '%{http_code}' -X POST \
+  http://127.0.0.1:18090/api/labs/guardrails/classified-rag \
+  -H 'Authorization: Bearer rag-public-reader-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"고객 복구 연락처","classification":"restricted"}')"
+test "$status" = 403
+jq -e '.application_decision=="block" and .blocking_reason=="classification-not-authorized" and .nemo_called==false' \
+  "$WORK/classified-rag-denied.json" >/dev/null
+
+curl -fsS --max-time 240 -X POST \
+  http://127.0.0.1:18090/api/labs/guardrails/classified-rag \
+  -H 'Authorization: Bearer rag-support-agent-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"고객 복구 연락처","classification":"restricted"}' \
+  | tee "$WORK/classified-rag-restricted.json" >/dev/null
+jq -e '.selected_rag=="restricted-rag" and .authenticated_subject=="support-agent" and .pii_detected==true and .redaction_applied==false and .application_decision=="allow_unredacted" and .context=="Synthetic customer recovery contact: customer.demo@example.com." and .nemo_called==true' \
+  "$WORK/classified-rag-restricted.json" >/dev/null
+
+! podman logs day6-guardrail-ui 2>&1 | grep -F 'customer.demo@example.com'
+! podman logs day6-nemo-guardrails-api 2>&1 | grep -F 'customer.demo@example.com'
 
 printf 'LOGS\n'
 podman logs day6-presidio-api | tee "$WORK/presidio-api.log"

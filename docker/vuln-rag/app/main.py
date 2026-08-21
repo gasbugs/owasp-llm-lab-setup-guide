@@ -19,6 +19,12 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.embedding import EmbeddingBackendError, EmbeddingClient
+from app.classified_rag import (
+    RagAuthenticationError,
+    RagAuthorizationError,
+    authenticate as authenticate_classified_rag,
+    retrieve_authorized,
+)
 from app.guardrails import GuardrailProxy, GuardrailProxyError
 from app.llm import LLMClient
 from app.secure_coding import (
@@ -163,6 +169,13 @@ class LLM09WorkshopRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     candidate: str = Field(min_length=1, max_length=200)
+
+
+class ClassifiedRagRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(min_length=1, max_length=4096)
+    classification: Literal["public", "restricted"]
 
 
 def get_scenario(name: str | None):
@@ -756,6 +769,75 @@ async def llm07_policy_canonical():
         "policy": day4_scenario.LLM07_POLICY_CANONICAL,
         "credential_present": False,
     }
+
+
+@app.post("/api/labs/guardrails/classified-rag")
+async def classified_rag(request_body: ClassifiedRagRequest, request: Request):
+    """Authorize a classified store before NeMo and Presidio inspect its chunks."""
+
+    try:
+        principal = authenticate_classified_rag(
+            request.headers.get("authorization")
+        )
+    except RagAuthenticationError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    try:
+        selection = retrieve_authorized(
+            principal=principal,
+            classification=request_body.classification,
+        )
+    except RagAuthorizationError as exc:
+        event = {
+            "event": "classified_rag_access",
+            "authenticated_subject": principal.subject,
+            "requested_classification": request_body.classification,
+            "application_decision": "block",
+            "blocking_reason": str(exc),
+            "nemo_called": False,
+        }
+        print(json.dumps(event, ensure_ascii=False), flush=True)
+        return JSONResponse(status_code=403, content=event)
+
+    documents = selection.pop("documents")
+    try:
+        rail = await guardrail_proxy.inspect_classified_retrieval(
+            chunks=[document["text"] for document in documents],
+            classification=request_body.classification,
+            handling_policy=selection["handling_policy"],
+        )
+    except GuardrailProxyError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    result = {
+        "event": "classified_rag_access",
+        **selection,
+        "query_received": bool(request_body.query),
+        "document_ids": [document["document_id"] for document in documents],
+        "application_decision": "allow_unredacted",
+        "redaction_applied": rail["redaction_applied"],
+        "pii_detected": rail["pii_detected"],
+        "entity_types": rail["entity_types"],
+        "context": rail["context"],
+        "nemo_called": True,
+        "upstream_model_called": False,
+    }
+    print(
+        json.dumps(
+            {
+                key: value
+                for key, value in result.items()
+                if key not in {"context"}
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+    return result
 
 
 @app.post("/api/labs/llm08/vulnerable/search")

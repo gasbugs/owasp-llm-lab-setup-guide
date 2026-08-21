@@ -99,6 +99,7 @@ else
       -p 127.0.0.1:18092:8013 \
       -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
       -e OLLAMA_URL=http://host.containers.internal:11434 -e "OLLAMA_MODEL=$MODEL" \
+      -e CLASSIFIED_RAG_INTERNAL_TOKEN=day7-classified-rag-internal \
       -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080 \
       -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_TOKEN" \
       -e "MODULE08_OBSERVABILITY_CONTRACT=$OBSERVABILITY_CONTRACT" \
@@ -132,6 +133,8 @@ else
       -p 127.0.0.1:18090:8000 \
       -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
       -e PRESIDIO_URL=http://day6-presidio-api:8013 \
+      -e NEMO_GUARD_URL=http://day6-nemo-guardrails-api:8013 \
+      -e CLASSIFIED_RAG_INTERNAL_TOKEN=day7-classified-rag-internal \
       localhost/day6-guardrail-ui:latest >/dev/null
   fi
 fi

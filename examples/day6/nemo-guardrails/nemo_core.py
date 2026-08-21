@@ -241,14 +241,24 @@ async def run_dialog(text: str) -> tuple[str, list[dict], dict]:
     return response_content(generated.response), records, generation_metrics(generated)
 
 
-async def run_retrieval(text: str) -> tuple[str, list[dict], dict]:
-    """Run only the retrieval rail against application-supplied RAG chunks."""
+async def run_retrieval_details(
+    text: str,
+    *,
+    handling_policy: str = "redact",
+) -> dict:
+    """Run the retrieval rail with an Application-selected PII policy."""
 
     rails = rails_for("retrieval")
     generated = require_generation_response(
         await rails.generate_async(
             messages=[
-                {"role": "context", "content": {"lab_retrieval_chunks": text}},
+                {
+                    "role": "context",
+                    "content": {
+                        "lab_retrieval_chunks": text,
+                        "retrieval_handling_policy": handling_policy,
+                    },
+                },
                 {"role": "user", "content": "검색 문서를 검사해 주세요."},
             ],
             options=log_options(),
@@ -257,4 +267,23 @@ async def run_retrieval(text: str) -> tuple[str, list[dict], dict]:
     records, _blocked_stage = activated_rails(generated)
     output_data = generated.output_data or {}
     sanitized = str(output_data.get("relevant_chunks", text))
-    return sanitized, records, generation_metrics(generated)
+    return {
+        "context": sanitized,
+        "pii_detected": bool(output_data.get("retrieval_pii_detected", False)),
+        "entity_types": list(output_data.get("retrieval_entity_types", [])),
+        "redaction_applied": bool(
+            output_data.get("retrieval_redaction_applied", sanitized != text)
+        ),
+        "application_decision": str(
+            output_data.get("retrieval_application_decision", "redact")
+        ),
+        "activated_rails": records,
+        "metrics": generation_metrics(generated),
+    }
+
+
+async def run_retrieval(text: str) -> tuple[str, list[dict], dict]:
+    """Keep the original redacting retrieval contract for the earlier lab."""
+
+    result = await run_retrieval_details(text, handling_policy="redact")
+    return result["context"], result["activated_rails"], result["metrics"]

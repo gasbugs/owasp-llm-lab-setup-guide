@@ -25,6 +25,11 @@ class GuardrailProxy:
             ),
         }
         self.base_url = urls.get(self.engine)
+        self.nemo_url = urls["nemo"]
+        self.classified_rag_token = os.getenv(
+            "CLASSIFIED_RAG_INTERNAL_TOKEN",
+            "day7-classified-rag-internal",
+        )
         self.timeout = httpx.Timeout(240.0)
 
     @property
@@ -66,4 +71,38 @@ class GuardrailProxy:
             ) from exc
         if not isinstance(data, dict):
             raise GuardrailProxyError("guardrail policy returned an invalid contract")
+        return data
+
+    async def inspect_classified_retrieval(
+        self,
+        *,
+        chunks: list[str],
+        classification: str,
+        handling_policy: str,
+    ) -> dict:
+        """Send only application-authorized chunks to NeMo's internal rail."""
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    f"{self.nemo_url.rstrip('/')}/api/labs/retrieval-classified",
+                    headers={
+                        "X-Classified-Rag-Token": self.classified_rag_token,
+                    },
+                    json={
+                        "chunks": chunks,
+                        "classification": classification,
+                        "handling_policy": handling_policy,
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise GuardrailProxyError(
+                "NeMo classified retrieval rail unavailable"
+            ) from exc
+        if not isinstance(data, dict) or data.get("guard_engine") != "nemo":
+            raise GuardrailProxyError(
+                "NeMo classified retrieval rail returned an invalid contract"
+            )
         return data

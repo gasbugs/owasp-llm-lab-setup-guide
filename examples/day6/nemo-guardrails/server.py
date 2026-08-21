@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import json
+import hmac
 import os
 import time
 import uuid
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from nemo_core import (
@@ -21,6 +22,7 @@ from nemo_core import (
     run_main_only,
     run_output_only,
     run_retrieval,
+    run_retrieval_details,
     run_suite,
 )
 
@@ -44,6 +46,10 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_MODEL)
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 TELEMETRY_INGEST_TOKEN = os.getenv(
     "TELEMETRY_INGEST_TOKEN", "module08-telemetry-ingest"
+)
+CLASSIFIED_RAG_INTERNAL_TOKEN = os.getenv(
+    "CLASSIFIED_RAG_INTERNAL_TOKEN",
+    "day7-classified-rag-internal",
 )
 
 app = FastAPI(title="Day 6 NeMo Guardrails integration API")
@@ -74,6 +80,15 @@ class DialogRequest(BaseModel):
 class RetrievalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     chunks: list[str] = Field(min_length=1, max_length=20)
+
+
+class ClassifiedRetrievalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    chunks: list[str] = Field(min_length=1, max_length=20)
+    classification: str = Field(pattern="^(public|restricted)$")
+    handling_policy: str = Field(
+        pattern="^allow-exact-after-application-authorization$"
+    )
 
 
 def emit(event: dict) -> None:
@@ -273,6 +288,42 @@ async def labs_retrieval(request: RetrievalRequest) -> dict:
         "duration_ms": round((time.perf_counter() - started) * 1000, 2),
     }
     emit({key: value for key, value in result.items() if key != "sanitized_context"})
+    return result
+
+
+@app.post("/api/labs/retrieval-classified")
+async def labs_retrieval_classified(
+    request: ClassifiedRetrievalRequest,
+    x_classified_rag_token: str | None = Header(default=None),
+) -> dict:
+    """Inspect chunks already selected and authorized by the Application."""
+
+    require_lab_endpoint()
+    if x_classified_rag_token is None or not hmac.compare_digest(
+        x_classified_rag_token,
+        CLASSIFIED_RAG_INTERNAL_TOKEN,
+    ):
+        raise HTTPException(status_code=401, detail="internal application token required")
+
+    started = time.perf_counter()
+    source = "\n\n".join(request.chunks)
+    inspected = await run_retrieval_details(
+        source,
+        handling_policy=request.handling_policy,
+    )
+    result = {
+        "event": "guard_retrieval_classified",
+        "guard_engine": "nemo",
+        "rail_type": "retrieval",
+        "provider": "microsoft-presidio-http-action",
+        "classification": request.classification,
+        "handling_policy": request.handling_policy,
+        "chunk_count": len(request.chunks),
+        **inspected,
+        "upstream_model_called": False,
+        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
+    emit({key: value for key, value in result.items() if key != "context"})
     return result
 
 

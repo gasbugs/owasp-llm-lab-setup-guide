@@ -165,6 +165,32 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn('app.register_action(retrieve_lab_chunks, "retrieve_relevant_chunks")', actions)
         self.assertIn("cache_dir: /opt/nemo-cache", config)
 
+    def test_classified_rag_authorizes_before_nemo_and_preserves_exact_value(self) -> None:
+        backend = read(UI / "app" / "main.py")
+        proxy = read(UI / "app" / "guardrails.py")
+        policy = read(UI / "app" / "classified_rag.py")
+        nemo_server = read(NEMO / "server.py")
+        nemo_action = read(NEMO / "config" / "retrieval" / "config.py")
+
+        self.assertIn('@app.post("/api/labs/guardrails/classified-rag")', backend)
+        self.assertLess(
+            backend.index("retrieve_authorized("),
+            backend.index("inspect_classified_retrieval("),
+        )
+        self.assertIn('"public": (', policy)
+        self.assertIn('"restricted": (', policy)
+        self.assertIn("classification-not-authorized", policy)
+        self.assertIn('"nemo_called": False', backend)
+        self.assertIn('"application_decision": "allow_unredacted"', backend)
+        self.assertIn("X-Classified-Rag-Token", proxy)
+        self.assertIn('@app.post("/api/labs/retrieval-classified")', nemo_server)
+        self.assertIn("hmac.compare_digest", nemo_server)
+        self.assertIn(
+            'handling_policy == "allow-exact-after-application-authorization"',
+            nemo_action,
+        )
+        self.assertIn("output = text", nemo_action)
+
     def test_ui_calls_only_its_backend_for_chat(self) -> None:
         proxy = read(UI / "app" / "guardrails.py")
         backend = read(UI / "app" / "main.py")
