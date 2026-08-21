@@ -1,36 +1,65 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 PRESIDIO_INTERNAL_TOKEN="${PRESIDIO_INTERNAL_TOKEN:-control-plane-nemo-to-presidio}"
 APPLICATION_INTERNAL_TOKEN="${APPLICATION_INTERNAL_TOKEN:-control-plane-app-to-nemo}"
 GUARD_MODE="${GUARD_MODE:-enforce}"
 ASSURANCE_PROFILE="${ASSURANCE_PROFILE:-high-assurance}"
 ENABLE_LAB_ENDPOINTS="${ENABLE_LAB_ENDPOINTS:-true}"
+IMAGE_VERSION="${IMAGE_VERSION:-1.0.0}"
+TELEMETRY_INGEST_TOKEN="${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}"
+
+NETWORK_ARGS=(--network slirp4netns:allow_host_loopback=true)
+PRESIDIO_URL=http://10.0.2.2:18093
+NEMO_HUB_URL=http://10.0.2.2:18094
+MONITOR_ARGS=()
+if podman network exists llm-security-observability; then
+  NETWORK_ARGS=(--network llm-security-observability)
+  PRESIDIO_URL=http://llm-security-presidio-spoke:8013
+  NEMO_HUB_URL=http://llm-security-nemo-hub:8014
+  MONITOR_ARGS=(
+    -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080
+    -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_INGEST_TOKEN"
+  )
+fi
 
 podman run -d --replace --name llm-security-presidio-spoke \
-  --network slirp4netns:allow_host_loopback=true \
+  "${NETWORK_ARGS[@]}" \
   -p 127.0.0.1:18093:8013 \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
-  localhost/llm-security-presidio-privacy-spoke:1.0.0 >/dev/null
+  -e "RELEASE_VERSION=$IMAGE_VERSION" \
+  -v "$ROOT/spokes/presidio-privacy/policy.py:/app/policy.py:ro,Z" \
+  "localhost/llm-security-presidio-privacy-spoke:$IMAGE_VERSION" >/dev/null
 
 podman run -d --replace --name llm-security-nemo-hub \
-  --network slirp4netns:allow_host_loopback=true \
+  "${NETWORK_ARGS[@]}" \
   -p 127.0.0.1:18094:8014 \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "GUARD_MODE=$GUARD_MODE" \
   -e "ASSURANCE_PROFILE=$ASSURANCE_PROFILE" \
   -e "ENABLE_LAB_ENDPOINTS=$ENABLE_LAB_ENDPOINTS" \
-  -e PRESIDIO_URL=http://10.0.2.2:18093 \
+  -e "RELEASE_VERSION=$IMAGE_VERSION" \
+  -e "PRESIDIO_URL=$PRESIDIO_URL" \
   -e OLLAMA_URL=http://10.0.2.2:11434 \
-  localhost/llm-security-nemo-policy-hub:1.0.0 >/dev/null
+  -v "$ROOT/policies/nemo-policy.yaml:/app/policies/nemo-policy.yaml:ro,Z" \
+  -v "$ROOT/versions.lock.yaml:/app/versions.lock.yaml:ro,Z" \
+  -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
+  "localhost/llm-security-nemo-policy-hub:$IMAGE_VERSION" >/dev/null
 
 podman run -d --replace --name llm-security-application-gateway \
-  --network slirp4netns:allow_host_loopback=true \
+  "${NETWORK_ARGS[@]}" \
   -p 127.0.0.1:18095:8000 \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
-  -e NEMO_HUB_URL=http://10.0.2.2:18094 \
-  localhost/llm-security-application-gateway:1.0.0 >/dev/null
+  -e "RELEASE_VERSION=$IMAGE_VERSION" \
+  -e "NEMO_HUB_URL=$NEMO_HUB_URL" \
+  "${MONITOR_ARGS[@]}" \
+  -v "$ROOT/policies/application-policy.yaml:/app/policies/application-policy.yaml:ro,Z" \
+  -v "$ROOT/application-gateway/policy.py:/app/policy.py:ro,Z" \
+  -v "$ROOT/application-gateway/server.py:/app/server.py:ro,Z" \
+  "localhost/llm-security-application-gateway:$IMAGE_VERSION" >/dev/null
 
 for url in \
   http://127.0.0.1:18093/healthz \
@@ -50,5 +79,5 @@ for url in \
   fi
 done
 
-printf 'control-plane=READY app=http://127.0.0.1:18095 profile=%s mode=%s\n' \
-  "$ASSURANCE_PROFILE" "$GUARD_MODE"
+printf 'control-plane=READY app=http://127.0.0.1:18095 profile=%s mode=%s version=%s\n' \
+  "$ASSURANCE_PROFILE" "$GUARD_MODE" "$IMAGE_VERSION"

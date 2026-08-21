@@ -16,39 +16,32 @@ class PrepareModule08ContractTests(unittest.TestCase):
     def test_script_is_bounded_and_idempotent(self) -> None:
         self.assertIn("--verify-only", self.source)
         self.assertIn("--repair", self.source)
-        self.assertIn("podman container exists", self.source)
-        self.assertIn("[REUSE]", self.source)
+        self.assertIn("podman image exists", self.source)
         self.assertNotIn("down --volumes", self.source)
         self.assertNotIn('"${COMPOSE[@]}" up --detach --build', self.source)
 
-    def test_script_connects_the_existing_guardrail_chain(self) -> None:
+    def test_script_connects_the_hub_and_spoke_control_plane(self) -> None:
         for value in (
-            "day6-nemo-guardrails-api",
-            "day6-presidio-api",
-            "day6-guardrail-ui",
-            "SECURITY_MONITOR_URL=http://llm-sec-gateway:8080",
+            "llm-security-control-plane",
+            "18093/healthz",
+            "18094/healthz",
+            "18095/healthz",
             "TELEMETRY_INGEST_TOKEN",
         ):
             self.assertIn(value, self.source)
-        self.assertIn("--network llm-security-observability", self.source)
-        self.assertIn("NEMO_GUARD_URL=http://day6-nemo-guardrails-api:8013", self.source)
+        self.assertIn("podman network exists llm-security-observability", self.source)
+        self.assertIn('bash "$CONTROL_ROOT/deploy/start-stack.sh"', self.source)
 
     def test_project_owned_guardrail_images_build_from_current_checkout(self) -> None:
-        self.assertIn("docker/base-gpu", self.source)
-        self.assertIn('BASE_GPU_IMAGE=localhost/owasp-llm-base-gpu:module08', self.source)
-        self.assertIn('--build-arg "BASE_IMAGE=$BASE_GPU_IMAGE"', self.source)
-        self.assertNotIn("ghcr.io/gasbugs/owasp-llm-base-gpu", self.source)
+        self.assertIn('bash "$CONTROL_ROOT/deploy/build-images.sh"', self.source)
+        self.assertIn("localhost/llm-security-application-gateway:1.0.0", self.source)
 
     def test_script_verifies_behavior_and_content_safety(self) -> None:
-        self.assertIn('decision=="redact"', self.source)
-        self.assertIn('decision=="block"', self.source)
-        self.assertIn('upstream_called==false', self.source)
-        self.assertIn("raw PII found in Presidio logs", self.source)
+        self.assertIn('.application_decision == "block"', self.source)
+        self.assertIn('.upstream_called == false', self.source)
         self.assertIn("llm_guardrail_decisions_total", self.source)
-        self.assertIn("healthy but not connected to Module 08 observability", self.source)
-        self.assertIn("--log-driver=k8s-file", self.source)
-        self.assertIn("container logs did not reach Loki", self.source)
-        self.assertIn("raw PII found in Loki", self.source)
+        self.assertIn("control-plane logs did not reach Loki", self.source)
+        self.assertIn('service_name=~"llm-security-.*"', self.source)
 
 
 if __name__ == "__main__":

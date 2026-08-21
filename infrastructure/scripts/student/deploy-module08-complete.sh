@@ -45,7 +45,9 @@ cd "$MONITOR_DIR"
 # not select bootstrap containers or volumes from the common course stack.
 "${COMPOSE[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
 
-for name in day6-guardrail-ui day6-presidio-api day6-nemo-guardrails-api; do
+for name in \
+  day6-guardrail-ui day6-presidio-api day6-nemo-guardrails-api \
+  llm-security-application-gateway llm-security-nemo-hub llm-security-presidio-spoke; do
   podman rm -f "$name" >/dev/null 2>&1 || true
 done
 

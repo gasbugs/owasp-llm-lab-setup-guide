@@ -3,6 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+from pathlib import Path
+
+import yaml
+
+
+_runtime_policy = Path("/app/policies/application-policy.yaml")
+_source_policy = Path(__file__).resolve().parents[1] / "policies/application-policy.yaml"
+POLICY_PATH = os.getenv(
+    "APPLICATION_POLICY_PATH",
+    str(_runtime_policy if _runtime_policy.exists() else _source_policy),
+)
+with open(POLICY_PATH, encoding="utf-8") as handle:
+    POLICY = yaml.safe_load(handle)
 
 
 class AuthenticationError(ValueError):
@@ -73,9 +87,10 @@ def authenticate(authorization: str | None) -> Principal:
 def authorize_retrieval(principal: Principal, classification: str, purpose: str) -> dict | None:
     if classification == "none":
         return None
-    if classification not in principal.allowed_classifications:
+    classification_policy = POLICY["classifications"].get(classification)
+    if not classification_policy or not set(principal.roles) & set(classification_policy["required_roles"]):
         raise AuthorizationError("classification-not-authorized")
-    if purpose not in principal.allowed_purposes:
+    if purpose not in classification_policy["allowed_purposes"]:
         raise AuthorizationError("purpose-not-authorized")
     store = RAG_STORES[classification]
     if purpose != store["purpose"]:
@@ -91,9 +106,9 @@ def authorize_retrieval(principal: Principal, classification: str, purpose: str)
 
 def public_policy() -> dict:
     return {
-        "policy_id": "application-data-boundary-v1",
+        "policy_id": POLICY["policy_id"],
         "authentication_source": "server-side-bearer-token-map",
-        "classifications": ["public", "internal", "restricted", "prohibited"],
+        "classifications": list(POLICY["classifications"]),
         "prohibited_policy": "not-stored-and-never-sent-to-model",
         "rag_stores": {
             key: {

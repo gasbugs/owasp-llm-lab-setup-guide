@@ -13,6 +13,7 @@ from policy import PrivacyAnalyzer
 
 
 INTERNAL_TOKEN = os.getenv("PRESIDIO_INTERNAL_TOKEN", "")
+RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
 if not INTERNAL_TOKEN:
     raise RuntimeError("PRESIDIO_INTERNAL_TOKEN is required")
 
@@ -50,14 +51,14 @@ def emit_metadata(result: dict) -> None:
 
 @app.get("/healthz")
 async def healthz() -> dict:
-    return {"ok": True, "service": "presidio-privacy-spoke", "version": "1.0.0"}
+    return {"ok": True, "service": "presidio-privacy-spoke", "version": RELEASE_VERSION}
 
 
 @app.get("/api/policy")
 async def policy() -> dict:
     return {
         "service": "presidio-privacy-spoke",
-        "version": "1.0.0",
+        "version": RELEASE_VERSION,
         "canonical_source": "llm-security-control-plane/spokes/presidio-privacy/policy.py",
         **ANALYZER.public_policy(),
     }

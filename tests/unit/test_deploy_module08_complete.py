@@ -18,6 +18,9 @@ class DeployModule08CompleteContractTests(unittest.TestCase):
             "day6-guardrail-ui",
             "day6-presidio-api",
             "day6-nemo-guardrails-api",
+            "llm-security-application-gateway",
+            "llm-security-nemo-hub",
+            "llm-security-presidio-spoke",
             "llm-security-observability_mimir-data",
         ):
             self.assertIn(name, self.source)

@@ -46,6 +46,7 @@ if not APPLICATION_INTERNAL_TOKEN or not PRESIDIO_INTERNAL_TOKEN:
     raise RuntimeError("both internal service tokens are required")
 PRESIDIO_URL = os.getenv("PRESIDIO_URL", "http://10.0.2.2:18093").rstrip("/")
 ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
+RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
 PROHIBITED_ENTITIES = set(POLICY["prohibited_entities"])
 RUNTIME = {"model_lock": {"valid": False, "error": "startup-not-complete"}}
 
@@ -230,7 +231,7 @@ async def healthz() -> dict:
     return {
         "ok": bool(RUNTIME["model_lock"].get("valid")),
         "service": "nemo-policy-hub",
-        "version": "1.0.0",
+        "version": RELEASE_VERSION,
         "guard_mode": GUARD_MODE,
         "assurance_profile": ASSURANCE_PROFILE,
         "model_lock_valid": bool(RUNTIME["model_lock"].get("valid")),
@@ -241,7 +242,7 @@ async def healthz() -> dict:
 async def policy() -> dict:
     return {
         "service": "nemo-policy-hub",
-        "version": "1.0.0",
+        "version": RELEASE_VERSION,
         "guard_mode": GUARD_MODE,
         "assurance_profile": ASSURANCE_PROFILE,
         "canonical_source": "llm-security-control-plane/policies/nemo-policy.yaml",
