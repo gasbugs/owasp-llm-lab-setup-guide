@@ -1,0 +1,25 @@
+FROM docker.io/library/python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+
+ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    XDG_CACHE_HOME=/opt/nemo-cache
+
+COPY nemo-policy-hub/requirements.txt /tmp/requirements.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc g++ python3-dev \
+    && python -m pip install --requirement /tmp/requirements.txt \
+    && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2', cache_dir='/opt/nemo-cache').embed(['cache warmup']))" \
+    && chmod -R a+rwX /opt/nemo-cache \
+    && apt-get purge -y --auto-remove gcc g++ python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --chmod=0444 versions.lock.yaml /app/versions.lock.yaml
+COPY --chmod=0444 policies/nemo-policy.yaml /app/policies/nemo-policy.yaml
+COPY --chmod=0444 nemo-policy-hub/hub_core.py /app/hub_core.py
+COPY --chmod=0444 nemo-policy-hub/server.py /app/server.py
+
+USER 65532:65532
+EXPOSE 8014
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8014", "--log-level", "warning"]

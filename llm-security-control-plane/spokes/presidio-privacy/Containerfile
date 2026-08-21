@@ -1,0 +1,21 @@
+FROM docker.io/library/python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    XDG_CACHE_HOME=/opt/presidio-cache
+
+COPY spokes/presidio-privacy/requirements.txt /tmp/requirements.txt
+RUN python -m pip install --requirement /tmp/requirements.txt \
+    && python -m pip install \
+      https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl \
+    && python -c "import tldextract; tldextract.extract('example.com')" \
+    && chmod -R a+rwX /opt/presidio-cache
+
+WORKDIR /app
+COPY --chmod=0444 versions.lock.yaml /app/versions.lock.yaml
+COPY --chmod=0444 spokes/presidio-privacy/policy.py /app/policy.py
+COPY --chmod=0444 spokes/presidio-privacy/server.py /app/server.py
+
+USER 65532:65532
+EXPOSE 8013
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8013", "--log-level", "warning"]

@@ -1,0 +1,32 @@
+schema_version: 1
+policy_id: application-data-boundary-v1
+
+classifications:
+  public:
+    required_roles: [public_reader, internal_analyst, support_agent]
+    allowed_purposes: [public_information, incident_response, customer_support]
+  internal:
+    required_roles: [internal_analyst, support_agent]
+    allowed_purposes: [incident_response, customer_support]
+  restricted:
+    required_roles: [support_agent]
+    allowed_purposes: [customer_support]
+  prohibited:
+    storage: forbidden
+    model_transmission: forbidden
+
+security_ownership:
+  application:
+    - authentication
+    - authorization
+    - classification
+    - rag_store_selection
+    - tenant_filter
+    - final_response_enforcement
+  nemo_hub:
+    - guardrail_stage_order
+    - guardrail_mode
+    - main_model_invocation
+  presidio_spoke:
+    - pii_detection
+    - sanitized_candidate_generation

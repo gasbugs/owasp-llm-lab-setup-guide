@@ -1,0 +1,31 @@
+schema_version: 1
+release: 1.0.0
+
+runtime:
+  python_image: docker.io/library/python:3.12-slim
+  python_image_digest: sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+
+python_packages:
+  fastapi: 0.141.1
+  httpx: 0.28.1
+  nemoguardrails: 0.22.0
+  presidio_analyzer: 2.2.362
+  presidio_anonymizer: 2.2.362
+  pydantic: 2.13.4
+  pyyaml: 6.0.3
+  spacy: 3.8.15
+  spacy_model: en_core_web_sm-3.8.0
+  uvicorn: 0.52.4
+
+ollama_models:
+  main:
+    tag: llama3.1:8b-instruct-q4_K_M
+    digest: 46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e
+  llama_guard:
+    tag: llama-guard3:8b
+    digest: 46f211c3d8662823ea4956d1a9e92b2924f84cbd0a0f88b64eaadb59fe58b99d
+
+images:
+  application_gateway: localhost/llm-security-application-gateway:1.0.0
+  nemo_policy_hub: localhost/llm-security-nemo-policy-hub:1.0.0
+  presidio_privacy_spoke: localhost/llm-security-presidio-privacy-spoke:1.0.0

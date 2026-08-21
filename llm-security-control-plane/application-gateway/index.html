@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LLM Security Control Plane</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07111f;--panel:#0e1c2f;--line:#24405f;--text:#e8f1fb;--muted:#9db1c7;--ok:#41d39a;--bad:#ff7185}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#173256 0,var(--bg) 45%);font:16px/1.5 system-ui;color:var(--text)}
+    main{max-width:1100px;margin:auto;padding:32px 20px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{background:rgba(14,28,47,.94);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 20px 50px #0006}
+    h1{font-size:28px;margin:0 0 8px}h2{font-size:18px;margin:0 0 14px}.muted{color:var(--muted)}label{display:block;margin:12px 0 5px}select,textarea,button{width:100%;border:1px solid var(--line);border-radius:10px;background:#081525;color:var(--text);padding:11px}textarea{min-height:130px;resize:vertical}button{margin-top:14px;background:#2774d8;border:0;font-weight:700;cursor:pointer}.stages{display:flex;flex-wrap:wrap;gap:7px}.stage{padding:6px 9px;border-radius:999px;background:#152b45;border:1px solid var(--line);font-size:13px}.allow,.redact{color:var(--ok)}.block,.infra{color:var(--bad)}pre{white-space:pre-wrap;word-break:break-word;background:#07111f;padding:14px;border-radius:10px;min-height:100px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body><main>
+  <h1>LLM Security Control Plane</h1>
+  <p class="muted">브라우저는 Application만 호출하고, NeMo 허브가 Presidio·Llama Guard·Self-check·Ollama를 순서대로 집행합니다.</p>
+  <div class="grid">
+    <section class="panel">
+      <h2>프롬프트와 애플리케이션 권한</h2>
+      <label for="token">사용자</label>
+      <select id="token"><option value="hub-public-reader-token">공개 자료 사용자</option><option value="hub-internal-analyst-token">내부 분석가</option><option value="hub-support-agent-token">지원 담당자</option></select>
+      <label for="classification">RAG 등급</label>
+      <select id="classification"><option value="none">검색 안 함</option><option value="public">공개</option><option value="internal">내부</option><option value="restricted">제한</option></select>
+      <label for="purpose">업무 목적</label>
+      <select id="purpose"><option value="public_information">공개 정보</option><option value="incident_response">사고 대응</option><option value="customer_support">고객 지원</option></select>
+      <label for="message">프롬프트 입력</label>
+      <textarea id="message">공개 보안 연락처를 알려 주세요.</textarea>
+      <button id="send">보안 처리 흐름 실행</button>
+    </section>
+    <section class="panel">
+      <h2>최종 판정</h2><div id="decision" class="muted">아직 실행하지 않았습니다.</div>
+      <h2 style="margin-top:20px">실행 단계</h2><div id="stages" class="stages"></div>
+      <h2 style="margin-top:20px">사용자 응답</h2><pre id="reply"></pre>
+      <details><summary>구조화된 원본 응답</summary><pre id="raw"></pre></details>
+    </section>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+$('send').onclick=async()=>{const body={message:$('message').value,classification:$('classification').value,purpose:$('purpose').value};$('decision').textContent='처리 중…';$('stages').innerHTML='';
+try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+$('token').value},body:JSON.stringify(body)});const d=await r.json();const decision=d.application_decision||'infra';$('decision').className=decision;$('decision').textContent=`${decision.toUpperCase()} · request_id=${d.request_id||'-'}`;$('reply').textContent=d.reply||JSON.stringify(d);const stages=[...(d.application_stages||[]),...((d.guardrail||{}).stages||[])];$('stages').innerHTML=stages.map(s=>`<span class="stage">${s.stage} · ${s.decision}</span>`).join('');$('raw').textContent=JSON.stringify(d,null,2)}catch(e){$('decision').className='infra';$('decision').textContent='INFRA';$('reply').textContent=String(e)}};
+</script></body></html>
