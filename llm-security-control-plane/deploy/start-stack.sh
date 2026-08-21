@@ -24,10 +24,12 @@ NETWORK_ARGS=(--network slirp4netns:allow_host_loopback=true)
 PRESIDIO_URL=http://10.0.2.2:18093
 NEMO_HUB_URL=http://10.0.2.2:18094
 MONITOR_ARGS=()
+OLLAMA_URL=http://10.0.2.2:11434
 if podman network exists llm-security-observability; then
   NETWORK_ARGS=(--network llm-security-observability)
   PRESIDIO_URL=http://llm-security-presidio-spoke:8013
   NEMO_HUB_URL=http://llm-security-nemo-hub:8014
+  OLLAMA_URL=http://host.containers.internal:11434
   MONITOR_ARGS=(
     -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080
     -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_INGEST_TOKEN"
@@ -52,7 +54,8 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "ENABLE_LAB_ENDPOINTS=$ENABLE_LAB_ENDPOINTS" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   -e "PRESIDIO_URL=$PRESIDIO_URL" \
-  -e OLLAMA_URL=http://10.0.2.2:11434 \
+  --add-host host.containers.internal:host-gateway \
+  -e "OLLAMA_URL=$OLLAMA_URL" \
   -v "$NEMO_POLICY_FILE:/app/policies/nemo-policy.yaml:ro,Z" \
   -v "$ROOT/versions.lock.yaml:/app/versions.lock.yaml:ro,Z" \
   -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
