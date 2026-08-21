@@ -179,7 +179,10 @@ async def policy() -> dict:
         "rails": {
             "input": ["self check input"],
             "dialog": ["Colang topic flow", "get_security_contact"],
-            "retrieval": ["mask retrieval with Presidio"],
+            "retrieval": [
+                "mask retrieval with Presidio",
+                "detect without redaction after Application authorization",
+            ],
             "output": ["self check output"],
         },
     }

@@ -78,6 +78,8 @@ podman run -d --replace --name day6-guardrail-ui \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
   -e PRESIDIO_URL=http://10.0.2.2:18091 \
+  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+  -e CLASSIFIED_RAG_INTERNAL_TOKEN=day7-classified-rag-internal \
   localhost/day6-guardrail-ui:latest
 ```
 
@@ -103,6 +105,8 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 - NeMo에서는 NeMo rail 실행기가 input rail, LLM 호출, output rail 순서를 조정한다.
 - Colang dialog flow는 읽기 전용 보안 연락처 action만 실행하며 송금 같은 상태 변경 요청은 고정된 거부 흐름으로 보낸다.
 - Retrieval rail은 RAG chunk를 생성 prompt에 넣기 전에 Presidio `/api/scan` action으로 비식별화한다.
+- 정보 등급별 RAG 실습은 Application이 공개·제한 저장소 접근을 먼저 인가하고, NeMo가 허가된 원문을 Presidio로 탐지하되 업무상 필수 값은 치환하지 않는다.
+- `CLASSIFIED_RAG_INTERNAL_TOKEN`은 Application과 NeMo 사이의 학습용 내부 endpoint를 보호하며 실제 서비스에서는 서비스 인증으로 교체한다.
 - 최종 왕복 경로는 `Application → Presidio input → NeMo input → LLM → NeMo output → Presidio output → Application`이다.
 - 18090~18092와 11434를 공인 인터페이스나 `0.0.0.0/0` Security Group에 노출하지 않는다.
 - 원격 브라우저는 기존 SSM port forwarding 경로를 사용한다.
@@ -110,7 +114,7 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 검사 결과는 별도 파일 생성 wrapper 없이 `podman logs day6-presidio-api` 또는
 `podman logs day6-nemo-guardrails-api`에서 구조화된 JSON으로 확인한다.
 
-## 회귀시험과 탐색 자산
+## 반복 테스트와 탐색 자산
 
 `promptfoo-guardrail/`은 정상 허용, prompt injection 사전 차단, PII 비식별화를
 애플리케이션 계약으로 고정한다. 앞 차시에서 설치한 Promptfoo runtime을 재사용하며
@@ -118,7 +122,7 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 
 `garak-guardrail/`은 NVIDIA Garak 0.15.1과 공식 REST generator를 사용해 같은
 애플리케이션 endpoint에 제한된 probe를 전달한다. Promptfoo는 이미 알고 있는
-요구사항의 회귀시험이고 Garak은 아직 테스트에 없는 실패 후보를 찾는 탐색 도구다.
+요구사항을 같은 조건으로 다시 확인하는 도구이고 Garak은 아직 테스트에 없는 실패 후보를 찾는 탐색 도구다.
 Garak에서 재현된 hit는 최소 입력으로 줄인 뒤 Promptfoo testcase로 승격한다.
 
 Presidio server의 `/api/guardrails/policy`는 정책·test corpus·model·system prompt
