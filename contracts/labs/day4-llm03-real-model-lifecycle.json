@@ -166,50 +166,50 @@
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "3. LLM04에서 검증한 Adapter를 공급망 Artifact로 인계",
+      "lesson_path": "publisher-evidence/day4-llm03-format-regression.md",
+      "section": "기존 Base 추론 게시자 증거",
       "observation_id": "day4-llm03-baseline-inference",
-      "observation_command": "jq -c '{case:\"baseline-inference\"",
+      "observation_command": "jq -c 'select(.case==\"baseline-inference\")",
       "case_ids": ["baseline-inference"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "3. LLM04에서 검증한 Adapter를 공급망 Artifact로 인계",
+      "lesson_path": "publisher-evidence/day4-llm03-format-regression.md",
+      "section": "기존 LoRA 트리거 게시자 증거",
       "observation_id": "day4-llm03-poisoned-trigger",
-      "observation_command": "jq -c '{case:\"poisoned-trigger\"",
+      "observation_command": "jq -c 'select(.case==\"poisoned-trigger\")",
       "case_ids": ["poisoned-trigger"],
       "required_projection_fields": ["case", "input_prompt", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "4. 배포용 모델 경량화부터 서명 검증·Registry·Ollama 배포까지",
+      "section": "4. Loader·서명·Registry·Ollama의 공급망 Gate 검증",
       "observation_id": "day4-llm03-unauthorized-sign-rejected",
       "observation_command": "curl -sS --max-time 30",
       "case_ids": ["unauthorized-sign-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "4. 배포용 모델 경량화부터 서명 검증·Registry·Ollama 배포까지",
+      "lesson_path": "publisher-evidence/day4-llm03-format-regression.md",
+      "section": "기존 변조 서명 게시자 증거",
       "observation_id": "day4-llm03-tampered-signature-rejected",
-      "observation_command": "curl -fsS --max-time 30",
+      "observation_command": "jq -c 'select(.case==\"tampered-signature-rejected\")",
       "case_ids": ["tampered-signature-rejected"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
       "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "4. 배포용 모델 경량화부터 서명 검증·Registry·Ollama 배포까지",
+      "section": "4. Loader·서명·Registry·Ollama의 공급망 Gate 검증",
       "observation_id": "day4-llm03-final-signature-valid",
       "observation_command": "jq '{data:{valid:.data.valid}}'",
       "case_ids": ["final-signature-valid"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
-      "section": "4. 배포용 모델 경량화부터 서명 검증·Registry·Ollama 배포까지",
+      "lesson_path": "publisher-evidence/day4-llm03-format-regression.md",
+      "section": "기존 Ollama Import 게시자 증거",
       "observation_id": "day4-llm03-verified-ollama-import",
-      "observation_command": "curl -fsS --max-time 240 http://127.0.0.1:18012/api/chat",
+      "observation_command": "jq -c 'select(.case==\"verified-ollama-import\")",
       "case_ids": ["verified-ollama-import"],
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     }
