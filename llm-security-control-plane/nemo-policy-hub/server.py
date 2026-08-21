@@ -174,7 +174,12 @@ def result_record(
     }
 
 
-async def evaluate_output(prompt: str, candidate: str, request_id: str) -> tuple[str, list[dict], str | None]:
+async def evaluate_output(
+    prompt: str,
+    candidate: str,
+    request_id: str,
+    allowed_exact_sources: list[str] | None = None,
+) -> tuple[str, list[dict], str | None]:
     stages: list[dict] = []
     output_rails = await run_output_rails(prompt, candidate, ASSURANCE_PROFILE)
     stages.append(
@@ -190,7 +195,24 @@ async def evaluate_output(prompt: str, candidate: str, request_id: str) -> tuple
         return candidate, stages, f"output:{output_rails['blocking_rail']}"
 
     privacy = await analyze_privacy("output", candidate, request_id)
-    privacy_decision = "redact" if privacy["entity_types"] else "allow"
+    exact_sources = allowed_exact_sources or []
+    detected_values = [
+        candidate[item["start"]:item["end"]]
+        for item in privacy["detections"]
+    ]
+    all_detections_are_authorized = bool(detected_values) and all(
+        any(value in source for source in exact_sources)
+        for value in detected_values
+    )
+    if all_detections_are_authorized:
+        privacy_decision = "allow_unredacted"
+        checked_candidate = candidate
+    elif privacy["entity_types"]:
+        privacy_decision = "redact"
+        checked_candidate = privacy["sanitized_candidate"]
+    else:
+        privacy_decision = "allow"
+        checked_candidate = candidate
     stages.append(
         stage_record(
             "presidio_output",
@@ -200,7 +222,7 @@ async def evaluate_output(prompt: str, candidate: str, request_id: str) -> tuple
             detection_count=len(privacy["detections"]),
         )
     )
-    return privacy["sanitized_candidate"], stages, None
+    return checked_candidate, stages, None
 
 
 @app.get("/healthz")
@@ -246,6 +268,7 @@ async def chat(
     started = time.perf_counter()
     stages: list[dict] = []
     upstream_called = False
+    allowed_exact_sources: list[str] = []
 
     try:
         message_for_model = request.message
@@ -312,6 +335,7 @@ async def chat(
                     retrieval_decision = "block"
                 elif request.retrieval.exact_value_required:
                     retrieval_decision = "allow_unredacted"
+                    allowed_exact_sources = list(request.retrieval.chunks)
                 elif retrieval_entities:
                     retrieval_decision = "redact"
                 else:
@@ -359,6 +383,7 @@ async def chat(
                 message_for_model,
                 reply,
                 request.request_id,
+                allowed_exact_sources,
             )
             stages.extend(output_stages)
             if output_reason and GUARD_MODE == "enforce":
