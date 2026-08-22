@@ -3,3 +3,4 @@ terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/*.tfplan
 runtime/__pycache__/
+.knowledge-base.env
