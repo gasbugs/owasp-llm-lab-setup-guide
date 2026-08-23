@@ -1,16 +1,23 @@
+# Base image가 예고 없이 바뀌지 않도록 Python 이미지를 digest로 고정한다.
 FROM docker.io/library/python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
 
+# 로그를 즉시 출력하고, 런타임에 주입되는 AWS 설정을 /tmp 아래에서 찾게 한다.
+# AWS 자격 증명은 이미지에 COPY하지 않으며 이 Gateway 컨테이너에만 마운트한다.
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     HOME=/tmp
 
+# Bedrock Converse 호출과 HTTP API 실행에 필요한 의존성만 설치한다.
 COPY bedrock-gateway/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
+# 공통 telemetry와 Gateway 코드는 컨테이너 안에서 수정되지 않도록 읽기 전용으로 복사한다.
 COPY --chmod=0444 shared/telemetry.py /app/telemetry.py
 COPY --chmod=0444 bedrock-gateway/server.py /app/server.py
 
+# root 권한 없이 실행한다. EXPOSE는 내부 포트를 문서화할 뿐 호스트에 공개하지 않는다.
 USER 65532:65532
 EXPOSE 8080
+# 모든 인터페이스에서 수신해 같은 Compose network의 Application과 NeMo 요청을 받는다.
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080", "--log-level", "warning"]
