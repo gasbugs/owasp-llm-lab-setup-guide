@@ -176,6 +176,18 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         telemetry = (CONTROL / "shared/telemetry.py").read_text()
         self.assertIn("FastAPIInstrumentor.instrument_app", telemetry)
         self.assertIn("HTTPXClientInstrumentor().instrument", telemetry)
+        for relative in (
+            "application-gateway/requirements.txt",
+            "bedrock-gateway/requirements.txt",
+            "nemo-policy-hub/requirements.txt",
+            "spokes/presidio-privacy/requirements.txt",
+        ):
+            requirements = (CONTROL / relative).read_text().splitlines()
+            self.assertIn(
+                "httpx==0.28.1",
+                requirements,
+                f"{relative} must install telemetry.py's direct httpx dependency",
+            )
         for relative, service_name in (
             ("application-gateway/server.py", "llm-security-application-gateway"),
             ("nemo-policy-hub/server.py", "llm-security-nemo-hub"),
