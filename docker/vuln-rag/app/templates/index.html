@@ -37,7 +37,7 @@
     select,input[type="text"],input[type="password"],textarea { width:100%; border:1px solid var(--line); border-radius:9px; background:var(--surface-raised); color:var(--ink); padding:10px 12px; }
     .warning { margin-top:12px; border-left:4px solid var(--warning); background:color-mix(in srgb,var(--warning) 10%,var(--surface)); padding:11px 15px; color:var(--ink); }
     .lab-grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr); gap:16px; margin-top:16px; align-items:start; }
-    .stack { display:grid; gap:16px; }.panel { border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
+    .stack,.panel { min-width:0; }.stack { display:grid; gap:16px; }.panel { border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
     .panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:16px 18px; border-bottom:1px solid var(--line-soft); }
     .panel h2 { margin:4px 0 0; font:750 17px/1.2 "Arial Narrow","Segoe UI",sans-serif; }.panel-code { color:var(--muted); font:11px ui-monospace,monospace; }
     .panel-body { padding:16px 18px 18px; }.panel p { margin:0 0 12px; color:var(--muted); font-size:13px; }

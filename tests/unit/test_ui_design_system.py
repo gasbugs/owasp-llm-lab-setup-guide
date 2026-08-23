@@ -28,6 +28,10 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn("prefers-reduced-motion:reduce", source)
             self.assertIn("@media", source)
 
+    def test_two_apps_constrain_panels_inside_mobile_viewport(self) -> None:
+        self.assertIn(".panel { min-width:0;", self.control)
+        self.assertIn(".stack,.panel { min-width:0; }", self.rag)
+
     def test_vulnerable_rag_ui_preserves_every_lab_control(self) -> None:
         for control_id in (
             "scenario",

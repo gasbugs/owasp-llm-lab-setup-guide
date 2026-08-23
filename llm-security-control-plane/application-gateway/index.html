@@ -58,7 +58,7 @@
       background:var(--surface-raised); color:var(--ink); cursor:pointer; font-weight:800;
     }
     .console-grid { display:grid; grid-template-columns:minmax(320px,.78fr) minmax(430px,1.22fr); gap:16px; margin-top:16px; }
-    .panel { border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
+    .panel { min-width:0; border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
     .panel-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; padding:18px 20px; border-bottom:1px solid var(--line-soft); }
     .panel-head h2 { margin:4px 0 0; font:750 18px/1.2 "Arial Narrow","Segoe UI",sans-serif; letter-spacing:.02em; }
     .panel-code { color:var(--muted); font:11px ui-monospace,monospace; }
