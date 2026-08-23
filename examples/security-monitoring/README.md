@@ -15,21 +15,21 @@ application instrumentation
   -> Alloy collection and processing
   -> Loki logs + Tempo traces + Prometheus metrics
   -> learner-built Metric/Log/Trace dashboard
-  -> provisioned dashboard JSON with alerts, GPU, RED, and queue health
+  -> provisioned dashboard JSON with alerts, Bedrock usage, RED, and queue health
 ```
 
 ## Request path
 
 ```text
 client -> gateway -> input policy -> internal retrieval service
-       -> tenant policy -> tool authorization -> Ollama -> output policy
+       -> tenant policy -> tool authorization -> local Bedrock Gateway -> output policy
 
 internal bridge: gateway/retrieval -> Alloy, Prometheus -> all metrics,
                  Alloy/Prometheus -> LGTM, Alertmanager -> webhook
 host boundary:   published ports -> learner public IPv4 /32 security group
 ```
 
-The gateway derives tenant and dangerous-tool permissions from the bearer-token map. A request body cannot select authorization attributes. A request blocked at input, retrieval, or tool authorization returns `upstream_called=false` and never reaches Ollama.
+The gateway derives tenant and dangerous-tool permissions from the bearer-token map. A request body cannot select authorization attributes. A request blocked at input, retrieval, or tool authorization returns `upstream_called=false` and never reaches Amazon Bedrock.
 
 ## Telemetry and alert paths
 
@@ -38,7 +38,7 @@ gateway + retrieval --OTLP logs/traces--> Alloy ----logs----> Loki
                                   \----traces--> Tempo --span RED/service graph--> Prometheus
 Podman rootless socket --stdout/stderr--> Alloy --> Loki
 
-gateway + Alloy + LGTM + alert services + GPU exporter
+application + local Bedrock Gateway + Alloy + LGTM + alert services
        --/metrics--> Prometheus --rules--> Alertmanager --> alert webhook
 
 Grafana --> Prometheus + Loki + Tempo + Alertmanager
@@ -60,30 +60,29 @@ Alloy performs two separate jobs from one configuration: it receives structured 
 - Grafana's bundled plugin preinstallation and update checks are disabled so the lab does not silently download code at startup. Only the built-in data sources used by the provisioned dashboard are required.
 - The rootless Podman 4.9 lab uses one private bridge because its CNI DNS does not reliably fall through between multiple network DNS zones. External exposure is restricted by the learner-owned `/32` security-group rule. A production Kubernetes deployment should separate application, telemetry, and backend planes with directional NetworkPolicy instead of treating this lab bridge as network isolation.
 
-## Start on the GPU host
+## Start on GPU-less WSL
 
 ```bash
-export OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M
+export BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
 export PODMAN_COMPOSE_PROVIDER=podman-compose
-podman compose --file compose.yaml --file compose.gpu.yaml up --detach --build
+export PODMAN_SOCKET_PATH=/run/user/$(id -u)/podman/podman.sock
+podman compose --file compose.yaml up --detach --build
 ```
-
-The GPU exporter receives only the NVIDIA CDI device and converts a fixed read-only `nvidia-smi` query to Prometheus metrics. The project runs rootless without `sudo`, `privileged`, or additional Linux capabilities.
 
 ## Publisher regression
 
-The default E2E uses a deterministic Ollama contract double. The real validation path uses the actual Ollama model and NVIDIA GPU.
+The default E2E uses a deterministic Bedrock contract double. The real validation path uses the local credential-isolating Gateway and Amazon Nova Lite.
 
 ```bash
 bash tests/e2e/security-monitoring/test_security_monitoring.sh
-USE_REAL_OLLAMA=true WITH_GPU=true RUN_FAILURE_DRILL=true \
+USE_REAL_BEDROCK=true RUN_FAILURE_DRILL=true \
   bash tests/e2e/security-monitoring/test_security_monitoring.sh
 ```
 
 ## Stop
 
 ```bash
-podman compose --file compose.yaml --file compose.gpu.yaml down
+podman compose --file compose.yaml down
 ```
 
 The learner command intentionally preserves named volumes. Publisher E2E adds `--volumes` because each validation run must start from isolated data.

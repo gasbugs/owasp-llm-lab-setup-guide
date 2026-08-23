@@ -58,8 +58,10 @@ ENABLE_LAB_ENDPOINTS = os.getenv("ENABLE_LAB_ENDPOINTS", "false").lower() in {
 }
 POLICY = load_policy(POLICY_PATH)
 STARTED_AT = time.time()
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rstrip("/")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
+BEDROCK_GATEWAY_URL = os.getenv(
+    "BEDROCK_GATEWAY_URL", "http://llm-security-bedrock-gateway:8080"
+).rstrip("/")
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
 RETRIEVAL_URL = os.getenv("RETRIEVAL_URL", "http://retrieval:8081").rstrip("/")
 RETRIEVAL_SERVICE_TOKEN = os.getenv(
     "RETRIEVAL_SERVICE_TOKEN", "module08-retrieval-service-token"
@@ -99,7 +101,7 @@ CHAT_INFLIGHT = Gauge(
 )
 UPSTREAM_DURATION = Histogram(
     "llm_upstream_duration_seconds",
-    "Ollama generation latency.",
+    "Amazon Bedrock Converse latency observed by the application.",
     ["model", "outcome"],
     buckets=(0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 240),
 )
@@ -159,7 +161,7 @@ def initialize_bounded_metric_series() -> None:
         CHAT_REQUESTS.labels(
             outcome=outcome,
             blocked_stage=blocked_stage,
-            model=OLLAMA_MODEL,
+            model=BEDROCK_MODEL_ID,
             policy_version=policy_version,
         ).inc(0)
 
@@ -176,8 +178,8 @@ def configure_telemetry() -> Any:
             "service.namespace": "owasp-llm-lab",
             "service.version": "3.0.0",
             "deployment.environment.name": "lab",
-            "gen_ai.system": "ollama",
-            "gen_ai.request.model": OLLAMA_MODEL,
+            "gen_ai.system": "aws.bedrock",
+            "gen_ai.request.model": BEDROCK_MODEL_ID,
             "llm.security.policy.version": str(POLICY["version"]),
         }
     )
@@ -447,7 +449,7 @@ def record_stage(event: SecurityEvent) -> dict[str, Any]:
     return persist(event, decision)
 
 
-def call_ollama(message: str, context: str) -> tuple[str, float, dict[str, int | float]]:
+def call_bedrock(message: str, context: str) -> tuple[str, float, dict[str, int | float]]:
     started = time.perf_counter()
     prompt = (
         "아래 신뢰된 문서만 참고하여 한국어 한 문장으로 답하세요. "
@@ -456,31 +458,34 @@ def call_ollama(message: str, context: str) -> tuple[str, float, dict[str, int |
     )
     try:
         response = httpx.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0}},
+            f"{BEDROCK_GATEWAY_URL}/v1/chat/completions",
+            json={
+                "model": BEDROCK_MODEL_ID,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0,
+                "max_tokens": 180,
+            },
             timeout=HTTP_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         body = response.json()
-        reply = str(body.get("response") or "").strip()
+        reply = str(body["choices"][0]["message"]["content"]).strip()
     except (httpx.HTTPError, ValueError) as exc:
-        UPSTREAM_DURATION.labels(model=OLLAMA_MODEL, outcome="infra").observe(
+        UPSTREAM_DURATION.labels(model=BEDROCK_MODEL_ID, outcome="infra").observe(
             time.perf_counter() - started
         )
-        raise HTTPException(status_code=502, detail=f"ollama upstream failed: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"bedrock upstream failed: {exc}") from exc
     if not reply:
-        raise HTTPException(status_code=502, detail="ollama upstream returned an empty response")
+        raise HTTPException(status_code=502, detail="bedrock upstream returned an empty response")
     elapsed_seconds = time.perf_counter() - started
     stats: dict[str, int | float] = {
-        "input_tokens": int(body.get("prompt_eval_count") or 0),
-        "output_tokens": int(body.get("eval_count") or 0),
-        "load_duration_seconds": round(float(body.get("load_duration") or 0) / 1_000_000_000, 6),
-        "prompt_duration_seconds": round(float(body.get("prompt_eval_duration") or 0) / 1_000_000_000, 6),
-        "generation_duration_seconds": round(float(body.get("eval_duration") or 0) / 1_000_000_000, 6),
+        "input_tokens": int(body.get("usage", {}).get("prompt_tokens") or 0),
+        "output_tokens": int(body.get("usage", {}).get("completion_tokens") or 0),
+        "bedrock_latency_ms": float(body.get("bedrock", {}).get("latency_ms") or 0),
     }
-    UPSTREAM_DURATION.labels(model=OLLAMA_MODEL, outcome="allow").observe(elapsed_seconds)
-    GEN_AI_TOKENS.labels(kind="input", model=OLLAMA_MODEL).inc(stats["input_tokens"])
-    GEN_AI_TOKENS.labels(kind="output", model=OLLAMA_MODEL).inc(stats["output_tokens"])
+    UPSTREAM_DURATION.labels(model=BEDROCK_MODEL_ID, outcome="allow").observe(elapsed_seconds)
+    GEN_AI_TOKENS.labels(kind="input", model=BEDROCK_MODEL_ID).inc(stats["input_tokens"])
+    GEN_AI_TOKENS.labels(kind="output", model=BEDROCK_MODEL_ID).inc(stats["output_tokens"])
     return reply, round(elapsed_seconds * 1000, 2), stats
 
 
@@ -512,7 +517,7 @@ def healthz() -> dict[str, Any]:
         "raw_prompt_storage": False,
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
         "otel_enabled": bool(OTEL_ENDPOINT),
-        "ollama_model": OLLAMA_MODEL,
+        "bedrock_model": BEDROCK_MODEL_ID,
         "uptime_seconds": round(time.time() - STARTED_AT, 2),
     }
 
@@ -521,7 +526,7 @@ def healthz() -> dict[str, Any]:
 def readyz() -> dict[str, Any]:
     checks = {
         "sqlite": False,
-        "ollama": False,
+        "bedrock_gateway": False,
         "retrieval": False,
         "otel_configured": bool(OTEL_ENDPOINT),
     }
@@ -532,8 +537,8 @@ def readyz() -> dict[str, Any]:
     except sqlite3.Error:
         pass
     try:
-        response = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=3.0)
-        checks["ollama"] = response.status_code == 200
+        response = httpx.get(f"{BEDROCK_GATEWAY_URL}/healthz", timeout=3.0)
+        checks["bedrock_gateway"] = response.status_code == 200 and response.json().get("ok") is True
     except httpx.HTTPError:
         pass
     try:
@@ -543,7 +548,7 @@ def readyz() -> dict[str, Any]:
         pass
     if not all(checks.values()):
         raise HTTPException(status_code=503, detail={"ready": False, "checks": checks})
-    return {"ready": True, "checks": checks, "model": OLLAMA_MODEL}
+    return {"ready": True, "checks": checks, "model": BEDROCK_MODEL_ID}
 
 
 @app.get("/api/policy")
@@ -572,7 +577,7 @@ def blocked_response(
         "blocked_stage": record["stage"],
         "policy_rule": record["policy_rule"],
         "upstream_called": False,
-        "model": OLLAMA_MODEL,
+        "model": BEDROCK_MODEL_ID,
         "stages": stages,
     }
 
@@ -610,7 +615,7 @@ def integrated_chat(
                 "llm.request.id": request_id,
                 "enduser.id": principal["subject"],
                 "llm.tenant": principal["tenant"],
-                "gen_ai.request.model": OLLAMA_MODEL,
+                "gen_ai.request.model": BEDROCK_MODEL_ID,
             },
         ) as root_span:
             trace_id = current_trace_id()
@@ -719,32 +724,32 @@ def integrated_chat(
                         return blocked_response(request_id, trace_id, tool_record, stages)
 
             with telemetry_span(
-                "llm.ollama.generate",
-                {"gen_ai.request.model": OLLAMA_MODEL, "server.address": "ollama"},
+                "llm.bedrock.converse",
+                {"gen_ai.request.model": BEDROCK_MODEL_ID, "server.address": "bedrock-gateway"},
                 kind=SpanKind.CLIENT if SpanKind is not None else None,
             ) as span:
                 try:
-                    reply, upstream_duration, model_stats = call_ollama(
+                    reply, upstream_duration, model_stats = call_bedrock(
                         payload.message, document["text"]
                     )
                     upstream_record = persist(
                         SecurityEvent(
                             request_id=request_id,
                             stage="runtime",
-                            event_type="ollama_call",
+                            event_type="bedrock_call",
                             actor=principal["subject"],
                             authenticated_tenant=principal["tenant"],
                             upstream_called=True,
                             duration_ms=upstream_duration,
                             application_decision="allow",
-                            policy_rule="ollama-upstream",
+                            policy_rule="bedrock-upstream",
                             attributes={
                                 "trace_id": trace_id,
-                                "model": OLLAMA_MODEL,
+                                "model": BEDROCK_MODEL_ID,
                                 **model_stats,
                             },
                         ),
-                        Decision("allow", "ollama-upstream", "info", "Ollama returned a response"),
+                        Decision("allow", "bedrock-upstream", "info", "Amazon Bedrock returned a response"),
                     )
                     if span is not None:
                         span.set_attribute("gen_ai.usage.input_tokens", model_stats["input_tokens"])
@@ -755,22 +760,22 @@ def integrated_chat(
                         SecurityEvent(
                             request_id=request_id,
                             stage="runtime",
-                            event_type="ollama_call",
+                            event_type="bedrock_call",
                             actor=principal["subject"],
                             authenticated_tenant=principal["tenant"],
                             upstream_called=True,
                             application_decision="infra",
-                            policy_rule="ollama-upstream-error",
+                            policy_rule="bedrock-upstream-error",
                             attributes={"trace_id": trace_id},
                         ),
-                        Decision("infra", "ollama-upstream-error", "high", str(exc.detail)),
+                        Decision("infra", "bedrock-upstream-error", "high", str(exc.detail)),
                     )
                     if span is not None:
                         span.record_exception(exc)
                         if Status is not None and StatusCode is not None:
                             span.set_status(Status(StatusCode.ERROR, str(exc.detail)))
                     if root_span is not None and Status is not None and StatusCode is not None:
-                        root_span.set_status(Status(StatusCode.ERROR, "ollama upstream failed"))
+                        root_span.set_status(Status(StatusCode.ERROR, "bedrock upstream failed"))
                     raise
                 stages.append(stage_summary(upstream_record))
 
@@ -809,7 +814,7 @@ def integrated_chat(
                 "blocked_stage": None,
                 "policy_rule": output_record["policy_rule"],
                 "upstream_called": True,
-                "model": OLLAMA_MODEL,
+                "model": BEDROCK_MODEL_ID,
                 "duration_ms": duration_ms,
                 "model_usage": model_stats,
                 "stages": stages,
@@ -820,11 +825,11 @@ def integrated_chat(
         CHAT_REQUESTS.labels(
             outcome=outcome,
             blocked_stage=blocked_stage,
-            model=OLLAMA_MODEL,
+            model=BEDROCK_MODEL_ID,
             policy_version=str(POLICY["version"]),
         ).inc()
         exemplar = {"trace_id": trace_id} if trace_id != "0" * 32 else None
-        CHAT_DURATION.labels(outcome=outcome, model=OLLAMA_MODEL).observe(
+        CHAT_DURATION.labels(outcome=outcome, model=BEDROCK_MODEL_ID).observe(
             elapsed, exemplar=exemplar
         )
 
@@ -1102,12 +1107,12 @@ def metrics() -> str:
         "# TYPE llm_security_event_duration_ms summary",
         f"llm_security_event_duration_ms_sum {float(duration_sum):.2f}",
         f"llm_security_event_duration_ms_count {duration_count}",
-        "# HELP llm_upstream_calls_total Ollama upstream call outcomes.",
+        "# HELP llm_upstream_calls_total Amazon Bedrock upstream call outcomes.",
         "# TYPE llm_upstream_calls_total counter",
     ])
     with connect() as connection:
         for decision, count in connection.execute(
-            "SELECT application_decision,COUNT(*) FROM events_v2 WHERE event_type = 'ollama_call' GROUP BY application_decision ORDER BY application_decision"
+            "SELECT application_decision,COUNT(*) FROM events_v2 WHERE event_type = 'bedrock_call' GROUP BY application_decision ORDER BY application_decision"
         ):
             lines.append(
                 f'llm_upstream_calls_total{{decision="{prometheus_escape(decision)}"}} {count}'

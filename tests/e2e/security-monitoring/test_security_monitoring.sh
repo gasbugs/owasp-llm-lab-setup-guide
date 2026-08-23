@@ -13,20 +13,14 @@ ALLOY_URL="${ALLOY_URL:-http://127.0.0.1:12345}"
 LOKI_URL="${LOKI_URL:-http://127.0.0.1:3100}"
 TEMPO_URL="${TEMPO_URL:-http://127.0.0.1:3200}"
 GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
-WITH_GPU="${WITH_GPU:-false}"
-USE_REAL_OLLAMA="${USE_REAL_OLLAMA:-false}"
+USE_REAL_BEDROCK="${USE_REAL_BEDROCK:-false}"
 RUN_FAILURE_DRILL="${RUN_FAILURE_DRILL:-true}"
 export PODMAN_COMPOSE_PROVIDER="${PODMAN_COMPOSE_PROVIDER:-podman-compose}"
 POLICY_COPY="${TMPDIR:-/tmp}/llm-security-policy-e2e-$$.json"
 
 compose() {
-  if [ "$USE_REAL_OLLAMA" = "true" ] && [ "$WITH_GPU" = "true" ]; then
-    podman compose --file "$COMPOSE_FILE" --file "$EXAMPLE/compose.gpu.yaml" "$@"
-  elif [ "$USE_REAL_OLLAMA" = "true" ]; then
+  if [ "$USE_REAL_BEDROCK" = "true" ]; then
     podman compose --file "$COMPOSE_FILE" "$@"
-  elif [ "$WITH_GPU" = "true" ]; then
-    podman compose --file "$COMPOSE_FILE" --file "$EXAMPLE/compose.gpu.yaml" \
-      --file "$SETUP_ROOT/tests/e2e/security-monitoring/compose.test.yaml" "$@"
   else
     podman compose --file "$COMPOSE_FILE" \
       --file "$SETUP_ROOT/tests/e2e/security-monitoring/compose.test.yaml" "$@"
@@ -39,6 +33,13 @@ cleanup() {
   rm -f "$POLICY_COPY"
 }
 trap cleanup EXIT
+
+compose_logs() {
+  local service
+  for service in "$@"; do
+    compose logs --tail 80 "$service" >&2 || true
+  done
+}
 
 prepare_compose_resources() {
   local project="llm-security-observability"
@@ -94,7 +95,7 @@ wait_loki_logs() {
     attempts=$((attempts + 1))
     if [ "$attempts" -ge 60 ]; then
       echo "INFRA: Loki did not receive the gateway security logs" >&2
-      compose logs --tail 80 alloy loki gateway >&2 || true
+      compose_logs alloy loki gateway
       return 1
     fi
     sleep 1
@@ -110,7 +111,7 @@ wait_loki_container_logs() {
     attempts=$((attempts + 1))
     if [ "$attempts" -ge 60 ]; then
       echo "INFRA: Alloy did not collect Grafana container logs" >&2
-      compose logs --tail 80 alloy loki grafana >&2 || true
+      compose_logs alloy loki grafana
       return 1
     fi
     sleep 1
@@ -165,7 +166,9 @@ wait_webhook_alert() {
 }
 
 cleanup
-if ! systemctl --user start podman.socket >/dev/null 2>&1; then
+if podman info --format '{{.Host.RemoteSocket.Path}}' >/dev/null 2>&1; then
+  export PODMAN_SOCKET_PATH="$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's#^unix://##')"
+elif ! systemctl --user start podman.socket >/dev/null 2>&1; then
   # GitHub-hosted runners do not expose a user systemd bus. Start the same
   # rootless API socket directly so Alloy can discover container stdout.
   export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/podman-runtime-$UID}"
@@ -173,23 +176,21 @@ if ! systemctl --user start podman.socket >/dev/null 2>&1; then
   podman system service --time=0 \
     "unix://$XDG_RUNTIME_DIR/podman/podman.sock" \
     >"${TMPDIR:-/tmp}/podman-system-service.log" 2>&1 &
+  export PODMAN_SOCKET_PATH="$XDG_RUNTIME_DIR/podman/podman.sock"
+else
+  export PODMAN_SOCKET_PATH="${XDG_RUNTIME_DIR:-/run/user/$UID}/podman/podman.sock"
 fi
 prepare_compose_resources
 cp "$EXAMPLE/policy.json" "$POLICY_COPY"
 export MONITOR_POLICY_PATH="$POLICY_COPY"
-export OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
-
-export OLLAMA_URL="${OLLAMA_URL:-http://host.containers.internal:11434}"
+export BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}"
 
 compose build gateway
 backend_services=(retrieval alloy prometheus alertmanager alert-webhook loki tempo grafana)
-if [ "$WITH_GPU" = "true" ]; then
-  backend_services+=(gpu-exporter)
-fi
-if [ "$USE_REAL_OLLAMA" = "true" ]; then
+if [ "$USE_REAL_BEDROCK" = "true" ]; then
   compose up --detach "${backend_services[@]}"
 else
-  compose up --detach fake-ollama "${backend_services[@]}"
+  compose up --detach llm-security-bedrock-gateway "${backend_services[@]}"
 fi
 
 wait_json "$RETRIEVAL_URL/healthz" '.ok == true and .service == "llm-security-retrieval" and .otel_enabled == true and .corpus_documents == 2'
@@ -202,11 +203,8 @@ wait_http "$TEMPO_URL/ready"
 wait_json "$GRAFANA_URL/api/health" '.database == "ok"'
 compose up --detach gateway
 wait_json "$MONITOR_URL/healthz" '.ok == true and .service == "llm-security-monitor" and .component == "llm-security-gateway" and .otel_enabled == true'
-wait_json "$MONITOR_URL/readyz" '.ready == true and .checks.sqlite == true and .checks.ollama == true and .checks.retrieval == true and .checks.otel_configured == true'
-wait_json "$PROMETHEUS_URL/api/v1/targets" '.data.activeTargets as $targets | ["llm-security-gateway","llm-security-retrieval","alloy","prometheus","alertmanager","alert-webhook","loki","tempo","grafana"] | all(.[]; . as $job | any($targets[]; .labels.job == $job and .health == "up"))'
-if [ "$WITH_GPU" = "true" ]; then
-  wait_json "$PROMETHEUS_URL/api/v1/targets" 'any(.data.activeTargets[]; .labels.job == "nvidia-gpu" and .health == "up")'
-fi
+wait_json "$MONITOR_URL/readyz" '.ready == true and .checks.sqlite == true and .checks.bedrock_gateway == true and .checks.retrieval == true and .checks.otel_configured == true'
+wait_json "$PROMETHEUS_URL/api/v1/targets" '.data.activeTargets as $targets | ["llm-security-gateway","amazon-bedrock-gateway","llm-security-retrieval","alloy","prometheus","alertmanager","alert-webhook","loki","tempo","grafana"] | all(.[]; . as $job | any($targets[]; .labels.job == $job and .health == "up"))'
 
 curl -fsS --max-time 10 -X DELETE "$MONITOR_URL/api/labs/events" \
   -H 'Authorization: Bearer llm-monitor-acme-token' \
@@ -218,7 +216,7 @@ normal=$(curl -fsS --max-time 240 -X POST "$MONITOR_URL/api/chat" \
   -H 'Authorization: Bearer llm-monitor-acme-token' \
   -H 'Content-Type: application/json' \
   -d '{"request_id":"e2e-normal","message":"공개된 사고 대응 절차를 한 문장으로 알려 주세요."}')
-jq -e '.application_decision == "allow" and .upstream_called == true and .blocked_stage == null and (.trace_id | length) == 32 and any(.stages[]; .rule == "ollama-upstream")' <<<"$normal" >/dev/null
+jq -e '.application_decision == "allow" and .upstream_called == true and .blocked_stage == null and (.trace_id | length) == 32 and any(.stages[]; .rule == "bedrock-upstream")' <<<"$normal" >/dev/null
 trace_id=$(jq -r '.trace_id' <<<"$normal")
 
 # Prometheus가 공격 전 기준 counter를 한 번 scrape한 다음 세 경계 위반을 만든다.
@@ -285,7 +283,7 @@ wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_chat_requests_total%7Boutc
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_gen_ai_tokens_total%7Bkind%3D%22output%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_decisions_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 2'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_model_calls_total%7Bengine%3D%22nemo%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 1'
-wait_json "$TEMPO_URL/api/traces/$trace_id" '([.batches[].scopeSpans[].spans[].name] | index("llm.security.chat") != null and index("POST /retrieve") != null and index("llm.ollama.generate") != null and index("llm.security.output_guardrail") != null) and ([.batches[].resource.attributes[] | select(.key == "service.name") | .value.stringValue] | index("llm-security-gateway") != null and index("llm-security-retrieval") != null)'
+wait_json "$TEMPO_URL/api/traces/$trace_id" '([.batches[].scopeSpans[].spans[].name] | index("llm.security.chat") != null and index("POST /retrieve") != null and index("llm.bedrock.converse") != null and index("llm.security.output_guardrail") != null) and ([.batches[].resource.attributes[] | select(.key == "service.name") | .value.stringValue] | index("llm-security-gateway") != null and index("llm-security-retrieval") != null)'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_spanmetrics_calls_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_service_graph_request_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 # Prometheus는 아직 한 번도 실패하지 않은 counter를 빈 vector로 반환할 수 있다.
@@ -316,9 +314,7 @@ wait_webhook_alert LLMBlockingSpike firing
 wait_json "$GRAFANA_URL/api/search?query=LLM%20Security%20Observability%20Center" 'any(.[]; .uid == "llm-security-monitoring")'
 wait_json "$GRAFANA_URL/api/datasources" 'any(.[]; .uid == "llm-security-prometheus") and any(.[]; .uid == "llm-security-loki") and any(.[]; .uid == "llm-security-tempo")'
 
-if [ "$WITH_GPU" = "true" ]; then
-  wait_json "$PROMETHEUS_URL/api/v1/query?query=llm_gpu_utilization_percent" '.status == "success" and (.data.result | length) >= 1'
-fi
+wait_json "$PROMETHEUS_URL/api/v1/query?query=bedrock_requests_total" '.status == "success" and (.data.result | length) >= 1'
 
 if [ "$RUN_FAILURE_DRILL" = "true" ]; then
   podman stop llm-sec-tempo >/dev/null
@@ -331,12 +327,10 @@ fi
 
 jq -n \
   --arg trace_id "$trace_id" \
-  --arg gpu "$WITH_GPU" \
   '{suite:"security-observability",status:"PASS",actual_chat:"PASS",
     input_block:"PASS",tenant_block:"PASS",tool_block:"PASS",
     output_redaction:"PASS",prometheus:"PASS",alloy:"PASS",
     container_logs:"PASS",loki:"PASS",tempo:"PASS",span_metrics:"PASS",
     telemetry_delivery_health:"PASS",
     bounded_log_labels:"PASS",alert_delivery:"PASS",alert_resolved:"PASS",
-    failure_drill:"PASS",grafana:"PASS",
-    gpu:($gpu == "true"),trace_id:$trace_id}'
+    failure_drill:"PASS",grafana:"PASS",bedrock_metrics:"PASS",trace_id:$trace_id}'

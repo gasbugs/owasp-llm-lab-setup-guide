@@ -4,8 +4,6 @@ import json
 import sys
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -13,7 +11,6 @@ EXAMPLE = ROOT / "examples" / "security-monitoring"
 sys.path.insert(0, str(EXAMPLE))
 
 from policy_engine import evaluate, load_policy, text_identity  # noqa: E402
-from gpu_exporter import metrics  # noqa: E402
 
 
 class SecurityMonitoringPolicyTests(unittest.TestCase):
@@ -149,12 +146,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             "0.0.0.0:12345:12345",
         ):
             self.assertIn(binding, compose)
-        gpu = (EXAMPLE / "compose.gpu.yaml").read_text(encoding="utf-8")
-        self.assertIn("gpu-exporter:", gpu)
-        self.assertIn("nvidia.com/gpu=all", gpu)
-        self.assertIn("0.0.0.0:9400:9400", gpu)
-        self.assertNotIn("privileged:", gpu)
-        self.assertNotIn("SYS_ADMIN", gpu)
+        self.assertIn("BEDROCK_GATEWAY_URL", compose)
+        self.assertIn("us.amazon.nova-lite-v1:0", compose)
 
     def test_compose_uses_the_verified_single_bridge_podman_topology(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
@@ -210,7 +203,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("prompt_risk_score", source)
         self.assertIn("call_retrieval", source)
         self.assertIn("requested_tool", source)
-        self.assertIn("call_ollama", source)
+        self.assertIn("call_bedrock", source)
         self.assertIn("llm.security.output_guardrail", source)
         self.assertIn('"input_hmac_sha256": record["input_hmac_sha256"]', source)
         self.assertIn("def request_trace(", source)
@@ -235,16 +228,16 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn('"raw_query_stored": False', source)
         self.assertIn("x_service_token", source)
 
-    def test_dashboard_correlates_metrics_logs_traces_and_gpu(self) -> None:
+    def test_dashboard_correlates_metrics_logs_traces_and_bedrock(self) -> None:
         dashboard = json.loads(
             (EXAMPLE / "grafana" / "dashboards" / "llm-security.json").read_text(
                 encoding="utf-8"
             )
         )
         panel_types = {panel["type"] for panel in dashboard["panels"]}
-        self.assertTrue({"stat", "gauge", "timeseries", "logs", "traces"}.issubset(panel_types))
+        self.assertTrue({"stat", "timeseries", "logs", "traces"}.issubset(panel_types))
         serialized = json.dumps(dashboard)
-        self.assertIn("llm_gpu_utilization_percent", serialized)
+        self.assertIn("bedrock_estimated_cost_usd_total", serialized)
         self.assertIn("llm-security-prometheus", serialized)
         self.assertNotIn("llm-security-mimir", serialized)
         self.assertIn("llm-security-loki", serialized)
@@ -256,17 +249,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("otelcol_exporter_queue_size", serialized)
         self.assertEqual(dashboard["refresh"], "5s")
 
-    @patch("gpu_exporter.subprocess.run")
-    def test_gpu_exporter_maps_read_only_nvidia_query_to_metrics(self, run) -> None:
-        run.return_value = SimpleNamespace(stdout="0, NVIDIA L4, 17, 2048, 23034, 51\n")
-        output = metrics()
-        self.assertIn('llm_gpu_utilization_percent{gpu="0",model="NVIDIA L4"} 17', output)
-        self.assertIn('llm_gpu_memory_used_mib{gpu="0",model="NVIDIA L4"} 2048', output)
-        command = run.call_args.args[0]
-        self.assertEqual(command[0], "nvidia-smi")
-        self.assertNotIn("shell", run.call_args.kwargs)
-
-    def test_alert_rules_cover_security_upstream_and_gpu_failures(self) -> None:
+    def test_alert_rules_cover_security_and_bedrock_failures(self) -> None:
         rules = (EXAMPLE / "alert-rules.yml").read_text(encoding="utf-8")
         self.assertIn("LLMBlockingSpike", rules)
         self.assertIn("Module08LearnerDrill", rules)
@@ -278,8 +261,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertNotIn("MimirRemoteWriteFailure", rules)
         self.assertIn("TelemetryDataDropped", rules)
         self.assertIn("AlloyExporterQueuePressure", rules)
-        self.assertIn("OllamaUpstreamFailure", rules)
-        self.assertIn("GPUMemoryPressure", rules)
+        self.assertIn("BedrockUpstreamFailure", rules)
+        self.assertNotIn("GPUMemoryPressure", rules)
 
     def test_alertmanager_delivers_to_lab_webhook(self) -> None:
         config = (EXAMPLE / "alertmanager.yml").read_text(encoding="utf-8")
@@ -295,13 +278,10 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         for job in ("alloy", "loki", "tempo", "alertmanager", "alert-webhook", "grafana"):
             self.assertIn(f"job_name: {job}", config)
 
-    def test_gpu_target_name_matches_publisher_e2e(self) -> None:
+    def test_bedrock_target_name_matches_gateway_contract(self) -> None:
         prometheus = (EXAMPLE / "prometheus.yml").read_text(encoding="utf-8")
-        e2e = (
-            ROOT / "tests" / "e2e" / "security-monitoring" / "test_security_monitoring.sh"
-        ).read_text(encoding="utf-8")
-        self.assertIn("job_name: nvidia-gpu", prometheus)
-        self.assertIn('.labels.job == "nvidia-gpu"', e2e)
+        self.assertIn("job_name: amazon-bedrock-gateway", prometheus)
+        self.assertIn("bedrock_requests_total", (EXAMPLE.parent.parent / "llm-security-control-plane" / "bedrock-gateway" / "server.py").read_text(encoding="utf-8"))
 
     def test_tempo_generates_span_metrics_and_service_graphs(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")

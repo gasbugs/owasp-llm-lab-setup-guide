@@ -13,15 +13,13 @@ services:
       LLM_MONITOR_ADMIN_TOKEN: ${LLM_MONITOR_ADMIN_TOKEN:-llm-monitor-admin-token}
       TELEMETRY_INGEST_TOKEN: ${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}
       TELEMETRY_HMAC_KEY: ${TELEMETRY_HMAC_KEY:-module08-lab-hmac-key-change-in-production}
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.containers.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+      BEDROCK_GATEWAY_URL: ${BEDROCK_GATEWAY_URL:-http://llm-security-bedrock-gateway:8080}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
       RETRIEVAL_URL: http://retrieval:8081
       RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:-module08-retrieval-service-token}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       SECURITY_EVENT_DB: /data/security-events.db
       SECURITY_POLICY_PATH: /app/policy.json
-    extra_hosts:
-      - host.containers.internal:host-gateway
     ports:
       - 0.0.0.0:8014:8080
     volumes:
@@ -45,6 +43,9 @@ services:
   alloy:
     image: docker.io/grafana/alloy:v1.18.0
     container_name: llm-sec-alloy
+    # Container root maps to the rootless Podman user on WSL and can read the
+    # owner-only API socket used for stdout discovery.
+    user: "0:0"
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -56,10 +57,10 @@ services:
       - 0.0.0.0:4318:4318
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro,Z
-      - ${XDG_RUNTIME_DIR:-/run/user/1000}/podman/podman.sock:/var/run/docker.sock:ro
+      - ${PODMAN_SOCKET_PATH:-/run/user/1000/podman/podman.sock}:/var/run/docker.sock:ro
       - alloy-data:/var/lib/alloy/data:Z
     networks: [observability]
-    security_opt: [no-new-privileges]
+    security_opt: [no-new-privileges, label=disable]
 
   prometheus:
     image: docker.io/prom/prometheus:v3.5.0

@@ -79,14 +79,14 @@ groups:
           summary: An Alloy OTLP exporter queue is more than eighty percent full
           runbook: Inspect the destination backend before the in-memory queue begins dropping data
 
-      - alert: OllamaUpstreamFailure
+      - alert: BedrockUpstreamFailure
         expr: increase(llm_upstream_calls_total{decision="infra"}[5m]) > 0
         for: 0m
         labels:
           severity: critical
         annotations:
-          summary: Ollama upstream request failed
-          runbook: Follow the failed trace and inspect Ollama connectivity
+          summary: Amazon Bedrock upstream request failed
+          runbook: Follow the failed trace and inspect the local Bedrock Gateway and Converse error
 
       - alert: LLMHighP95Latency
         expr: histogram_quantile(0.95, sum by (le) (rate(llm_chat_request_duration_seconds_bucket[5m]))) > 10
@@ -95,13 +95,4 @@ groups:
           severity: warning
         annotations:
           summary: LLM chat p95 latency exceeds ten seconds
-          runbook: Compare Ollama span duration, token counts, and GPU saturation
-
-      - alert: GPUMemoryPressure
-        expr: 100 * llm_gpu_memory_used_mib / llm_gpu_memory_total_mib > 90
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: NVIDIA GPU framebuffer usage exceeds 90 percent
-          runbook: Compare loaded model size, concurrent requests, and GPU memory
+          runbook: Compare Bedrock Converse latency, token counts, errors, and estimated cost

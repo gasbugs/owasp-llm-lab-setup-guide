@@ -53,11 +53,11 @@
       "gridPos": {"h": 5, "w": 4, "x": 12, "y": 0}
     },
     {
-      "type": "gauge",
-      "title": "GPU utilization",
+      "type": "stat",
+      "title": "Estimated Bedrock cost",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "fieldConfig": {"defaults": {"min": 0, "max": 100, "unit": "percent"}, "overrides": []},
-      "targets": [{"expr": "avg(llm_gpu_utilization_percent)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"min": 0, "unit": "currencyUSD"}, "overrides": []},
+      "targets": [{"expr": "sum(bedrock_estimated_cost_usd_total)", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 16, "y": 0}
     },
     {
@@ -128,7 +128,7 @@
   ],
   "refresh": "5s",
   "schemaVersion": 41,
-  "tags": ["llm", "security", "observability", "lgtm", "gpu"],
+  "tags": ["llm", "security", "observability", "lgtm", "bedrock"],
   "templating": {
     "list": [
       {
