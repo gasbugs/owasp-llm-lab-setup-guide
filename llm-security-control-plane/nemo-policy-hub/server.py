@@ -117,8 +117,14 @@ def require_internal_token(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="application service token required")
 
 
-def require_ready() -> None:
-    # 이름이 같은 다른 모델이 실행되는 것을 막기 위해 digest lock이 유효해야 한다.
+async def require_ready() -> None:
+    # Gateway가 늦게 복구되면 시작 때 실패한 lock을 요청 경계에서 다시 검증한다.
+    if not RUNTIME["model_lock"].get("valid"):
+        try:
+            RUNTIME["model_lock"] = await verify_model_lock()
+        except Exception as exc:
+            RUNTIME["model_lock"] = {"valid": False, "error": type(exc).__name__}
+    # 이름만 같은 모델이나 아직 준비되지 않은 Gateway에는 요청을 보내지 않는다.
     if not RUNTIME["model_lock"].get("valid"):
         raise HTTPException(status_code=503, detail="Bedrock Gateway model contract mismatch")
 
@@ -279,7 +285,7 @@ async def chat(
     authorization: str | None = Header(default=None),
 ) -> dict:
     require_internal_token(authorization)
-    require_ready()
+    await require_ready()
     started = time.perf_counter()
     stages: list[dict] = []
     upstream_called = False
@@ -477,7 +483,7 @@ async def output_candidate(
     require_internal_token(authorization)
     if not ENABLE_LAB_ENDPOINTS:
         raise HTTPException(status_code=404, detail="lab endpoint disabled")
-    require_ready()
+    await require_ready()
     started = time.perf_counter()
     checked, stages, reason = await evaluate_output(
         request.prompt,

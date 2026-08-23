@@ -259,5 +259,9 @@ async def verify_model_lock() -> dict:
         response = await client.get(f"{MODEL_GATEWAY_URL}/healthz")
         response.raise_for_status()
         payload = response.json()
-    valid = payload.get("provider") == MODEL_PROVIDER and payload.get("model") == MAIN_MODEL
+    valid = (
+        payload.get("ok") is True
+        and payload.get("provider") == MODEL_PROVIDER
+        and payload.get("model") == MAIN_MODEL
+    )
     return {"valid": valid, "provider": MODEL_PROVIDER, "model": MAIN_MODEL}

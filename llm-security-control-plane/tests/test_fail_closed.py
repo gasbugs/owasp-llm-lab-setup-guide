@@ -44,6 +44,17 @@ class FailClosedTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         server.RUNTIME["model_lock"] = {"valid": True}
 
+    async def test_model_lock_recovers_after_gateway_becomes_ready(self) -> None:
+        server.RUNTIME["model_lock"] = {"valid": False, "error": "ConnectError"}
+        with patch.object(
+            server,
+            "verify_model_lock",
+            AsyncMock(return_value={"valid": True, "provider": "amazon-bedrock"}),
+        ) as verify:
+            await server.require_ready()
+        verify.assert_awaited_once()
+        self.assertTrue(server.RUNTIME["model_lock"]["valid"])
+
     async def test_content_safety_input_failure_stops_before_main_model(self) -> None:
         with (
             patch.object(server, "analyze_privacy", AsyncMock(return_value=SAFE_PRIVACY)),
