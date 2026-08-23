@@ -26,6 +26,17 @@ jobs:
       - name: Build the real control-plane images
         run: bash llm-security-control-plane/deploy/build-images.sh
 
+      - name: Smoke-test the real Bedrock Gateway entrypoint imports
+        run: |
+          podman run --rm --network none \
+            --entrypoint python \
+            --env AWS_EC2_METADATA_DISABLED=true \
+            --env AWS_ACCESS_KEY_ID=test \
+            --env AWS_SECRET_ACCESS_KEY=test \
+            --env AWS_REGION=us-east-1 \
+            localhost/llm-security-bedrock-gateway:1.0.0 \
+            -c 'import httpx; import telemetry; import server; print("real-bedrock-gateway-import=PASS")'
+
       - name: Start the deterministic Bedrock contract gateway
         run: |
           podman run --detach --name module08-bedrock-contract \
