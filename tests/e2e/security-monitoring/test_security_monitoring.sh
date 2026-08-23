@@ -166,9 +166,12 @@ wait_webhook_alert() {
 }
 
 cleanup
-if podman info --format '{{.Host.RemoteSocket.Path}}' >/dev/null 2>&1; then
+if systemctl --user start podman.socket >/dev/null 2>&1; then
+  export PODMAN_SOCKET_PATH="${XDG_RUNTIME_DIR:-/run/user/$UID}/podman/podman.sock"
+elif podman machine list --format '{{.Name}}' 2>/dev/null | grep -q .; then
+  # A remote macOS client mounts paths from the Podman VM, not the macOS host.
   export PODMAN_SOCKET_PATH="$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's#^unix://##')"
-elif ! systemctl --user start podman.socket >/dev/null 2>&1; then
+else
   # GitHub-hosted runners do not expose a user systemd bus. Start the same
   # rootless API socket directly so Alloy can discover container stdout.
   export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/podman-runtime-$UID}"
@@ -177,8 +180,6 @@ elif ! systemctl --user start podman.socket >/dev/null 2>&1; then
     "unix://$XDG_RUNTIME_DIR/podman/podman.sock" \
     >"${TMPDIR:-/tmp}/podman-system-service.log" 2>&1 &
   export PODMAN_SOCKET_PATH="$XDG_RUNTIME_DIR/podman/podman.sock"
-else
-  export PODMAN_SOCKET_PATH="${XDG_RUNTIME_DIR:-/run/user/$UID}/podman/podman.sock"
 fi
 prepare_compose_resources
 cp "$EXAMPLE/policy.json" "$POLICY_COPY"
