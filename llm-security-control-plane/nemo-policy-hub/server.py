@@ -2,8 +2,8 @@
 
 처음에는 ``GUARD_MODE``와 ``ASSURANCE_PROFILE``에서 집행 강도와 Rail 묶음을
 확인한다. 다음으로 ``analyze_privacy``와 ``/api/chat``에서 Presidio 입력 검사 →
-Llama Guard·Self-check → Main Model → 출력 검사 순서를 읽는다. 내부 Service
-Token과 Model digest가 맞지 않으면 요청을 닫는다.
+Nova Lite 일반 위해·Self-check → Main Model → 출력 검사 순서를 읽는다. 내부 Service
+Token과 Bedrock Gateway model 계약이 맞지 않으면 요청을 닫는다.
 
 사용자 인증과 RAG 등급 인가는 Application 책임이다. 이 Hub는 이미 인증·인가된
 Principal과 Retrieval Context만 받아 Guardrail 순서와 Model 호출을 집행한다.
@@ -11,6 +11,7 @@ Principal과 Retrieval Context만 받아 Guardrail 순서와 Model 호출을 집
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import json
 import os
@@ -22,9 +23,6 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from hub_core import (
-    LLAMA_GUARD_DIGEST,
-    LLAMA_GUARD_MODEL,
-    MAIN_DIGEST,
     MAIN_MODEL,
     MODEL_PROVIDER,
     POLICY,
@@ -52,7 +50,7 @@ APPLICATION_INTERNAL_TOKEN = os.getenv("APPLICATION_INTERNAL_TOKEN", "")
 PRESIDIO_INTERNAL_TOKEN = os.getenv("PRESIDIO_INTERNAL_TOKEN", "")
 if not APPLICATION_INTERNAL_TOKEN or not PRESIDIO_INTERNAL_TOKEN:
     raise RuntimeError("both internal service tokens are required")
-PRESIDIO_URL = os.getenv("PRESIDIO_URL", "http://10.0.2.2:18093").rstrip("/")
+PRESIDIO_URL = os.getenv("PRESIDIO_URL", "http://llm-security-presidio-spoke:8013").rstrip("/")
 ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
 RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
 PROHIBITED_ENTITIES = set(POLICY["prohibited_entities"])
@@ -61,10 +59,15 @@ RUNTIME = {"model_lock": {"valid": False, "error": "startup-not-complete"}}
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    try:
-        RUNTIME["model_lock"] = await verify_model_lock()
-    except Exception as exc:
-        RUNTIME["model_lock"] = {"valid": False, "error": type(exc).__name__}
+    for attempt in range(10):
+        try:
+            RUNTIME["model_lock"] = await verify_model_lock()
+            if RUNTIME["model_lock"].get("valid"):
+                break
+        except Exception as exc:
+            RUNTIME["model_lock"] = {"valid": False, "error": type(exc).__name__}
+        if attempt < 9:
+            await asyncio.sleep(1)
     yield
 
 
@@ -117,7 +120,7 @@ def require_internal_token(authorization: str | None) -> None:
 def require_ready() -> None:
     # 이름이 같은 다른 모델이 실행되는 것을 막기 위해 digest lock이 유효해야 한다.
     if not RUNTIME["model_lock"].get("valid"):
-        raise HTTPException(status_code=503, detail="Ollama model digest lock mismatch")
+        raise HTTPException(status_code=503, detail="Bedrock Gateway model contract mismatch")
 
 
 def emit_metadata(event: dict) -> None:
@@ -199,7 +202,7 @@ async def evaluate_output(
     stages.append(
         stage_record(
             "nemo_output_rails",
-            "llama-guard+self-check" if ASSURANCE_PROFILE == "high-assurance" else "llama-guard",
+            "content-safety+self-check" if ASSURANCE_PROFILE == "high-assurance" else "content-safety",
             "allow" if output_rails["valid"] else "block",
             activated_rails=output_rails["activated_rails"],
             metrics=output_rails["metrics"],
@@ -264,10 +267,7 @@ async def policy() -> dict:
         "profiles": POLICY["profiles"],
         "execution": POLICY["execution"],
         "stages": POLICY["stages"],
-        "models": {
-            "main": {"tag": MAIN_MODEL, "digest": MAIN_DIGEST},
-            "llama_guard": {"tag": LLAMA_GUARD_MODEL, "digest": LLAMA_GUARD_DIGEST},
-        },
+        "models": {"main": {"id": MAIN_MODEL, "provider": MODEL_PROVIDER}},
         "runtime_model_lock": RUNTIME["model_lock"],
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
     }
@@ -322,7 +322,7 @@ async def chat(
             stages.append(
                 stage_record(
                     "nemo_input_rails",
-                    "llama-guard+self-check" if ASSURANCE_PROFILE == "high-assurance" else "llama-guard",
+                    "content-safety+self-check" if ASSURANCE_PROFILE == "high-assurance" else "content-safety",
                     "allow" if input_rails["valid"] else "block",
                     activated_rails=input_rails["activated_rails"],
                     metrics=input_rails["metrics"],
@@ -402,7 +402,7 @@ async def chat(
         reply = model_result["reply"]
         stages.append(
             stage_record(
-                "bedrock_main" if MODEL_PROVIDER == "amazon-bedrock" else "ollama_main",
+                "bedrock_main",
                 MODEL_PROVIDER,
                 model_result["decision"],
                 model=MAIN_MODEL,

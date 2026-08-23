@@ -321,7 +321,7 @@ async def policy() -> dict:
         "version": RELEASE_VERSION,
         "canonical_source": "llm-security-control-plane/policies/application-policy.yaml",
         "runtime_source": "llm-security-control-plane/application-gateway/policy.py",
-        "topology": "browser>application>nemo-hub>{presidio,llama-guard,self-check,ollama}>application",
+        "topology": "browser>application>nemo-hub>{presidio,content-safety,self-check,bedrock}>application",
         **public_policy(),
     }
 

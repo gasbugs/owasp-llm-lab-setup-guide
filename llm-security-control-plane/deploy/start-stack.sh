@@ -24,31 +24,54 @@ LEGACY_STATIC_TOKEN_MODE="${LEGACY_STATIC_TOKEN_MODE:-false}"
 AUTH_STATE_DIR="${AUTH_STATE_DIR:-$ROOT/.state/application-auth}"
 install -d -m 0700 "$AUTH_STATE_DIR"
 
-NETWORK_ARGS=(--network slirp4netns:allow_host_loopback=true)
-PRESIDIO_URL=http://10.0.2.2:18093
-NEMO_HUB_URL=http://10.0.2.2:18094
-MONITOR_ARGS=()
-OTEL_ARGS=()
-OLLAMA_URL=http://10.0.2.2:11434
-MODEL_PROVIDER="${MODEL_PROVIDER:-ollama}"
-BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}"
+NETWORK_NAME=llm-security-control-plane
 if podman network exists llm-security-observability; then
-  NETWORK_ARGS=(--network llm-security-observability)
-  PRESIDIO_URL=http://llm-security-presidio-spoke:8013
-  NEMO_HUB_URL=http://llm-security-nemo-hub:8014
-  OLLAMA_URL=http://host.containers.internal:11434
-  MONITOR_ARGS=(
+  NETWORK_NAME=llm-security-observability
+elif ! podman network exists "$NETWORK_NAME"; then
+  podman network create "$NETWORK_NAME" >/dev/null
+fi
+NETWORK_ARGS=(--network "$NETWORK_NAME")
+PRESIDIO_URL=http://llm-security-presidio-spoke:8013
+NEMO_HUB_URL=http://llm-security-nemo-hub:8014
+MODEL_GATEWAY_URL="${MODEL_GATEWAY_URL:-http://llm-security-bedrock-gateway:8080}"
+START_BEDROCK_GATEWAY="${START_BEDROCK_GATEWAY:-true}"
+OTEL_ARGS=(--network "$NETWORK_NAME")
+BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}"
+AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
+AWS_PROFILE="${AWS_PROFILE:-default}"
+AWS_CONFIG_DIR="${AWS_CONFIG_DIR:-$HOME/.aws}"
+if [ "$START_BEDROCK_GATEWAY" = true ] && [ ! -d "$AWS_CONFIG_DIR" ]; then
+  echo "AWS config directory does not exist: $AWS_CONFIG_DIR" >&2
+  exit 1
+fi
+if podman container exists llm-sec-alloy && podman container exists llm-sec-gateway; then
+  OTEL_ARGS+=(
     -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080
     -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_INGEST_TOKEN"
+    -e OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318
   )
-  OTEL_ARGS=(-e OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318)
   AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-stdout,monitor}"
 fi
 AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-stdout}"
-MODEL_GATEWAY_URL="${MODEL_GATEWAY_URL:-$OLLAMA_URL}"
+
+if [ "$START_BEDROCK_GATEWAY" = true ]; then
+  podman run -d --replace --name llm-security-bedrock-gateway \
+    --userns=keep-id:uid=65532,gid=65532 \
+    -p 127.0.0.1:18096:8080 \
+    -e "AWS_REGION=$AWS_REGION" \
+    -e "AWS_PROFILE=$AWS_PROFILE" \
+    -e AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials \
+    -e AWS_CONFIG_FILE=/tmp/.aws/config \
+    -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
+    -e "BEDROCK_INPUT_USD_PER_MILLION=${BEDROCK_INPUT_USD_PER_MILLION:-0.06}" \
+    -e "BEDROCK_OUTPUT_USD_PER_MILLION=${BEDROCK_OUTPUT_USD_PER_MILLION:-0.24}" \
+    -e "RELEASE_VERSION=$IMAGE_VERSION" \
+    "${OTEL_ARGS[@]}" \
+    -v "$AWS_CONFIG_DIR:/tmp/.aws:ro" \
+    "localhost/llm-security-bedrock-gateway:$IMAGE_VERSION" >/dev/null
+fi
 
 podman run -d --replace --name llm-security-presidio-spoke \
-  "${NETWORK_ARGS[@]}" \
   -p 127.0.0.1:18093:8013 \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
@@ -57,7 +80,6 @@ podman run -d --replace --name llm-security-presidio-spoke \
   "localhost/llm-security-presidio-privacy-spoke:$IMAGE_VERSION" >/dev/null
 
 podman run -d --replace --name llm-security-nemo-hub \
-  "${NETWORK_ARGS[@]}" \
   -p 127.0.0.1:18094:8014 \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
@@ -67,19 +89,14 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   "${OTEL_ARGS[@]}" \
   -e "PRESIDIO_URL=$PRESIDIO_URL" \
-  --add-host host.containers.internal:host-gateway \
-  -e "OLLAMA_URL=$OLLAMA_URL" \
-  -e "MODEL_PROVIDER=$MODEL_PROVIDER" \
   -e "MODEL_GATEWAY_URL=$MODEL_GATEWAY_URL" \
   -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
   -v "$NEMO_POLICY_FILE:/app/policies/nemo-policy.yaml:ro,Z" \
-  -v "$ROOT/versions.lock.yaml:/app/versions.lock.yaml:ro,Z" \
   -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
   "localhost/llm-security-nemo-policy-hub:$IMAGE_VERSION" >/dev/null
 
 podman run -d --replace --name llm-security-application-gateway \
   --userns=keep-id:uid=65532,gid=65532 \
-  "${NETWORK_ARGS[@]}" \
   -p 127.0.0.1:18095:8000 \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
@@ -87,7 +104,6 @@ podman run -d --replace --name llm-security-application-gateway \
   -e "AUTH_EVENT_SINK=$AUTH_EVENT_SINK" \
   -e "LEGACY_STATIC_TOKEN_MODE=$LEGACY_STATIC_TOKEN_MODE" \
   "${OTEL_ARGS[@]}" \
-  "${MONITOR_ARGS[@]}" \
   -v "$APPLICATION_POLICY_FILE:/app/policies/application-policy.yaml:ro,Z" \
   -v "$ROOT/policies/application-users.yaml:/app/policies/application-users.yaml:ro,Z" \
   -v "$AUTH_STATE_DIR:/app/state:rw,Z" \
@@ -96,10 +112,15 @@ podman run -d --replace --name llm-security-application-gateway \
   -v "$ROOT/application-gateway/server.py:/app/server.py:ro,Z" \
   "localhost/llm-security-application-gateway:$IMAGE_VERSION" >/dev/null
 
-for url in \
-  http://127.0.0.1:18093/healthz \
-  http://127.0.0.1:18094/healthz \
-  http://127.0.0.1:18095/healthz; do
+HEALTH_URLS=(
+  http://127.0.0.1:18093/healthz
+  http://127.0.0.1:18094/healthz
+  http://127.0.0.1:18095/healthz
+)
+if [ "$START_BEDROCK_GATEWAY" = true ]; then
+  HEALTH_URLS=(http://127.0.0.1:18096/healthz "${HEALTH_URLS[@]}")
+fi
+for url in "${HEALTH_URLS[@]}"; do
   ready=false
   for _ in $(seq 1 90); do
     if curl -fsS --max-time 3 "$url" 2>/dev/null | jq -e '.ok == true' >/dev/null 2>&1; then
@@ -114,5 +135,5 @@ for url in \
   fi
 done
 
-printf 'control-plane=READY app=http://127.0.0.1:18095 profile=%s mode=%s version=%s\n' \
-  "$ASSURANCE_PROFILE" "$GUARD_MODE" "$IMAGE_VERSION"
+printf 'control-plane=READY app=http://127.0.0.1:18095 model=%s profile=%s mode=%s version=%s\n' \
+  "$BEDROCK_MODEL_ID" "$ASSURANCE_PROFILE" "$GUARD_MODE" "$IMAGE_VERSION"

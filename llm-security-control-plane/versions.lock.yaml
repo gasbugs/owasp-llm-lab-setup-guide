@@ -3,8 +3,8 @@ release: 1.0.0
 
 # 처음 읽는 순서
 # 1. runtime과 python_packages: API 서비스가 실행되는 공통 환경을 본다.
-# 2. ollama_models: Main Model과 Llama Guard의 tag·digest를 본다.
-# 3. images: 세 서비스 Image가 같은 release인지 본다.
+# 2. bedrock: Main·일반 위해·Self-check가 공유하는 Model ID를 본다.
+# 3. images: 네 서비스 Image가 같은 release인지 본다.
 # 4. test_tools: Promptfoo와 Garak 테스트 결과를 재현할 버전을 본다.
 # tag는 사람이 읽는 이름이고 digest는 실제 Image·Model 바이트를 식별하는 값이다.
 
@@ -20,7 +20,7 @@ test_tools:
   promptfoo: 0.121.20
   garak: 0.15.1
 
-# 세 서비스 이미지를 다시 만들 때 재현할 Python dependency 정본이다.
+# 서비스 이미지를 다시 만들 때 재현할 Python dependency 정본이다.
 python_packages:
   fastapi: 0.141.1
   httpx: 0.28.1
@@ -36,17 +36,14 @@ python_packages:
   opentelemetry: 1.36.0
   opentelemetry_instrumentation: 0.57b0
 
-# NeMo Hub는 시작할 때 실제 Ollama digest와 아래 값을 비교한다.
-ollama_models:
-  main:
-    tag: llama3.1:8b-instruct-q4_K_M
-    digest: 46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e
-  llama_guard:
-    tag: llama-guard3:8b
-    digest: 46f211c3d8662823ea4956d1a9e92b2924f84cbd0a0f88b64eaadb59fe58b99d
+# Gateway health와 실제 응답의 Model ID가 다르면 Hub는 fail-closed 한다.
+bedrock:
+  provider: amazon-bedrock
+  model_id: us.amazon.nova-lite-v1:0
 
 # 정책 변경은 기존 tag를 덮어쓰지 않고 새 release와 image tag로 승격한다.
 images:
   application_gateway: localhost/llm-security-application-gateway:1.0.0
   nemo_policy_hub: localhost/llm-security-nemo-policy-hub:1.0.0
   presidio_privacy_spoke: localhost/llm-security-presidio-privacy-spoke:1.0.0
+  bedrock_gateway: localhost/llm-security-bedrock-gateway:1.0.0

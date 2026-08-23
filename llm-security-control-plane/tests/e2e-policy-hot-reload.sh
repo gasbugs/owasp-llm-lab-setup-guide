@@ -19,15 +19,15 @@ ACCESS_TOKEN="$(curl -fsS --max-time 30 -X POST http://127.0.0.1:18095/.well-kno
   -d '{"username":"public-reader","password":"public-reader-demo"}' | jq -er '.access_token')"
 
 curl -fsS http://127.0.0.1:18094/api/guardrails/policy \
-  | jq -e '.profiles.standard.input_rails == ["llama_guard"]' >/dev/null
+  | jq -e '.profiles.standard.input_rails == ["content_safety"]' >/dev/null
 
-sed -i 's/input_rails: \[llama_guard\]/input_rails: [llama_guard, self_check]/' \
+sed -i 's/input_rails: \[content_safety\]/input_rails: [content_safety, self_check]/' \
   "$WORK/nemo-policy.yaml"
 podman restart llm-security-nemo-hub >/dev/null
 
 for _ in $(seq 1 90); do
   curl -fsS --max-time 3 http://127.0.0.1:18094/api/guardrails/policy \
-    | jq -e '.runtime_model_lock.valid == true and .profiles.standard.input_rails == ["llama_guard","self_check"]' \
+    | jq -e '.runtime_model_lock.valid == true and .profiles.standard.input_rails == ["content_safety","self_check"]' \
       >/dev/null 2>&1 && break
   sleep 2
 done

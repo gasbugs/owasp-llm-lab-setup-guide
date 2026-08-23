@@ -32,8 +32,8 @@ def response_for_openai(payload: dict) -> str:
             )
         )
         return "Yes" if risky else "No"
-    if "first line must be exactly safe or unsafe" in lowered:
-        inspected = lowered.rsplit("user:", 1)[-1]
+    if "return only yes to block or no to allow" in lowered:
+        inspected = lowered.rsplit("agent:", 1)[-1] if "agent:" in lowered else lowered.rsplit("user:", 1)[-1]
         unsafe = any(
             marker in inspected
             for marker in (
@@ -42,7 +42,7 @@ def response_for_openai(payload: dict) -> str:
                 "detailed steps to steal",
             )
         )
-        return "unsafe\nS3" if unsafe else "safe"
+        return "Yes" if unsafe else "No"
     return "요청을 안전하게 처리했습니다."
 
 
@@ -68,6 +68,18 @@ class Handler(BaseHTTPRequestHandler):
                     "model": MODEL_ID,
                 },
             )
+            return
+        if self.path == "/metrics":
+            body = (
+                '# HELP bedrock_requests_total Bedrock contract requests\n'
+                '# TYPE bedrock_requests_total counter\n'
+                f'bedrock_requests_total{{model="{MODEL_ID}",outcome="allow",task="main"}} 1\n'
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; version=0.0.4")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         self.send_json(404, {"detail": "not-found"})
 

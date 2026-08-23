@@ -38,6 +38,7 @@ jobs:
           MODEL_PROVIDER: amazon-bedrock
           BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
           MODEL_GATEWAY_URL: http://host.containers.internal:18097
+          START_BEDROCK_GATEWAY: "false"
         run: |
           set -o pipefail
           bash llm-security-control-plane/tests/e2e-control-plane.sh 2>&1 | tee /tmp/module08-e2e.log

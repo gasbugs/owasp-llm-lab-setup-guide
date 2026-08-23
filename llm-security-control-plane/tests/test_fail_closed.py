@@ -15,7 +15,7 @@ sys.path.insert(0, "/app")
 import server  # noqa: E402
 
 
-class LlamaGuardUnavailable(RuntimeError):
+class ContentSafetyUnavailable(RuntimeError):
     pass
 
 
@@ -44,13 +44,13 @@ class FailClosedTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         server.RUNTIME["model_lock"] = {"valid": True}
 
-    async def test_llama_guard_input_failure_stops_before_main_model(self) -> None:
+    async def test_content_safety_input_failure_stops_before_main_model(self) -> None:
         with (
             patch.object(server, "analyze_privacy", AsyncMock(return_value=SAFE_PRIVACY)),
             patch.object(
                 server,
                 "run_input_rails",
-                AsyncMock(side_effect=LlamaGuardUnavailable()),
+                AsyncMock(side_effect=ContentSafetyUnavailable()),
             ),
             patch.object(server, "call_main_model", AsyncMock()) as main_model,
         ):
@@ -61,7 +61,7 @@ class FailClosedTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["guardrail"]["upstream_called"])
         self.assertEqual(
             result["guardrail"]["blocking_reason"],
-            "guardrail_dependency:LlamaGuardUnavailable",
+            "guardrail_dependency:ContentSafetyUnavailable",
         )
         main_model.assert_not_awaited()
 

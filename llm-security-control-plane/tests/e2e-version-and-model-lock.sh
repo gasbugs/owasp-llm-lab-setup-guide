@@ -9,23 +9,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-awk '
-  /^  main:$/ { in_main=1 }
-  in_main && /^    digest:/ {
-    print "    digest: sha256:intentionally-wrong-for-lock-test"
-    in_main=0
-    next
-  }
-  { print }
-' "$ROOT/versions.lock.yaml" > "$WORK/versions.lock.yaml"
-
 podman run -d --replace --name llm-security-nemo-hub-lock-canary \
-  --network slirp4netns:allow_host_loopback=true \
+  --network llm-security-control-plane \
   -p 127.0.0.1:18194:8014 \
   -e APPLICATION_INTERNAL_TOKEN=control-plane-app-to-nemo \
   -e PRESIDIO_INTERNAL_TOKEN=control-plane-nemo-to-presidio \
-  -e OLLAMA_URL=http://10.0.2.2:11434 \
-  -v "$WORK/versions.lock.yaml:/app/versions.lock.yaml:ro,Z" \
+  -e MODEL_GATEWAY_URL=http://llm-security-bedrock-gateway:8080 \
+  -e BEDROCK_MODEL_ID=us.amazon.nova-micro-v1:0 \
   -v "$ROOT/policies/nemo-policy.yaml:/app/policies/nemo-policy.yaml:ro,Z" \
   localhost/llm-security-nemo-policy-hub:1.0.0 >/dev/null
 
@@ -48,5 +38,5 @@ bash "$ROOT/deploy/promote-and-rollback.sh" > "$WORK/version-output.jsons"
 grep -q '"candidate_version": "1.1.0-candidate"' "$WORK/version-output.jsons"
 grep -q '"rollback_version": "1.0.0"' "$WORK/version-output.jsons"
 
-printf 'model_digest_mismatch_health=false chat_http=%s\n' "$status"
+printf 'model_id_mismatch_health=false chat_http=%s\n' "$status"
 cat "$WORK/version-output.jsons"

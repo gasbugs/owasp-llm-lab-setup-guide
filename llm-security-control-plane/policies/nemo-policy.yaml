@@ -7,7 +7,7 @@ policy_id: nemo-hub-policy-v1
 # 3. stages: 입력부터 최종 응답까지 실제 검사 순서를 본다.
 # 4. prohibited_entities와 self_check: 구체적인 차단 조건을 본다.
 # Rail은 한 단계의 검사이고, Profile은 함께 사용할 Rail 묶음이다.
-# 예: high-assurance는 Llama Guard와 Self-check를 모두 통과해야 Main Model을 호출한다.
+# 예: high-assurance는 일반 위해와 업무 Self-check를 모두 통과해야 Main Model을 호출한다.
 
 # 성능을 위해 검사를 병렬·추측 실행하지 않는다. 앞 단계가 통과한 뒤
 # 다음 단계를 실행하며, Spoke 장애 시 더 약한 정책으로 자동 전환하지 않는다.
@@ -19,14 +19,14 @@ execution:
   spoke_read_retry_count: 1
 
 profiles:
-  # standard는 전용 Guard Model만 사용한다.
+  # standard는 Nova Lite에 일반 위해 정책 Prompt만 전달한다.
   standard:
-    input_rails: [llama_guard]
-    output_rails: [llama_guard]
+    input_rails: [content_safety]
+    output_rails: [content_safety]
   # high-assurance는 Self-check를 추가해 독립된 의미 검사를 한 번 더 수행한다.
   high-assurance:
-    input_rails: [llama_guard, self_check]
-    output_rails: [llama_guard, self_check]
+    input_rails: [content_safety, self_check]
+    output_rails: [content_safety, self_check]
 # 정책 실행의 정본 순서다. 인증·인가·RAG 선택은 Application이 먼저 끝내고,
 # Main Model은 모든 입력 검사가 통과한 뒤에만 호출한다.
 stages:
@@ -34,11 +34,11 @@ stages:
   - application_authorization
   - application_rag_selection
   - presidio_input
-  - llama_guard_input
+  - content_safety_input
   - self_check_input
   - presidio_retrieval
-  - bedrock_or_ollama_main
-  - llama_guard_output
+  - bedrock_main
+  - content_safety_output
   - self_check_output
   - presidio_output
   - application_final_enforcement

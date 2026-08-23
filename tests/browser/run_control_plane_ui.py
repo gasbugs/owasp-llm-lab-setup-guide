@@ -60,7 +60,7 @@ def main() -> int:
 
     chat_requests = sum(url == f"{origin}/api/chat" for url in requests)
     internal_requests = sum(
-        urlsplit(url).port in {11434, 18093, 18094}
+        urlsplit(url).port in {18093, 18094, 18096}
         for url in requests
         if urlsplit(url).hostname in {"127.0.0.1", "localhost"}
     )

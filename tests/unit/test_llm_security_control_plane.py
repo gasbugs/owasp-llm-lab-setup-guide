@@ -54,27 +54,25 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
                 }
             ]
         }
-        safe_llama_guard = {
+        safe_content_safety = {
             "messages": [
                 {
                     "content": (
                         "S3 includes credential theft.\n"
                         "User: 비밀번호 변경 절차를 알려 주세요.\n"
-                        "The first line must be exactly safe or unsafe."
+                        "Return only Yes to block or No to allow."
                     )
                 }
             ]
         }
         self.assertEqual(fake.response_for_openai(safe_self_check), "No")
         self.assertEqual(fake.response_for_openai(unsafe_self_check), "Yes")
-        self.assertEqual(fake.response_for_openai(safe_llama_guard), "safe")
+        self.assertEqual(fake.response_for_openai(safe_content_safety), "No")
 
-    def test_versions_are_explicit_and_model_digests_are_full(self) -> None:
+    def test_versions_are_explicit_and_bedrock_model_is_pinned(self) -> None:
         lock = yaml.safe_load((CONTROL / "versions.lock.yaml").read_text())
-        self.assertNotIn("latest", lock["ollama_models"]["main"]["tag"])
-        self.assertNotIn("latest", lock["ollama_models"]["llama_guard"]["tag"])
-        for model in lock["ollama_models"].values():
-            self.assertEqual(len(model["digest"]), 64)
+        self.assertEqual(lock["bedrock"]["provider"], "amazon-bedrock")
+        self.assertEqual(lock["bedrock"]["model_id"], "us.amazon.nova-lite-v1:0")
         for image in lock["images"].values():
             self.assertTrue(image.endswith(":1.0.0"))
         self.assertEqual(lock["test_tools"]["promptfoo"], "0.121.20")
@@ -89,7 +87,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertFalse(policy["execution"]["automatic_downgrade"])
         self.assertEqual(
             policy["profiles"]["high-assurance"]["input_rails"],
-            ["llama_guard", "self_check"],
+            ["content_safety", "self_check"],
         )
 
     def test_presidio_spoke_has_no_application_decision(self) -> None:
@@ -164,12 +162,12 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
 
     def test_browser_harness_rejects_direct_internal_calls(self) -> None:
         harness = (ROOT / "tests/browser/run_control_plane_ui.py").read_text()
-        self.assertIn("{11434, 18093, 18094}", harness)
+        self.assertIn("{18093, 18094, 18096}", harness)
         self.assertIn("browser_internal_service_requests", harness)
 
     def test_publisher_checks_dependency_fail_closed(self) -> None:
         source = (CONTROL / "tests/test_fail_closed.py").read_text()
-        self.assertIn("LlamaGuardUnavailable", source)
+        self.assertIn("ContentSafetyUnavailable", source)
         self.assertIn("SelfCheckUnavailable", source)
         self.assertIn("main_model.assert_not_awaited()", source)
         self.assertIn('result["reply"], "guardrail infrastructure unavailable"', source)

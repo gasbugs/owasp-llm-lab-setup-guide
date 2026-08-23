@@ -12,11 +12,11 @@ Browser
        authentication -> authorization -> classified RAG selection
        -> NeMo Policy Hub :18094
             -> Presidio Privacy Spoke :18093 (input)
-            -> Llama Guard input rail
+            -> Content Safety input rail (Nova Lite)
             -> Self-check input rail (high-assurance only)
             -> Presidio Privacy Spoke (authorized retrieval text)
-            -> Ollama main model :11434
-            -> Llama Guard output rail
+            -> local Bedrock Gateway :18096 -> Nova Lite main model
+            -> Content Safety output rail (Nova Lite)
             -> Self-check output rail (high-assurance only)
             -> Presidio Privacy Spoke (output)
        <- Application final enforcement
@@ -24,7 +24,7 @@ Browser
 ```
 
 Application은 인증, 인가, 정보 등급, RAG 선택과 최종 응답 승인을 소유한다.
-NeMo는 LLM 처리 단계의 허브이며 Presidio, Llama Guard, Self-check와 Ollama 호출
+NeMo는 LLM 처리 단계의 허브이며 Presidio, Content Safety, Self-check와 Bedrock 호출
 순서를 소유한다. Presidio Spoke는 개인정보 탐지와 비식별화 후보만 반환하며
 `allow`, `block`, `redact`를 결정하지 않는다.
 
@@ -36,27 +36,25 @@ SQLite 폐기 상태를 모두 확인한 뒤에만 인가를 시작한다. 실�
 
 ## 명시적 버전 관리
 
-`versions.lock.yaml`은 Python base digest, 직접 설치하는 Python package, Ollama model
-tag와 digest, 세 이미지의 semantic version, Promptfoo·Garak과 테스트용 Node image
-digest를 고정한다. NeMo Hub는 시작할 때 Ollama
-`/api/tags`와 lock을 비교하며 digest가 다르면 `/healthz`를 실패시키고 `/api/chat`을
-503으로 닫는다. `latest`나 자동 downgrade는 사용하지 않는다.
+`versions.lock.yaml`은 Python base digest, 직접 설치하는 Python package, Bedrock Model ID,
+네 이미지의 semantic version, Promptfoo·Garak과 테스트용 Node image digest를 고정한다.
+NeMo Hub는 시작할 때 local Bedrock Gateway의 provider와 Model ID를 비교하며 다르면
+`/healthz`를 실패시키고 `/api/chat`을 503으로 닫는다. 자동 downgrade는 사용하지 않는다.
 
 검증 환경의 실제 모델은 다음과 같다.
 
-- Main: `llama3.1:8b-instruct-q4_K_M` (`46e0c10c...666e`)
-- Guard: `llama-guard3:8b` (`46f211c3...b99d`, 실제 quantization `Q4_K_M`)
+- Main·Content Safety·Self-check: `us.amazon.nova-lite-v1:0`
 
 ## 이미지 빌드와 실행
 
-세 Containerfile은 이 디렉터리를 build context로 사용한다.
+네 Containerfile은 이 디렉터리를 build context로 사용한다.
 
 ```bash
 bash llm-security-control-plane/deploy/build-images.sh
 ```
 
 기본 실행은 `GUARD_MODE=enforce`, `ASSURANCE_PROFILE=high-assurance`다. 모든 publish는
-EC2 loopback에만 bind하며 18093, 18094, 18095를 Security Group에 공개하지 않는다.
+WSL loopback에만 bind하며 18093~18096을 외부에 공개하지 않는다.
 
 ```bash
 bash llm-security-control-plane/deploy/start-stack.sh
@@ -66,10 +64,10 @@ bash llm-security-control-plane/deploy/start-stack.sh
 bash llm-security-control-plane/deploy/stop-stack.sh
 ```
 
-`standard`는 Python 정책, Presidio, Llama Guard를 사용한다. `high-assurance`는 여기에
+`standard`는 Python 정책, Presidio, Content Safety를 사용한다. `high-assurance`는 여기에
 업무별 Self-check input/output을 추가한다. 두 profile 모두 rail 오류를 만나면
-`infra`로 닫고 다른 profile로 자동 전환하지 않는다. G6.xlarge에서는 Llama Guard,
-Self-check, Main 호출을 병렬화하지 않아 24GB L4 메모리의 피크를 낮춘다.
+`infra`로 닫고 다른 profile로 자동 전환하지 않는다. GPU 없는 WSL에서 모델 호출은
+local Bedrock Gateway를 거쳐 순차 실행되며 AWS 자격 증명은 Gateway에만 mount한다.
 
 ## API
 
