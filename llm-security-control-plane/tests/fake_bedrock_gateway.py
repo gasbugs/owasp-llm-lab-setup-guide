@@ -66,7 +66,6 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "provider": "amazon-bedrock",
                     "model": MODEL_ID,
-                    "guardrail_configured": True,
                 },
             )
             return

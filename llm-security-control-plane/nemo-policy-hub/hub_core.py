@@ -224,7 +224,6 @@ async def run_output_rails(prompt: str, candidate: str, assurance_profile: str) 
 async def call_main_model(
     message: str,
     context: str | None,
-    apply_provider_guardrail: bool = True,
 ) -> dict:
     user_content = message
     if context:
@@ -238,7 +237,6 @@ async def call_main_model(
             json={
                 "model": MAIN_MODEL,
                 "stream": False,
-                "guardrail": MODEL_PROVIDER == "amazon-bedrock" and apply_provider_guardrail,
                 "options": {"temperature": 0.0, "num_predict": 180},
                 "messages": [
                     {
@@ -275,7 +273,6 @@ async def verify_model_lock() -> dict:
             "valid": valid,
             "provider": MODEL_PROVIDER,
             "model": MAIN_MODEL,
-            "guardrail_configured": bool(payload.get("guardrail_configured")),
         }
     async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
         response = await client.get(f"{MODEL_GATEWAY_URL}/api/tags")

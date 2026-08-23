@@ -19,6 +19,10 @@ ASSURANCE_PROFILE="${ASSURANCE_PROFILE:-high-assurance}"
 ENABLE_LAB_ENDPOINTS="${ENABLE_LAB_ENDPOINTS:-true}"
 IMAGE_VERSION="${IMAGE_VERSION:-1.0.0}"
 TELEMETRY_INGEST_TOKEN="${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}"
+AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-}"
+LEGACY_STATIC_TOKEN_MODE="${LEGACY_STATIC_TOKEN_MODE:-false}"
+AUTH_STATE_DIR="${AUTH_STATE_DIR:-$ROOT/.state/application-auth}"
+install -d -m 0700 "$AUTH_STATE_DIR"
 
 NETWORK_ARGS=(--network slirp4netns:allow_host_loopback=true)
 PRESIDIO_URL=http://10.0.2.2:18093
@@ -38,7 +42,9 @@ if podman network exists llm-security-observability; then
     -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_INGEST_TOKEN"
   )
   OTEL_ARGS=(-e OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318)
+  AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-stdout,monitor}"
 fi
+AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-stdout}"
 MODEL_GATEWAY_URL="${MODEL_GATEWAY_URL:-$OLLAMA_URL}"
 
 podman run -d --replace --name llm-security-presidio-spoke \
@@ -72,14 +78,20 @@ podman run -d --replace --name llm-security-nemo-hub \
   "localhost/llm-security-nemo-policy-hub:$IMAGE_VERSION" >/dev/null
 
 podman run -d --replace --name llm-security-application-gateway \
+  --userns=keep-id:uid=65532,gid=65532 \
   "${NETWORK_ARGS[@]}" \
   -p 127.0.0.1:18095:8000 \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   -e "NEMO_HUB_URL=$NEMO_HUB_URL" \
+  -e "AUTH_EVENT_SINK=$AUTH_EVENT_SINK" \
+  -e "LEGACY_STATIC_TOKEN_MODE=$LEGACY_STATIC_TOKEN_MODE" \
   "${OTEL_ARGS[@]}" \
   "${MONITOR_ARGS[@]}" \
   -v "$APPLICATION_POLICY_FILE:/app/policies/application-policy.yaml:ro,Z" \
+  -v "$ROOT/policies/application-users.yaml:/app/policies/application-users.yaml:ro,Z" \
+  -v "$AUTH_STATE_DIR:/app/state:rw,Z" \
+  -v "$ROOT/application-gateway/auth.py:/app/auth.py:ro,Z" \
   -v "$ROOT/application-gateway/policy.py:/app/policy.py:ro,Z" \
   -v "$ROOT/application-gateway/server.py:/app/server.py:ro,Z" \
   "localhost/llm-security-application-gateway:$IMAGE_VERSION" >/dev/null

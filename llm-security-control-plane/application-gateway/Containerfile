@@ -9,9 +9,12 @@ WORKDIR /app
 COPY --chmod=0444 shared/telemetry.py /app/telemetry.py
 COPY --chmod=0444 versions.lock.yaml /app/versions.lock.yaml
 COPY --chmod=0444 policies/application-policy.yaml /app/policies/application-policy.yaml
+COPY --chmod=0444 policies/application-users.yaml /app/policies/application-users.yaml
+COPY --chmod=0444 application-gateway/auth.py /app/auth.py
 COPY --chmod=0444 application-gateway/policy.py /app/policy.py
 COPY --chmod=0444 application-gateway/server.py /app/server.py
 COPY --chmod=0444 application-gateway/index.html /app/index.html
+RUN install -d -o 65532 -g 65532 -m 0700 /app/state
 
 USER 65532:65532
 EXPOSE 8000

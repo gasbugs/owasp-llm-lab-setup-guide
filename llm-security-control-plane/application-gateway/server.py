@@ -9,17 +9,21 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import secrets
 import time
 import uuid
 from pathlib import Path
+from typing import Optional
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import Cookie, FastAPI, Header, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from auth import AuthError, AuthService, InvalidCredentials, TokenReplay
 from policy import (
     AuthenticationError,
     AuthorizationError,
@@ -35,8 +39,32 @@ SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 TELEMETRY_INGEST_TOKEN = os.getenv("TELEMETRY_INGEST_TOKEN", "")
 RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
 APPLICATION_INTERNAL_TOKEN = os.getenv("APPLICATION_INTERNAL_TOKEN", "")
+AUTH_USERS_PATH = os.getenv("AUTH_USERS_PATH", "/app/policies/application-users.yaml")
+AUTH_STATE_DIR = os.getenv("AUTH_STATE_DIR", "/app/state")
+AUTH_ISSUER = os.getenv("AUTH_ISSUER", "http://127.0.0.1:18095")
+AUTH_AUDIENCE = os.getenv("AUTH_AUDIENCE", "llm-security-application")
+AUTH_EVENT_SINK = {
+    item.strip() for item in os.getenv("AUTH_EVENT_SINK", "stdout").split(",") if item.strip()
+}
+AUTH_ALLOWED_ORIGINS = {
+    item.strip()
+    for item in os.getenv(
+        "AUTH_ALLOWED_ORIGINS", "http://127.0.0.1:18095,http://localhost:18095"
+    ).split(",")
+    if item.strip()
+}
+AUTH_SECURE_COOKIE = os.getenv("AUTH_SECURE_COOKIE", "true").lower() == "true"
+AUTH_ADMIN_TOKEN = os.getenv("AUTH_ADMIN_TOKEN", "application-auth-admin-demo")
+LEGACY_STATIC_TOKEN_MODE = os.getenv("LEGACY_STATIC_TOKEN_MODE", "false").lower() == "true"
 if not APPLICATION_INTERNAL_TOKEN:
     raise RuntimeError("APPLICATION_INTERNAL_TOKEN is required")
+
+auth_service = AuthService(
+    users_path=AUTH_USERS_PATH,
+    state_dir=AUTH_STATE_DIR,
+    issuer=AUTH_ISSUER,
+    audience=AUTH_AUDIENCE,
+)
 
 app = FastAPI(title="LLM security application gateway", docs_url=None, redoc_url=None)
 configure_telemetry(app, "llm-security-application-gateway")
@@ -50,8 +78,63 @@ class ChatRequest(BaseModel):
     purpose: str = Field(default="public_information", min_length=1, max_length=100)
 
 
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=200)
+
+
 def emit_metadata(event: dict) -> None:
     print(json.dumps(event, ensure_ascii=False, separators=(",", ":")), flush=True)
+
+
+def token_fingerprint(authorization: Optional[str]) -> Optional[str]:
+    token = (authorization or "").partition(" ")[2]
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:16] if token else None
+
+
+async def emit_auth_event(event: dict) -> None:
+    payload = {
+        "event": "application_authentication",
+        "engine": "application-auth",
+        "direction": "authentication",
+        **event,
+    }
+    if "stdout" in AUTH_EVENT_SINK:
+        emit_metadata(payload)
+    if (
+        "monitor" not in AUTH_EVENT_SINK
+        or not SECURITY_MONITOR_URL
+        or not TELEMETRY_INGEST_TOKEN
+    ):
+        return
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.post(
+                f"{SECURITY_MONITOR_URL}/api/events/guardrail",
+                headers={"X-Telemetry-Token": TELEMETRY_INGEST_TOKEN},
+                json=payload,
+            )
+            response.raise_for_status()
+    except httpx.HTTPError:
+        emit_metadata({"event": "auth_event_delivery_failed", "request_id": payload.get("request_id")})
+
+
+def require_browser_origin(origin: Optional[str]) -> None:
+    if origin not in AUTH_ALLOWED_ORIGINS:
+        raise HTTPException(status_code=403, detail="trusted Origin required")
+
+
+def set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key="__Host-lab_refresh",
+        value=token,
+        max_age=auth_service.refresh_ttl,
+        httponly=True,
+        secure=AUTH_SECURE_COOKIE,
+        samesite="strict",
+        path="/",
+    )
 
 
 async def observe_guardrail(result: dict) -> None:
@@ -111,6 +194,126 @@ async def healthz() -> dict:
     return {"ok": True, "service": "llm-security-application-gateway", "version": RELEASE_VERSION}
 
 
+@app.get("/.well-known/jwks.json")
+async def jwks() -> dict:
+    return auth_service.jwks()
+
+
+@app.post("/.well-known/login")
+async def login(credentials: LoginRequest, request: Request) -> Response:
+    request_id = str(uuid.uuid4())
+    try:
+        pair = auth_service.authenticate_password(credentials.username, credentials.password)
+    except InvalidCredentials as exc:
+        await emit_auth_event({
+            "request_id": request_id,
+            "decision": "block",
+            "blocking_reason": str(exc),
+            "subject": credentials.username,
+            "client_ip": request.client.host if request.client else None,
+        })
+        raise HTTPException(status_code=401, detail="invalid username or password") from exc
+    await emit_auth_event({
+        "request_id": request_id,
+        "decision": "allow",
+        "subject": pair["subject"],
+        "jti": pair["access_jti"],
+        "client_ip": request.client.host if request.client else None,
+    })
+    response = JSONResponse({
+        "access_token": pair["access_token"],
+        "token_type": pair["token_type"],
+        "expires_in": pair["expires_in"],
+        "subject": pair["subject"],
+    })
+    set_refresh_cookie(response, pair["refresh_token"])
+    return response
+
+
+@app.post("/api/auth/refresh")
+async def refresh(
+    request: Request,
+    origin: Optional[str] = Header(default=None),
+    refresh_token: Optional[str] = Cookie(default=None, alias="__Host-lab_refresh"),
+) -> Response:
+    require_browser_origin(origin)
+    request_id = str(uuid.uuid4())
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="refresh token required")
+    try:
+        pair = auth_service.refresh(refresh_token)
+    except TokenReplay as exc:
+        await emit_auth_event({
+            "request_id": request_id,
+            "decision": "block",
+            "blocking_reason": str(exc),
+            "client_ip": request.client.host if request.client else None,
+        })
+        raise HTTPException(status_code=401, detail="refresh token reuse detected") from exc
+    except AuthError as exc:
+        await emit_auth_event({
+            "request_id": request_id,
+            "decision": "block",
+            "blocking_reason": str(exc),
+            "client_ip": request.client.host if request.client else None,
+        })
+        raise HTTPException(status_code=401, detail="invalid refresh token") from exc
+    await emit_auth_event({
+        "request_id": request_id,
+        "decision": "allow",
+        "subject": pair["subject"],
+        "jti": pair["access_jti"],
+        "auth_action": "refresh",
+        "client_ip": request.client.host if request.client else None,
+    })
+    response = JSONResponse({
+        "access_token": pair["access_token"],
+        "token_type": pair["token_type"],
+        "expires_in": pair["expires_in"],
+        "subject": pair["subject"],
+    })
+    set_refresh_cookie(response, pair["refresh_token"])
+    return response
+
+
+@app.post("/api/auth/logout", status_code=204)
+async def logout(
+    request: Request,
+    origin: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+    refresh_token: Optional[str] = Cookie(default=None, alias="__Host-lab_refresh"),
+) -> Response:
+    require_browser_origin(origin)
+    subject = None
+    for token, token_type in (
+        (refresh_token, "refresh"),
+        ((authorization or "").partition(" ")[2], "access"),
+    ):
+        if token:
+            try:
+                claims = auth_service.revoke(token, token_type)
+                subject = subject or claims["sub"]
+            except AuthError:
+                pass
+    await emit_auth_event({
+        "request_id": str(uuid.uuid4()),
+        "decision": "allow",
+        "subject": subject,
+        "auth_action": "logout",
+        "client_ip": request.client.host if request.client else None,
+    })
+    response = Response(status_code=204)
+    response.delete_cookie("__Host-lab_refresh", path="/")
+    return response
+
+
+@app.post("/api/auth/keys/rotate")
+async def rotate_key(x_auth_admin_token: Optional[str] = Header(default=None)) -> dict:
+    if not secrets.compare_digest(x_auth_admin_token or "", AUTH_ADMIN_TOKEN):
+        raise HTTPException(status_code=403, detail="auth admin token required")
+    return {"kid": auth_service.rotate_key(), "jwks": auth_service.jwks()}
+
+
 @app.get("/api/security/policy")
 async def policy() -> dict:
     return {
@@ -125,8 +328,9 @@ async def policy() -> dict:
 
 @app.post("/api/chat")
 async def chat(
+    request_context: Request,
     request: ChatRequest,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ) -> dict:
     started = time.perf_counter()
     request_id = str(uuid.uuid4())
@@ -134,11 +338,22 @@ async def chat(
 
     # 1) 인증은 모델을 호출하기 전에 Application이 결정한다.
     try:
-        principal = authenticate(authorization)
+        principal = authenticate(
+            authorization,
+            auth_service=auth_service,
+            legacy_static_tokens=LEGACY_STATIC_TOKEN_MODE,
+        )
         application_stages.append(
             {"stage": "application_authentication", "decision": "allow", "subject": principal.subject}
         )
     except AuthenticationError as exc:
+        await emit_auth_event({
+            "request_id": request_id,
+            "decision": "block",
+            "blocking_reason": str(exc),
+            "token_fingerprint": token_fingerprint(authorization),
+            "client_ip": request_context.client.host if request_context.client else None,
+        })
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
     # 2) 인증된 Principal의 역할·목적·데이터 등급으로 RAG 접근을 인가한다.

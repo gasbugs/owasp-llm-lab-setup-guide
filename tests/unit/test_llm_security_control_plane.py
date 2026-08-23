@@ -14,6 +14,9 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 CONTROL = ROOT / "llm-security-control-plane"
 
+# The application gateway directory is not a Python package in the container image.
+sys.path.insert(0, str(CONTROL / "application-gateway"))
+
 
 def load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -109,6 +112,19 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertEqual(selected["authorized_by"], "application-policy")
         self.assertNotIn("prohibited", policy.RAG_STORES)
 
+    def test_application_auth_contract_is_rs256_and_stateful(self) -> None:
+        source = (CONTROL / "application-gateway/auth.py").read_text()
+        server = (CONTROL / "application-gateway/server.py").read_text()
+        users = yaml.safe_load((CONTROL / "policies/application-users.yaml").read_text())
+
+        self.assertIn('algorithm="RS256"', source)
+        self.assertIn('audience=self.audience', source)
+        self.assertIn('issuer=self.issuer', source)
+        self.assertIn("refresh-token-reuse", source)
+        self.assertIn('@app.post("/.well-known/login")', server)
+        self.assertIn('@app.get("/.well-known/jwks.json")', server)
+        self.assertEqual(set(users["users"]), {"public-reader", "internal-analyst", "support-agent"})
+
     def test_logs_exclude_raw_content_fields(self) -> None:
         for relative in (
             "application-gateway/server.py",
@@ -134,7 +150,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
     def test_external_test_tools_target_application_gateway(self) -> None:
         promptfoo = (CONTROL / "tests/promptfoo/promptfooconfig.yaml").read_text()
         self.assertIn("{{env.CONTROL_PLANE_APP_URL}}/api/chat", promptfoo)
-        self.assertIn("Bearer hub-public-reader-token", promptfoo)
+        self.assertIn("Bearer {{env.CONTROL_PLANE_ACCESS_TOKEN}}", promptfoo)
         self.assertIn("maxConcurrency: 1", promptfoo)
         self.assertIn("GARAK-PROMOTED", promptfoo)
         generator = json.loads(

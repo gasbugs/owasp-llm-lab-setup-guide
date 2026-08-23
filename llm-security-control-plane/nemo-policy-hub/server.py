@@ -390,7 +390,6 @@ async def chat(
         model_result = await call_main_model(
             message_for_model,
             context_for_model,
-            apply_provider_guardrail=GUARD_MODE != "off",
         )
         if isinstance(model_result, str):
             model_result = {

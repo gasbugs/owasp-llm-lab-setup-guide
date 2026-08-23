@@ -5,8 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
+from typing import Dict, Optional
 
 import yaml
+
+from auth import AuthError, AuthService
 
 
 _runtime_policy = Path("/app/policies/application-policy.yaml")
@@ -76,15 +79,35 @@ RAG_STORES = {
 }
 
 
-def authenticate(authorization: str | None) -> Principal:
+def authenticate(
+    authorization: Optional[str],
+    auth_service: AuthService,
+    legacy_static_tokens: bool = False,
+) -> Principal:
     scheme, _, token = (authorization or "").partition(" ")
-    principal = PRINCIPALS.get(token) if scheme.lower() == "bearer" else None
-    if principal is None:
+    if scheme.lower() != "bearer" or not token:
         raise AuthenticationError("valid application bearer token required")
-    return principal
+    if legacy_static_tokens and token in PRINCIPALS:
+        return PRINCIPALS[token]
+    try:
+        claims = auth_service.verify_access(token)
+    except AuthError as exc:
+        raise AuthenticationError(str(exc)) from exc
+    return Principal(
+        subject=str(claims["sub"]),
+        roles=frozenset(str(value) for value in claims["roles"]),
+        allowed_classifications=frozenset(
+            str(value) for value in claims.get("allowed_classifications", [])
+        ),
+        allowed_purposes=frozenset(
+            str(value) for value in claims.get("allowed_purposes", [])
+        ),
+    )
 
 
-def authorize_retrieval(principal: Principal, classification: str, purpose: str) -> dict | None:
+def authorize_retrieval(
+    principal: Principal, classification: str, purpose: str
+) -> Optional[Dict]:
     if classification == "none":
         return None
     classification_policy = POLICY["classifications"].get(classification)
@@ -107,7 +130,7 @@ def authorize_retrieval(principal: Principal, classification: str, purpose: str)
 def public_policy() -> dict:
     return {
         "policy_id": POLICY["policy_id"],
-        "authentication_source": "server-side-bearer-token-map",
+        "authentication_source": "application-rs256-jwt",
         "classifications": list(POLICY["classifications"]),
         "prohibited_policy": "not-stored-and-never-sent-to-model",
         "rag_stores": {

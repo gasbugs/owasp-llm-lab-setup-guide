@@ -12,7 +12,7 @@ providers:
       url: "{{env.CONTROL_PLANE_APP_URL}}/api/chat"
       method: POST
       headers:
-        Authorization: "Bearer hub-public-reader-token"
+        Authorization: "Bearer {{env.CONTROL_PLANE_ACCESS_TOKEN}}"
         Content-Type: application/json
       body:
         message: "{{prompt}}"

@@ -28,6 +28,7 @@ python_packages:
   presidio_analyzer: 2.2.362
   presidio_anonymizer: 2.2.362
   pydantic: 2.13.4
+  pyjwt: 2.10.1
   pyyaml: 6.0.3
   spacy: 3.8.15
   spacy_model: en_core_web_sm-3.8.0
