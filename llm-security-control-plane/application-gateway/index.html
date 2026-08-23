@@ -1,53 +1,205 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>LLM Security Control Plane</title>
+  <title>Cloud Security · LLM Lab Control Center</title>
   <style>
-    :root{color-scheme:dark;--bg:#07111f;--panel:#0e1c2f;--line:#24405f;--text:#e8f1fb;--muted:#9db1c7;--ok:#41d39a;--bad:#ff7185}
-    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#173256 0,var(--bg) 45%);font:16px/1.5 system-ui;color:var(--text)}
-    main{max-width:1100px;margin:auto;padding:32px 20px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{background:rgba(14,28,47,.94);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 20px 50px #0006}
-    h1{font-size:28px;margin:0 0 8px}h2{font-size:18px;margin:0 0 14px}.muted{color:var(--muted)}label{display:block;margin:12px 0 5px}select,input,textarea,button{width:100%;border:1px solid var(--line);border-radius:8px;background:#081525;color:var(--text);padding:11px}textarea{min-height:130px;resize:vertical}button{margin-top:14px;background:#2774d8;border:0;font-weight:700;cursor:pointer}.secondary{background:#26384d}.auth-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stages{display:flex;flex-wrap:wrap;gap:7px}.stage{padding:6px 9px;border-radius:999px;background:#152b45;border:1px solid var(--line);font-size:13px}.allow,.redact{color:var(--ok)}.block,.infra{color:var(--bad)}pre{white-space:pre-wrap;word-break:break-word;background:#07111f;padding:14px;border-radius:8px;min-height:100px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+    :root {
+      color-scheme: dark;
+      --canvas:#071018; --surface:#0c1822; --surface-raised:#112330; --rail:#1b3445;
+      --line:#284353; --line-soft:#1a303d; --ink:#e8f0f4; --muted:#8fa7b5;
+      --signal:#55c2d8; --warning:#f0b35b; --incident:#ff6978; --verified:#55d69e;
+      --shadow:0 24px 70px rgba(0,0,0,.34); --radius:14px;
+    }
+    html[data-theme="light"] {
+      color-scheme: light;
+      --canvas:#e9eff1; --surface:#f7fafb; --surface-raised:#ffffff; --rail:#d8e4e8;
+      --line:#b8cbd2; --line-soft:#dbe5e8; --ink:#10232d; --muted:#607985;
+      --signal:#087f98; --warning:#9a6208; --incident:#c6384c; --verified:#167b55;
+      --shadow:0 22px 60px rgba(23,49,61,.13);
+    }
+    * { box-sizing:border-box; }
+    html { min-width:320px; }
+    body {
+      margin:0; min-height:100vh; background:var(--canvas); color:var(--ink);
+      font:15px/1.55 "Segoe UI", "Noto Sans KR", sans-serif;
+    }
+    body::before {
+      content:""; position:fixed; inset:0; pointer-events:none; opacity:.42;
+      background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+      background-size:48px 48px; mask-image:linear-gradient(to bottom,#000,transparent 72%);
+    }
+    button,input,select,textarea { font:inherit; }
+    button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible {
+      outline:3px solid color-mix(in srgb,var(--signal) 38%,transparent); outline-offset:2px;
+    }
+    .shell { position:relative; width:min(1440px,100%); margin:auto; padding:22px; }
+    .masthead {
+      display:grid; grid-template-columns:auto 1fr auto; gap:22px; align-items:center;
+      border:1px solid var(--line); background:color-mix(in srgb,var(--surface) 94%,transparent);
+      box-shadow:var(--shadow); padding:18px 20px;
+    }
+    .brand-kicker,.eyebrow,.micro-label {
+      color:var(--signal); font:700 11px/1.2 ui-monospace,"SFMono-Regular",Consolas,monospace;
+      letter-spacing:.15em; text-transform:uppercase;
+    }
+    .brand h1 {
+      margin:4px 0 0; font:800 clamp(21px,2.3vw,34px)/.95 "Arial Narrow","Roboto Condensed","Segoe UI",sans-serif;
+      letter-spacing:.025em; text-transform:uppercase;
+    }
+    .brand h1 span { color:var(--signal); }
+    .mission { max-width:680px; color:var(--muted); font-size:13px; }
+    .top-actions { display:flex; align-items:center; gap:10px; }
+    .status-beacon { display:flex; align-items:center; gap:8px; color:var(--verified); font:700 11px ui-monospace,monospace; }
+    .status-beacon::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; box-shadow:0 0 0 4px color-mix(in srgb,currentColor 15%,transparent); }
+    .icon-button {
+      width:auto; min-width:42px; height:42px; margin:0; border:1px solid var(--line); border-radius:10px;
+      background:var(--surface-raised); color:var(--ink); cursor:pointer; font-weight:800;
+    }
+    .console-grid { display:grid; grid-template-columns:minmax(320px,.78fr) minmax(430px,1.22fr); gap:16px; margin-top:16px; }
+    .panel { border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
+    .panel-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; padding:18px 20px; border-bottom:1px solid var(--line-soft); }
+    .panel-head h2 { margin:4px 0 0; font:750 18px/1.2 "Arial Narrow","Segoe UI",sans-serif; letter-spacing:.02em; }
+    .panel-code { color:var(--muted); font:11px ui-monospace,monospace; }
+    .workbench { padding:18px 20px 20px; }
+    .field { display:grid; gap:6px; margin-bottom:14px; }
+    .field label { color:var(--muted); font-size:12px; font-weight:700; }
+    select,input,textarea {
+      width:100%; border:1px solid var(--line); border-radius:9px; background:var(--surface-raised);
+      color:var(--ink); padding:11px 12px; transition:border-color .16s,box-shadow .16s;
+    }
+    select:hover,input:hover,textarea:hover { border-color:var(--signal); }
+    textarea { min-height:148px; resize:vertical; }
+    .split-fields,.auth-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .action {
+      width:100%; border:1px solid transparent; border-radius:9px; padding:11px 14px;
+      background:var(--signal); color:#06131a; font-weight:800; cursor:pointer; transition:transform .16s,filter .16s;
+    }
+    .action:hover { transform:translateY(-1px); filter:brightness(1.06); }
+    .action.secondary { background:transparent; border-color:var(--line); color:var(--ink); }
+    .action.primary { margin-top:4px; padding:13px; }
+    .auth-status { margin:9px 0 15px; min-height:21px; color:var(--muted); font:12px ui-monospace,monospace; }
+    .flight-board { padding:20px; }
+    .flight-summary { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; margin-bottom:18px; }
+    .flight-summary p { margin:5px 0 0; color:var(--muted); font-size:13px; }
+    .decision-badge { min-width:112px; padding:9px 12px; border:1px solid var(--line); color:var(--muted); text-align:center; font:800 12px ui-monospace,monospace; letter-spacing:.08em; }
+    .decision-badge.allow,.decision-badge.redact { border-color:var(--verified); color:var(--verified); }
+    .decision-badge.block,.decision-badge.infra { border-color:var(--incident); color:var(--incident); }
+    .flight-path { position:relative; display:grid; grid-template-columns:repeat(6,minmax(72px,1fr)); gap:8px; padding:8px 0 22px; }
+    .flight-path::before { content:""; position:absolute; left:7%; right:7%; top:30px; height:1px; background:var(--line); }
+    .checkpoint { position:relative; z-index:1; text-align:center; }
+    .checkpoint-dot { display:grid; place-items:center; width:44px; height:44px; margin:auto; border:1px solid var(--line); border-radius:50%; background:var(--surface-raised); color:var(--muted); font:800 11px ui-monospace,monospace; }
+    .checkpoint.active .checkpoint-dot { border-color:var(--signal); color:var(--signal); box-shadow:0 0 0 5px color-mix(in srgb,var(--signal) 12%,transparent); }
+    .checkpoint.allow .checkpoint-dot,.checkpoint.redact .checkpoint-dot { border-color:var(--verified); color:var(--verified); }
+    .checkpoint.block .checkpoint-dot,.checkpoint.infra .checkpoint-dot { border-color:var(--incident); color:var(--incident); }
+    .checkpoint strong { display:block; margin-top:8px; font-size:11px; }
+    .checkpoint small { display:block; color:var(--muted); font:9px ui-monospace,monospace; }
+    .stage-strips { display:grid; gap:7px; min-height:48px; }
+    .stage {
+      display:grid; grid-template-columns:28px minmax(130px,1fr) auto; gap:10px; align-items:center;
+      border-left:3px solid var(--line); background:var(--surface-raised); padding:9px 11px;
+      font:11px ui-monospace,monospace;
+    }
+    .stage::before { content:"→"; color:var(--signal); }
+    .stage.allow,.stage.redact { border-color:var(--verified); }
+    .stage.block,.stage.infra { border-color:var(--incident); }
+    .empty-strip { border:1px dashed var(--line); padding:13px; color:var(--muted); font-size:12px; text-align:center; }
+    .result-grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr); gap:16px; margin-top:16px; }
+    .result-body { padding:20px; }
+    pre { margin:0; white-space:pre-wrap; word-break:break-word; color:var(--ink); font:13px/1.65 ui-monospace,"SFMono-Regular",Consolas,monospace; }
+    #reply { min-height:120px; }
+    details { height:100%; }
+    summary { cursor:pointer; color:var(--signal); font-weight:700; }
+    details pre { margin-top:14px; max-height:310px; overflow:auto; }
+    @media (max-width:980px) {
+      .masthead { grid-template-columns:1fr auto; }.mission { grid-column:1/-1; grid-row:2; }
+      .console-grid,.result-grid { grid-template-columns:1fr; }.flight-path { overflow-x:auto; }
+    }
+    @media (max-width:620px) {
+      .shell { padding:10px; }.masthead,.panel-head,.workbench,.flight-board,.result-body { padding:15px; }
+      .status-beacon { display:none; }.split-fields { grid-template-columns:1fr; }
+      .flight-path { grid-template-columns:repeat(6,82px); }.stage { grid-template-columns:22px 1fr; }.stage span:last-child { grid-column:2; }
+    }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; } }
   </style>
 </head>
-<body><main>
-  <h1>LLM Security Control Plane</h1>
-  <p class="muted">브라우저는 Application만 호출하고, NeMo 허브가 Presidio·일반 콘텐츠 안전 정책·Self-check·Amazon Bedrock을 순서대로 집행합니다.</p>
-  <div class="grid">
-    <section class="panel">
-      <h2>프롬프트와 애플리케이션 권한</h2>
-      <label for="username">사용자</label>
-      <select id="username"><option value="public-reader">공개 자료 사용자</option><option value="internal-analyst">내부 분석가</option><option value="support-agent">지원 담당자</option></select>
-      <label for="password">비밀번호</label>
-      <input id="password" type="password" value="public-reader-demo" autocomplete="current-password">
-      <div class="auth-actions"><button id="login">로그인</button><button id="logout" class="secondary">로그아웃</button></div>
-      <div id="auth-status" class="muted">로그인하지 않았습니다.</div>
-      <label for="classification">RAG 등급</label>
-      <select id="classification"><option value="none">검색 안 함</option><option value="public">공개</option><option value="internal">내부</option><option value="restricted">제한</option></select>
-      <label for="purpose">업무 목적</label>
-      <select id="purpose"><option value="public_information">공개 정보</option><option value="incident_response">사고 대응</option><option value="customer_support">고객 지원</option></select>
-      <label for="message">프롬프트 입력</label>
-      <textarea id="message">공개 보안 연락처를 알려 주세요.</textarea>
-      <button id="send">보안 처리 흐름 실행</button>
+<body>
+<main class="shell">
+  <header class="masthead">
+    <div class="brand">
+      <div class="brand-kicker">Cloud Security</div>
+      <h1>LLM Lab <span>// Control Center</span></h1>
+    </div>
+    <div class="mission">Application이 인증·인가를 확정하고, NeMo가 Presidio·Content Safety·Self-check·Amazon Bedrock을 순서대로 조정합니다.</div>
+    <div class="top-actions">
+      <div class="status-beacon">LOCAL CONTROL PLANE</div>
+      <button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button>
+    </div>
+  </header>
+
+  <div class="console-grid">
+    <section class="panel" aria-labelledby="workbench-title">
+      <header class="panel-head"><div><div class="eyebrow">Request workbench</div><h2 id="workbench-title">대화와 애플리케이션 권한</h2></div><span class="panel-code">APP / 18095</span></header>
+      <div class="workbench">
+        <div class="field"><label for="username">실습 사용자</label><select id="username"><option value="public-reader">공개 자료 사용자</option><option value="internal-analyst">내부 분석가</option><option value="support-agent">지원 담당자</option></select></div>
+        <div class="field"><label for="password">비밀번호</label><input id="password" type="password" value="public-reader-demo" autocomplete="current-password"></div>
+        <div class="auth-actions"><button id="login" class="action" type="button">로그인</button><button id="logout" class="action secondary" type="button">로그아웃</button></div>
+        <div id="auth-status" class="auth-status" aria-live="polite">AUTH / 로그인하지 않았습니다.</div>
+        <div class="split-fields">
+          <div class="field"><label for="classification">RAG 정보 등급</label><select id="classification"><option value="none">검색 안 함</option><option value="public">공개</option><option value="internal">내부</option><option value="restricted">제한</option></select></div>
+          <div class="field"><label for="purpose">업무 목적</label><select id="purpose"><option value="public_information">공개 정보</option><option value="incident_response">사고 대응</option><option value="customer_support">고객 지원</option></select></div>
+        </div>
+        <div class="field"><label for="message">프롬프트 입력</label><textarea id="message">공개 보안 연락처를 알려 주세요.</textarea></div>
+        <button id="send" class="action primary" type="button">보안 처리 흐름 실행</button>
+      </div>
     </section>
-    <section class="panel">
-      <h2>최종 판정</h2><div id="decision" class="muted">아직 실행하지 않았습니다.</div>
-      <h2 style="margin-top:20px">실행 단계</h2><div id="stages" class="stages"></div>
-      <h2 style="margin-top:20px">사용자 응답</h2><pre id="reply"></pre>
-      <details><summary>구조화된 원본 응답</summary><pre id="raw"></pre></details>
+
+    <section class="panel" aria-labelledby="flight-title">
+      <header class="panel-head"><div><div class="eyebrow">Security flight path</div><h2 id="flight-title">요청 처리 경로</h2></div><span class="panel-code">TRACE / LIVE</span></header>
+      <div class="flight-board">
+        <div class="flight-summary"><div><div class="micro-label">Current disposition</div><p id="decision-copy">요청을 실행하면 각 보안 경계의 판정이 여기에 표시됩니다.</p></div><div id="decision" class="decision-badge" aria-live="polite">STANDBY</div></div>
+        <div class="flight-path" aria-label="Application에서 출력 정책까지의 보안 처리 경로">
+          <div class="checkpoint" data-stage="application"><div class="checkpoint-dot">01</div><strong>AUTH</strong><small>Application</small></div>
+          <div class="checkpoint" data-stage="presidio_input"><div class="checkpoint-dot">02</div><strong>PRIVACY</strong><small>Presidio</small></div>
+          <div class="checkpoint" data-stage="nemo_input_rails"><div class="checkpoint-dot">03</div><strong>INPUT</strong><small>NeMo rails</small></div>
+          <div class="checkpoint" data-stage="bedrock_main"><div class="checkpoint-dot">04</div><strong>MODEL</strong><small>Bedrock</small></div>
+          <div class="checkpoint" data-stage="nemo_output_rails"><div class="checkpoint-dot">05</div><strong>OUTPUT</strong><small>NeMo rails</small></div>
+          <div class="checkpoint" data-stage="presidio_output"><div class="checkpoint-dot">06</div><strong>RELEASE</strong><small>Privacy</small></div>
+        </div>
+        <div id="stages" class="stage-strips"><div class="empty-strip">NO ACTIVE REQUEST / 대기 중</div></div>
+      </div>
     </section>
+  </div>
+
+  <div class="result-grid">
+    <section class="panel"><header class="panel-head"><div><div class="eyebrow">Released response</div><h2>사용자 응답</h2></div><span class="panel-code">OUTPUT</span></header><div class="result-body"><pre id="reply">아직 실행하지 않았습니다.</pre></div></section>
+    <section class="panel"><header class="panel-head"><div><div class="eyebrow">Evidence payload</div><h2>구조화된 원본</h2></div><span class="panel-code">JSON</span></header><div class="result-body"><details><summary>원본 응답 펼치기</summary><pre id="raw">{}</pre></details></div></section>
   </div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
 const passwords={'public-reader':'public-reader-demo','internal-analyst':'internal-analyst-demo','support-agent':'support-agent-demo'};
+const themeButton=$('theme-toggle');
 let accessToken='';
+function setTheme(theme){document.documentElement.dataset.theme=theme;localStorage.setItem('llm-lab-theme',theme);themeButton.setAttribute('aria-label',`${theme==='dark'?'라이트':'다크'} 테마로 전환`)}
+setTheme(localStorage.getItem('llm-lab-theme')||'dark');
+themeButton.onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 $('username').onchange=()=>{$('password').value=passwords[$('username').value]};
-async function login(){const r=await fetch('/.well-known/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('username').value,password:$('password').value})});const d=await r.json();if(!r.ok)throw new Error(d.detail||'로그인 실패');accessToken=d.access_token;$('auth-status').textContent=`${d.subject} 로그인됨 · ${d.expires_in}초`;return d}
+async function login(){const r=await fetch('/.well-known/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('username').value,password:$('password').value})});const d=await r.json();if(!r.ok)throw new Error(d.detail||'로그인 실패');accessToken=d.access_token;$('auth-status').textContent=`AUTH / ${d.subject} 로그인 · ${d.expires_in}초`;return d}
 async function refresh(){const r=await fetch('/api/auth/refresh',{method:'POST'});if(!r.ok)return false;const d=await r.json();accessToken=d.access_token;return true}
-$('login').onclick=async()=>{try{await login()}catch(e){accessToken='';$('auth-status').textContent=String(e)}};
-$('logout').onclick=async()=>{await fetch('/api/auth/logout',{method:'POST',headers:accessToken?{'Authorization':'Bearer '+accessToken}:{}});accessToken='';$('auth-status').textContent='로그아웃했습니다.'};
-$('send').onclick=async()=>{const body={message:$('message').value,classification:$('classification').value,purpose:$('purpose').value};$('decision').textContent='처리 중…';$('stages').innerHTML='';
-try{if(!accessToken)await login();let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});if(r.status===401&&await refresh())r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});const d=await r.json();const decision=d.application_decision||'infra';$('decision').className=decision;$('decision').textContent=`${decision.toUpperCase()} · request_id=${d.request_id||'-'}`;$('reply').textContent=d.reply||JSON.stringify(d);const stages=[...(d.application_stages||[]),...((d.guardrail||{}).stages||[])];$('stages').innerHTML=stages.map(s=>`<span class="stage">${s.stage} · ${s.decision}</span>`).join('');$('raw').textContent=JSON.stringify(d,null,2)}catch(e){$('decision').className='infra';$('decision').textContent='INFRA';$('reply').textContent=String(e)}};
-</script></body></html>
+$('login').onclick=async()=>{try{await login()}catch(e){accessToken='';$('auth-status').textContent=`AUTH / ${String(e)}`}};
+$('logout').onclick=async()=>{await fetch('/api/auth/logout',{method:'POST',headers:accessToken?{'Authorization':'Bearer '+accessToken}:{}});accessToken='';$('auth-status').textContent='AUTH / 로그아웃했습니다.'};
+function renderStages(stages){
+  document.querySelectorAll('.checkpoint').forEach(node=>node.className='checkpoint');
+  $('stages').replaceChildren();
+  if(!stages.length){const empty=document.createElement('div');empty.className='empty-strip';empty.textContent='NO STAGE EVIDENCE / 단계 증거 없음';$('stages').appendChild(empty);return}
+  stages.forEach((stage,index)=>{const strip=document.createElement('div');strip.className=`stage ${stage.decision||''}`;const order=document.createElement('span');order.textContent=String(index+1).padStart(2,'0');const name=document.createElement('strong');name.textContent=String(stage.stage||'unknown');const decision=document.createElement('span');decision.textContent=String(stage.decision||'observed').toUpperCase();strip.append(order,name,decision);$('stages').appendChild(strip)});
+  for(const stage of stages){const node=[...document.querySelectorAll('[data-stage]')].find(item=>item.dataset.stage===stage.stage);if(node)node.classList.add(stage.decision||'active')}
+  const appNode=document.querySelector('[data-stage="application"]');if(appNode)appNode.classList.add('allow');
+}
+$('send').onclick=async()=>{const body={message:$('message').value,classification:$('classification').value,purpose:$('purpose').value};$('decision').className='decision-badge';$('decision').textContent='IN FLIGHT';$('decision-copy').textContent='정책 경계를 순서대로 통과하고 있습니다.';$('stages').innerHTML='<div class="empty-strip">REQUEST IN FLIGHT / 처리 중</div>';
+try{if(!accessToken)await login();let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});if(r.status===401&&await refresh())r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});const d=await r.json();const decision=d.application_decision||'infra';$('decision').className=`decision-badge ${decision}`;$('decision').textContent=decision.toUpperCase();$('decision-copy').textContent=`request_id=${d.request_id||'-'}`;$('reply').textContent=d.reply||JSON.stringify(d);const stages=[...(d.application_stages||[]),...((d.guardrail||{}).stages||[])];renderStages(stages);$('raw').textContent=JSON.stringify(d,null,2)}catch(e){$('decision').className='decision-badge infra';$('decision').textContent='INFRA';$('decision-copy').textContent='요청 경로를 완료하지 못했습니다.';$('reply').textContent=String(e);renderStages([])}};
+</script>
+</body>
+</html>
