@@ -136,7 +136,16 @@
     .map-link.active::after { border-left-color:var(--signal); }
     .node-browser { grid-column:1; }.link-browser-app { grid-column:2; }.node-application { grid-column:3; }
     .link-app-hub { grid-column:4; }.node-nemo { grid-column:5; }.link-hub-spokes { grid-column:6; }
-    .spoke-stack { grid-column:7/10; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .spoke-stack { grid-column:7/10; display:grid; grid-template-columns:minmax(120px,.72fr) minmax(260px,1.28fr); gap:8px; }
+    .gateway-branch { display:grid; grid-template-columns:minmax(110px,.8fr) 24px minmax(130px,1fr); gap:7px; align-items:center; }
+    .gateway-targets { display:grid; gap:7px; }
+    .branch-link { position:relative; height:52%; border-left:1px solid var(--line); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .branch-link::before,.branch-link::after { content:""; position:absolute; right:-1px; width:7px; height:1px; background:var(--line); }
+    .branch-link::before { top:-1px; }.branch-link::after { bottom:-1px; }
+    .branch-link.active { border-color:var(--signal); box-shadow:-5px 0 12px color-mix(in srgb,var(--signal) 18%,transparent); }
+    .branch-link.active::before,.branch-link.active::after { background:var(--signal); }
+    .service-node.aws-target { min-height:70px; text-align:left; }
+    .service-node.aws-target::before { content:attr(data-api); }
     .exchange-head { display:flex; justify-content:space-between; gap:16px; align-items:end; margin:22px 0 10px; }
     .exchange-head p { margin:4px 0 0; color:var(--muted); font-size:12px; }
     .exchange-count { color:var(--signal); font:700 11px ui-monospace,monospace; }
@@ -164,7 +173,8 @@
       .shell { padding:10px; }.masthead,.panel-head,.workbench,.flight-board,.result-body { padding:15px; }
       .status-beacon { display:none; }.split-fields { grid-template-columns:1fr; }
       .flight-path { grid-template-columns:repeat(6,82px); }.stage { grid-template-columns:22px 1fr; }.stage span:last-child { grid-column:2; }
-      .architecture-body { padding:15px; }.topology-map { padding:10px; }.spoke-stack { grid-template-columns:1fr 1fr; }
+      .architecture-body { padding:15px; }.topology-map { padding:10px; }.spoke-stack { grid-template-columns:1fr; }
+      .gateway-branch { grid-template-columns:minmax(100px,.8fr) 20px minmax(120px,1fr); }
       .service-node { min-height:88px; padding:10px 7px; }.exchange-head { align-items:flex-start; }.exchange { gap:8px; padding:10px; }
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; } }
@@ -235,7 +245,14 @@
         <div class="map-link link-hub-spokes" data-link="nemo-dependencies" aria-hidden="true"></div>
         <div class="spoke-stack">
           <div class="service-node" data-service="presidio" data-port=":18093"><strong>Presidio</strong><small>PII 탐지·비식별화</small></div>
-          <div class="service-node" data-service="bedrock" data-port=":18096"><strong>Bedrock Gateway</strong><small>Nova Lite·Knowledge Base</small></div>
+          <div class="gateway-branch">
+            <div class="service-node" data-service="bedrock" data-port=":18096"><strong>Bedrock Gateway</strong><small>AWS 자격 증명 격리</small></div>
+            <div class="branch-link" data-link="bedrock-targets" aria-hidden="true"></div>
+            <div class="gateway-targets">
+              <div class="service-node aws-target" data-service="knowledge-base" data-api="RETRIEVE"><strong>Knowledge Base</strong><small>RAG Retrieval</small></div>
+              <div class="service-node aws-target" data-service="nova" data-api="CONVERSE"><strong>Nova Lite</strong><small>Inference</small></div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="exchange-head"><div><div class="micro-label">Observed exchanges</div><p>응답에 포함된 실제 stage metadata를 서비스 간 요청·응답으로 번역합니다. Prompt와 내부 Token은 표시하지 않습니다.</p></div><div id="exchange-count" class="exchange-count">0 EXCHANGES</div></div>
@@ -267,20 +284,20 @@ function renderStages(stages){
 const exchangeCatalog={
   application_authentication:{from:'Browser',to:'Application',route:'POST /api/chat',request:'Bearer token 검증 요청',response:s=>`주체 ${s.subject||'-'} 인증`},
   application_authorization:{from:'Application',to:'Policy',route:'LOCAL authorize_retrieval()',request:s=>`${s.classification||'none'} · ${s.purpose||'-'}`,response:()=>`정적 권한 정책 판정`},
-  application_rag_selection:{from:'Application',to:'Bedrock Gateway',route:'POST /v1/retrieve',request:'인가된 검색 질의',response:s=>`${s.chunk_count||0}개 허용 chunk 반환`},
+  application_rag_selection:{from:'Application',to:'Bedrock Gateway',target:'knowledge-base',route:'POST /v1/retrieve',request:'인가된 검색 질의',response:s=>`${s.chunk_count||0}개 허용 chunk 반환`},
   application_hub_request:{from:'Application',to:'NeMo Hub',route:'POST /api/chat',request:'검증된 Principal · 인가된 Context',response:s=>`Guardrail ${String(s.decision||'infra').toUpperCase()} · ${s.duration_ms||0} ms`},
   presidio_input:{from:'NeMo Hub',to:'Presidio',route:'POST /api/analyze',request:'입력 PII 분석',response:s=>`${s.detection_count||0}건 탐지`},
-  nemo_input_rails:{from:'NeMo Hub',to:'Bedrock Gateway',route:'POST /v1/chat/completions',request:'Content Safety · Self-check input',response:s=>`${(s.metrics||{}).llm_calls_count||0}회 Rail 판정`},
+  nemo_input_rails:{from:'NeMo Hub',to:'Bedrock Gateway',target:'nova',route:'POST /v1/chat/completions',request:'Content Safety · Self-check input',response:s=>`${(s.metrics||{}).llm_calls_count||0}회 Rail 판정`},
   presidio_retrieval:{from:'NeMo Hub',to:'Presidio',route:'POST /api/analyze',request:'검색 문서 PII 분석',response:s=>`${s.detection_count||0}건 탐지`},
-  bedrock_main:{from:'NeMo Hub',to:'Bedrock Gateway',route:'POST /v1/chat/completions',request:s=>`Nova Lite · ${s.model||'model'}`,response:s=>`${s.stop_reason||'unknown'} · output ${(s.usage||{}).output_tokens||0} tokens`},
-  nemo_output_rails:{from:'NeMo Hub',to:'Bedrock Gateway',route:'POST /v1/chat/completions',request:'Content Safety · Self-check output',response:s=>`${(s.metrics||{}).llm_calls_count||0}회 Rail 판정`},
+  bedrock_main:{from:'NeMo Hub',to:'Bedrock Gateway',target:'nova',route:'POST /v1/chat/completions',request:s=>`Nova Lite · ${s.model||'model'}`,response:s=>`${s.stop_reason||'unknown'} · output ${(s.usage||{}).output_tokens||0} tokens`},
+  nemo_output_rails:{from:'NeMo Hub',to:'Bedrock Gateway',target:'nova',route:'POST /v1/chat/completions',request:'Content Safety · Self-check output',response:s=>`${(s.metrics||{}).llm_calls_count||0}회 Rail 판정`},
   presidio_output:{from:'NeMo Hub',to:'Presidio',route:'POST /api/analyze',request:'생성 응답 PII 분석',response:s=>`${s.detection_count||0}건 탐지`},
   application_final_enforcement:{from:'Application',to:'Browser',route:'HTTP response',request:'내부 응답 계약 재검증',response:s=>`최종 ${String(s.decision||'infra').toUpperCase()}`}
 };
 function valueOf(value,stage){return typeof value==='function'?value(stage):value}
 function composeTraceStages(data){const application=data.application_stages||[];const final=application.filter(stage=>stage.stage==='application_final_enforcement');const beforeFinal=application.filter(stage=>stage.stage!=='application_final_enforcement');const guardrail=data.guardrail||{};const guardStages=guardrail.stages||[];const hub=guardStages.length?[{stage:'application_hub_request',decision:guardrail.decision||data.application_decision,duration_ms:guardrail.duration_ms}]:[];return [...beforeFinal,...hub,...guardStages,...final]}
 function resetTopology(){document.querySelectorAll('[data-service],[data-link]').forEach(node=>node.classList.remove('active','block'))}
-function activateTopology(exchange,decision){const names={Browser:'browser',Application:'application','NeMo Hub':'nemo',Presidio:'presidio','Bedrock Gateway':'bedrock'};for(const endpoint of [exchange.from,exchange.to]){const name=names[endpoint];if(name){const node=document.querySelector(`[data-service="${name}"]`);if(node)node.classList.add(decision==='block'||decision==='infra'?'block':'active')}}if((exchange.from==='Browser'&&exchange.to==='Application')||(exchange.from==='Application'&&exchange.to==='Browser'))document.querySelector('[data-link="browser-application"]')?.classList.add('active');if(exchange.from==='Application'&&exchange.to==='NeMo Hub')document.querySelector('[data-link="application-nemo"]')?.classList.add('active');if(exchange.from==='NeMo Hub')document.querySelector('[data-link="nemo-dependencies"]')?.classList.add('active')}
+function activateTopology(exchange,decision){const names={Browser:'browser',Application:'application','NeMo Hub':'nemo',Presidio:'presidio','Bedrock Gateway':'bedrock'};const state=decision==='block'||decision==='infra'?'block':'active';for(const endpoint of [exchange.from,exchange.to]){const name=names[endpoint];if(name){const node=document.querySelector(`[data-service="${name}"]`);if(node)node.classList.add(state)}}if(exchange.target){document.querySelector(`[data-service="${exchange.target}"]`)?.classList.add(state);document.querySelector('[data-link="bedrock-targets"]')?.classList.add('active')}if((exchange.from==='Browser'&&exchange.to==='Application')||(exchange.from==='Application'&&exchange.to==='Browser'))document.querySelector('[data-link="browser-application"]')?.classList.add('active');if(exchange.from==='Application'&&exchange.to==='NeMo Hub')document.querySelector('[data-link="application-nemo"]')?.classList.add('active');if(exchange.from==='NeMo Hub')document.querySelector('[data-link="nemo-dependencies"]')?.classList.add('active')}
 function renderExchanges(stages){resetTopology();$('exchange-log').replaceChildren();const exchanges=stages.map(stage=>({stage,definition:exchangeCatalog[stage.stage]})).filter(item=>item.definition);$('exchange-count').textContent=`${exchanges.length} EXCHANGES`;if(!exchanges.length){const empty=document.createElement('div');empty.className='empty-strip';empty.textContent='서비스 통신 증거가 없습니다.';$('exchange-log').appendChild(empty);return}exchanges.forEach(({stage,definition},index)=>{const row=document.createElement('div');row.className=`exchange ${stage.decision||''}`;const order=document.createElement('div');order.className='exchange-index';order.textContent=String(index+1).padStart(2,'0');const route=document.createElement('div');route.className='exchange-route';const routeTitle=document.createElement('strong');routeTitle.textContent=`${definition.from} → ${definition.to}`;const routePath=document.createElement('small');routePath.textContent=definition.route;route.append(routeTitle,routePath);const payload=document.createElement('div');payload.className='exchange-payload';const request=document.createElement('strong');request.textContent=`REQ · ${valueOf(definition.request,stage)}`;const response=document.createElement('small');response.textContent=`RES · ${valueOf(definition.response,stage)}`;payload.append(request,response);const status=document.createElement('div');status.className='exchange-status';status.textContent=String(stage.decision||'observed');row.append(order,route,payload,status);$('exchange-log').appendChild(row);activateTopology(definition,stage.decision)})}
 function renderInvestigationLinks(data){const traceId=data.trace_id||'';const tempo=$('tempo-link');if(/^[a-f0-9]{32}$/.test(traceId)){tempo.href=`http://127.0.0.1:3200/api/traces/${traceId}`;tempo.target='_blank';tempo.rel='noopener';tempo.setAttribute('aria-disabled','false')}else{tempo.href='#';tempo.removeAttribute('target');tempo.setAttribute('aria-disabled','true')}}
 $('send').onclick=async()=>{const body={message:$('message').value,classification:$('classification').value,purpose:$('purpose').value};$('decision').className='decision-badge';$('decision').textContent='IN FLIGHT';$('decision-copy').textContent='정책 경계를 순서대로 통과하고 있습니다.';$('stages').innerHTML='<div class="empty-strip">REQUEST IN FLIGHT / 처리 중</div>';
