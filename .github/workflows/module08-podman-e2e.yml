@@ -49,6 +49,7 @@ jobs:
           MODEL_PROVIDER: amazon-bedrock
           BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
           MODEL_GATEWAY_URL: http://host.containers.internal:18097
+          BEDROCK_GATEWAY_TEST_URL: http://127.0.0.1:18097
           START_BEDROCK_GATEWAY: "false"
         run: |
           set -o pipefail

@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 APP=http://127.0.0.1:18095
 HUB=http://127.0.0.1:18094
+BEDROCK_GATEWAY_TEST_URL="${BEDROCK_GATEWAY_TEST_URL:-http://127.0.0.1:18096}"
 APP_TOKEN=control-plane-app-to-nemo
 MAIN_STAGE=bedrock_main
 
@@ -62,7 +63,7 @@ podman run --rm --network none \
 bash "$ROOT/deploy/start-stack.sh"
 
 gateway_without_token="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
-  -X POST http://127.0.0.1:18096/v1/chat/completions \
+  -X POST "$BEDROCK_GATEWAY_TEST_URL/v1/chat/completions" \
   -H 'Content-Type: application/json' \
   -d '{"model":"us.amazon.nova-lite-v1:0","messages":[{"role":"user","content":"status"}]}')"
 test "$gateway_without_token" = 401
