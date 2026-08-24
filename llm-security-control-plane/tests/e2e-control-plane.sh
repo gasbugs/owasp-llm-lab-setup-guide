@@ -61,6 +61,12 @@ podman run --rm --network none \
 
 bash "$ROOT/deploy/start-stack.sh"
 
+gateway_without_token="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
+  -X POST http://127.0.0.1:18096/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"us.amazon.nova-lite-v1:0","messages":[{"role":"user","content":"status"}]}')"
+test "$gateway_without_token" = 401
+
 PUBLIC_TOKEN="$(login public-reader public-reader-demo)"
 INTERNAL_TOKEN="$(login internal-analyst internal-analyst-demo)"
 SUPPORT_TOKEN="$(login support-agent support-agent-demo)"
@@ -247,4 +253,5 @@ printf 'modes=audit:%s/%s off:%s/%s lab_endpoints_disabled_http=%s\n' \
 printf 'rail_fail_closed=PASS loopback=PASS metadata_only_logs=PASS legacy_containers_untouched=PASS\n'
 printf 'internal_auth=hub:%s spoke:%s body_role_spoof:%s\n' \
   "$hub_without_service_token" "$spoke_without_service_token" "$body_role_spoof"
+printf 'bedrock_gateway_auth=missing_token:%s\n' "$gateway_without_token"
 printf 'application_auth=login:PASS wrong_password_http:%s jwks:RS256\n' "$bad_login_status"

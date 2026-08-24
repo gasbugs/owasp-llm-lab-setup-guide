@@ -23,6 +23,12 @@ Browser
   <- Browser
 ```
 
+Browser chat has one external entry point: Application `:18095`. The local
+Bedrock Gateway `:18096` is an internal model/retrieval boundary and rejects
+protected requests unless they carry the fixed lab Bearer token
+`module08-bedrock-gateway-token`. Health and metrics remain available to local
+probes without that token.
+
 Application은 인증, 인가, 정보 등급, RAG 선택과 최종 응답 승인을 소유한다.
 NeMo는 LLM 처리 단계의 허브이며 Presidio, Content Safety, Self-check와 Bedrock 호출
 순서를 소유한다. Presidio Spoke는 개인정보 탐지와 비식별화 후보만 반환하며
@@ -78,7 +84,8 @@ Application Gateway는 브라우저가 사용하는 `/`, `/healthz`, `/.well-kno
 학습 전용 `/api/labs/output-candidate`를 제공한다. Presidio Spoke는 `/healthz`,
 `/api/policy`, `/api/analyze`만 제공한다.
 
-브라우저 사용자 JWT, Application-to-NeMo 토큰, NeMo-to-Presidio 토큰은 서로 다르다.
+브라우저 사용자 JWT, Application-to-NeMo 토큰, NeMo-to-Presidio 토큰과
+Application/NeMo-to-Bedrock-Gateway 토큰은 서로 다르다.
 내부 토큰은 브라우저 JavaScript로 전달하지 않는다. 실서비스에서는 환경변수 Bearer
 token을 mTLS, service mesh identity 또는 cloud workload identity로 교체한다.
 

@@ -147,6 +147,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         ):
             self.assertIn(binding, compose)
         self.assertIn("BEDROCK_GATEWAY_URL", compose)
+        self.assertIn("BEDROCK_GATEWAY_TOKEN", compose)
         self.assertIn("us.amazon.nova-lite-v1:0", compose)
 
     def test_compose_uses_the_verified_single_bridge_podman_topology(self) -> None:

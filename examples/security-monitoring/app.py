@@ -62,6 +62,9 @@ BEDROCK_GATEWAY_URL = os.getenv(
     "BEDROCK_GATEWAY_URL", "http://llm-security-bedrock-gateway:8080"
 ).rstrip("/")
 BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
+BEDROCK_GATEWAY_TOKEN = os.getenv(
+    "BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token"
+)
 RETRIEVAL_URL = os.getenv("RETRIEVAL_URL", "http://retrieval:8081").rstrip("/")
 RETRIEVAL_SERVICE_TOKEN = os.getenv(
     "RETRIEVAL_SERVICE_TOKEN", "module08-retrieval-service-token"
@@ -459,6 +462,7 @@ def call_bedrock(message: str, context: str) -> tuple[str, float, dict[str, int 
     try:
         response = httpx.post(
             f"{BEDROCK_GATEWAY_URL}/v1/chat/completions",
+            headers={"Authorization": f"Bearer {BEDROCK_GATEWAY_TOKEN}"},
             json={
                 "model": BEDROCK_MODEL_ID,
                 "messages": [{"role": "user", "content": prompt}],

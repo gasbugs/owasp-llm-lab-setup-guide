@@ -29,8 +29,16 @@ podman network exists llm-security-observability \
 curl -fsS http://127.0.0.1:8014/healthz >/dev/null \
   || fail "Module 09 monitoring gateway is unavailable"
 
+if [ "$MODE" = verify ]; then
+  bash "$CONTROL_ROOT/deploy/restore-module08-aws.sh" --verify-only
+elif [ "$MODE" = repair ]; then
+  # The account cleanup runs before the next class. Restore only the
+  # Module 08-prefixed AWS state before reconnecting the local containers.
+  bash "$CONTROL_ROOT/deploy/restore-module08-aws.sh" --repair
+fi
+
 if [ "$MODE" != verify ]; then
-  if [ "$MODE" = repair ] || ! podman image exists localhost/llm-security-application-gateway:1.0.0; then
+  if ! podman image exists localhost/llm-security-application-gateway:1.0.0; then
     bash "$CONTROL_ROOT/deploy/build-images.sh"
   fi
   TELEMETRY_INGEST_TOKEN="$TELEMETRY_TOKEN" \

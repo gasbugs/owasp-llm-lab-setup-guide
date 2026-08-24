@@ -30,6 +30,71 @@ for command in aws jq; do
   command -v "$command" >/dev/null 2>&1 || { echo "required command missing: $command" >&2; exit 1; }
 done
 
+wait_for_knowledge_base_absent() {
+  local current_id=$1
+  local current_status
+  for _ in $(seq 1 60); do
+    current_status="$(aws bedrock-agent get-knowledge-base --region "$AWS_REGION" \
+      --knowledge-base-id "$current_id" --query 'knowledgeBase.status' \
+      --output text 2>/dev/null || true)"
+    [ -z "$current_status" ] && return 0
+    sleep 5
+  done
+  echo "module08 knowledge base deletion did not complete within 300 seconds" >&2
+  exit 1
+}
+
+wait_for_knowledge_base_active() {
+  local current_id=$1
+  local current_status
+  for _ in $(seq 1 60); do
+    current_status="$(aws bedrock-agent get-knowledge-base --region "$AWS_REGION" \
+      --knowledge-base-id "$current_id" --query 'knowledgeBase.status' --output text)"
+    case "$current_status" in
+      ACTIVE) return 0 ;;
+      FAILED|DELETE_UNSUCCESSFUL)
+        echo "module08 knowledge base is not recoverable in place: $current_status" >&2
+        return 1
+        ;;
+    esac
+    sleep 5
+  done
+  echo "module08 knowledge base did not become ACTIVE within 300 seconds" >&2
+  return 1
+}
+
+wait_for_data_source_absent() {
+  local current_kb_id=$1
+  local current_ds_id=$2
+  local current_status
+  for _ in $(seq 1 60); do
+    current_status="$(aws bedrock-agent get-data-source --region "$AWS_REGION" \
+      --knowledge-base-id "$current_kb_id" --data-source-id "$current_ds_id" \
+      --query 'dataSource.status' --output text 2>/dev/null || true)"
+    [ -z "$current_status" ] && return 0
+    sleep 5
+  done
+  echo "module08 data source deletion did not complete within 300 seconds" >&2
+  exit 1
+}
+
+wait_for_data_source_available() {
+  local current_kb_id=$1
+  local current_ds_id=$2
+  local current_status
+  for _ in $(seq 1 60); do
+    current_status="$(aws bedrock-agent get-data-source --region "$AWS_REGION" \
+      --knowledge-base-id "$current_kb_id" --data-source-id "$current_ds_id" \
+      --query 'dataSource.status' --output text)"
+    case "$current_status" in
+      AVAILABLE) return 0 ;;
+      FAILED|DELETE_UNSUCCESSFUL) return 1 ;;
+    esac
+    sleep 5
+  done
+  return 1
+}
+
 knowledge_base_id="$(aws bedrock-agent list-knowledge-bases --region "$AWS_REGION" \
   --query "knowledgeBaseSummaries[?name=='${KB_NAME}'].knowledgeBaseId | [0]" \
   --output text)"
@@ -46,8 +111,50 @@ if [ "$MODE" = --verify-only ]; then
     echo "module08-aws=NOT_READY status=$knowledge_base_status" >&2
     exit 1
   }
-  printf 'module08-aws=READY knowledge_base_id=%s region=%s\n' "$knowledge_base_id" "$AWS_REGION"
+  data_source_id="$(aws bedrock-agent list-data-sources --region "$AWS_REGION" \
+    --knowledge-base-id "$knowledge_base_id" \
+    --query "dataSourceSummaries[?name=='${DATA_SOURCE_NAME}'].dataSourceId | [0]" \
+    --output text)"
+  test -n "$data_source_id" && test "$data_source_id" != None || {
+    echo "module08-aws=NOT_READY data_source=MISSING" >&2
+    exit 1
+  }
+  data_source_status="$(aws bedrock-agent get-data-source --region "$AWS_REGION" \
+    --knowledge-base-id "$knowledge_base_id" --data-source-id "$data_source_id" \
+    --query 'dataSource.status' --output text)"
+  test "$data_source_status" = AVAILABLE || {
+    echo "module08-aws=NOT_READY data_source_status=$data_source_status" >&2
+    exit 1
+  }
+  ingestion_status="$(aws bedrock-agent list-ingestion-jobs --region "$AWS_REGION" \
+    --knowledge-base-id "$knowledge_base_id" --data-source-id "$data_source_id" \
+    --max-results 1 --query 'ingestionJobSummaries[0].status' --output text)"
+  test "$ingestion_status" = COMPLETE || {
+    echo "module08-aws=NOT_READY ingestion_status=$ingestion_status" >&2
+    exit 1
+  }
+  printf 'module08-aws=READY knowledge_base_id=%s data_source_id=%s ingestion_status=%s region=%s\n' \
+    "$knowledge_base_id" "$data_source_id" "$ingestion_status" "$AWS_REGION"
   exit 0
+fi
+
+if [ -n "$knowledge_base_id" ] && [ "$knowledge_base_id" != None ]; then
+  knowledge_base_status="$(aws bedrock-agent get-knowledge-base --region "$AWS_REGION" \
+    --knowledge-base-id "$knowledge_base_id" --query 'knowledgeBase.status' --output text)"
+  case "$knowledge_base_status" in
+    FAILED|DELETE_UNSUCCESSFUL)
+      aws bedrock-agent delete-knowledge-base --region "$AWS_REGION" \
+        --knowledge-base-id "$knowledge_base_id"
+      wait_for_knowledge_base_absent "$knowledge_base_id"
+      knowledge_base_id=None
+      ;;
+    DELETING)
+      wait_for_knowledge_base_absent "$knowledge_base_id"
+      knowledge_base_id=None
+      ;;
+    ACTIVE) ;;
+    *) wait_for_knowledge_base_active "$knowledge_base_id" ;;
+  esac
 fi
 
 aws s3api head-bucket --bucket "$SOURCE_BUCKET" >/dev/null 2>&1 \
@@ -90,6 +197,7 @@ if [ -z "$knowledge_base_id" ] || [ "$knowledge_base_id" = None ]; then
     --storage-configuration \
     "{\"type\":\"S3_VECTORS\",\"s3VectorsConfiguration\":{\"indexArn\":\"${VECTOR_INDEX_ARN}\"}}" \
     --query 'knowledgeBase.knowledgeBaseId' --output text)"
+  wait_for_knowledge_base_active "$knowledge_base_id"
 fi
 
 data_source_id="$(aws bedrock-agent list-data-sources --region "$AWS_REGION" \
@@ -104,6 +212,39 @@ if [ -z "$data_source_id" ] || [ "$data_source_id" = None ]; then
     --vector-ingestion-configuration \
     '{"chunkingConfiguration":{"chunkingStrategy":"FIXED_SIZE","fixedSizeChunkingConfiguration":{"maxTokens":300,"overlapPercentage":10}}}' \
     --query 'dataSource.dataSourceId' --output text)"
+  wait_for_data_source_available "$knowledge_base_id" "$data_source_id"
+else
+  data_source_status="$(aws bedrock-agent get-data-source --region "$AWS_REGION" \
+    --knowledge-base-id "$knowledge_base_id" --data-source-id "$data_source_id" \
+    --query 'dataSource.status' --output text)"
+  case "$data_source_status" in
+    FAILED|DELETE_UNSUCCESSFUL)
+      aws bedrock-agent delete-data-source --region "$AWS_REGION" \
+        --knowledge-base-id "$knowledge_base_id" --data-source-id "$data_source_id"
+      wait_for_data_source_absent "$knowledge_base_id" "$data_source_id"
+      data_source_id="$(aws bedrock-agent create-data-source --region "$AWS_REGION" \
+        --knowledge-base-id "$knowledge_base_id" --name "$DATA_SOURCE_NAME" \
+        --data-deletion-policy DELETE --data-source-configuration \
+        "{\"type\":\"S3\",\"s3Configuration\":{\"bucketArn\":\"arn:aws:s3:::${SOURCE_BUCKET}\",\"inclusionPrefixes\":[\"knowledge/\"]}}" \
+        --vector-ingestion-configuration \
+        '{"chunkingConfiguration":{"chunkingStrategy":"FIXED_SIZE","fixedSizeChunkingConfiguration":{"maxTokens":300,"overlapPercentage":10}}}' \
+        --query 'dataSource.dataSourceId' --output text)"
+      wait_for_data_source_available "$knowledge_base_id" "$data_source_id"
+      ;;
+    DELETING)
+      wait_for_data_source_absent "$knowledge_base_id" "$data_source_id"
+      data_source_id="$(aws bedrock-agent create-data-source --region "$AWS_REGION" \
+        --knowledge-base-id "$knowledge_base_id" --name "$DATA_SOURCE_NAME" \
+        --data-deletion-policy DELETE --data-source-configuration \
+        "{\"type\":\"S3\",\"s3Configuration\":{\"bucketArn\":\"arn:aws:s3:::${SOURCE_BUCKET}\",\"inclusionPrefixes\":[\"knowledge/\"]}}" \
+        --vector-ingestion-configuration \
+        '{"chunkingConfiguration":{"chunkingStrategy":"FIXED_SIZE","fixedSizeChunkingConfiguration":{"maxTokens":300,"overlapPercentage":10}}}' \
+        --query 'dataSource.dataSourceId' --output text)"
+      wait_for_data_source_available "$knowledge_base_id" "$data_source_id"
+      ;;
+    AVAILABLE) ;;
+    *) wait_for_data_source_available "$knowledge_base_id" "$data_source_id" ;;
+  esac
 fi
 ingestion_job_id="$(aws bedrock-agent start-ingestion-job --region "$AWS_REGION" \
   --knowledge-base-id "$knowledge_base_id" --data-source-id "$data_source_id" \

@@ -2,7 +2,7 @@
   "rest": {
     "RestGenerator": {
       "name": "llm-security-application-gateway",
-      "uri": "http://10.0.2.2:18095/api/chat",
+      "uri": "http://llm-security-application-gateway:8000/api/chat",
       "method": "post",
       "headers": {
         "Authorization": "Bearer hub-public-reader-token",

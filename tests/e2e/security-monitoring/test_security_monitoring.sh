@@ -16,7 +16,8 @@ GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
 USE_REAL_BEDROCK="${USE_REAL_BEDROCK:-false}"
 RUN_FAILURE_DRILL="${RUN_FAILURE_DRILL:-true}"
 export PODMAN_COMPOSE_PROVIDER="${PODMAN_COMPOSE_PROVIDER:-podman-compose}"
-POLICY_COPY="${TMPDIR:-/tmp}/llm-security-policy-e2e-$$.json"
+E2E_SHARED_TMPDIR="${E2E_SHARED_TMPDIR:-${TMPDIR:-/tmp}}"
+POLICY_COPY="$E2E_SHARED_TMPDIR/llm-security-policy-e2e-$$.json"
 
 compose() {
   if [ "$USE_REAL_BEDROCK" = "true" ]; then
@@ -166,7 +167,12 @@ wait_webhook_alert() {
 }
 
 cleanup
-if systemctl --user start podman.socket >/dev/null 2>&1; then
+mkdir -p "$E2E_SHARED_TMPDIR"
+if [ -n "${PODMAN_SOCKET_PATH:-}" ]; then
+  # A caller such as the Ubuntu compatibility container can provide the
+  # already shared WSL/rootless Podman socket explicitly.
+  :
+elif systemctl --user start podman.socket >/dev/null 2>&1; then
   export PODMAN_SOCKET_PATH="${XDG_RUNTIME_DIR:-/run/user/$UID}/podman/podman.sock"
 elif podman machine list --format '{{.Name}}' 2>/dev/null | grep -q .; then
   # A remote macOS client mounts paths from the Podman VM, not the macOS host.

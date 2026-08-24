@@ -12,7 +12,7 @@ from nemoguardrails.rails.llm.options import GenerationResponse
 
 FRAMEWORK = "nvidia-nemo-guardrails"
 FRAMEWORK_VERSION = "0.22.0"
-DEFAULT_MODEL = "llama3.1:8b-instruct-q4_K_M"
+DEFAULT_MODEL = "us.amazon.nova-lite-v1:0"
 
 CASES = {
     "input-benign": {
@@ -102,14 +102,16 @@ def generation_metrics(response: GenerationResponse) -> dict:
 
 
 def _openai_base_url() -> str:
-    value = os.getenv("OLLAMA_URL", "http://10.0.2.2:11434").rstrip("/")
+    value = os.getenv(
+        "MODEL_GATEWAY_URL", "http://llm-security-bedrock-gateway:8080"
+    ).rstrip("/")
     return value if value.endswith("/v1") else value + "/v1"
 
 
 @lru_cache(maxsize=4)
 def rails_for(profile: str) -> LLMRails:
     config = RailsConfig.from_path(f"/app/config/{profile}")
-    model_name = os.getenv("OLLAMA_MODEL", DEFAULT_MODEL)
+    model_name = os.getenv("BEDROCK_MODEL_ID", DEFAULT_MODEL)
     for model in config.models:
         if isinstance(model, dict):
             model_type = model.get("type")
@@ -125,7 +127,9 @@ def rails_for(profile: str) -> LLMRails:
             parameters = dict(getattr(model, "parameters", {}) or {})
             model.parameters = parameters
         parameters["base_url"] = _openai_base_url()
-        parameters["api_key"] = "ollama-local"
+        parameters["api_key"] = os.getenv(
+            "BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token"
+        )
     return LLMRails(config)
 
 
@@ -156,7 +160,7 @@ async def run_case(case_name: str) -> dict:
         "case": case_name,
         "profile": case["profile"],
         "purpose": case["purpose"],
-        "model": os.getenv("OLLAMA_MODEL", DEFAULT_MODEL),
+        "model": os.getenv("BEDROCK_MODEL_ID", DEFAULT_MODEL),
         "input": case["prompt"],
         "reply": response_content(generated.response),
         "policy_decision": "block" if blocked_stage else "allow",

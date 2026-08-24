@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 import time
 import uuid
@@ -9,7 +10,7 @@ from contextlib import asynccontextmanager
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from opentelemetry import trace
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,6 +24,9 @@ INPUT_USD_PER_MILLION = float(os.getenv("BEDROCK_INPUT_USD_PER_MILLION", "0.06")
 OUTPUT_USD_PER_MILLION = float(os.getenv("BEDROCK_OUTPUT_USD_PER_MILLION", "0.24"))
 PRICING_REFERENCE_DATE = os.getenv("BEDROCK_PRICING_REFERENCE_DATE", "2026-08-24")
 KNOWLEDGE_BASE_ID = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "")
+BEDROCK_GATEWAY_TOKEN = os.getenv(
+    "BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token"
+)
 BEDROCK = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 BEDROCK_AGENT_RUNTIME = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION)
 RUNTIME = {"ready": False, "error": "startup-not-complete"}
@@ -78,6 +82,15 @@ class RetrievalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     query: str = Field(min_length=1, max_length=4000)
     number_of_results: int = Field(default=3, ge=1, le=10)
+
+
+def require_gateway_token(authorization: str | None = Header(default=None)) -> None:
+    """Allow only local services that know the fixed Module 08/09 gateway token."""
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(
+        token, BEDROCK_GATEWAY_TOKEN
+    ):
+        raise HTTPException(status_code=401, detail="invalid Bedrock Gateway token")
 
 
 def _converse(request: ChatCompletionRequest) -> dict:
@@ -205,14 +218,19 @@ def metrics() -> Response:
 
 
 @app.post("/v1/chat/completions")
-def chat_completions(request: ChatCompletionRequest) -> dict:
+def chat_completions(
+    request: ChatCompletionRequest,
+    _authorized: None = Depends(require_gateway_token),
+) -> dict:
     if not RUNTIME["ready"]:
         raise HTTPException(status_code=503, detail="Bedrock gateway startup check failed")
     return _converse(request)
 
 
 @app.post("/v1/retrieve")
-def retrieve(request: RetrievalRequest) -> dict:
+def retrieve(
+    request: RetrievalRequest, _authorized: None = Depends(require_gateway_token)
+) -> dict:
     """Retrieve through the credential boundary instead of exposing AWS credentials downstream."""
     if not KNOWLEDGE_BASE_ID:
         raise HTTPException(status_code=503, detail="Module 08 Knowledge Base is not configured")

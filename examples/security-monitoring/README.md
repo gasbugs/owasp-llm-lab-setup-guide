@@ -1,6 +1,6 @@
 # LLM Security Observability Stack
 
-`compose.yaml` is the canonical Module 08 deployment. Learners first inspect the
+`compose.yaml` is the canonical Module 09 observability deployment. Learners first inspect the
 application code that emits one structured security log, a distributed trace,
 and bounded Prometheus metrics. They verify each raw signal before following it
 through Alloy and the storage backends. The module ends by building a minimal
@@ -21,15 +21,20 @@ application instrumentation
 ## Request path
 
 ```text
-client -> gateway -> input policy -> internal retrieval service
-       -> tenant policy -> tool authorization -> local Bedrock Gateway -> output policy
+browser -> Module 08 Application :18095 -> NeMo/Presidio
+        -> local Bedrock Gateway -> Amazon Bedrock
+
+Security Events :8014 <- metadata-only events from Application and local services
 
 internal bridge: gateway/retrieval -> Alloy, Prometheus -> all metrics,
                  Alloy/Prometheus -> LGTM, Alertmanager -> webhook
 host boundary:   published ports -> learner public IPv4 /32 security group
 ```
 
-The gateway derives tenant and dangerous-tool permissions from the bearer-token map. A request body cannot select authorization attributes. A request blocked at input, retrieval, or tool authorization returns `upstream_called=false` and never reaches Amazon Bedrock.
+The Application derives identity and authorization from its signed access token.
+The Security Events service on `:8014` is a lookup and telemetry component, not
+a second chat API. Requests blocked by Application or a Guardrail return
+`upstream_called=false` and never reach Amazon Bedrock.
 
 ## Telemetry and alert paths
 
@@ -64,6 +69,7 @@ Alloy performs two separate jobs from one configuration: it receives structured 
 
 ```bash
 export BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
+export BEDROCK_GATEWAY_TOKEN=module08-bedrock-gateway-token
 export PODMAN_COMPOSE_PROVIDER=podman-compose
 export PODMAN_SOCKET_PATH=/run/user/$(id -u)/podman/podman.sock
 podman compose --file compose.yaml up --detach --build

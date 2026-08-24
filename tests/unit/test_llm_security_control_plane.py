@@ -119,6 +119,27 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("owasp-llm-module08", source)
         self.assertNotIn("owasp-llm-course-knowledge-base", source)
         self.assertIn("module08-aws.env", source)
+        self.assertIn("FAILED|DELETE_UNSUCCESSFUL", source)
+        self.assertIn("DELETING", source)
+        self.assertIn("wait_for_data_source_available", source)
+
+    def test_module08_cleanup_is_aws_only_and_preserves_local_runtime(self) -> None:
+        source = (CONTROL / "deploy/cleanup-module08-aws.sh").read_text()
+        self.assertIn("owasp-llm-module08", source)
+        self.assertIn("delete-data-source", source)
+        self.assertIn("delete-knowledge-base", source)
+        self.assertIn("delete-vector-bucket", source)
+        self.assertNotIn("podman", source)
+
+    def test_module09_repair_restores_module08_aws_before_local_stack(self) -> None:
+        source = (
+            ROOT / "infrastructure/scripts/student/prepare-module08.sh"
+        ).read_text()
+        restore = 'bash "$CONTROL_ROOT/deploy/restore-module08-aws.sh" --repair'
+        start = 'bash "$CONTROL_ROOT/deploy/start-stack.sh"'
+        self.assertIn(restore, source)
+        self.assertIn(start, source)
+        self.assertLess(source.index(restore), source.index(start))
 
     def test_gateway_owns_bedrock_retrieval_and_pricing_metadata(self) -> None:
         gateway = (CONTROL / "bedrock-gateway/server.py").read_text()
@@ -126,8 +147,20 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn('@app.post("/v1/retrieve")', gateway)
         self.assertIn("BEDROCK_AGENT_RUNTIME.retrieve", gateway)
         self.assertIn("bedrock_pricing_info", gateway)
+        self.assertIn("require_gateway_token", gateway)
+        self.assertIn("BEDROCK_GATEWAY_TOKEN", application)
+        self.assertIn('headers={"Authorization": f"Bearer {BEDROCK_GATEWAY_TOKEN}"}', application)
         self.assertIn('f"{MODEL_GATEWAY_URL}/v1/retrieve"', application)
         self.assertIn("allowed_suffixes", application)
+
+    def test_gateway_token_is_shared_by_every_bedrock_caller(self) -> None:
+        start = (CONTROL / "deploy/start-stack.sh").read_text()
+        hub = (CONTROL / "nemo-policy-hub/hub_core.py").read_text()
+        fake = (CONTROL / "tests/fake_bedrock_gateway.py").read_text()
+        self.assertIn("module08-bedrock-gateway-token", start)
+        self.assertIn("api_key\": BEDROCK_GATEWAY_TOKEN", hub)
+        self.assertIn('Bearer {BEDROCK_GATEWAY_TOKEN}', hub)
+        self.assertIn("invalid Bedrock Gateway token", fake)
 
     def test_application_auth_contract_is_rs256_and_stateful(self) -> None:
         source = (CONTROL / "application-gateway/auth.py").read_text()
@@ -173,7 +206,10 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         generator = json.loads(
             (CONTROL / "tests/garak/rest-generator.json").read_text()
         )["rest"]["RestGenerator"]
-        self.assertEqual(generator["uri"], "http://10.0.2.2:18095/api/chat")
+        self.assertEqual(
+            generator["uri"],
+            "http://llm-security-application-gateway:8000/api/chat",
+        )
         self.assertEqual(
             generator["headers"]["Authorization"],
             "Bearer hub-public-reader-token",

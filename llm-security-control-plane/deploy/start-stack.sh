@@ -14,6 +14,7 @@ fi
 
 PRESIDIO_INTERNAL_TOKEN="${PRESIDIO_INTERNAL_TOKEN:-control-plane-nemo-to-presidio}"
 APPLICATION_INTERNAL_TOKEN="${APPLICATION_INTERNAL_TOKEN:-control-plane-app-to-nemo}"
+BEDROCK_GATEWAY_TOKEN="${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}"
 GUARD_MODE="${GUARD_MODE:-enforce}"
 ASSURANCE_PROFILE="${ASSURANCE_PROFILE:-high-assurance}"
 ENABLE_LAB_ENDPOINTS="${ENABLE_LAB_ENDPOINTS:-true}"
@@ -68,6 +69,7 @@ if [ "$START_BEDROCK_GATEWAY" = true ]; then
     -e AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials \
     -e AWS_CONFIG_FILE=/tmp/.aws/config \
     -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
+    -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
     -e "BEDROCK_KNOWLEDGE_BASE_ID=${MODULE08_KNOWLEDGE_BASE_ID:-}" \
     -e "BEDROCK_INPUT_USD_PER_MILLION=${BEDROCK_INPUT_USD_PER_MILLION:-0.06}" \
     -e "BEDROCK_OUTPUT_USD_PER_MILLION=${BEDROCK_OUTPUT_USD_PER_MILLION:-0.24}" \
@@ -98,6 +100,7 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "PRESIDIO_URL=$PRESIDIO_URL" \
   -e "MODEL_GATEWAY_URL=$MODEL_GATEWAY_URL" \
   -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
+  -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
   -v "$NEMO_POLICY_FILE:/app/policies/nemo-policy.yaml:ro,Z" \
   -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
   "localhost/llm-security-nemo-policy-hub:$IMAGE_VERSION" >/dev/null
@@ -109,6 +112,7 @@ podman run -d --replace --name llm-security-application-gateway \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   -e "NEMO_HUB_URL=$NEMO_HUB_URL" \
   -e "MODEL_GATEWAY_URL=$MODEL_GATEWAY_URL" \
+  -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
   -e "AUTH_EVENT_SINK=$AUTH_EVENT_SINK" \
   -e "LEGACY_STATIC_TOKEN_MODE=$LEGACY_STATIC_TOKEN_MODE" \
   "${OTEL_ARGS[@]}" \

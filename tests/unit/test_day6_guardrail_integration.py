@@ -129,12 +129,14 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn("input_checks.append(scan_metadata(input_result))", server)
         self.assertIn("output_checks.append(scan_metadata(output_result))", server)
 
-    def test_nemo_uses_slirp_gateway_for_loopback_ollama(self) -> None:
-        expected = "http://10.0.2.2:11434"
-        self.assertIn(expected, read(NEMO / "nemo_core.py"))
-        self.assertIn(expected, read(NEMO / "server.py"))
-        for profile in ["input", "output", "integrated"]:
-            self.assertIn(expected + "/v1", read(NEMO / "config" / profile / "config.yml"))
+    def test_nemo_runtime_uses_the_authenticated_bedrock_gateway(self) -> None:
+        source = read(NEMO / "nemo_core.py")
+        self.assertIn("MODEL_GATEWAY_URL", source)
+        self.assertIn("http://llm-security-bedrock-gateway:8080", source)
+        self.assertIn("BEDROCK_GATEWAY_TOKEN", source)
+        self.assertIn("us.amazon.nova-lite-v1:0", source)
+        self.assertNotIn("OLLAMA_URL", source)
+        self.assertNotIn("OLLAMA_MODEL", source)
 
     def test_nemo_main_path_keeps_dialog_generation_enabled(self) -> None:
         core = read(NEMO / "nemo_core.py")

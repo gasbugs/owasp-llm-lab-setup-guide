@@ -40,6 +40,9 @@ SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 TELEMETRY_INGEST_TOKEN = os.getenv("TELEMETRY_INGEST_TOKEN", "")
 RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
 APPLICATION_INTERNAL_TOKEN = os.getenv("APPLICATION_INTERNAL_TOKEN", "")
+BEDROCK_GATEWAY_TOKEN = os.getenv(
+    "BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token"
+)
 AUTH_USERS_PATH = os.getenv("AUTH_USERS_PATH", "/app/policies/application-users.yaml")
 AUTH_STATE_DIR = os.getenv("AUTH_STATE_DIR", "/app/state")
 AUTH_ISSUER = os.getenv("AUTH_ISSUER", "http://127.0.0.1:18095")
@@ -374,6 +377,7 @@ async def chat(
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
                 response = await client.post(
                     f"{MODEL_GATEWAY_URL}/v1/retrieve",
+                    headers={"Authorization": f"Bearer {BEDROCK_GATEWAY_TOKEN}"},
                     json={"query": request.message, "number_of_results": 5},
                 )
                 response.raise_for_status()

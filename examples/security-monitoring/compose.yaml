@@ -14,6 +14,7 @@ services:
       TELEMETRY_INGEST_TOKEN: ${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}
       TELEMETRY_HMAC_KEY: ${TELEMETRY_HMAC_KEY:-module08-lab-hmac-key-change-in-production}
       BEDROCK_GATEWAY_URL: ${BEDROCK_GATEWAY_URL:-http://llm-security-bedrock-gateway:8080}
+      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
       RETRIEVAL_URL: http://retrieval:8081
       RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:-module08-retrieval-service-token}

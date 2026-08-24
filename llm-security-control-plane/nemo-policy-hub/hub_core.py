@@ -23,6 +23,9 @@ MAIN_MODEL = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
 MODEL_GATEWAY_URL = os.getenv(
     "MODEL_GATEWAY_URL", "http://llm-security-bedrock-gateway:8080"
 ).rstrip("/")
+BEDROCK_GATEWAY_TOKEN = os.getenv(
+    "BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token"
+)
 
 
 CONTENT_SAFETY_INPUT_PROMPT = """Task: Check whether the User content is unsafe.
@@ -63,7 +66,7 @@ def _base_config(policy_prompt: str, rail_name: str) -> dict:
                 "model": f"{MAIN_MODEL}#{rail_name}",
                 "parameters": {
                     "base_url": _openai_base_url(),
-                    "api_key": "bedrock-gateway-local",
+                    "api_key": BEDROCK_GATEWAY_TOKEN,
                     "temperature": 0.0,
                 },
             }
@@ -225,6 +228,7 @@ async def call_main_model(
     async with httpx.AsyncClient(timeout=httpx.Timeout(180.0)) as client:
         response = await client.post(
             f"{MODEL_GATEWAY_URL}/v1/chat/completions",
+            headers={"Authorization": f"Bearer {BEDROCK_GATEWAY_TOKEN}"},
             json={
                 "model": MAIN_MODEL,
                 "temperature": 0.0,

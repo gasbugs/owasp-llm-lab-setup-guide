@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 MODEL_ID = "us.amazon.nova-lite-v1:0"
+GATEWAY_TOKEN = os.getenv("BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token")
 
 
 def response_for_openai(payload: dict) -> str:
@@ -84,6 +85,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(404, {"detail": "not-found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path in {"/v1/retrieve", "/v1/chat/completions"} and self.headers.get(
+            "Authorization"
+        ) != f"Bearer {GATEWAY_TOKEN}":
+            self.send_json(401, {"detail": "invalid Bedrock Gateway token"})
+            return
         length = int(self.headers.get("Content-Length", "0"))
         payload = json.loads(self.rfile.read(length) or b"{}")
         if self.path == "/v1/retrieve":
