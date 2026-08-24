@@ -1,0 +1,121 @@
+name: llm-security-control-plane
+
+services:
+  bedrock-gateway:
+    container_name: llm-security-bedrock-gateway
+    build:
+      context: .
+      dockerfile: bedrock-gateway/Containerfile
+    image: localhost/llm-security-bedrock-gateway:${IMAGE_VERSION:-1.0.0}
+    userns_mode: keep-id:uid=65532,gid=65532
+    restart: always
+    ports:
+      - "127.0.0.1:18096:8080"
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SHARED_CREDENTIALS_FILE: /tmp/.aws/credentials
+      AWS_CONFIG_FILE: /tmp/.aws/config
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
+      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}
+      BEDROCK_KNOWLEDGE_BASE_ID: ${MODULE08_KNOWLEDGE_BASE_ID:?Run restore-module08-aws.sh and source .state/module08-aws.env first}
+      BEDROCK_INPUT_USD_PER_MILLION: ${BEDROCK_INPUT_USD_PER_MILLION:-0.06}
+      BEDROCK_OUTPUT_USD_PER_MILLION: ${BEDROCK_OUTPUT_USD_PER_MILLION:-0.24}
+      RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
+    volumes:
+      - "${HOME}/.aws:/tmp/.aws:ro"
+
+  presidio:
+    container_name: llm-security-presidio-spoke
+    build:
+      context: .
+      dockerfile: spokes/presidio-privacy/Containerfile
+    image: localhost/llm-security-presidio-privacy-spoke:${IMAGE_VERSION:-1.0.0}
+    restart: always
+    ports:
+      - "127.0.0.1:18093:8013"
+    environment:
+      PRESIDIO_INTERNAL_TOKEN: ${PRESIDIO_INTERNAL_TOKEN:-control-plane-nemo-to-presidio}
+      RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
+    volumes:
+      - "./spokes/presidio-privacy/policy.py:/app/policy.py:ro,Z"
+
+  nemo-hub:
+    container_name: llm-security-nemo-hub
+    build:
+      context: .
+      dockerfile: nemo-policy-hub/Containerfile
+    image: localhost/llm-security-nemo-policy-hub:${IMAGE_VERSION:-1.0.0}
+    restart: always
+    depends_on:
+      - bedrock-gateway
+      - presidio
+    ports:
+      - "127.0.0.1:18094:8014"
+    environment:
+      PRESIDIO_INTERNAL_TOKEN: ${PRESIDIO_INTERNAL_TOKEN:-control-plane-nemo-to-presidio}
+      APPLICATION_INTERNAL_TOKEN: ${APPLICATION_INTERNAL_TOKEN:-control-plane-app-to-nemo}
+      GUARD_MODE: ${GUARD_MODE:-enforce}
+      ASSURANCE_PROFILE: ${ASSURANCE_PROFILE:-high-assurance}
+      ENABLE_LAB_ENDPOINTS: ${ENABLE_LAB_ENDPOINTS:-true}
+      RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
+      PRESIDIO_URL: http://llm-security-presidio-spoke:8013
+      MODEL_GATEWAY_URL: http://llm-security-bedrock-gateway:8080
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
+      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}
+    volumes:
+      - "./policies/nemo-policy.yaml:/app/policies/nemo-policy.yaml:ro,Z"
+      - "./nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z"
+
+  application:
+    container_name: llm-security-application-gateway
+    build:
+      context: .
+      dockerfile: application-gateway/Containerfile
+    image: localhost/llm-security-application-gateway:${IMAGE_VERSION:-1.0.0}
+    userns_mode: keep-id:uid=65532,gid=65532
+    restart: always
+    depends_on:
+      - bedrock-gateway
+      - nemo-hub
+    ports:
+      - "127.0.0.1:18095:8000"
+    environment:
+      APPLICATION_INTERNAL_TOKEN: ${APPLICATION_INTERNAL_TOKEN:-control-plane-app-to-nemo}
+      RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
+      NEMO_HUB_URL: http://llm-security-nemo-hub:8014
+      MODEL_GATEWAY_URL: http://llm-security-bedrock-gateway:8080
+      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}
+      AUTH_EVENT_SINK: ${AUTH_EVENT_SINK:-stdout}
+      LEGACY_STATIC_TOKEN_MODE: ${LEGACY_STATIC_TOKEN_MODE:-false}
+    volumes:
+      - "./policies/application-policy.yaml:/app/policies/application-policy.yaml:ro,Z"
+      - "./policies/application-users.yaml:/app/policies/application-users.yaml:ro,Z"
+      - "./.state/application-auth:/app/state:rw,Z"
+      - "./application-gateway/auth.py:/app/auth.py:ro,Z"
+      - "./application-gateway/policy.py:/app/policy.py:ro,Z"
+      - "./application-gateway/server.py:/app/server.py:ro,Z"
+
+  dialog:
+    profiles: [dialog]
+    container_name: day6-nemo-guardrails-api
+    build:
+      context: ../examples/day6/nemo-guardrails
+      dockerfile: Containerfile
+    image: localhost/day6-nemo-guardrails:${DIALOG_IMAGE_VERSION:-0.22.0}
+    restart: always
+    depends_on:
+      - bedrock-gateway
+    ports:
+      - "127.0.0.1:18092:8013"
+    environment:
+      RUN_MODE: server
+      GUARD_MODE: enforce
+      ENABLE_LAB_ENDPOINTS: "true"
+      MODEL_GATEWAY_URL: http://llm-security-bedrock-gateway:8080
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
+      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}
+
+networks:
+  default:
+    name: llm-security-control-plane
