@@ -22,6 +22,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes podman jq
+          python -m pip install --requirement tests/browser/requirements.txt
+          python -m playwright install --with-deps chromium
 
       - name: Build the real control-plane images
         run: bash llm-security-control-plane/deploy/build-images.sh
@@ -51,10 +53,14 @@ jobs:
           MODEL_GATEWAY_URL: http://host.containers.internal:18097
           BEDROCK_GATEWAY_TEST_URL: http://127.0.0.1:18097
           START_BEDROCK_GATEWAY: "false"
+          KEEP_CONTROL_PLANE: "true"
         run: |
           set -o pipefail
           bash llm-security-control-plane/tests/e2e-control-plane.sh 2>&1 | tee /tmp/module08-e2e.log
           ! grep -E '(^|[[:space:]])(Error:|INFRA:|Traceback|curl:)|service did not become ready' /tmp/module08-e2e.log
+
+      - name: Run the deterministic Control Center browser contract
+        run: python tests/browser/run_control_plane_ui.py --browser-channel chromium
 
       - name: Preserve Podman diagnostics on failure
         if: failure()
