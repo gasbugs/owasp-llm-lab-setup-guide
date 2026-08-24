@@ -119,7 +119,7 @@ Module 08은 `AUTH_EVENT_SINK=stdout`으로 인증 성공·실패 JSON을 컨테
 BUILD_IMAGES=true bash llm-security-control-plane/tests/e2e-control-plane.sh
 ```
 
-GitHub의 Module 08 workflow는 매 push마다 fake 모델이 아니라 실제 Bedrock과 Browser를
-호출한다. Repository Actions secret의 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`와
-임시 자격 증명일 때 `AWS_SESSION_TOKEN`을 사용하며, 실행 직전에 Module 08 Knowledge
-Base 상태를 `--repair`로 복구한 뒤 desktop·390px UI 계약까지 검사한다.
+GitHub의 Module 08 workflow는 AWS 자격 증명이 필요 없는 결정적 Gateway 계약을 검사한다.
+실제 Bedrock과 Browser 검증은 게시자 환경에서 `restore-module08-aws.sh --repair`, 실제
+control-plane E2E와 `tests/browser/run_control_plane_ui.py`를 순서대로 실행한다. Browser
+harness는 desktop·390px, theme, `bedrock_main` stage와 same-origin 경계를 확인한다.
