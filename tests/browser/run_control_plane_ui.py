@@ -59,6 +59,14 @@ def main() -> int:
         normal_exchange_count = page.locator("#exchange-log .exchange").count()
         normal_exchange_text = page.locator("#exchange-log").inner_text()
         architecture_nodes = page.locator(".topology-map [data-service]").count()
+        presidio_height = page.locator('[data-service="presidio"]').bounding_box()["height"]
+        bedrock_height = page.locator('[data-service="bedrock"]').bounding_box()["height"]
+        presidio_arrow_active = "active" in (
+            page.locator('[data-link="nemo-presidio"]').get_attribute("class") or ""
+        )
+        bedrock_arrow_active = "active" in (
+            page.locator('[data-link="nemo-bedrock"]').get_attribute("class") or ""
+        )
         normal_nova_active = "active" in (page.locator('[data-service="nova"]').get_attribute("class") or "")
         normal_kb_active = "active" in (page.locator('[data-service="knowledge-base"]').get_attribute("class") or "")
         page.locator("#classification").select_option("public")
@@ -100,6 +108,9 @@ def main() -> int:
         and "Application → NeMo Hub" in normal_exchange_text
         and "NeMo Hub → Presidio" in normal_exchange_text
         and "NeMo Hub → Bedrock Gateway" in normal_exchange_text
+        and abs(presidio_height - bedrock_height) < 1
+        and presidio_arrow_active
+        and bedrock_arrow_active
         and normal_nova_active
         and not normal_kb_active
         and rag.get("application_decision") == "allow"
@@ -124,6 +135,9 @@ def main() -> int:
     print(f"light_theme={str(light_theme).lower()} mobile_overflow={str(mobile_overflow).lower()}")
     print(
         f"architecture_nodes={architecture_nodes} "
+        f"presidio_height={presidio_height:.0f} bedrock_height={bedrock_height:.0f} "
+        f"presidio_arrow_active={str(presidio_arrow_active).lower()} "
+        f"bedrock_arrow_active={str(bedrock_arrow_active).lower()} "
         f"normal_exchanges={normal_exchange_count} "
         f"normal_nova_active={str(normal_nova_active).lower()} "
         f"rag_kb_active={str(rag_kb_active).lower()} "
