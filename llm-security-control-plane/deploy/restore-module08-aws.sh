@@ -35,6 +35,8 @@ write_compose_env() {
   {
     printf 'AWS_PROFILE=%s\n' "$AWS_PROFILE"
     printf 'AWS_REGION=%s\n' "$AWS_REGION"
+    printf 'LOCAL_UID=%s\n' "$(id -u)"
+    printf 'LOCAL_GID=%s\n' "$(id -g)"
     printf 'BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0\n'
     printf 'MODULE08_KNOWLEDGE_BASE_ID=%s\n' "$current_knowledge_base_id"
     printf 'PRESIDIO_INTERNAL_TOKEN=control-plane-nemo-to-presidio\n'
