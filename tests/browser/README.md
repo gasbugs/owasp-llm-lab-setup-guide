@@ -10,7 +10,7 @@ python tests/browser/run_control_plane_ui.py \
 ```
 
 The check submits one normal prompt and one application-specific override. It
-also fails if browser JavaScript contacts Ollama, Presidio, or the NeMo Hub
+also fails if browser JavaScript contacts the Bedrock Gateway, Presidio, or the NeMo Hub
 directly instead of the same-origin Application `/api/chat` endpoint.
 
 This harness records three mandatory UI observations that API-only tests cannot
@@ -42,7 +42,7 @@ forwarded from EC2.
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r tests/browser/requirements.txt
-python -m playwright install chromium
+python -m playwright install --with-deps chromium
 ```
 
 If Google Chrome is already installed, the browser download can be skipped and
@@ -58,7 +58,7 @@ root, install the pinned browser dependency once:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r tests/browser/requirements.txt
-python -m playwright install chromium
+python -m playwright install --with-deps chromium
 ```
 
 Resolve only the instance carrying the current course `Student` tag, then keep
