@@ -18,7 +18,9 @@ services:
       AWS_CONFIG_FILE: /tmp/.aws/config
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
       BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}
-      BEDROCK_KNOWLEDGE_BASE_ID: ${MODULE08_KNOWLEDGE_BASE_ID:?Run restore-module08-aws.sh and source .state/module08-aws.env first}
+      # Build와 dialog profile은 Knowledge Base ID 없이도 YAML을 읽을 수 있어야 한다.
+      # 전체 제어면 실행 전에는 교재대로 module08-aws.env를 source·export한다.
+      BEDROCK_KNOWLEDGE_BASE_ID: ${MODULE08_KNOWLEDGE_BASE_ID:-}
       BEDROCK_INPUT_USD_PER_MILLION: ${BEDROCK_INPUT_USD_PER_MILLION:-0.06}
       BEDROCK_OUTPUT_USD_PER_MILLION: ${BEDROCK_OUTPUT_USD_PER_MILLION:-0.24}
       RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
