@@ -28,6 +28,16 @@ def load_module(name: str, path: Path):
 
 
 class LlmSecurityControlPlaneTests(unittest.TestCase):
+    def test_stop_stack_removes_every_control_plane_container(self) -> None:
+        stop = (CONTROL / "deploy/stop-stack.sh").read_text()
+        for container in (
+            "llm-security-application-gateway",
+            "llm-security-nemo-hub",
+            "llm-security-presidio-spoke",
+            "llm-security-bedrock-gateway",
+        ):
+            self.assertIn(container, stop)
+
     def test_bedrock_contract_double_inspects_only_runtime_content(self) -> None:
         fake = load_module(
             "control_plane_fake_bedrock_gateway",
