@@ -64,17 +64,17 @@ RAG_STORES = {
     "public": {
         "purpose": "public_information",
         "exact_value_required": True,
-        "chunks": ["Public security contact: security@example.com."],
+        "allowed_source_suffixes": ["/public-support.md"],
     },
     "internal": {
         "purpose": "incident_response",
         "exact_value_required": False,
-        "chunks": ["Internal incident process owner: incident.lead@example.com."],
+        "allowed_source_suffixes": ["/restricted-incident.md"],
     },
     "restricted": {
         "purpose": "customer_support",
         "exact_value_required": True,
-        "chunks": ["Synthetic customer recovery contact: customer.demo@example.com."],
+        "allowed_source_suffixes": ["/restricted-incident.md"],
     },
 }
 
@@ -121,7 +121,7 @@ def authorize_retrieval(
     return {
         "classification": classification,
         "purpose": purpose,
-        "chunks": list(store["chunks"]),
+        "allowed_source_suffixes": list(store["allowed_source_suffixes"]),
         "exact_value_required": bool(store["exact_value_required"]),
         "authorized_by": "application-policy",
     }
@@ -137,6 +137,7 @@ def public_policy() -> dict:
             key: {
                 "purpose": value["purpose"],
                 "exact_value_required": value["exact_value_required"],
+                "allowed_source_suffixes": list(value["allowed_source_suffixes"]),
             }
             for key, value in RAG_STORES.items()
         },

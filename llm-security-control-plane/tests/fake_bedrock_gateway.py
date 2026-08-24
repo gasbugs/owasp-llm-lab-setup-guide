@@ -86,6 +86,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         length = int(self.headers.get("Content-Length", "0"))
         payload = json.loads(self.rfile.read(length) or b"{}")
+        if self.path == "/v1/retrieve":
+            query = str(payload.get("query", ""))
+            if "공개" in query:
+                source = "s3://owasp-llm-module08-test-source/knowledge/public-support.md"
+                text = "Public security contact: security@example.com."
+            else:
+                source = "s3://owasp-llm-module08-test-source/knowledge/restricted-incident.md"
+                text = "Synthetic customer recovery contact: customer.demo@example.com."
+            self.send_json(200, {"knowledge_base_id": "TESTKB1234", "hits": [{"score": 0.9, "source": source, "text": text}]})
+            return
         if self.path == "/v1/chat/completions":
             content = response_for_openai(payload)
             self.send_json(

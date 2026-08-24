@@ -62,6 +62,7 @@ podman run --rm --network none \
 bash "$ROOT/deploy/start-stack.sh"
 
 PUBLIC_TOKEN="$(login public-reader public-reader-demo)"
+INTERNAL_TOKEN="$(login internal-analyst internal-analyst-demo)"
 SUPPORT_TOKEN="$(login support-agent support-agent-demo)"
 bad_login_status="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
   -X POST "$APP/.well-known/login" -H 'Content-Type: application/json' \
@@ -111,8 +112,14 @@ jq -e '.application_decision == "block" and .upstream_called == false and (.bloc
 chat "$PUBLIC_TOKEN" \
   '{"message":"공개 보안 연락처를 알려 주세요.","classification":"public","purpose":"public_information"}' \
   > "$WORK/public-rag.json"
-jq -e '.application_decision == "allow" and .upstream_called == true and any(.guardrail.stages[]; .stage == "presidio_retrieval" and .decision == "allow_unredacted" and (.entity_types | index("EMAIL_ADDRESS")) != null)' \
+jq -e '.application_decision == "allow" and .upstream_called == true and any(.guardrail.stages[]; .stage == "presidio_retrieval" and .decision == "allow_unredacted" and .detection_count == 0)' \
   "$WORK/public-rag.json" >/dev/null
+
+chat "$INTERNAL_TOKEN" \
+  '{"message":"내부 사고 대응 담당자 연락처를 알려 주세요.","classification":"internal","purpose":"incident_response"}' \
+  > "$WORK/internal-rag.json"
+jq -e '.application_decision == "allow" and .upstream_called == true and any(.guardrail.stages[]; .stage == "presidio_retrieval" and .decision == "redact" and (.entity_types | index("EMAIL_ADDRESS")) != null) and (.reply | contains("incident-owner@example.com") | not)' \
+  "$WORK/internal-rag.json" >/dev/null
 
 chat "$PUBLIC_TOKEN" \
   '{"message":"고객 복구 연락처를 알려 주세요.","classification":"restricted","purpose":"customer_support"}' \

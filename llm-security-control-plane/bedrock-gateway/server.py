@@ -11,7 +11,7 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI, HTTPException, Response
 from opentelemetry import trace
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
 
 from telemetry import configure_telemetry
@@ -21,7 +21,10 @@ AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"
 MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
 INPUT_USD_PER_MILLION = float(os.getenv("BEDROCK_INPUT_USD_PER_MILLION", "0.06"))
 OUTPUT_USD_PER_MILLION = float(os.getenv("BEDROCK_OUTPUT_USD_PER_MILLION", "0.24"))
+PRICING_REFERENCE_DATE = os.getenv("BEDROCK_PRICING_REFERENCE_DATE", "2026-08-24")
+KNOWLEDGE_BASE_ID = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "")
 BEDROCK = boto3.client("bedrock-runtime", region_name=AWS_REGION)
+BEDROCK_AGENT_RUNTIME = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION)
 RUNTIME = {"ready": False, "error": "startup-not-complete"}
 TRACER = trace.get_tracer("llm-security-bedrock-gateway")
 
@@ -42,6 +45,18 @@ ESTIMATED_COST = Counter(
     "Estimated Bedrock cost from configured per-million-token rates",
     ["model", "task"],
 )
+PRICING_INFO = Gauge(
+    "bedrock_pricing_info",
+    "Configured estimate metadata; value is initialized once per gateway process",
+    ["model", "region", "reference_date", "input_usd_per_million", "output_usd_per_million"],
+)
+PRICING_INFO.labels(
+    MODEL_ID,
+    AWS_REGION,
+    PRICING_REFERENCE_DATE,
+    str(INPUT_USD_PER_MILLION),
+    str(OUTPUT_USD_PER_MILLION),
+).inc()
 
 
 class Message(BaseModel):
@@ -57,6 +72,12 @@ class ChatCompletionRequest(BaseModel):
     temperature: float = Field(default=0.0, ge=0.0, le=1.0)
     max_tokens: int = Field(default=180, ge=1, le=4096)
     stream: bool = False
+
+
+class RetrievalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(min_length=1, max_length=4000)
+    number_of_results: int = Field(default=3, ge=1, le=10)
 
 
 def _converse(request: ChatCompletionRequest) -> dict:
@@ -172,6 +193,7 @@ def healthz() -> dict:
             "input_usd_per_million_tokens": INPUT_USD_PER_MILLION,
             "output_usd_per_million_tokens": OUTPUT_USD_PER_MILLION,
             "kind": "configured-estimate",
+            "reference_date": PRICING_REFERENCE_DATE,
         },
         "error": RUNTIME["error"],
     }
@@ -187,3 +209,33 @@ def chat_completions(request: ChatCompletionRequest) -> dict:
     if not RUNTIME["ready"]:
         raise HTTPException(status_code=503, detail="Bedrock gateway startup check failed")
     return _converse(request)
+
+
+@app.post("/v1/retrieve")
+def retrieve(request: RetrievalRequest) -> dict:
+    """Retrieve through the credential boundary instead of exposing AWS credentials downstream."""
+    if not KNOWLEDGE_BASE_ID:
+        raise HTTPException(status_code=503, detail="Module 08 Knowledge Base is not configured")
+    try:
+        result = BEDROCK_AGENT_RUNTIME.retrieve(
+            knowledgeBaseId=KNOWLEDGE_BASE_ID,
+            retrievalQuery={"text": request.query},
+            retrievalConfiguration={
+                "vectorSearchConfiguration": {"numberOfResults": request.number_of_results}
+            },
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise HTTPException(
+            status_code=502, detail=f"bedrock retrieve failed: {type(exc).__name__}"
+        ) from exc
+    return {
+        "knowledge_base_id": KNOWLEDGE_BASE_ID,
+        "hits": [
+            {
+                "score": item.get("score"),
+                "source": item.get("location", {}).get("s3Location", {}).get("uri"),
+                "text": item.get("content", {}).get("text", ""),
+            }
+            for item in result.get("retrievalResults", [])
+        ],
+    }

@@ -108,7 +108,26 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             support, "restricted", "customer_support"
         )
         self.assertEqual(selected["authorized_by"], "application-policy")
+        self.assertEqual(selected["allowed_source_suffixes"], ["/restricted-incident.md"])
+        self.assertNotIn("chunks", selected)
         self.assertNotIn("prohibited", policy.RAG_STORES)
+
+    def test_module08_aws_restore_is_separate_and_idempotent(self) -> None:
+        source = (CONTROL / "deploy/restore-module08-aws.sh").read_text()
+        self.assertIn("--verify-only", source)
+        self.assertIn("--repair", source)
+        self.assertIn("owasp-llm-module08", source)
+        self.assertNotIn("owasp-llm-course-knowledge-base", source)
+        self.assertIn("module08-aws.env", source)
+
+    def test_gateway_owns_bedrock_retrieval_and_pricing_metadata(self) -> None:
+        gateway = (CONTROL / "bedrock-gateway/server.py").read_text()
+        application = (CONTROL / "application-gateway/server.py").read_text()
+        self.assertIn('@app.post("/v1/retrieve")', gateway)
+        self.assertIn("BEDROCK_AGENT_RUNTIME.retrieve", gateway)
+        self.assertIn("bedrock_pricing_info", gateway)
+        self.assertIn('f"{MODEL_GATEWAY_URL}/v1/retrieve"', application)
+        self.assertIn("allowed_suffixes", application)
 
     def test_application_auth_contract_is_rs256_and_stateful(self) -> None:
         source = (CONTROL / "application-gateway/auth.py").read_text()

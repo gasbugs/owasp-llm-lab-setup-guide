@@ -112,6 +112,9 @@
     details { height:100%; }
     summary { cursor:pointer; color:var(--signal); font-weight:700; }
     details pre { margin-top:14px; max-height:310px; overflow:auto; }
+    .investigation-links { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+    .investigation-links a { border:1px solid var(--line); border-radius:8px; padding:8px 10px; color:var(--signal); text-decoration:none; font:700 11px ui-monospace,monospace; }
+    .investigation-links a[aria-disabled="true"] { pointer-events:none; color:var(--muted); opacity:.6; }
     @media (max-width:980px) {
       .masthead { grid-template-columns:1fr auto; }.mission { grid-column:1/-1; grid-row:2; }
       .console-grid,.result-grid { grid-template-columns:1fr; }.flight-path { overflow-x:auto; }
@@ -174,7 +177,7 @@
 
   <div class="result-grid">
     <section class="panel"><header class="panel-head"><div><div class="eyebrow">Released response</div><h2>사용자 응답</h2></div><span class="panel-code">OUTPUT</span></header><div class="result-body"><pre id="reply">아직 실행하지 않았습니다.</pre></div></section>
-    <section class="panel"><header class="panel-head"><div><div class="eyebrow">Evidence payload</div><h2>구조화된 원본</h2></div><span class="panel-code">JSON</span></header><div class="result-body"><details><summary>원본 응답 펼치기</summary><pre id="raw">{}</pre></details></div></section>
+    <section class="panel"><header class="panel-head"><div><div class="eyebrow">Evidence payload</div><h2>구조화된 원본</h2></div><span class="panel-code">JSON</span></header><div class="result-body"><details><summary>원본 응답 펼치기</summary><pre id="raw">{}</pre></details><nav class="investigation-links" aria-label="관측 증거 바로가기"><a id="grafana-link" href="http://127.0.0.1:3001" target="_blank" rel="noopener">GRAFANA</a><a id="monitor-link" href="http://127.0.0.1:8014" target="_blank" rel="noopener">SECURITY EVENTS</a><a id="tempo-link" href="#" aria-disabled="true">TEMPO TRACE</a></nav></div></section>
   </div>
 </main>
 <script>
@@ -198,8 +201,9 @@ function renderStages(stages){
   for(const stage of stages){const node=[...document.querySelectorAll('[data-stage]')].find(item=>item.dataset.stage===stage.stage);if(node)node.classList.add(stage.decision||'active')}
   const appNode=document.querySelector('[data-stage="application"]');if(appNode)appNode.classList.add('allow');
 }
+function renderInvestigationLinks(data){const traceId=data.trace_id||'';const tempo=$('tempo-link');if(/^[a-f0-9]{32}$/.test(traceId)){tempo.href=`http://127.0.0.1:3200/api/traces/${traceId}`;tempo.target='_blank';tempo.rel='noopener';tempo.setAttribute('aria-disabled','false')}else{tempo.href='#';tempo.removeAttribute('target');tempo.setAttribute('aria-disabled','true')}}
 $('send').onclick=async()=>{const body={message:$('message').value,classification:$('classification').value,purpose:$('purpose').value};$('decision').className='decision-badge';$('decision').textContent='IN FLIGHT';$('decision-copy').textContent='정책 경계를 순서대로 통과하고 있습니다.';$('stages').innerHTML='<div class="empty-strip">REQUEST IN FLIGHT / 처리 중</div>';
-try{if(!accessToken)await login();let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});if(r.status===401&&await refresh())r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});const d=await r.json();const decision=d.application_decision||'infra';$('decision').className=`decision-badge ${decision}`;$('decision').textContent=decision.toUpperCase();$('decision-copy').textContent=`request_id=${d.request_id||'-'}`;$('reply').textContent=d.reply||JSON.stringify(d);const stages=[...(d.application_stages||[]),...((d.guardrail||{}).stages||[])];renderStages(stages);$('raw').textContent=JSON.stringify(d,null,2)}catch(e){$('decision').className='decision-badge infra';$('decision').textContent='INFRA';$('decision-copy').textContent='요청 경로를 완료하지 못했습니다.';$('reply').textContent=String(e);renderStages([])}};
+try{if(!accessToken)await login();let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});if(r.status===401&&await refresh())r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});const d=await r.json();const decision=d.application_decision||'infra';$('decision').className=`decision-badge ${decision}`;$('decision').textContent=decision.toUpperCase();$('decision-copy').textContent=`request_id=${d.request_id||'-'} · trace_id=${d.trace_id||'-'}`;$('reply').textContent=d.reply||JSON.stringify(d);const stages=[...(d.application_stages||[]),...((d.guardrail||{}).stages||[])];renderStages(stages);renderInvestigationLinks(d);$('raw').textContent=JSON.stringify(d,null,2)}catch(e){$('decision').className='decision-badge infra';$('decision').textContent='INFRA';$('decision-copy').textContent='요청 경로를 완료하지 못했습니다.';$('reply').textContent=String(e);renderStages([]);renderInvestigationLinks({})}};
 </script>
 </body>
 </html>

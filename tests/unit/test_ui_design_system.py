@@ -90,6 +90,12 @@ class UiDesignSystemTests(unittest.TestCase):
         ):
             self.assertIn(stage, self.control)
 
+    def test_control_center_links_request_evidence_to_observability(self) -> None:
+        for control_id in ("grafana-link", "monitor-link", "tempo-link"):
+            self.assertIn(f'id="{control_id}"', self.control)
+        self.assertIn("/api/traces/${traceId}", self.control)
+        self.assertIn("renderInvestigationLinks(d)", self.control)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -35,6 +35,7 @@ from telemetry import configure_telemetry, current_trace_id
 
 
 NEMO_HUB_URL = os.getenv("NEMO_HUB_URL", "http://10.0.2.2:18094").rstrip("/")
+MODEL_GATEWAY_URL = os.getenv("MODEL_GATEWAY_URL", "http://10.0.2.2:18096").rstrip("/")
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 TELEMETRY_INGEST_TOKEN = os.getenv("TELEMETRY_INGEST_TOKEN", "")
 RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
@@ -369,6 +370,26 @@ async def chat(
             }
         )
         if retrieval:
+            # 인증·인가가 끝난 뒤에만 자격 증명 격리 Gateway에 검색을 요청한다.
+            async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+                response = await client.post(
+                    f"{MODEL_GATEWAY_URL}/v1/retrieve",
+                    json={"query": request.message, "number_of_results": 5},
+                )
+                response.raise_for_status()
+                hits = response.json().get("hits", [])
+            allowed_suffixes = tuple(retrieval.pop("allowed_source_suffixes"))
+            # Knowledge Base 검색 결과도 신뢰하지 않고 정책이 허용한 S3 source만 선택한다.
+            retrieval["chunks"] = [
+                hit["text"]
+                for hit in hits
+                if isinstance(hit, dict)
+                and isinstance(hit.get("source"), str)
+                and hit["source"].endswith(allowed_suffixes)
+                and isinstance(hit.get("text"), str)
+            ]
+            if not retrieval["chunks"]:
+                raise AuthorizationError("no-authorized-retrieval-hit")
             application_stages.append(
                 {
                     "stage": "application_rag_selection",
@@ -377,6 +398,17 @@ async def chat(
                     "chunk_count": len(retrieval["chunks"]),
                 }
             )
+    except (httpx.HTTPError, ValueError) as exc:
+        result = {
+            "request_id": request_id,
+            "reply": "retrieval infrastructure unavailable",
+            "application_decision": "infra",
+            "blocking_reason": f"bedrock-retrieval:{type(exc).__name__}",
+            "upstream_called": False,
+            "application_stages": application_stages,
+        }
+        emit_metadata({"event": "application_chat", **result, "reply": None})
+        return result
     except AuthorizationError as exc:
         application_stages.append(
             {

@@ -9,4 +9,8 @@ Nova Lite와 Titan Text Embeddings V2는 On-Demand API이므로 Terraform으로 
 
 Knowledge Base 실습 리소스도 Terraform이나 래퍼 스크립트에 포함하지 않습니다. 수강생은 07장에서 정책 원문을 읽고 AWS CLI 명령을 단계별로 직접 실행합니다.
 
-08장의 보호 계층은 AWS 관리형 정책 리소스를 만들거나 호출하지 않습니다. NeMo Guardrails가 흐름을 조정하고 로컬 Llama Guard가 위해 콘텐츠를 분류하며 Microsoft Presidio가 개인정보를 탐지·비식별화합니다. 07~09장에서 Bedrock은 생성 모델, 임베딩과 Knowledge Base API 호출에만 사용합니다.
+07장의 Knowledge Base는 튜토리얼 종료 때 삭제하며 08장으로 넘기지 않습니다. 08장은
+`llm-security-control-plane/deploy/restore-module08-aws.sh`가 별도 접두사의 실습 상태를
+복구합니다. NeMo Guardrails가 흐름을 조정하고 Amazon Nova Lite Content Safety와
+애플리케이션 Self-check가 서로 다른 정책 prompt를 실행하며 Microsoft Presidio가
+개인정보를 탐지·비식별화합니다. 실제 Llama Guard나 로컬 Ollama는 사용하지 않습니다.

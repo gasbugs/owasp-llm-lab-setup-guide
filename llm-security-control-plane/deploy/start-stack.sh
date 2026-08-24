@@ -40,6 +40,11 @@ BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}"
 AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
 AWS_PROFILE="${AWS_PROFILE:-default}"
 AWS_CONFIG_DIR="${AWS_CONFIG_DIR:-$HOME/.aws}"
+MODULE08_STATE_FILE="${MODULE08_STATE_FILE:-$ROOT/.state/module08-aws.env}"
+if [ -f "$MODULE08_STATE_FILE" ]; then
+  # shellcheck disable=SC1090
+  source "$MODULE08_STATE_FILE"
+fi
 if [ "$START_BEDROCK_GATEWAY" = true ] && [ ! -d "$AWS_CONFIG_DIR" ]; then
   echo "AWS config directory does not exist: $AWS_CONFIG_DIR" >&2
   exit 1
@@ -63,8 +68,10 @@ if [ "$START_BEDROCK_GATEWAY" = true ]; then
     -e AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials \
     -e AWS_CONFIG_FILE=/tmp/.aws/config \
     -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
+    -e "BEDROCK_KNOWLEDGE_BASE_ID=${MODULE08_KNOWLEDGE_BASE_ID:-}" \
     -e "BEDROCK_INPUT_USD_PER_MILLION=${BEDROCK_INPUT_USD_PER_MILLION:-0.06}" \
     -e "BEDROCK_OUTPUT_USD_PER_MILLION=${BEDROCK_OUTPUT_USD_PER_MILLION:-0.24}" \
+    -e "BEDROCK_PRICING_REFERENCE_DATE=${BEDROCK_PRICING_REFERENCE_DATE:-2026-08-24}" \
     -e "RELEASE_VERSION=$IMAGE_VERSION" \
     "${OTEL_ARGS[@]}" \
     -v "$AWS_CONFIG_DIR:/tmp/.aws:ro" \
@@ -101,6 +108,7 @@ podman run -d --replace --name llm-security-application-gateway \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   -e "NEMO_HUB_URL=$NEMO_HUB_URL" \
+  -e "MODEL_GATEWAY_URL=$MODEL_GATEWAY_URL" \
   -e "AUTH_EVENT_SINK=$AUTH_EVENT_SINK" \
   -e "LEGACY_STATIC_TOKEN_MODE=$LEGACY_STATIC_TOKEN_MODE" \
   "${OTEL_ARGS[@]}" \
