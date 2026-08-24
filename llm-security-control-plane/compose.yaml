@@ -1,5 +1,9 @@
 name: llm-security-control-plane
 
+# 서비스마다 loopback port와 keep-id user namespace를 소유하므로 하나의 Pod로 묶지 않는다.
+x-podman:
+  in_pod: false
+
 services:
   bedrock-gateway:
     container_name: llm-security-bedrock-gateway
@@ -7,9 +11,7 @@ services:
       context: .
       dockerfile: bedrock-gateway/Containerfile
     image: localhost/llm-security-bedrock-gateway:${IMAGE_VERSION:-1.0.0}
-    # WSL 사용자의 AWS 설정 파일을 읽도록 host UID/GID로 실행한다.
-    # 개별 user namespace를 만들지 않아 Compose의 Pod 모드와도 충돌하지 않는다.
-    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    userns_mode: keep-id:uid=65532,gid=65532
     restart: always
     ports:
       - "127.0.0.1:18096:8080"
@@ -77,8 +79,7 @@ services:
       context: .
       dockerfile: application-gateway/Containerfile
     image: localhost/llm-security-application-gateway:${IMAGE_VERSION:-1.0.0}
-    # 인증 상태 디렉터리를 만든 WSL 사용자와 같은 UID/GID로 실행한다.
-    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    userns_mode: keep-id:uid=65532,gid=65532
     restart: always
     depends_on:
       - bedrock-gateway

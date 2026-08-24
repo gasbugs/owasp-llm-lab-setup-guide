@@ -153,13 +153,18 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("DELETING", source)
         self.assertIn("wait_for_data_source_available", source)
 
-    def test_compose_uses_host_ids_without_per_container_user_namespace(self) -> None:
+    def test_compose_disables_pod_mode_for_keep_id_services(self) -> None:
         compose = (CONTROL / "compose.yaml").read_text()
-        restore = (CONTROL / "deploy/restore-module08-aws.sh").read_text()
-        self.assertNotIn("userns_mode", compose)
-        self.assertIn('${LOCAL_UID:-1000}:${LOCAL_GID:-1000}', compose)
-        self.assertIn("LOCAL_UID=%s", restore)
-        self.assertIn("LOCAL_GID=%s", restore)
+        parsed = yaml.safe_load(compose)
+        self.assertFalse(parsed["x-podman"]["in_pod"])
+        self.assertEqual(
+            parsed["services"]["bedrock-gateway"]["userns_mode"],
+            "keep-id:uid=65532,gid=65532",
+        )
+        self.assertEqual(
+            parsed["services"]["application"]["userns_mode"],
+            "keep-id:uid=65532,gid=65532",
+        )
 
     def test_module08_cleanup_is_aws_only_and_preserves_local_runtime(self) -> None:
         source = (CONTROL / "deploy/cleanup-module08-aws.sh").read_text()
