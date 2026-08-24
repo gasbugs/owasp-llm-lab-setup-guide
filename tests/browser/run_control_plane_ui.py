@@ -55,7 +55,11 @@ def main() -> int:
         page.on("request", lambda request: requests.append(request.url))
         page.goto(origin, wait_until="domcontentloaded", timeout=timeout_ms)
         normal = submit(page, NORMAL, timeout_ms)
+        normal_exchange_count = page.locator("#exchange-log .exchange").count()
+        normal_exchange_text = page.locator("#exchange-log").inner_text()
+        architecture_nodes = page.locator(".topology-map [data-service]").count()
         attack = submit(page, SELF_CHECK_ATTACK, timeout_ms)
+        attack_exchange_text = page.locator("#exchange-log").inner_text()
         page.locator("#theme-toggle").click()
         light_theme = page.locator("html").get_attribute("data-theme") == "light"
         page.set_viewport_size({"width": 390, "height": 844})
@@ -84,6 +88,12 @@ def main() -> int:
         and urlsplit(origin).hostname in {"127.0.0.1", "localhost"},
         "theme": light_theme,
         "mobile": mobile_overflow is False,
+        "architecture": architecture_nodes == 5
+        and normal_exchange_count >= 8
+        and "Application → NeMo Hub" in normal_exchange_text
+        and "NeMo Hub → Presidio" in normal_exchange_text
+        and "NeMo Hub → Bedrock Gateway" in normal_exchange_text
+        and "REQ · Nova Lite" not in attack_exchange_text,
     }
 
     print(
@@ -101,6 +111,11 @@ def main() -> int:
     print(f"browser_api_chat_requests={chat_requests}")
     print(f"browser_internal_service_requests={internal_requests}")
     print(f"light_theme={str(light_theme).lower()} mobile_overflow={str(mobile_overflow).lower()}")
+    print(
+        f"architecture_nodes={architecture_nodes} "
+        f"normal_exchanges={normal_exchange_count} "
+        f"attack_main_hidden={str('REQ · Nova Lite' not in attack_exchange_text).lower()}"
+    )
     print("overall_ui=" + ("PASS" if all(checks.values()) else "FAIL"))
     return 0 if all(checks.values()) else 1
 
