@@ -1,0 +1,17 @@
+schema_version: 1
+model_id: us.amazon.nova-lite-v1:0
+main_stage: bedrock_main
+browser_entrypoint: application
+services:
+  application:
+    host_port: 18095
+    container_port: 8000
+  nemo:
+    host_port: 18094
+    container_port: 8014
+  presidio:
+    host_port: 18093
+    container_port: 8013
+  bedrock_gateway:
+    host_port: 18096
+    container_port: 8080

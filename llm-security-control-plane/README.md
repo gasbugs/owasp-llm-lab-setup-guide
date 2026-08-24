@@ -44,6 +44,8 @@ SQLite 폐기 상태를 모두 확인한 뒤에만 인가를 시작한다. 실�
 
 `versions.lock.yaml`은 Python base digest, 직접 설치하는 Python package, Bedrock Model ID,
 네 이미지의 semantic version, Promptfoo·Garak과 테스트용 Node image digest를 고정한다.
+`runtime-contract.yaml`은 교재·배포·브라우저 E2E가 공유하는 host/container port,
+`bedrock_main` stage와 Browser 단일 진입점을 고정한다.
 NeMo Hub는 시작할 때 local Bedrock Gateway의 provider와 Model ID를 비교하며 다르면
 `/healthz`를 실패시키고 `/api/chat`을 503으로 닫는다. 자동 downgrade는 사용하지 않는다.
 
@@ -116,3 +118,8 @@ Module 08은 `AUTH_EVENT_SINK=stdout`으로 인증 성공·실패 JSON을 컨테
 ```bash
 BUILD_IMAGES=true bash llm-security-control-plane/tests/e2e-control-plane.sh
 ```
+
+GitHub의 Module 08 workflow는 매 push마다 fake 모델이 아니라 실제 Bedrock과 Browser를
+호출한다. Repository Actions secret의 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`와
+임시 자격 증명일 때 `AWS_SESSION_TOKEN`을 사용하며, 실행 직전에 Module 08 Knowledge
+Base 상태를 `--repair`로 복구한 뒤 desktop·390px UI 계약까지 검사한다.

@@ -18,13 +18,28 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Configure AWS credentials for the real Bedrock browser path
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
       - name: Install Podman and jq
         run: |
           sudo apt-get update
           sudo apt-get install --yes podman jq
+          python -m pip install --requirement tests/browser/requirements.txt
+          python -m playwright install --with-deps chromium
 
       - name: Build the real control-plane images
         run: bash llm-security-control-plane/deploy/build-images.sh
+
+      - name: Restore the nightly Module 08 AWS state
+        env:
+          AWS_REGION: us-east-1
+        run: bash llm-security-control-plane/deploy/restore-module08-aws.sh --repair
 
       - name: Smoke-test the real Bedrock Gateway entrypoint imports
         run: |
@@ -37,30 +52,25 @@ jobs:
             localhost/llm-security-bedrock-gateway:1.0.0 \
             -c 'import httpx; import telemetry; import server; print("real-bedrock-gateway-import=PASS")'
 
-      - name: Start the deterministic Bedrock contract gateway
-        run: |
-          podman run --detach --name module08-bedrock-contract \
-            --publish 18097:8080 \
-            --volume "$PWD/llm-security-control-plane/tests/fake_bedrock_gateway.py:/app/server.py:ro,Z" \
-            docker.io/library/python:3.12-slim python /app/server.py
-
       - name: Run the complete control-plane E2E without intermediate errors
         env:
           MODEL_PROVIDER: amazon-bedrock
           BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
-          MODEL_GATEWAY_URL: http://host.containers.internal:18097
-          BEDROCK_GATEWAY_TEST_URL: http://127.0.0.1:18097
-          START_BEDROCK_GATEWAY: "false"
+          START_BEDROCK_GATEWAY: "true"
+          KEEP_CONTROL_PLANE: "true"
         run: |
           set -o pipefail
           bash llm-security-control-plane/tests/e2e-control-plane.sh 2>&1 | tee /tmp/module08-e2e.log
           ! grep -E '(^|[[:space:]])(Error:|INFRA:|Traceback|curl:)|service did not become ready' /tmp/module08-e2e.log
 
+      - name: Run the Control Center browser contract at desktop and mobile widths
+        run: python tests/browser/run_control_plane_ui.py --browser-channel chromium
+
       - name: Preserve Podman diagnostics on failure
         if: failure()
         run: |
           podman ps --all
-          podman logs module08-bedrock-contract || true
+          podman logs llm-security-bedrock-gateway || true
           podman logs llm-security-presidio-spoke || true
           podman logs llm-security-nemo-hub || true
           podman logs llm-security-application-gateway || true
@@ -68,6 +78,6 @@ jobs:
       - name: Remove test resources
         if: always()
         run: |
-          podman rm --force module08-bedrock-contract \
+          podman rm --force llm-security-bedrock-gateway \
             llm-security-application-gateway llm-security-nemo-hub \
             llm-security-presidio-spoke 2>/dev/null || true

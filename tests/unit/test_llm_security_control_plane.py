@@ -79,6 +79,26 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertEqual(lock["test_tools"]["garak"], "0.15.1")
         self.assertEqual(len(lock["test_tools"]["node_image_digest"]), 71)
 
+    def test_runtime_contract_matches_server_and_browser_harness(self) -> None:
+        contract = yaml.safe_load((CONTROL / "runtime-contract.yaml").read_text())
+        self.assertEqual(contract["model_id"], "us.amazon.nova-lite-v1:0")
+        self.assertEqual(contract["main_stage"], "bedrock_main")
+        self.assertEqual(contract["services"]["application"]["host_port"], 18095)
+        harness = (ROOT / "tests/browser/run_control_plane_ui.py").read_text()
+        self.assertIn('"bedrock_main" in normal_stage_order', harness)
+        self.assertIn('"width": 390', harness)
+        self.assertIn("mobile_overflow", harness)
+
+    def test_dialog_image_uses_the_pinned_runtime_and_dependencies(self) -> None:
+        dialog = ROOT / "examples/day6/nemo-guardrails"
+        containerfile = (dialog / "Containerfile").read_text()
+        lock = yaml.safe_load((CONTROL / "versions.lock.yaml").read_text())
+        self.assertIn(lock["runtime"]["python_image_digest"], containerfile)
+        requirements = (dialog / "requirements.txt").read_text().splitlines()
+        for package in ("fastapi", "httpx", "nemoguardrails", "uvicorn"):
+            expected = f'{package}=={lock["python_packages"][package]}'
+            self.assertIn(expected, requirements)
+
     def test_hub_policy_is_sequential_and_never_downgrades(self) -> None:
         policy = yaml.safe_load((CONTROL / "policies/nemo-policy.yaml").read_text())
         self.assertFalse(policy["execution"]["input_parallel"])

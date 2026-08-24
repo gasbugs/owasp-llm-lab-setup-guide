@@ -41,12 +41,26 @@ BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}"
 AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
 AWS_PROFILE="${AWS_PROFILE:-default}"
 AWS_CONFIG_DIR="${AWS_CONFIG_DIR:-$HOME/.aws}"
+AWS_ENV_ARGS=()
+AWS_MOUNT_ARGS=()
+if [ -d "$AWS_CONFIG_DIR" ]; then
+  AWS_MOUNT_ARGS=(-v "$AWS_CONFIG_DIR:/tmp/.aws:ro")
+fi
+if [ -n "${AWS_ACCESS_KEY_ID:-}" ] && [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+  AWS_ENV_ARGS+=(
+    -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+    -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+  )
+  if [ -n "${AWS_SESSION_TOKEN:-}" ]; then
+    AWS_ENV_ARGS+=(-e "AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN")
+  fi
+fi
 MODULE08_STATE_FILE="${MODULE08_STATE_FILE:-$ROOT/.state/module08-aws.env}"
 if [ -f "$MODULE08_STATE_FILE" ]; then
   # shellcheck disable=SC1090
   source "$MODULE08_STATE_FILE"
 fi
-if [ "$START_BEDROCK_GATEWAY" = true ] && [ ! -d "$AWS_CONFIG_DIR" ]; then
+if [ "$START_BEDROCK_GATEWAY" = true ] && [ ! -d "$AWS_CONFIG_DIR" ] && [ "${#AWS_ENV_ARGS[@]}" -eq 0 ]; then
   echo "AWS config directory does not exist: $AWS_CONFIG_DIR" >&2
   exit 1
 fi
@@ -75,8 +89,9 @@ if [ "$START_BEDROCK_GATEWAY" = true ]; then
     -e "BEDROCK_OUTPUT_USD_PER_MILLION=${BEDROCK_OUTPUT_USD_PER_MILLION:-0.24}" \
     -e "BEDROCK_PRICING_REFERENCE_DATE=${BEDROCK_PRICING_REFERENCE_DATE:-2026-08-24}" \
     -e "RELEASE_VERSION=$IMAGE_VERSION" \
+    "${AWS_ENV_ARGS[@]}" \
     "${OTEL_ARGS[@]}" \
-    -v "$AWS_CONFIG_DIR:/tmp/.aws:ro" \
+    "${AWS_MOUNT_ARGS[@]}" \
     "localhost/llm-security-bedrock-gateway:$IMAGE_VERSION" >/dev/null
 fi
 

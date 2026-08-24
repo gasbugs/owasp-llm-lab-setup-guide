@@ -22,7 +22,7 @@ test_tools:
 
 # 서비스 이미지를 다시 만들 때 재현할 Python dependency 정본이다.
 python_packages:
-  fastapi: 0.141.1
+  fastapi: 0.116.1
   httpx: 0.28.1
   nemoguardrails: 0.22.0
   presidio_analyzer: 2.2.362

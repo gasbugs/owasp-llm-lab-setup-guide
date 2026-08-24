@@ -10,6 +10,10 @@ APP_TOKEN=control-plane-app-to-nemo
 MAIN_STAGE=bedrock_main
 
 cleanup() {
+  if [ "${KEEP_CONTROL_PLANE:-false}" = true ]; then
+    rm -rf "$WORK"
+    return
+  fi
   podman rm -f llm-security-application-gateway llm-security-nemo-hub \
     llm-security-presidio-spoke llm-security-bedrock-gateway >/dev/null 2>&1 || true
   rm -rf "$WORK"

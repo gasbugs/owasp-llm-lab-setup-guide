@@ -56,6 +56,12 @@ def main() -> int:
         page.goto(origin, wait_until="domcontentloaded", timeout=timeout_ms)
         normal = submit(page, NORMAL, timeout_ms)
         attack = submit(page, SELF_CHECK_ATTACK, timeout_ms)
+        page.locator("#theme-toggle").click()
+        light_theme = page.locator("html").get_attribute("data-theme") == "light"
+        page.set_viewport_size({"width": 390, "height": 844})
+        mobile_overflow = page.evaluate(
+            "() => document.documentElement.scrollWidth > document.documentElement.clientWidth"
+        )
         browser.close()
 
     chat_requests = sum(url == f"{origin}/api/chat" for url in requests)
@@ -68,7 +74,7 @@ def main() -> int:
     checks = {
         "normal": normal.get("application_decision") == "allow"
         and normal.get("upstream_called") is True
-        and "ollama_main" in normal_stage_order
+        and "bedrock_main" in normal_stage_order
         and normal.get("guardrail", {}).get("guard_model_calls") == 4,
         "attack": attack.get("application_decision") == "block"
         and attack.get("upstream_called") is False
@@ -76,6 +82,8 @@ def main() -> int:
         "same_origin": chat_requests == 2
         and internal_requests == 0
         and urlsplit(origin).hostname in {"127.0.0.1", "localhost"},
+        "theme": light_theme,
+        "mobile": mobile_overflow is False,
     }
 
     print(
@@ -92,6 +100,7 @@ def main() -> int:
     )
     print(f"browser_api_chat_requests={chat_requests}")
     print(f"browser_internal_service_requests={internal_requests}")
+    print(f"light_theme={str(light_theme).lower()} mobile_overflow={str(mobile_overflow).lower()}")
     print("overall_ui=" + ("PASS" if all(checks.values()) else "FAIL"))
     return 0 if all(checks.values()) else 1
 
