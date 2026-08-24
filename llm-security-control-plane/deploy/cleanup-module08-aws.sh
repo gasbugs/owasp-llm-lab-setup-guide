@@ -61,6 +61,6 @@ aws s3vectors delete-index --region "$AWS_REGION" \
 aws s3vectors delete-vector-bucket --region "$AWS_REGION" \
   --vector-bucket-name "$VECTOR_BUCKET" 2>/dev/null || true
 
-rm -f "$ROOT/.state/module08-aws.env"
+rm -f "$ROOT/.state/module08-aws.env" "$ROOT/.state/module08-compose.env"
 printf 'module08-aws=DELETED prefix=%s region=%s local_containers=PRESERVED\n' \
   "$PREFIX" "$AWS_REGION"

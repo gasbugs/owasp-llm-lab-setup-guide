@@ -12,6 +12,7 @@ esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AWS_REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}
+AWS_PROFILE=${AWS_PROFILE:-default}
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 PREFIX=owasp-llm-module08
 SOURCE_BUCKET="${PREFIX}-${ACCOUNT_ID}-source"
@@ -25,6 +26,27 @@ VECTOR_BUCKET_ARN="arn:aws:s3vectors:${AWS_REGION}:${ACCOUNT_ID}:bucket/${VECTOR
 VECTOR_INDEX_ARN="${VECTOR_BUCKET_ARN}/index/${VECTOR_INDEX}"
 STATE_DIR="$ROOT/.state"
 STATE_FILE="$STATE_DIR/module08-aws.env"
+COMPOSE_ENV_FILE="$STATE_DIR/module08-compose.env"
+
+write_compose_env() {
+  local current_knowledge_base_id=$1
+  install -d -m 0700 "$STATE_DIR"
+  umask 077
+  {
+    printf 'AWS_PROFILE=%s\n' "$AWS_PROFILE"
+    printf 'AWS_REGION=%s\n' "$AWS_REGION"
+    printf 'BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0\n'
+    printf 'MODULE08_KNOWLEDGE_BASE_ID=%s\n' "$current_knowledge_base_id"
+    printf 'PRESIDIO_INTERNAL_TOKEN=control-plane-nemo-to-presidio\n'
+    printf 'APPLICATION_INTERNAL_TOKEN=control-plane-app-to-nemo\n'
+    printf 'BEDROCK_GATEWAY_TOKEN=module08-bedrock-gateway-token\n'
+    printf 'GUARD_MODE=enforce\n'
+    printf 'ASSURANCE_PROFILE=high-assurance\n'
+    printf 'ENABLE_LAB_ENDPOINTS=true\n'
+    printf 'IMAGE_VERSION=1.0.0\n'
+    printf 'DIALOG_IMAGE_VERSION=0.22.0\n'
+  } > "$COMPOSE_ENV_FILE"
+}
 
 for command in aws jq; do
   command -v "$command" >/dev/null 2>&1 || { echo "required command missing: $command" >&2; exit 1; }
@@ -133,6 +155,7 @@ if [ "$MODE" = --verify-only ]; then
     echo "module08-aws=NOT_READY ingestion_status=$ingestion_status" >&2
     exit 1
   }
+  write_compose_env "$knowledge_base_id"
   printf 'module08-aws=READY knowledge_base_id=%s data_source_id=%s ingestion_status=%s region=%s\n' \
     "$knowledge_base_id" "$data_source_id" "$ingestion_status" "$AWS_REGION"
   exit 0
@@ -274,5 +297,6 @@ umask 077
   printf 'MODULE08_INGESTION_JOB_ID=%q\n' "$ingestion_job_id"
   printf 'AWS_REGION=%q\n' "$AWS_REGION"
 } > "$STATE_FILE"
-printf 'module08-aws=RESTORED knowledge_base_id=%s ingestion_job_id=%s state=%s\n' \
-  "$knowledge_base_id" "$ingestion_job_id" "$STATE_FILE"
+write_compose_env "$knowledge_base_id"
+printf 'module08-aws=RESTORED knowledge_base_id=%s ingestion_job_id=%s state=%s compose_env=%s\n' \
+  "$knowledge_base_id" "$ingestion_job_id" "$STATE_FILE" "$COMPOSE_ENV_FILE"
