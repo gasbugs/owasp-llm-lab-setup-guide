@@ -146,6 +146,7 @@
     .route-arrow.block { height:2px; background:var(--incident); }
     .route-arrow.block::after { border-left-color:var(--incident); }
     .gateway-branch { display:grid; grid-template-columns:minmax(110px,.8fr) 24px minmax(130px,1fr); gap:7px; align-items:center; }
+    .gateway-branch > .service-node { height:100px; min-height:100px; }
     .gateway-targets { display:grid; gap:7px; }
     .branch-link { position:relative; height:52%; border-left:1px solid var(--line); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
     .branch-link::before,.branch-link::after { content:""; position:absolute; right:-1px; border-left:6px solid var(--line); border-top:3px solid transparent; border-bottom:3px solid transparent; }
