@@ -16,6 +16,8 @@ sys.path.insert(0, "/app")
 
 import server  # noqa: E402
 
+APPLICATION_AUTHORIZATION = f"Bearer {os.environ['APPLICATION_INTERNAL_TOKEN']}"
+
 
 class ContentSafetyUnavailable(RuntimeError):
     pass
@@ -67,9 +69,7 @@ class FailClosedTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(server, "call_main_model", AsyncMock()) as main_model,
         ):
-            result = await server.chat(
-                request(), "Bearer control-plane-app-to-nemo"
-            )
+            result = await server.chat(request(), APPLICATION_AUTHORIZATION)
         self.assertEqual(result["guardrail"]["decision"], "infra")
         self.assertFalse(result["guardrail"]["upstream_called"])
         self.assertEqual(
@@ -88,9 +88,7 @@ class FailClosedTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(server, "call_main_model", AsyncMock()) as main_model,
         ):
-            result = await server.chat(
-                request(), "Bearer control-plane-app-to-nemo"
-            )
+            result = await server.chat(request(), APPLICATION_AUTHORIZATION)
         self.assertEqual(result["guardrail"]["decision"], "infra")
         self.assertFalse(result["guardrail"]["upstream_called"])
         main_model.assert_not_awaited()
@@ -112,9 +110,7 @@ class FailClosedTests(unittest.IsolatedAsyncioTestCase):
                 AsyncMock(side_effect=SelfCheckUnavailable()),
             ),
         ):
-            result = await server.chat(
-                request(), "Bearer control-plane-app-to-nemo"
-            )
+            result = await server.chat(request(), APPLICATION_AUTHORIZATION)
         self.assertEqual(result["guardrail"]["decision"], "infra")
         self.assertTrue(result["guardrail"]["upstream_called"])
         self.assertEqual(result["reply"], "guardrail infrastructure unavailable")
