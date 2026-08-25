@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "llm-security-control-plane/**"
+      - "tests/browser/**"
       - ".github/workflows/module08-podman-e2e.yml"
 
 permissions:
