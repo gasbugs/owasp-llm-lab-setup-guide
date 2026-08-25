@@ -36,6 +36,7 @@ jobs:
             --env AWS_ACCESS_KEY_ID=test \
             --env AWS_SECRET_ACCESS_KEY=test \
             --env AWS_REGION=us-east-1 \
+            --env BEDROCK_GATEWAY_TOKEN=e2e-bedrock-token \
             localhost/llm-security-bedrock-gateway:1.0.0 \
             -c 'import httpx; import telemetry; import server; print("real-bedrock-gateway-import=PASS")'
 
