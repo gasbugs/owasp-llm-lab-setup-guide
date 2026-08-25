@@ -9,7 +9,7 @@ rootless Podman 컨테이너로 격리한다. 수강생 host의 Python site-pack
 | 이미지 | CLI 독립 검증 | HTTP 통합 서버 | 네트워크 |
 |---|---|---|---|
 | `localhost/day6-presidio:2.2.362` | PII 탐지·비식별화 suite | input 분석·비식별화 → Ollama → output 분석·비식별화 | CLI는 `none`, 서버만 host loopback 허용 |
-| `localhost/day6-nemo-guardrails:0.22.0` | rail suite | input rail → Ollama → output rail | Ollama 접근용 host loopback 허용 |
+| `localhost/llm-security-nemo-dialog-rails:0.22.0` | rail suite | input rail → Ollama → output rail | Ollama 접근용 host loopback 허용 |
 | `localhost/day6-guardrail-ui:latest` | 해당 없음 | 기존 vuln-rag UI와 backend | guard API 접근용 host loopback 허용 |
 
 `--suite`, `--case`, Microsoft Presidio의 `--text`·`--direction`은 vendor 공식 옵션이 아니라
@@ -33,7 +33,7 @@ Python 프로세스에 자동 반영되지 않으므로 컨테이너를 재생�
 
 ```bash
 podman build -t localhost/day6-presidio:2.2.362 examples/day6/presidio
-podman build -t localhost/day6-nemo-guardrails:0.22.0 examples/day6/nemo-guardrails
+podman build -t localhost/llm-security-nemo-dialog-rails:0.22.0 examples/day6/nemo-guardrails
 podman build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
 ```
 

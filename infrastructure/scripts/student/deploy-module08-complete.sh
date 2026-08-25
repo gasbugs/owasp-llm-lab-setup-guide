@@ -46,7 +46,7 @@ cd "$MONITOR_DIR"
 "${COMPOSE[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
 
 for name in \
-  day6-guardrail-ui day6-presidio-api day6-nemo-guardrails-api \
+  day6-guardrail-ui day6-presidio-api day6-nemo-guardrails-api llm-security-nemo-dialog-rails \
   llm-security-application-gateway llm-security-nemo-hub llm-security-presidio-spoke; do
   podman rm -f "$name" >/dev/null 2>&1 || true
 done

@@ -12,7 +12,7 @@ CLI가 아니다. 이 저장소가 정상·위험 사례를 반복 검증하려�
 ## 이미지 빌드
 
 ```bash
-podman build -t localhost/day6-nemo-guardrails:0.22.0 examples/day6/nemo-guardrails
+podman build -t localhost/llm-security-nemo-dialog-rails:0.22.0 examples/day6/nemo-guardrails
 podman build -t localhost/day6-presidio:2.2.362 examples/day6/presidio
 podman build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
 ```
@@ -33,7 +33,7 @@ loopback에 접근할 수 있는 네트워크가 필요하다.
 
 ```bash
 podman run --rm --network slirp4netns:allow_host_loopback=true \
-  localhost/day6-nemo-guardrails:0.22.0 --suite
+  localhost/llm-security-nemo-dialog-rails:0.22.0 --suite
 ```
 
 ## HTTP 통합 실행
@@ -46,13 +46,13 @@ podman run --rm --network slirp4netns:allow_host_loopback=true \
 확인한다.
 
 ```bash
-podman run -d --replace --name day6-nemo-guardrails-api \
+podman run -d --replace --name llm-security-nemo-dialog-rails \
   --network slirp4netns:allow_host_loopback=true \
   -p 127.0.0.1:18092:8013 \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
   -e OLLAMA_URL=http://10.0.2.2:11434 \
   -e OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
-  localhost/day6-nemo-guardrails:0.22.0
+  localhost/llm-security-nemo-dialog-rails:0.22.0
 
 podman run -d --replace --name day6-guardrail-ui \
   --network slirp4netns:allow_host_loopback=true \
@@ -112,7 +112,7 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 - 원격 브라우저는 기존 SSM port forwarding 경로를 사용한다.
 
 검사 결과는 별도 파일 생성 wrapper 없이 `podman logs day6-presidio-api` 또는
-`podman logs day6-nemo-guardrails-api`에서 구조화된 JSON으로 확인한다.
+`podman logs llm-security-nemo-dialog-rails`에서 구조화된 JSON으로 확인한다.
 
 ## 반복 테스트와 탐색 자산
 

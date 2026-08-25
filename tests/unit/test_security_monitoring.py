@@ -168,7 +168,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         config = (EXAMPLE / "alloy" / "config.alloy").read_text(encoding="utf-8")
         self.assertIn('discovery.docker "podman"', config)
         self.assertIn("day6-presidio-api", config)
-        self.assertIn("day6-nemo-guardrails-api", config)
+        self.assertIn("llm-security-.*", config)
         self.assertIn("day6-guardrail-ui", config)
         self.assertIn('action        = "keep"', config)
         self.assertIn('loki.source.docker "podman"', config)

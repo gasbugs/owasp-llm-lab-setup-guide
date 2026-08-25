@@ -104,11 +104,11 @@ services:
 
   dialog:
     profiles: [dialog]
-    container_name: day6-nemo-guardrails-api
+    container_name: llm-security-nemo-dialog-rails
     build:
       context: ../examples/day6/nemo-guardrails
       dockerfile: Containerfile
-    image: localhost/day6-nemo-guardrails:${DIALOG_IMAGE_VERSION:-0.22.0}
+    image: localhost/llm-security-nemo-dialog-rails:${DIALOG_IMAGE_VERSION:-0.22.0}
     restart: always
     depends_on:
       - bedrock-gateway
