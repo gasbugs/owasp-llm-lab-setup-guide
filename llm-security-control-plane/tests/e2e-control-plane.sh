@@ -6,7 +6,12 @@ WORK="$(mktemp -d)"
 APP=http://127.0.0.1:18095
 HUB=http://127.0.0.1:18094
 BEDROCK_GATEWAY_TEST_URL="${BEDROCK_GATEWAY_TEST_URL:-http://127.0.0.1:18096}"
-APP_TOKEN=control-plane-app-to-nemo
+PRESIDIO_INTERNAL_TOKEN="${PRESIDIO_INTERNAL_TOKEN:-e2e-presidio-token}"
+APPLICATION_INTERNAL_TOKEN="${APPLICATION_INTERNAL_TOKEN:-e2e-application-token}"
+BEDROCK_GATEWAY_TOKEN="${BEDROCK_GATEWAY_TOKEN:-e2e-bedrock-token}"
+AUTH_ADMIN_TOKEN="${AUTH_ADMIN_TOKEN:-e2e-auth-admin-token}"
+export PRESIDIO_INTERNAL_TOKEN APPLICATION_INTERNAL_TOKEN BEDROCK_GATEWAY_TOKEN AUTH_ADMIN_TOKEN
+APP_TOKEN="$APPLICATION_INTERNAL_TOKEN"
 MAIN_STAGE=bedrock_main
 
 cleanup() {
@@ -58,8 +63,8 @@ if [ "${BUILD_IMAGES:-false}" = true ]; then
 fi
 
 podman run --rm --network none \
-  -e APPLICATION_INTERNAL_TOKEN=control-plane-app-to-nemo \
-  -e PRESIDIO_INTERNAL_TOKEN=control-plane-nemo-to-presidio \
+  -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
+  -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
   -v "$ROOT/tests/test_fail_closed.py:/tmp/test_fail_closed.py:ro,Z" \
   --entrypoint python localhost/llm-security-nemo-policy-hub:1.0.0 \
   /tmp/test_fail_closed.py >/dev/null
