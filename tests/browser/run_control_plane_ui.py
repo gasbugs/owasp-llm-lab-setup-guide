@@ -55,6 +55,7 @@ def main() -> int:
         page = context.new_page()
         page.on("request", lambda request: requests.append(request.url))
         page.goto(origin, wait_until="domcontentloaded", timeout=timeout_ms)
+        page.locator("#password").fill("public-reader-demo")
         normal = submit(page, NORMAL, timeout_ms)
         normal_exchange_count = page.locator("#exchange-log .exchange").count()
         normal_exchange_text = page.locator("#exchange-log").inner_text()
