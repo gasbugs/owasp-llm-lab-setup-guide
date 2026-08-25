@@ -325,7 +325,7 @@ async def policy() -> dict:
         "version": RELEASE_VERSION,
         "canonical_source": "llm-security-control-plane/policies/application-policy.yaml",
         "runtime_source": "llm-security-control-plane/application-gateway/policy.py",
-        "topology": "browser>application>nemo-hub>{presidio,content-safety,self-check,bedrock}>application",
+        "topology": "browser>application>nemo-hub>{presidio,nova-general-safety,application-self-check,bedrock}>application",
         **public_policy(),
     }
 
@@ -382,6 +382,14 @@ async def chat(
                 )
                 response.raise_for_status()
                 hits = response.json().get("hits", [])
+            application_stages.append(
+                {
+                    "stage": "knowledge_base_retrieval",
+                    "decision": "allow",
+                    "classification": request.classification,
+                    "hit_count": len(hits),
+                }
+            )
             allowed_suffixes = tuple(retrieval.pop("allowed_source_suffixes"))
             # Knowledge Base 검색 결과도 신뢰하지 않고 정책이 허용한 S3 source만 선택한다.
             retrieval["chunks"] = [

@@ -55,7 +55,7 @@ class FailClosedTests(unittest.IsolatedAsyncioTestCase):
         verify.assert_awaited_once()
         self.assertTrue(server.RUNTIME["model_lock"]["valid"])
 
-    async def test_content_safety_input_failure_stops_before_main_model(self) -> None:
+    async def test_general_safety_input_failure_stops_before_main_model(self) -> None:
         with (
             patch.object(server, "analyze_privacy", AsyncMock(return_value=SAFE_PRIVACY)),
             patch.object(

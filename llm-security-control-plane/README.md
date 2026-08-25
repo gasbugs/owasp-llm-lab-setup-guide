@@ -12,12 +12,12 @@ Browser
        authentication -> authorization -> classified RAG selection
        -> NeMo Policy Hub :18094
             -> Presidio Privacy Spoke :18093 (input)
-            -> Content Safety input rail (Nova Lite)
-            -> Self-check input rail (high-assurance only)
+            -> project Nova general-safety input rail (Nova Lite)
+            -> application self-check input rail (high-assurance only)
             -> Presidio Privacy Spoke (authorized retrieval text)
             -> local Bedrock Gateway :18096 -> Nova Lite main model
-            -> Content Safety output rail (Nova Lite)
-            -> Self-check output rail (high-assurance only)
+            -> project Nova general-safety output rail (Nova Lite)
+            -> application self-check output rail (high-assurance only)
             -> Presidio Privacy Spoke (output)
        <- Application final enforcement
   <- Browser
@@ -30,8 +30,8 @@ protected requests unless they carry the fixed lab Bearer token
 probes without that token.
 
 Application은 인증, 인가, 정보 등급, RAG 선택과 최종 응답 승인을 소유한다.
-NeMo는 LLM 처리 단계의 허브이며 Presidio, Content Safety, Self-check와 Bedrock 호출
-순서를 소유한다. Presidio Spoke는 개인정보 탐지와 비식별화 후보만 반환하며
+프로젝트 Control Plane은 전체 처리 순서를 소유하고 NeMo는 공식 `config.yml`의
+Input·Output Rail을 실행한다. Presidio Spoke는 개인정보 탐지와 비식별화 후보만 반환하며
 `allow`, `block`, `redact`를 결정하지 않는다.
 
 Application 인증은 교육용 `application-users.yaml`의 평문 계정으로 로그인을 받고,
@@ -51,7 +51,7 @@ NeMo Hub는 시작할 때 local Bedrock Gateway의 provider와 Model ID를 비�
 
 검증 환경의 실제 모델은 다음과 같다.
 
-- Main·Content Safety·Self-check: `us.amazon.nova-lite-v1:0`
+- Main·프로젝트 Nova 일반 위해·애플리케이션 Self-check: `us.amazon.nova-lite-v1:0`
 
 ## 이미지 빌드와 실행
 
@@ -72,8 +72,11 @@ bash llm-security-control-plane/deploy/start-stack.sh
 bash llm-security-control-plane/deploy/stop-stack.sh
 ```
 
-`standard`는 Python 정책, Presidio, Content Safety를 사용한다. `high-assurance`는 여기에
-업무별 Self-check input/output을 추가한다. 두 profile 모두 rail 오류를 만나면
+`standard`와 `high-assurance`는 NeMo 공식 profile이 아니라
+`policies/control-plane-policy.yaml`이 정의한 프로젝트 Rail 조합이다. `standard`는
+Presidio와 Nova 일반 위해 Rail을 사용하고 `high-assurance`는 애플리케이션 Self-check를
+추가한다. 공식 NeMo `models`, `rails`, `prompts`는 `nemo-policy-hub/config/*/config.yml`에
+분리되어 `RailsConfig.from_path()`로 읽힌다. 두 profile 모두 rail 오류를 만나면
 `infra`로 닫고 다른 profile로 자동 전환하지 않는다. GPU 없는 WSL에서 모델 호출은
 local Bedrock Gateway를 거쳐 순차 실행되며 AWS 자격 증명은 Gateway에만 mount한다.
 

@@ -1,0 +1,45 @@
+models:
+  - type: main
+    engine: openai
+    model: us.amazon.nova-lite-v1:0
+    parameters:
+      temperature: 0.0
+
+instructions:
+  - type: general
+    content: |
+      You are a policy classifier. Follow the requested Yes or No output contract.
+
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output
+
+prompts:
+  - task: self_check_input
+    content: |
+      Task: Check whether the User content is unsafe.
+      S1: violent, hateful, or self-harm assistance.
+      S2: sexual exploitation or abuse.
+      S3: instructions that facilitate serious wrongdoing, weapons, malware, fraud, or credential theft.
+      S4: exposure or acquisition of private credentials.
+
+      User: {{ user_input }}
+
+      Return only Yes to block or No to allow.
+
+  - task: self_check_output
+    content: |
+      Task: Check whether the Agent content is unsafe.
+      S1: violent, hateful, or self-harm assistance.
+      S2: sexual exploitation or abuse.
+      S3: instructions that facilitate serious wrongdoing, weapons, malware, fraud, or credential theft.
+      S4: exposure of private credentials.
+
+      User: {{ user_input }}
+      Agent: {{ bot_response }}
+
+      Return only Yes to block or No to allow.

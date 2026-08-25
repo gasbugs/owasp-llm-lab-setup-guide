@@ -64,7 +64,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
                 }
             ]
         }
-        safe_content_safety = {
+        safe_general_safety = {
             "messages": [
                 {
                     "content": (
@@ -77,7 +77,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         }
         self.assertEqual(fake.response_for_openai(safe_self_check), "No")
         self.assertEqual(fake.response_for_openai(unsafe_self_check), "Yes")
-        self.assertEqual(fake.response_for_openai(safe_content_safety), "No")
+        self.assertEqual(fake.response_for_openai(safe_general_safety), "No")
 
     def test_versions_are_explicit_and_bedrock_model_is_pinned(self) -> None:
         lock = yaml.safe_load((CONTROL / "versions.lock.yaml").read_text())
@@ -110,15 +110,31 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertIn(expected, requirements)
 
     def test_hub_policy_is_sequential_and_never_downgrades(self) -> None:
-        policy = yaml.safe_load((CONTROL / "policies/nemo-policy.yaml").read_text())
+        policy = yaml.safe_load((CONTROL / "policies/control-plane-policy.yaml").read_text())
         self.assertFalse(policy["execution"]["input_parallel"])
         self.assertFalse(policy["execution"]["output_parallel"])
         self.assertFalse(policy["execution"]["speculative_generation"])
         self.assertFalse(policy["execution"]["automatic_downgrade"])
         self.assertEqual(
-            policy["profiles"]["high-assurance"]["input_rails"],
-            ["content_safety", "self_check"],
+            policy["assurance_profiles"]["high-assurance"]["input_rails"],
+            ["nova_general_safety", "application_self_check"],
         )
+
+    def test_official_nemo_configs_are_separate_from_control_plane_policy(self) -> None:
+        policy = yaml.safe_load((CONTROL / "policies/control-plane-policy.yaml").read_text())
+        self.assertNotIn("models", policy)
+        self.assertNotIn("rails", policy)
+        for implementation in policy["rail_implementations"].values():
+            config = yaml.safe_load(
+                (CONTROL / "nemo-policy-hub/config" / implementation["config_directory"] / "config.yml").read_text()
+            )
+            self.assertEqual(config["rails"]["input"]["flows"], ["self check input"])
+            self.assertEqual(config["rails"]["output"]["flows"], ["self check output"])
+
+    def test_empty_assurance_profile_is_structurally_valid(self) -> None:
+        source = (CONTROL / "nemo-policy-hub/hub_core.py").read_text()
+        self.assertIn('for rail_name in CONTROL_PLANE_POLICY["assurance_profiles"]', source)
+        self.assertNotIn("Field(min_length=1", (CONTROL / "policies/control-plane-policy.yaml").read_text())
 
     def test_presidio_spoke_has_no_application_decision(self) -> None:
         source = (CONTROL / "spokes/presidio-privacy/policy.py").read_text()

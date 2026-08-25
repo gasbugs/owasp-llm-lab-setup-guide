@@ -198,7 +198,7 @@
       <div class="brand-kicker">Cloud Security</div>
       <h1>LLM Lab <span>// Control Center</span></h1>
     </div>
-    <div class="mission">Application이 인증·인가를 확정하고, NeMo가 Presidio·Content Safety·Self-check·Amazon Bedrock을 순서대로 조정합니다.</div>
+    <div class="mission">Application이 인증·인가를 확정하고, Control Plane이 Presidio·NeMo Rail·Amazon Bedrock을 순서대로 조정합니다.</div>
     <div class="top-actions">
       <div class="status-beacon">LOCAL CONTROL PLANE</div>
       <button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button>
@@ -301,13 +301,14 @@ function renderStages(stages){
 const exchangeCatalog={
   application_authentication:{from:'Browser',to:'Application',route:'POST /api/chat',request:'Bearer token 검증 요청',response:s=>`주체 ${s.subject||'-'} 인증`},
   application_authorization:{from:'Application',to:'Policy',route:'LOCAL authorize_retrieval()',request:s=>`${s.classification||'none'} · ${s.purpose||'-'}`,response:()=>`정적 권한 정책 판정`},
-  application_rag_selection:{from:'Application',to:'Bedrock Gateway',target:'knowledge-base',route:'POST /v1/retrieve',request:'인가된 검색 질의',response:s=>`${s.chunk_count||0}개 허용 chunk 반환`},
+  knowledge_base_retrieval:{from:'Application',to:'Bedrock Gateway',target:'knowledge-base',route:'POST /v1/retrieve',request:'인가된 검색 질의',response:s=>`${s.hit_count||0}개 Knowledge Base hit`},
+  application_rag_selection:{from:'Application',to:'Policy',route:'LOCAL source allowlist',request:'검색 hit source 검증',response:s=>`${s.chunk_count||0}개 허용 chunk 선택`},
   application_hub_request:{from:'Application',to:'NeMo Hub',route:'POST /api/chat',request:'검증된 Principal · 인가된 Context',response:s=>`Guardrail ${String(s.decision||'infra').toUpperCase()} · ${s.duration_ms||0} ms`},
   presidio_input:{from:'NeMo Hub',to:'Presidio',route:'POST /api/analyze',request:'입력 PII 분석',response:s=>`${s.detection_count||0}건 탐지`},
-  nemo_input_rails:{from:'NeMo Hub',to:'Bedrock Gateway',target:'nova',route:'POST /v1/chat/completions',request:'Content Safety · Self-check input',response:s=>`${(s.metrics||{}).llm_calls_count||0}회 Rail 판정`},
+  nemo_input_rails:{from:'NeMo Hub',to:'Bedrock Gateway',target:'nova',route:'POST /v1/chat/completions',request:'Nova 일반 위해 · 애플리케이션 Self-check 입력',response:s=>`${(s.metrics||{}).llm_calls_count||0}회 Rail 판정`},
   presidio_retrieval:{from:'NeMo Hub',to:'Presidio',route:'POST /api/analyze',request:'검색 문서 PII 분석',response:s=>`${s.detection_count||0}건 탐지`},
   bedrock_main:{from:'NeMo Hub',to:'Bedrock Gateway',target:'nova',route:'POST /v1/chat/completions',request:s=>`Nova Lite · ${s.model||'model'}`,response:s=>`${s.stop_reason||'unknown'} · output ${(s.usage||{}).output_tokens||0} tokens`},
-  nemo_output_rails:{from:'NeMo Hub',to:'Bedrock Gateway',target:'nova',route:'POST /v1/chat/completions',request:'Content Safety · Self-check output',response:s=>`${(s.metrics||{}).llm_calls_count||0}회 Rail 판정`},
+  nemo_output_rails:{from:'NeMo Hub',to:'Bedrock Gateway',target:'nova',route:'POST /v1/chat/completions',request:'Nova 일반 위해 · 애플리케이션 Self-check 출력',response:s=>`${(s.metrics||{}).llm_calls_count||0}회 Rail 판정`},
   presidio_output:{from:'NeMo Hub',to:'Presidio',route:'POST /api/analyze',request:'생성 응답 PII 분석',response:s=>`${s.detection_count||0}건 탐지`},
   application_final_enforcement:{from:'Application',to:'Browser',route:'HTTP response',request:'내부 응답 계약 재검증',response:s=>`최종 ${String(s.decision||'infra').toUpperCase()}`}
 };

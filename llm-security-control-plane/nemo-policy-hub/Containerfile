@@ -22,7 +22,8 @@ WORKDIR /app
 # telemetry, 모델 잠금, Rail 정책과 집행 코드는 읽기 전용으로 이미지에 넣는다.
 COPY --chmod=0444 shared/telemetry.py /app/telemetry.py
 COPY --chmod=0444 versions.lock.yaml /app/versions.lock.yaml
-COPY --chmod=0444 policies/nemo-policy.yaml /app/policies/nemo-policy.yaml
+COPY --chmod=0444 policies/control-plane-policy.yaml /app/policies/control-plane-policy.yaml
+COPY --chmod=0555 nemo-policy-hub/config /app/nemo-config
 COPY --chmod=0444 nemo-policy-hub/hub_core.py /app/hub_core.py
 COPY --chmod=0444 nemo-policy-hub/server.py /app/server.py
 

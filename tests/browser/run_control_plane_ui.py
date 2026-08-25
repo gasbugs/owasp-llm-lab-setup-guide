@@ -97,7 +97,7 @@ def main() -> int:
         and normal.get("guardrail", {}).get("guard_model_calls") == 4,
         "attack": attack.get("application_decision") == "block"
         and attack.get("upstream_called") is False
-        and attack.get("blocking_reason") == "input:self check input",
+        and attack.get("blocking_reason") == "input:application self check input",
         "same_origin": chat_requests == 3
         and internal_requests == 0
         and urlsplit(origin).hostname in {"127.0.0.1", "localhost"},

@@ -1,0 +1,56 @@
+schema_version: 1
+policy_id: llm-security-control-plane-v1
+
+# 이 파일은 NVIDIA NeMo Guardrails의 config.yml이 아니다. Application, Presidio,
+# NeMo, Knowledge Base와 Bedrock을 묶는 이 실습의 제어면 오케스트레이션 정책이다.
+execution:
+  input_parallel: false
+  output_parallel: false
+  speculative_generation: false
+  automatic_downgrade: false
+  spoke_read_retry_count: 1
+
+# Profile은 이 프로젝트가 만든 Rail 선택 기능이다. 빈 목록도 유효하며, 그 경우에도
+# Application 인증·인가, Presidio, RAG 정책과 최종 집행은 그대로 동작한다.
+assurance_profiles:
+  control-plane-only:
+    input_rails: []
+    output_rails: []
+  standard:
+    input_rails: [nova_general_safety]
+    output_rails: [nova_general_safety]
+  high-assurance:
+    input_rails: [nova_general_safety, application_self_check]
+    output_rails: [nova_general_safety, application_self_check]
+
+# 각 프로젝트 Rail ID를 NeMo가 직접 읽는 공식 config 디렉터리에 연결한다.
+rail_implementations:
+  nova_general_safety:
+    config_directory: nova-general-safety
+    telemetry_task: general_safety
+  application_self_check:
+    config_directory: application-self-check
+    telemetry_task: self_check
+
+# 전체 시스템의 vocabulary/관측 모델이다. 이 목록이 실행 순서를 자동 생성하지는 않는다.
+# 실제 순서는 Application Gateway와 NeMo Hub 코드가 만들고 응답 stage evidence로 검증한다.
+pipeline:
+  stages:
+    - application_authentication
+    - application_authorization
+    - knowledge_base_retrieval
+    - application_rag_selection
+    - presidio_input
+    - nova_general_safety_input
+    - application_self_check_input
+    - presidio_retrieval
+    - bedrock_main
+    - nova_general_safety_output
+    - application_self_check_output
+    - presidio_output
+    - application_final_enforcement
+
+prohibited_entities:
+  - DEMO_API_KEY
+  - US_SSN
+  - KR_RRN

@@ -70,7 +70,8 @@ services:
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
       BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}
     volumes:
-      - "./policies/nemo-policy.yaml:/app/policies/nemo-policy.yaml:ro,Z"
+      - "./policies/control-plane-policy.yaml:/app/policies/control-plane-policy.yaml:ro,Z"
+      - "./nemo-policy-hub/config:/app/nemo-config:ro,Z"
       - "./nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z"
 
   application:

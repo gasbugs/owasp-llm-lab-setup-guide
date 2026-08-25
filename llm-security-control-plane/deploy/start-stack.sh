@@ -4,11 +4,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -n "${POLICY_WORKSPACE:-}" ]; then
   APPLICATION_POLICY_FILE="$POLICY_WORKSPACE/application-policy.yaml"
-  NEMO_POLICY_FILE="$POLICY_WORKSPACE/nemo-policy.yaml"
+  CONTROL_PLANE_POLICY_FILE="$POLICY_WORKSPACE/control-plane-policy.yaml"
   PRESIDIO_POLICY_FILE="$POLICY_WORKSPACE/presidio-policy.py"
 else
   APPLICATION_POLICY_FILE="$ROOT/policies/application-policy.yaml"
-  NEMO_POLICY_FILE="$ROOT/policies/nemo-policy.yaml"
+  CONTROL_PLANE_POLICY_FILE="$ROOT/policies/control-plane-policy.yaml"
   PRESIDIO_POLICY_FILE="$ROOT/spokes/presidio-privacy/policy.py"
 fi
 
@@ -101,7 +101,8 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "MODEL_GATEWAY_URL=$MODEL_GATEWAY_URL" \
   -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
   -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
-  -v "$NEMO_POLICY_FILE:/app/policies/nemo-policy.yaml:ro,Z" \
+  -v "$CONTROL_PLANE_POLICY_FILE:/app/policies/control-plane-policy.yaml:ro,Z" \
+  -v "$ROOT/nemo-policy-hub/config:/app/nemo-config:ro,Z" \
   -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
   "localhost/llm-security-nemo-policy-hub:$IMAGE_VERSION" >/dev/null
 

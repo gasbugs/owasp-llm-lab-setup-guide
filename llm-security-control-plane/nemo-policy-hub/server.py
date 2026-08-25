@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from hub_core import (
     MAIN_MODEL,
     MODEL_PROVIDER,
-    POLICY,
+    CONTROL_PLANE_POLICY,
     call_main_model,
     run_input_rails,
     run_output_rails,
@@ -44,7 +44,7 @@ GUARD_MODE = os.getenv("GUARD_MODE", "enforce").strip().lower()
 if GUARD_MODE not in {"off", "audit", "enforce"}:
     raise RuntimeError("GUARD_MODE must be off, audit, or enforce")
 ASSURANCE_PROFILE = os.getenv("ASSURANCE_PROFILE", "high-assurance").strip().lower()
-if ASSURANCE_PROFILE not in POLICY["profiles"]:
+if ASSURANCE_PROFILE not in CONTROL_PLANE_POLICY["assurance_profiles"]:
     raise RuntimeError("ASSURANCE_PROFILE must name a configured policy profile")
 APPLICATION_INTERNAL_TOKEN = os.getenv("APPLICATION_INTERNAL_TOKEN", "")
 PRESIDIO_INTERNAL_TOKEN = os.getenv("PRESIDIO_INTERNAL_TOKEN", "")
@@ -53,7 +53,7 @@ if not APPLICATION_INTERNAL_TOKEN or not PRESIDIO_INTERNAL_TOKEN:
 PRESIDIO_URL = os.getenv("PRESIDIO_URL", "http://llm-security-presidio-spoke:8013").rstrip("/")
 ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
 RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
-PROHIBITED_ENTITIES = set(POLICY["prohibited_entities"])
+PROHIBITED_ENTITIES = set(CONTROL_PLANE_POLICY["prohibited_entities"])
 RUNTIME = {"model_lock": {"valid": False, "error": "startup-not-complete"}}
 
 
@@ -136,7 +136,9 @@ def emit_metadata(event: dict) -> None:
 async def analyze_privacy(stage: str, text: str, request_id: str) -> dict:
     # 읽기 전용 Spoke 호출만 제한적으로 재시도한다. 계약 오류도 성공으로 취급하지 않는다.
     last_error: Exception | None = None
-    for _attempt in range(int(POLICY["execution"]["spoke_read_retry_count"]) + 1):
+    for _attempt in range(
+        int(CONTROL_PLANE_POLICY["execution"]["spoke_read_retry_count"]) + 1
+    ):
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
                 response = await client.post(
@@ -190,7 +192,7 @@ def result_record(
             "guard_model_calls": guard_model_calls,
             "stage_order": [stage["stage"] for stage in stages],
             "stages": stages,
-            "policy_id": POLICY["policy_id"],
+            "policy_id": CONTROL_PLANE_POLICY["policy_id"],
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         },
     }
@@ -208,7 +210,7 @@ async def evaluate_output(
     stages.append(
         stage_record(
             "nemo_output_rails",
-            "content-safety+self-check" if ASSURANCE_PROFILE == "high-assurance" else "content-safety",
+            "+".join(CONTROL_PLANE_POLICY["assurance_profiles"][ASSURANCE_PROFILE]["output_rails"]),
             "allow" if output_rails["valid"] else "block",
             activated_rails=output_rails["activated_rails"],
             metrics=output_rails["metrics"],
@@ -268,11 +270,12 @@ async def policy() -> dict:
         "version": RELEASE_VERSION,
         "guard_mode": GUARD_MODE,
         "assurance_profile": ASSURANCE_PROFILE,
-        "canonical_source": "llm-security-control-plane/policies/nemo-policy.yaml",
+        "control_plane_policy_source": "llm-security-control-plane/policies/control-plane-policy.yaml",
+        "nemo_config_source": "llm-security-control-plane/nemo-policy-hub/config/",
         "runtime_source": "llm-security-control-plane/nemo-policy-hub/hub_core.py",
-        "profiles": POLICY["profiles"],
-        "execution": POLICY["execution"],
-        "stages": POLICY["stages"],
+        "assurance_profiles": CONTROL_PLANE_POLICY["assurance_profiles"],
+        "execution": CONTROL_PLANE_POLICY["execution"],
+        "pipeline": CONTROL_PLANE_POLICY["pipeline"],
         "models": {"main": {"id": MAIN_MODEL, "provider": MODEL_PROVIDER}},
         "runtime_model_lock": RUNTIME["model_lock"],
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
@@ -328,7 +331,7 @@ async def chat(
             stages.append(
                 stage_record(
                     "nemo_input_rails",
-                    "content-safety+self-check" if ASSURANCE_PROFILE == "high-assurance" else "content-safety",
+                    "+".join(CONTROL_PLANE_POLICY["assurance_profiles"][ASSURANCE_PROFILE]["input_rails"]),
                     "allow" if input_rails["valid"] else "block",
                     activated_rails=input_rails["activated_rails"],
                     metrics=input_rails["metrics"],

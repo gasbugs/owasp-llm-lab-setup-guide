@@ -96,7 +96,7 @@ def require_gateway_token(authorization: str | None = Header(default=None)) -> N
 def _converse(request: ChatCompletionRequest) -> dict:
     model_id, separator, task_name = request.model.partition("#")
     task = task_name if separator else "main"
-    if model_id != MODEL_ID or task not in {"main", "content_safety", "self_check"}:
+    if model_id != MODEL_ID or task not in {"main", "general_safety", "self_check"}:
         raise HTTPException(status_code=422, detail="model must match configured Bedrock model")
     if request.stream:
         raise HTTPException(status_code=422, detail="streaming is not enabled in this lab gateway")
