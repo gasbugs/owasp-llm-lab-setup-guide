@@ -210,7 +210,7 @@
       <header class="panel-head"><div><div class="eyebrow">Request workbench</div><h2 id="workbench-title">대화와 애플리케이션 권한</h2></div><span class="panel-code">APP / 18095</span></header>
       <div class="workbench">
         <div class="field"><label for="username">실습 사용자</label><select id="username"><option value="public-reader">공개 자료 사용자</option><option value="internal-analyst">내부 분석가</option><option value="support-agent">지원 담당자</option></select></div>
-        <div class="field"><label for="password">비밀번호</label><input id="password" type="password" value="public-reader-demo" autocomplete="current-password"></div>
+        <div class="field"><label for="password">비밀번호</label><input id="password" type="password" autocomplete="current-password"></div>
         <div class="auth-actions"><button id="login" class="action" type="button">로그인</button><button id="logout" class="action secondary" type="button">로그아웃</button></div>
         <div id="auth-status" class="auth-status" aria-live="polite">AUTH / 로그인하지 않았습니다.</div>
         <div class="split-fields">
@@ -279,13 +279,11 @@
 </main>
 <script>
 const $=id=>document.getElementById(id);
-const passwords={'public-reader':'public-reader-demo','internal-analyst':'internal-analyst-demo','support-agent':'support-agent-demo'};
 const themeButton=$('theme-toggle');
 let accessToken='';
 function setTheme(theme){document.documentElement.dataset.theme=theme;localStorage.setItem('llm-lab-theme',theme);themeButton.setAttribute('aria-label',`${theme==='dark'?'라이트':'다크'} 테마로 전환`)}
 setTheme(localStorage.getItem('llm-lab-theme')||'dark');
 themeButton.onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
-$('username').onchange=()=>{$('password').value=passwords[$('username').value]};
 async function login(){const r=await fetch('/.well-known/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('username').value,password:$('password').value})});const d=await r.json();if(!r.ok)throw new Error(d.detail||'로그인 실패');accessToken=d.access_token;$('auth-status').textContent=`AUTH / ${d.subject} 로그인 · ${d.expires_in}초`;return d}
 async function refresh(){const r=await fetch('/api/auth/refresh',{method:'POST'});if(!r.ok)return false;const d=await r.json();accessToken=d.access_token;return true}
 $('login').onclick=async()=>{try{await login()}catch(e){accessToken='';$('auth-status').textContent=`AUTH / ${String(e)}`}};

@@ -24,9 +24,7 @@ INPUT_USD_PER_MILLION = float(os.getenv("BEDROCK_INPUT_USD_PER_MILLION", "0.06")
 OUTPUT_USD_PER_MILLION = float(os.getenv("BEDROCK_OUTPUT_USD_PER_MILLION", "0.24"))
 PRICING_REFERENCE_DATE = os.getenv("BEDROCK_PRICING_REFERENCE_DATE", "2026-08-24")
 KNOWLEDGE_BASE_ID = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "")
-BEDROCK_GATEWAY_TOKEN = os.getenv(
-    "BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token"
-)
+BEDROCK_GATEWAY_TOKEN = os.environ["BEDROCK_GATEWAY_TOKEN"]
 BEDROCK = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 BEDROCK_AGENT_RUNTIME = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION)
 RUNTIME = {"ready": False, "error": "startup-not-complete"}

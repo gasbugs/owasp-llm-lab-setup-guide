@@ -1,20 +1,20 @@
 schema_version: 1
 
-# 교육 전용 평문 계정이다. 실제 서비스에서는 외부 IdP와 비밀번호 해시 저장소를 사용한다.
+# 교육용 로컬 계정도 평문 비밀번호를 저장하지 않고 salt가 포함된 PBKDF2-SHA256
+# verifier만 보관한다. 실제 서비스에서는 외부 IdP와 조직의 계정 수명주기를 사용한다.
 users:
   public-reader:
-    password: public-reader-demo
+    password_hash: pbkdf2_sha256$600000$r_G_urXDY3ZFHmW8SwFnng$CigxakjB7YHGbX2uZYlYaw0p2DK5GDX5csT8h2Debgo
     roles: [public_reader]
     allowed_classifications: [public]
     allowed_purposes: [public_information]
   internal-analyst:
-    password: internal-analyst-demo
+    password_hash: pbkdf2_sha256$600000$IQJjFXx-7bF-_qj1ispmCw$YwYGTEIdOWEwKPdnLeDtybu_qpwxsOWBWSK5sZJGCxc
     roles: [internal_analyst]
     allowed_classifications: [public, internal]
     allowed_purposes: [public_information, incident_response]
   support-agent:
-    password: support-agent-demo
+    password_hash: pbkdf2_sha256$600000$qGvu_fZpH48Q9VeeEAtijg$-ygrvQX6kYR_Jf_lcF1qiaqiiQIRHwJ43v77GVfNSbk
     roles: [support_agent]
     allowed_classifications: [public, internal, restricted]
     allowed_purposes: [public_information, incident_response, customer_support]
-

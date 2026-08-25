@@ -25,20 +25,20 @@ Browser
 
 Browser chat has one external entry point: Application `:18095`. The local
 Bedrock Gateway `:18096` is an internal model/retrieval boundary and rejects
-protected requests unless they carry the fixed lab Bearer token
-`module08-bedrock-gateway-token`. Health and metrics remain available to local
-probes without that token.
+protected requests unless they carry the generated service Bearer token from
+the mode-`0600` `.state/module08-compose.env`. Health and metrics remain
+available to local probes without that token.
 
 Application은 인증, 인가, 정보 등급, RAG 선택과 최종 응답 승인을 소유한다.
 프로젝트 Control Plane은 전체 처리 순서를 소유하고 NeMo는 공식 `config.yml`의
 Input·Output Rail을 실행한다. Presidio Spoke는 개인정보 탐지와 비식별화 후보만 반환하며
 `allow`, `block`, `redact`를 결정하지 않는다.
 
-Application 인증은 교육용 `application-users.yaml`의 평문 계정으로 로그인을 받고,
+Application 인증은 교육용 `application-users.yaml`의 salt 포함 PBKDF2-SHA256 verifier로 비밀번호를 확인하고,
 Application이 보관하는 RSA 개인키로 5분 Access Token과 30분 Refresh Token을
 발급한다. `/api/chat`은 RS256 서명, `kid`, `iss`, `aud`, `exp`, `nbf`, `jti`와
 SQLite 폐기 상태를 모두 확인한 뒤에만 인가를 시작한다. 실제 서비스에서는 이
-내장 발급기를 OIDC IdP와 비밀번호 해시 저장소로 교체해야 한다.
+내장 발급기를 OIDC IdP와 조직의 계정 수명주기로 교체해야 한다.
 
 ## 명시적 버전 관리
 

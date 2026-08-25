@@ -215,11 +215,29 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
     def test_gateway_token_is_shared_by_every_bedrock_caller(self) -> None:
         start = (CONTROL / "deploy/start-stack.sh").read_text()
         hub = (CONTROL / "nemo-policy-hub/hub_core.py").read_text()
+        nemo_config = (CONTROL / "nemo-policy-hub/config/nova-general-safety/config.yml").read_text()
         fake = (CONTROL / "tests/fake_bedrock_gateway.py").read_text()
-        self.assertIn("module08-bedrock-gateway-token", start)
-        self.assertIn("api_key\": BEDROCK_GATEWAY_TOKEN", hub)
+        self.assertIn("BEDROCK_GATEWAY_TOKEN:?Run restore-module08-aws.sh", start)
+        self.assertIn("api_key_env_var: BEDROCK_GATEWAY_TOKEN", nemo_config)
+        self.assertNotIn('"api_key": BEDROCK_GATEWAY_TOKEN', hub)
         self.assertIn('Bearer {BEDROCK_GATEWAY_TOKEN}', hub)
         self.assertIn("invalid Bedrock Gateway token", fake)
+
+    def test_compose_secrets_are_generated_and_have_no_runtime_defaults(self) -> None:
+        restore = (CONTROL / "deploy/restore-module08-aws.sh").read_text()
+        compose = (CONTROL / "compose.yaml").read_text()
+        monitor_compose = (ROOT / "examples/security-monitoring/compose.yaml").read_text()
+        self.assertIn("umask 077", restore)
+        self.assertIn('openssl rand -hex "$bytes"', restore)
+        for secret in (
+            "PRESIDIO_INTERNAL_TOKEN",
+            "APPLICATION_INTERNAL_TOKEN",
+            "BEDROCK_GATEWAY_TOKEN",
+            "AUTH_ADMIN_TOKEN",
+        ):
+            self.assertIn(f"{secret}:?Run restore-module08-aws.sh", compose)
+        self.assertNotIn(":-module08-bedrock-gateway-token", compose)
+        self.assertNotIn(":-llm-monitor-acme-token", monitor_compose)
 
     def test_application_auth_contract_is_rs256_and_stateful(self) -> None:
         source = (CONTROL / "application-gateway/auth.py").read_text()
@@ -227,6 +245,9 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         users = yaml.safe_load((CONTROL / "policies/application-users.yaml").read_text())
 
         self.assertIn('algorithm="RS256"', source)
+        self.assertIn("pbkdf2_hmac", source)
+        self.assertNotIn("password", users["users"]["public-reader"])
+        self.assertIn("password_hash", users["users"]["public-reader"])
         self.assertIn('audience=self.audience', source)
         self.assertIn('issuer=self.issuer', source)
         self.assertIn("refresh-token-reuse", source)

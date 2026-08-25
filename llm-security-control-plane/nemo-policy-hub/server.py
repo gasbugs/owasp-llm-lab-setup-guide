@@ -46,8 +46,8 @@ if GUARD_MODE not in {"off", "audit", "enforce"}:
 ASSURANCE_PROFILE = os.getenv("ASSURANCE_PROFILE", "high-assurance").strip().lower()
 if ASSURANCE_PROFILE not in CONTROL_PLANE_POLICY["assurance_profiles"]:
     raise RuntimeError("ASSURANCE_PROFILE must name a configured policy profile")
-APPLICATION_INTERNAL_TOKEN = os.getenv("APPLICATION_INTERNAL_TOKEN", "")
-PRESIDIO_INTERNAL_TOKEN = os.getenv("PRESIDIO_INTERNAL_TOKEN", "")
+APPLICATION_INTERNAL_TOKEN = os.environ["APPLICATION_INTERNAL_TOKEN"]
+PRESIDIO_INTERNAL_TOKEN = os.environ["PRESIDIO_INTERNAL_TOKEN"]
 if not APPLICATION_INTERNAL_TOKEN or not PRESIDIO_INTERNAL_TOKEN:
     raise RuntimeError("both internal service tokens are required")
 PRESIDIO_URL = os.getenv("PRESIDIO_URL", "http://llm-security-presidio-spoke:8013").rstrip("/")

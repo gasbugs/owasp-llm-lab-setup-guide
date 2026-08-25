@@ -24,6 +24,8 @@ class ApplicationAuthApiTests(unittest.TestCase):
         sys.modules["telemetry"] = telemetry
         os.environ.update({
             "APPLICATION_INTERNAL_TOKEN": "test-app-to-hub",
+            "AUTH_ADMIN_TOKEN": "test-auth-admin-token",
+            "BEDROCK_GATEWAY_TOKEN": "test-bedrock-token",
             "AUTH_USERS_PATH": str(control / "policies/application-users.yaml"),
             "AUTH_STATE_DIR": str(Path(cls.temp.name) / "state"),
             "AUTH_ISSUER": "https://testserver",

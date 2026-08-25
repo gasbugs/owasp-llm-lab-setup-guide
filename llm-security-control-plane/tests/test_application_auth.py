@@ -19,7 +19,7 @@ class ApplicationAuthTests(unittest.TestCase):
         self.users.write_text(
             """users:
   reader:
-    password: demo-password
+    password_hash: pbkdf2_sha256$600000$MDEyMzQ1Njc4OWFiY2RlZg$Pu5R-46DItg8O-EfKSsWJa2dMUEumoPhthp_Mx_VC-0
     roles: [public_reader]
     allowed_classifications: [public]
     allowed_purposes: [public_information]

@@ -13,7 +13,7 @@ from policy import PrivacyAnalyzer
 from telemetry import configure_telemetry
 
 
-INTERNAL_TOKEN = os.getenv("PRESIDIO_INTERNAL_TOKEN", "")
+INTERNAL_TOKEN = os.environ["PRESIDIO_INTERNAL_TOKEN"]
 RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
 if not INTERNAL_TOKEN:
     raise RuntimeError("PRESIDIO_INTERNAL_TOKEN is required")

@@ -55,7 +55,7 @@ Alloy performs two separate jobs from one configuration: it receives structured 
 
 ## Data and trust boundaries
 
-- Host-published ports listen on the EC2 interface and are reachable only from the learner public IPv4 `/32` allowed by the security group. Never allow `0.0.0.0/0`.
+- Host-published ports bind only to WSL loopback. Container-to-container traffic uses the private Compose network and no observability backend is published on a LAN interface.
 - Raw prompts are not stored. The structured event contains a keyed HMAC identity, a sanitized excerpt, decision, rule, stage, request ID, and trace ID.
 - Request IDs and trace IDs remain log fields or exemplars, not metric or Loki stream labels, to avoid unbounded cardinality.
 - Prometheus retains lab metrics for 24 hours. Loki and Tempo keep their lab data in named volumes that survive the learner stop command.
@@ -69,10 +69,10 @@ Alloy performs two separate jobs from one configuration: it receives structured 
 
 ```bash
 export BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
-export BEDROCK_GATEWAY_TOKEN=module08-bedrock-gateway-token
 export PODMAN_COMPOSE_PROVIDER=podman-compose
 export PODMAN_SOCKET_PATH=/run/user/$(id -u)/podman/podman.sock
-podman compose --file compose.yaml up --detach --build
+export COMPOSE_ENV_FILE="$HOME/owasp-llm-lab-setup-guide/llm-security-control-plane/.state/module08-compose.env"
+podman compose --env-file "$COMPOSE_ENV_FILE" --file compose.yaml up --detach --build
 ```
 
 ## Publisher regression
@@ -88,7 +88,7 @@ USE_REAL_BEDROCK=true RUN_FAILURE_DRILL=true \
 ## Stop
 
 ```bash
-podman compose --file compose.yaml down
+podman compose --env-file "$COMPOSE_ENV_FILE" --file compose.yaml down
 ```
 
 The learner command intentionally preserves named volumes. Publisher E2E adds `--volumes` because each validation run must start from isolated data.

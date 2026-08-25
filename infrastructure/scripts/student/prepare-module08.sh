@@ -15,7 +15,7 @@ esac
 REPO_ROOT=${SETUP_REPO:-$HOME/owasp-llm-lab-setup-guide}
 CONTROL_ROOT=$REPO_ROOT/llm-security-control-plane
 APP=http://127.0.0.1:18095
-TELEMETRY_TOKEN=${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}
+COMPOSE_ENV_FILE=$CONTROL_ROOT/.state/module08-compose.env
 
 pass() { printf '[PASS] %s\n' "$*"; }
 fail() { printf '[FAIL] %s\n' "$*" >&2; exit 1; }
@@ -36,6 +36,13 @@ elif [ "$MODE" = repair ]; then
   # Module 08-prefixed AWS state before reconnecting the local containers.
   bash "$CONTROL_ROOT/deploy/restore-module08-aws.sh" --repair
 fi
+
+test -f "$COMPOSE_ENV_FILE" || fail "Module 08 Compose env file is unavailable"
+set -a
+# shellcheck disable=SC1090
+source "$COMPOSE_ENV_FILE"
+set +a
+TELEMETRY_TOKEN=$TELEMETRY_INGEST_TOKEN
 
 if [ "$MODE" != verify ]; then
   if ! podman image exists localhost/llm-security-application-gateway:1.0.0; then

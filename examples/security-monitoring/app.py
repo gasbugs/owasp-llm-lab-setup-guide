@@ -77,8 +77,8 @@ TELEMETRY_HMAC_KEY = os.getenv(
 TELEMETRY_INGEST_TOKEN = os.getenv(
     "TELEMETRY_INGEST_TOKEN", "module08-telemetry-ingest"
 )
-OBSERVER_TOKEN = os.getenv("LLM_MONITOR_TOKEN", "llm-monitor-acme-token")
-ADMIN_TOKEN = os.getenv("LLM_MONITOR_ADMIN_TOKEN", "llm-monitor-admin-token")
+OBSERVER_TOKEN = os.environ["LLM_MONITOR_TOKEN"]
+ADMIN_TOKEN = os.environ["LLM_MONITOR_ADMIN_TOKEN"]
 TOKEN_PRINCIPALS = {
     OBSERVER_TOKEN: {"subject": "acme-observer", "tenant": "acme", "dangerous_tools": []},
     ADMIN_TOKEN: {"subject": "acme-operator", "tenant": "acme", "dangerous_tools": ["delete_animal"]},

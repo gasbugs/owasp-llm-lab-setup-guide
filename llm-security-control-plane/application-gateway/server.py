@@ -39,10 +39,8 @@ MODEL_GATEWAY_URL = os.getenv("MODEL_GATEWAY_URL", "http://10.0.2.2:18096").rstr
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 TELEMETRY_INGEST_TOKEN = os.getenv("TELEMETRY_INGEST_TOKEN", "")
 RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")
-APPLICATION_INTERNAL_TOKEN = os.getenv("APPLICATION_INTERNAL_TOKEN", "")
-BEDROCK_GATEWAY_TOKEN = os.getenv(
-    "BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token"
-)
+APPLICATION_INTERNAL_TOKEN = os.environ["APPLICATION_INTERNAL_TOKEN"]
+BEDROCK_GATEWAY_TOKEN = os.environ["BEDROCK_GATEWAY_TOKEN"]
 AUTH_USERS_PATH = os.getenv("AUTH_USERS_PATH", "/app/policies/application-users.yaml")
 AUTH_STATE_DIR = os.getenv("AUTH_STATE_DIR", "/app/state")
 AUTH_ISSUER = os.getenv("AUTH_ISSUER", "http://127.0.0.1:18095")
@@ -58,7 +56,7 @@ AUTH_ALLOWED_ORIGINS = {
     if item.strip()
 }
 AUTH_SECURE_COOKIE = os.getenv("AUTH_SECURE_COOKIE", "true").lower() == "true"
-AUTH_ADMIN_TOKEN = os.getenv("AUTH_ADMIN_TOKEN", "application-auth-admin-demo")
+AUTH_ADMIN_TOKEN = os.environ["AUTH_ADMIN_TOKEN"]
 LEGACY_STATIC_TOKEN_MODE = os.getenv("LEGACY_STATIC_TOKEN_MODE", "false").lower() == "true"
 if not APPLICATION_INTERNAL_TOKEN:
     raise RuntimeError("APPLICATION_INTERNAL_TOKEN is required")

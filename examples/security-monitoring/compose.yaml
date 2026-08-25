@@ -9,20 +9,20 @@ services:
     container_name: llm-sec-gateway
     environment:
       ENABLE_LAB_ENDPOINTS: "true"
-      LLM_MONITOR_TOKEN: ${LLM_MONITOR_TOKEN:-llm-monitor-acme-token}
-      LLM_MONITOR_ADMIN_TOKEN: ${LLM_MONITOR_ADMIN_TOKEN:-llm-monitor-admin-token}
-      TELEMETRY_INGEST_TOKEN: ${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}
-      TELEMETRY_HMAC_KEY: ${TELEMETRY_HMAC_KEY:-module08-lab-hmac-key-change-in-production}
+      LLM_MONITOR_TOKEN: ${LLM_MONITOR_TOKEN:?Use the generated Module 08 Compose env file}
+      LLM_MONITOR_ADMIN_TOKEN: ${LLM_MONITOR_ADMIN_TOKEN:?Use the generated Module 08 Compose env file}
+      TELEMETRY_INGEST_TOKEN: ${TELEMETRY_INGEST_TOKEN:?Use the generated Module 08 Compose env file}
+      TELEMETRY_HMAC_KEY: ${TELEMETRY_HMAC_KEY:?Use the generated Module 08 Compose env file}
       BEDROCK_GATEWAY_URL: ${BEDROCK_GATEWAY_URL:-http://llm-security-bedrock-gateway:8080}
-      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}
+      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?Use the generated Module 08 Compose env file}
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
       RETRIEVAL_URL: http://retrieval:8081
-      RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:-module08-retrieval-service-token}
+      RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:?Use the generated Module 08 Compose env file}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       SECURITY_EVENT_DB: /data/security-events.db
       SECURITY_POLICY_PATH: /app/policy.json
     ports:
-      - 0.0.0.0:8014:8080
+      - 127.0.0.1:8014:8080
     volumes:
       - ${MONITOR_POLICY_PATH:-./policy.json}:/app/policy.json:ro,Z
       - gateway-events:/data:Z
@@ -35,9 +35,9 @@ services:
     command: ["uvicorn", "retrieval_service:app", "--host", "0.0.0.0", "--port", "8081", "--no-access-log"]
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
-      RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:-module08-retrieval-service-token}
+      RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:?Use the generated Module 08 Compose env file}
     ports:
-      - 0.0.0.0:8015:8081
+      - 127.0.0.1:8015:8081
     networks: [observability]
     security_opt: [no-new-privileges]
 
@@ -54,8 +54,7 @@ services:
       - --disable-reporting
       - /etc/alloy/config.alloy
     ports:
-      - 0.0.0.0:12345:12345
-      - 0.0.0.0:4318:4318
+      - 127.0.0.1:12345:12345
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro,Z
       - ${PODMAN_SOCKET_PATH:-/run/user/1000/podman/podman.sock}:/var/run/docker.sock:ro
@@ -74,7 +73,7 @@ services:
       - --web.enable-remote-write-receiver
       - --enable-feature=exemplar-storage
     ports:
-      - 0.0.0.0:9090:9090
+      - 127.0.0.1:9090:9090
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
       - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro,Z
@@ -90,7 +89,7 @@ services:
       - --storage.path=/alertmanager
       - --web.listen-address=0.0.0.0:9093
     ports:
-      - 0.0.0.0:9093:9093
+      - 127.0.0.1:9093:9093
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,Z
       - alertmanager-data:/alertmanager:Z
@@ -102,7 +101,7 @@ services:
     container_name: llm-sec-alert-webhook
     command: ["uvicorn", "alert_receiver:app", "--host", "0.0.0.0", "--port", "8099", "--no-access-log"]
     ports:
-      - 0.0.0.0:8099:8099
+      - 127.0.0.1:8099:8099
     networks: [observability]
     security_opt: [no-new-privileges]
 
@@ -111,7 +110,7 @@ services:
     container_name: llm-sec-loki
     command: ["-config.file=/etc/loki/config.yaml"]
     ports:
-      - 0.0.0.0:3100:3100
+      - 127.0.0.1:3100:3100
     volumes:
       - ./loki-config.yaml:/etc/loki/config.yaml:ro,Z
       - loki-data:/loki:Z
@@ -123,7 +122,7 @@ services:
     container_name: llm-sec-tempo
     command: ["-target=all", "-config.file=/etc/tempo/config.yaml"]
     ports:
-      - 0.0.0.0:3200:3200
+      - 127.0.0.1:3200:3200
     volumes:
       - ./tempo.yaml:/etc/tempo/config.yaml:ro,Z
       - tempo-data:/var/tempo:Z
@@ -136,16 +135,17 @@ services:
     environment:
       GF_SERVER_HTTP_ADDR: 0.0.0.0
       GF_SERVER_HTTP_PORT: "3000"
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?Use the generated Module 08 Compose env file}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Use the generated Module 08 Compose env file}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
       GF_PLUGINS_PREINSTALL_DISABLED: "true"
       GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
     ports:
-      - 0.0.0.0:3001:3000
+      - 127.0.0.1:3001:3000
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro,Z
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro,Z

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import secrets
@@ -37,6 +38,28 @@ class TokenReplay(InvalidToken):
 def _b64uint(value: int) -> str:
     raw = value.to_bytes((value.bit_length() + 7) // 8, "big")
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _decode_urlsafe(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def _verify_password(encoded: str, candidate: str) -> bool:
+    """Verify a salted PBKDF2-SHA256 record without storing plaintext."""
+    try:
+        algorithm, iterations, salt, expected = encoded.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        derived = hashlib.pbkdf2_hmac(
+            "sha256",
+            candidate.encode("utf-8"),
+            _decode_urlsafe(salt),
+            int(iterations),
+            dklen=32,
+        )
+        return secrets.compare_digest(derived, _decode_urlsafe(expected))
+    except (TypeError, ValueError):
+        return False
 
 
 class AuthService:
@@ -132,7 +155,7 @@ class AuthService:
 
     def authenticate_password(self, username: str, password: str) -> dict[str, Any]:
         user = self.users.get(username)
-        if not user or not secrets.compare_digest(str(user.get("password", "")), password):
+        if not user or not _verify_password(str(user.get("password_hash", "")), password):
             raise InvalidCredentials("invalid-username-or-password")
         return self.issue_pair(username)
 

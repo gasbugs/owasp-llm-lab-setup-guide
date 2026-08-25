@@ -2,6 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+COMPOSE_ENV_FILE="${MODULE08_COMPOSE_ENV_FILE:-$ROOT/.state/module08-compose.env}"
+if [ -f "$COMPOSE_ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$COMPOSE_ENV_FILE"
+  set +a
+fi
 if [ -n "${POLICY_WORKSPACE:-}" ]; then
   APPLICATION_POLICY_FILE="$POLICY_WORKSPACE/application-policy.yaml"
   CONTROL_PLANE_POLICY_FILE="$POLICY_WORKSPACE/control-plane-policy.yaml"
@@ -12,14 +19,15 @@ else
   PRESIDIO_POLICY_FILE="$ROOT/spokes/presidio-privacy/policy.py"
 fi
 
-PRESIDIO_INTERNAL_TOKEN="${PRESIDIO_INTERNAL_TOKEN:-control-plane-nemo-to-presidio}"
-APPLICATION_INTERNAL_TOKEN="${APPLICATION_INTERNAL_TOKEN:-control-plane-app-to-nemo}"
-BEDROCK_GATEWAY_TOKEN="${BEDROCK_GATEWAY_TOKEN:-module08-bedrock-gateway-token}"
+: "${PRESIDIO_INTERNAL_TOKEN:?Run restore-module08-aws.sh to create module08-compose.env}"
+: "${APPLICATION_INTERNAL_TOKEN:?Run restore-module08-aws.sh to create module08-compose.env}"
+: "${BEDROCK_GATEWAY_TOKEN:?Run restore-module08-aws.sh to create module08-compose.env}"
+: "${AUTH_ADMIN_TOKEN:?Run restore-module08-aws.sh to create module08-compose.env}"
 GUARD_MODE="${GUARD_MODE:-enforce}"
 ASSURANCE_PROFILE="${ASSURANCE_PROFILE:-high-assurance}"
 ENABLE_LAB_ENDPOINTS="${ENABLE_LAB_ENDPOINTS:-true}"
 IMAGE_VERSION="${IMAGE_VERSION:-1.0.0}"
-TELEMETRY_INGEST_TOKEN="${TELEMETRY_INGEST_TOKEN:-module08-telemetry-ingest}"
+TELEMETRY_INGEST_TOKEN="${TELEMETRY_INGEST_TOKEN:-}"
 AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-}"
 LEGACY_STATIC_TOKEN_MODE="${LEGACY_STATIC_TOKEN_MODE:-false}"
 AUTH_STATE_DIR="${AUTH_STATE_DIR:-$ROOT/.state/application-auth}"
@@ -115,6 +123,7 @@ podman run -d --replace --name llm-security-application-gateway \
   -e "MODEL_GATEWAY_URL=$MODEL_GATEWAY_URL" \
   -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
   -e "AUTH_EVENT_SINK=$AUTH_EVENT_SINK" \
+  -e "AUTH_ADMIN_TOKEN=$AUTH_ADMIN_TOKEN" \
   -e "LEGACY_STATIC_TOKEN_MODE=$LEGACY_STATIC_TOKEN_MODE" \
   "${OTEL_ARGS[@]}" \
   -v "$APPLICATION_POLICY_FILE:/app/policies/application-policy.yaml:ro,Z" \

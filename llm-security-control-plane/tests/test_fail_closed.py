@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock, patch
 
 os.environ.setdefault("APPLICATION_INTERNAL_TOKEN", "control-plane-app-to-nemo")
 os.environ.setdefault("PRESIDIO_INTERNAL_TOKEN", "control-plane-nemo-to-presidio")
+os.environ.setdefault("BEDROCK_GATEWAY_TOKEN", "test-bedrock-gateway-token")
+os.environ.setdefault("AUTH_ADMIN_TOKEN", "test-auth-admin-token")
 sys.path.insert(0, "/app")
 
 import server  # noqa: E402

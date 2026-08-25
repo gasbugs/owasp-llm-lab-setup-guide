@@ -30,16 +30,49 @@ COMPOSE_ENV_FILE="$STATE_DIR/module08-compose.env"
 
 write_compose_env() {
   local current_knowledge_base_id=$1
+  local presidio_token application_token bedrock_token telemetry_token telemetry_hmac
+  local monitor_token monitor_admin_token retrieval_token grafana_password auth_admin_token
   install -d -m 0700 "$STATE_DIR"
   umask 077
+  read_existing_or_generate() {
+    local key=$1
+    local bytes=$2
+    local existing=""
+    if [ -f "$COMPOSE_ENV_FILE" ]; then
+      existing="$(sed -n "s/^${key}=//p" "$COMPOSE_ENV_FILE" | head -n 1)"
+    fi
+    if [ -n "$existing" ]; then
+      printf '%s' "$existing"
+    else
+      openssl rand -hex "$bytes"
+    fi
+  }
+  presidio_token="$(read_existing_or_generate PRESIDIO_INTERNAL_TOKEN 24)"
+  application_token="$(read_existing_or_generate APPLICATION_INTERNAL_TOKEN 24)"
+  bedrock_token="$(read_existing_or_generate BEDROCK_GATEWAY_TOKEN 24)"
+  telemetry_token="$(read_existing_or_generate TELEMETRY_INGEST_TOKEN 24)"
+  telemetry_hmac="$(read_existing_or_generate TELEMETRY_HMAC_KEY 32)"
+  monitor_token="$(read_existing_or_generate LLM_MONITOR_TOKEN 24)"
+  monitor_admin_token="$(read_existing_or_generate LLM_MONITOR_ADMIN_TOKEN 24)"
+  retrieval_token="$(read_existing_or_generate RETRIEVAL_SERVICE_TOKEN 24)"
+  grafana_password="$(read_existing_or_generate GRAFANA_ADMIN_PASSWORD 18)"
+  auth_admin_token="$(read_existing_or_generate AUTH_ADMIN_TOKEN 24)"
   {
     printf 'AWS_PROFILE=%s\n' "$AWS_PROFILE"
     printf 'AWS_REGION=%s\n' "$AWS_REGION"
     printf 'BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0\n'
     printf 'MODULE08_KNOWLEDGE_BASE_ID=%s\n' "$current_knowledge_base_id"
-    printf 'PRESIDIO_INTERNAL_TOKEN=control-plane-nemo-to-presidio\n'
-    printf 'APPLICATION_INTERNAL_TOKEN=control-plane-app-to-nemo\n'
-    printf 'BEDROCK_GATEWAY_TOKEN=module08-bedrock-gateway-token\n'
+    printf 'PRESIDIO_INTERNAL_TOKEN=%s\n' "$presidio_token"
+    printf 'APPLICATION_INTERNAL_TOKEN=%s\n' "$application_token"
+    printf 'BEDROCK_GATEWAY_TOKEN=%s\n' "$bedrock_token"
+    printf 'TELEMETRY_INGEST_TOKEN=%s\n' "$telemetry_token"
+    printf 'TELEMETRY_HMAC_KEY=%s\n' "$telemetry_hmac"
+    printf 'LLM_MONITOR_TOKEN=%s\n' "$monitor_token"
+    printf 'LLM_MONITOR_ADMIN_TOKEN=%s\n' "$monitor_admin_token"
+    printf 'RETRIEVAL_SERVICE_TOKEN=%s\n' "$retrieval_token"
+    printf 'GRAFANA_ADMIN_USER=admin\n'
+    printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$grafana_password"
+    printf 'AUTH_ADMIN_TOKEN=%s\n' "$auth_admin_token"
     printf 'GUARD_MODE=enforce\n'
     printf 'ASSURANCE_PROFILE=high-assurance\n'
     printf 'ENABLE_LAB_ENDPOINTS=true\n'
@@ -48,7 +81,7 @@ write_compose_env() {
   } > "$COMPOSE_ENV_FILE"
 }
 
-for command in aws jq; do
+for command in aws jq openssl; do
   command -v "$command" >/dev/null 2>&1 || { echo "required command missing: $command" >&2; exit 1; }
 done
 

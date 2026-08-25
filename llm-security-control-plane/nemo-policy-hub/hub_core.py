@@ -28,9 +28,7 @@ MAIN_MODEL = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
 MODEL_GATEWAY_URL = os.getenv(
     "MODEL_GATEWAY_URL", "http://llm-security-bedrock-gateway:8080"
 ).rstrip("/")
-BEDROCK_GATEWAY_TOKEN = os.getenv(
-    "BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-token"
-)
+BEDROCK_GATEWAY_TOKEN = os.environ["BEDROCK_GATEWAY_TOKEN"]
 
 
 def _openai_base_url() -> str:
@@ -52,7 +50,6 @@ def rails_for(rail_name: str) -> LLMRails:
     model.parameters = {
         **(model.parameters or {}),
         "base_url": _openai_base_url(),
-        "api_key": BEDROCK_GATEWAY_TOKEN,
     }
     return LLMRails(rails_config)
 

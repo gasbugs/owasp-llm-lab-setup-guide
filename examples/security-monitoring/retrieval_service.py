@@ -21,7 +21,7 @@ from prometheus_client import Counter, generate_latest
 
 
 OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").rstrip("/")
-SERVICE_TOKEN = os.getenv("RETRIEVAL_SERVICE_TOKEN", "module08-retrieval-service-token")
+SERVICE_TOKEN = os.environ["RETRIEVAL_SERVICE_TOKEN"]
 CORPUS = (
     {
         "document_id": "acme/incident-response.md",

@@ -8,7 +8,13 @@ set -euo pipefail
 REPO_ROOT=${SETUP_REPO:-$HOME/owasp-llm-lab-setup-guide}
 MONITOR_DIR=$REPO_ROOT/examples/security-monitoring
 PREPARE_SCRIPT=$REPO_ROOT/infrastructure/scripts/student/prepare-module08.sh
-COMPOSE=(podman compose --file "$MONITOR_DIR/compose.yaml")
+COMPOSE_ENV_FILE=$REPO_ROOT/llm-security-control-plane/.state/module08-compose.env
+test -f "$COMPOSE_ENV_FILE" || bash "$REPO_ROOT/llm-security-control-plane/deploy/restore-module08-aws.sh" --repair
+set -a
+# shellcheck disable=SC1090
+source "$COMPOSE_ENV_FILE"
+set +a
+COMPOSE=(podman compose --env-file "$COMPOSE_ENV_FILE" --file "$MONITOR_DIR/compose.yaml")
 
 if command -v nvidia-smi >/dev/null 2>&1; then
   COMPOSE+=(--file "$MONITOR_DIR/compose.gpu.yaml")
@@ -76,7 +82,7 @@ pass "Module 08 observability stack built from current source"
 SETUP_REPO="$REPO_ROOT" bash "$PREPARE_SCRIPT" --repair
 
 normal_result=$(curl -fsS --max-time 240 -X POST http://127.0.0.1:8014/api/chat \
-  -H 'Authorization: Bearer llm-monitor-acme-token' \
+  -H "Authorization: Bearer $LLM_MONITOR_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"request_id":"module08-complete-normal","message":"공개된 사고 대응 절차를 한 문장으로 알려 주세요."}')
 jq -e '.application_decision == "allow" and .upstream_called == true and
@@ -91,8 +97,10 @@ wait_json 'http://127.0.0.1:9090/api/v1/query?query=sum(traces_spanmetrics_calls
   '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 wait_json 'http://127.0.0.1:9090/api/v1/query?query=sum(traces_service_graph_request_total)' \
   '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
-wait_json 'http://127.0.0.1:3001/api/datasources' \
-  'any(.[]; .uid == "llm-security-prometheus") and any(.[]; .uid == "llm-security-loki") and any(.[]; .uid == "llm-security-tempo")'
+curl -fsS -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD" \
+  http://127.0.0.1:3001/api/datasources \
+  | jq -e 'any(.[]; .uid == "llm-security-prometheus") and any(.[]; .uid == "llm-security-loki") and any(.[]; .uid == "llm-security-tempo")' >/dev/null \
+  || fail "Grafana datasources are unavailable"
 curl -fsS --max-time 10 http://127.0.0.1:9093/-/ready >/dev/null \
   || fail "Alertmanager is unavailable"
 pass "normal, PII, injection, log, trace, metric and datasource contracts verified"

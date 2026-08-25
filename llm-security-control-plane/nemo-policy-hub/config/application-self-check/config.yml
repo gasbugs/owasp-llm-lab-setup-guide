@@ -2,6 +2,7 @@ models:
   - type: main
     engine: openai
     model: us.amazon.nova-lite-v1:0
+    api_key_env_var: BEDROCK_GATEWAY_TOKEN
     parameters:
       temperature: 0.0
 
