@@ -29,22 +29,55 @@ RUN_FAILURE_DRILL="${RUN_FAILURE_DRILL:-true}"
 export PODMAN_COMPOSE_PROVIDER="${PODMAN_COMPOSE_PROVIDER:-podman-compose}"
 E2E_SHARED_TMPDIR="${E2E_SHARED_TMPDIR:-${TMPDIR:-/tmp}}"
 POLICY_COPY="$E2E_SHARED_TMPDIR/llm-security-policy-e2e-$$.json"
+E2E_OWNS_RESOURCES=false
+E2E_PROJECT="llm-security-observability-e2e-$$"
+export COMPOSE_PROJECT_NAME="$E2E_PROJECT"
+export OBSERVABILITY_NETWORK_NAME="$E2E_PROJECT"
+export CONTAINER_NAME_PREFIX="llm-sec-e2e-$$"
 
 compose() {
   if [ "$USE_REAL_BEDROCK" = "true" ]; then
-    podman compose --file "$COMPOSE_FILE" "$@"
+    podman compose --project-name "$E2E_PROJECT" --file "$COMPOSE_FILE" "$@"
   else
-    podman compose --file "$COMPOSE_FILE" \
+    podman compose --project-name "$E2E_PROJECT" --file "$COMPOSE_FILE" \
       --file "$SETUP_ROOT/tests/e2e/security-monitoring/compose.test.yaml" "$@"
   fi
 }
 
 cleanup() {
+  [ "$E2E_OWNS_RESOURCES" = "true" ] || return 0
   compose stop gateway retrieval >/dev/null 2>&1 || true
   compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   rm -f "$POLICY_COPY"
 }
 trap cleanup EXIT
+
+assert_isolated_targets_absent() {
+  local resource
+  if ! podman info >/dev/null 2>&1; then
+    echo "INFRA: Podman is not reachable; start the configured machine or service first" >&2
+    return 1
+  fi
+  for resource in gateway retrieval alloy prometheus alertmanager alert-webhook \
+      loki tempo grafana bedrock-gateway; do
+    resource="$CONTAINER_NAME_PREFIX-$resource"
+    if podman container exists "$resource"; then
+      echo "REFUSE: existing container is outside this E2E ownership: $resource" >&2
+      return 1
+    fi
+  done
+  if podman network exists "$E2E_PROJECT"; then
+    echo "REFUSE: existing network is outside this E2E ownership: $E2E_PROJECT" >&2
+    return 1
+  fi
+  for resource in gateway-events alloy-data prometheus-data alertmanager-data \
+      loki-data tempo-data grafana-data; do
+    if podman volume exists "${E2E_PROJECT}_$resource"; then
+      echo "REFUSE: existing volume is outside this E2E ownership: ${E2E_PROJECT}_$resource" >&2
+      return 1
+    fi
+  done
+}
 
 compose_logs() {
   local service
@@ -54,7 +87,7 @@ compose_logs() {
 }
 
 prepare_compose_resources() {
-  local project="llm-security-observability"
+  local project="$E2E_PROJECT"
   local volume
   podman network exists "$project" || podman network create "$project" >/dev/null
   for volume in gateway-events alloy-data prometheus-data alertmanager-data \
@@ -114,37 +147,6 @@ wait_loki_logs() {
   done
 }
 
-wait_loki_container_logs() {
-  local attempts=0
-  until curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
-      --data-urlencode 'query={telemetry_source="container-stdout",service_name="llm-sec-grafana"}' \
-      --data-urlencode 'limit=20' \
-      | jq -e '.status == "success" and ([.data.result[].values[]?] | length) > 0' >/dev/null 2>&1; do
-    attempts=$((attempts + 1))
-    if [ "$attempts" -ge 60 ]; then
-      echo "INFRA: Alloy did not collect Grafana container logs" >&2
-      compose_logs alloy loki grafana
-      return 1
-    fi
-    sleep 1
-  done
-}
-
-wait_loki_redaction_probe() {
-  local attempts=0
-  until curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
-      --data-urlencode 'query={telemetry_source="container-stdout",service_name="llm-sec-redaction-probe"} |= "[REDACTED]"' \
-      --data-urlencode 'limit=20' \
-      | jq -e '.status == "success" and ([.data.result[].values[]?] | length) > 0' >/dev/null 2>&1; do
-    attempts=$((attempts + 1))
-    if [ "$attempts" -ge 60 ]; then
-      echo "INFRA: Alloy did not redact the controlled container log probe" >&2
-      return 1
-    fi
-    sleep 1
-  done
-}
-
 wait_alert() {
   local attempts=0
   until curl -fsS --max-time 10 "$PROMETHEUS_URL/api/v1/alerts" \
@@ -177,27 +179,9 @@ wait_webhook_alert() {
   done
 }
 
-cleanup
+assert_isolated_targets_absent
+E2E_OWNS_RESOURCES=true
 mkdir -p "$E2E_SHARED_TMPDIR"
-if [ -n "${PODMAN_SOCKET_PATH:-}" ]; then
-  # A caller such as the Ubuntu compatibility container can provide the
-  # already shared WSL/rootless Podman socket explicitly.
-  :
-elif systemctl --user start podman.socket >/dev/null 2>&1; then
-  export PODMAN_SOCKET_PATH="${XDG_RUNTIME_DIR:-/run/user/$UID}/podman/podman.sock"
-elif podman machine list --format '{{.Name}}' 2>/dev/null | grep -q .; then
-  # A remote macOS client mounts paths from the Podman VM, not the macOS host.
-  export PODMAN_SOCKET_PATH="$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's#^unix://##')"
-else
-  # GitHub-hosted runners do not expose a user systemd bus. Start the same
-  # rootless API socket directly so Alloy can discover container stdout.
-  export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/podman-runtime-$UID}"
-  mkdir -p "$XDG_RUNTIME_DIR/podman"
-  podman system service --time=0 \
-    "unix://$XDG_RUNTIME_DIR/podman/podman.sock" \
-    >"${TMPDIR:-/tmp}/podman-system-service.log" 2>&1 &
-  export PODMAN_SOCKET_PATH="$XDG_RUNTIME_DIR/podman/podman.sock"
-fi
 prepare_compose_resources
 cp "$EXAMPLE/policy.json" "$POLICY_COPY"
 export MONITOR_POLICY_PATH="$POLICY_COPY"
@@ -230,10 +214,14 @@ curl -fsS --max-time 10 -X DELETE "$MONITOR_URL/api/labs/events" \
 curl -fsS --max-time 10 -X DELETE "$WEBHOOK_URL/api/notifications" \
   | jq -e '.deleted >= 0' >/dev/null
 
-normal=$(curl -fsS --max-time 240 -X POST "$MONITOR_URL/api/chat" \
+if ! normal=$(curl -fsS --max-time 240 -X POST "$MONITOR_URL/api/chat" \
   -H "Authorization: Bearer $LLM_MONITOR_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"request_id":"e2e-normal","message":"공개된 사고 대응 절차를 한 문장으로 알려 주세요."}')
+  -d '{"request_id":"e2e-normal","message":"공개된 사고 대응 절차를 한 문장으로 알려 주세요."}'); then
+  echo "INFRA: normal chat request failed after readiness passed" >&2
+  compose_logs gateway retrieval llm-security-bedrock-gateway
+  exit 1
+fi
 jq -e '.application_decision == "allow" and .upstream_called == true and .blocked_stage == null and (.trace_id | length) == 32 and any(.stages[]; .rule == "bedrock-upstream")' <<<"$normal" >/dev/null
 trace_id=$(jq -r '.trace_id' <<<"$normal")
 
@@ -301,7 +289,7 @@ wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_chat_requests_total%7Boutc
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_gen_ai_tokens_total%7Bkind%3D%22output%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_decisions_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 2'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_model_calls_total%7Bengine%3D%22nemo%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 1'
-wait_json "$TEMPO_URL/api/traces/$trace_id" '([.batches[].scopeSpans[].spans[].name] | index("llm.security.chat") != null and index("POST /retrieve") != null and index("llm.bedrock.converse") != null and index("llm.security.output_guardrail") != null) and ([.batches[].resource.attributes[] | select(.key == "service.name") | .value.stringValue] | index("llm-security-gateway") != null and index("llm-security-retrieval") != null)'
+wait_json "$TEMPO_URL/api/traces/$trace_id" '([.batches[].scopeSpans[].spans[].name] | index("owasp_llm.security.chat") != null and index("POST /retrieve") != null and index("chat us.amazon.nova-lite-v1:0") != null and index("owasp_llm.security.output_guardrail") != null) and ([.batches[].resource.attributes[] | select(.key == "service.name") | .value.stringValue] | index("llm-security-gateway") != null and index("llm-security-retrieval") != null)'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_spanmetrics_calls_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_service_graph_request_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 # Prometheus는 아직 한 번도 실패하지 않은 counter를 빈 vector로 반환할 수 있다.
@@ -309,21 +297,11 @@ wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_service_graph_request_t
 wait_json "$PROMETHEUS_URL/api/v1/query?query=(sum(otelcol_receiver_failed_log_records_total)%20or%20vector(0))%2B(sum(otelcol_receiver_failed_spans_total)%20or%20vector(0))%2B(sum(loki_write_dropped_entries_total)%20or%20vector(0))" '.status == "success" and (.data.result[0].value[1] | tonumber) == 0'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=max(otelcol_exporter_queue_capacity)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 2048'
 wait_loki_logs
-wait_loki_container_logs
-podman run --rm --name llm-sec-redaction-probe \
-  --network llm-security-observability \
-  localhost/llm-security-gateway:3.0 \
-  python /app/log_redaction_probe.py >/dev/null
-wait_loki_redaction_probe
 curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/series" \
   --data-urlencode 'match[]={service_name="llm-security-gateway"}' \
   | jq -e '.status == "success" and all(.data[]?; has("request_id") | not) and all(.data[]?; has("trace_id") | not) and all(.data[]?; has("input_hmac_sha256") | not)' >/dev/null
 curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
   --data-urlencode 'query={service_name="llm-security-gateway"} |= "ops@example.com"' \
-  --data-urlencode 'limit=20' \
-  | jq -e '.status == "success" and ([.data.result[].values[]?] | length) == 0' >/dev/null
-curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
-  --data-urlencode 'query={service_name="llm-sec-redaction-probe"} |~ "sk-module08-probe|ops@example.com"' \
   --data-urlencode 'limit=20' \
   | jq -e '.status == "success" and ([.data.result[].values[]?] | length) == 0' >/dev/null
 wait_alert
@@ -344,10 +322,10 @@ wait_json_basic_auth "$GRAFANA_URL/api/datasources" 'any(.[]; .uid == "llm-secur
 wait_json "$PROMETHEUS_URL/api/v1/query?query=bedrock_requests_total" '.status == "success" and (.data.result | length) >= 1'
 
 if [ "$RUN_FAILURE_DRILL" = "true" ]; then
-  podman stop llm-sec-tempo >/dev/null
+  compose stop tempo >/dev/null
   wait_json "$PROMETHEUS_URL/api/v1/alerts" 'any(.data.alerts[]?; .labels.alertname == "LLMObservabilityPipelineUnavailable" and .labels.job == "tempo" and .state == "firing")'
   wait_webhook_alert LLMObservabilityPipelineUnavailable firing
-  podman start llm-sec-tempo >/dev/null
+  compose start tempo >/dev/null
   wait_http "$TEMPO_URL/ready"
   wait_webhook_alert LLMObservabilityPipelineUnavailable resolved
 fi
@@ -357,7 +335,7 @@ jq -n \
   '{suite:"security-observability",status:"PASS",actual_chat:"PASS",
     input_block:"PASS",tenant_block:"PASS",tool_block:"PASS",
     output_redaction:"PASS",prometheus:"PASS",alloy:"PASS",
-    container_logs:"PASS",loki:"PASS",tempo:"PASS",span_metrics:"PASS",
+    loki:"PASS",tempo:"PASS",span_metrics:"PASS",
     telemetry_delivery_health:"PASS",
     bounded_log_labels:"PASS",alert_delivery:"PASS",alert_resolved:"PASS",
     failure_drill:"PASS",grafana:"PASS",bedrock_metrics:"PASS",trace_id:$trace_id}'

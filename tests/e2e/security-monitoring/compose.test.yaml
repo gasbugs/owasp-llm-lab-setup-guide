@@ -5,8 +5,10 @@ services:
 
   llm-security-bedrock-gateway:
     image: localhost/llm-security-gateway:3.0
-    container_name: llm-security-bedrock-gateway
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-bedrock-gateway
     command: ["python", "/app/fake_bedrock_gateway.py"]
+    environment:
+      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?E2E Bedrock token is required}
     volumes:
       - ../../llm-security-control-plane/tests/fake_bedrock_gateway.py:/app/fake_bedrock_gateway.py:ro,Z
     networks: [observability]

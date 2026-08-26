@@ -85,7 +85,7 @@ TOKEN_PRINCIPALS = {
 }
 REQUEST_WINDOWS: dict[str, list[float]] = {}
 REQUEST_WINDOW_LOCK = threading.Lock()
-SECURITY_LOGGER = logging.getLogger("llm.security")
+SECURITY_LOGGER = logging.getLogger("owasp_llm.security")
 
 CHAT_REQUESTS = Counter(
     "llm_chat_requests_total",
@@ -181,9 +181,7 @@ def configure_telemetry() -> Any:
             "service.namespace": "owasp-llm-lab",
             "service.version": "3.0.0",
             "deployment.environment.name": "lab",
-            "gen_ai.system": "aws.bedrock",
-            "gen_ai.request.model": BEDROCK_MODEL_ID,
-            "llm.security.policy.version": str(POLICY["version"]),
+            "owasp_llm.security.policy.version": str(POLICY["version"]),
         }
     )
     tracer_provider = TracerProvider(resource=resource)
@@ -614,17 +612,17 @@ def integrated_chat(
 
     try:
         with telemetry_span(
-            "llm.security.chat",
+            "owasp_llm.security.chat",
             {
-                "llm.request.id": request_id,
+                "owasp_llm.request.id": request_id,
                 "enduser.id": principal["subject"],
-                "llm.tenant": principal["tenant"],
+                "owasp_llm.tenant": principal["tenant"],
                 "gen_ai.request.model": BEDROCK_MODEL_ID,
             },
         ) as root_span:
             trace_id = current_trace_id()
 
-            with telemetry_span("llm.security.rate_limit") as span:
+            with telemetry_span("owasp_llm.security.rate_limit") as span:
                 count = request_count(principal["subject"])
                 rate_record = record_stage(
                     SecurityEvent(
@@ -639,14 +637,14 @@ def integrated_chat(
                 )
                 stages.append(stage_summary(rate_record))
                 if span is not None:
-                    span.set_attribute("llm.security.decision", rate_record["application_decision"])
+                    span.set_attribute("owasp_llm.security.decision", rate_record["application_decision"])
                 if rate_record["application_decision"] == "block":
                     outcome, blocked_stage = "block", "runtime"
                     if root_span is not None:
-                        root_span.set_attribute("llm.security.blocked_stage", blocked_stage)
+                        root_span.set_attribute("owasp_llm.security.blocked_stage", blocked_stage)
                     return blocked_response(request_id, trace_id, rate_record, stages)
 
-            with telemetry_span("llm.security.input_guardrail") as span:
+            with telemetry_span("owasp_llm.security.input_guardrail") as span:
                 input_record = record_stage(
                     SecurityEvent(
                         request_id=request_id,
@@ -661,15 +659,15 @@ def integrated_chat(
                 )
                 stages.append(stage_summary(input_record))
                 if span is not None:
-                    span.set_attribute("llm.security.decision", input_record["application_decision"])
-                    span.set_attribute("llm.security.policy_rule", input_record["policy_rule"])
+                    span.set_attribute("owasp_llm.security.decision", input_record["application_decision"])
+                    span.set_attribute("owasp_llm.security.policy_rule", input_record["policy_rule"])
                 if input_record["application_decision"] == "block":
                     outcome, blocked_stage = "block", "input"
                     if root_span is not None:
-                        root_span.set_attribute("llm.security.blocked_stage", blocked_stage)
+                        root_span.set_attribute("owasp_llm.security.blocked_stage", blocked_stage)
                     return blocked_response(request_id, trace_id, input_record, stages)
 
-            with telemetry_span("llm.security.retrieval") as span:
+            with telemetry_span("owasp_llm.security.retrieval") as span:
                 document = call_retrieval(payload.message)
                 retrieval_record = record_stage(
                     SecurityEvent(
@@ -689,18 +687,18 @@ def integrated_chat(
                     resource_tenant=document["tenant"],
                 ).inc()
                 if span is not None:
-                    span.set_attribute("llm.retrieval.document_id", document["document_id"])
-                    span.set_attribute("llm.retrieval.resource_tenant", document["tenant"])
-                    span.set_attribute("llm.security.decision", retrieval_record["application_decision"])
+                    span.set_attribute("owasp_llm.retrieval.document_id", document["document_id"])
+                    span.set_attribute("owasp_llm.retrieval.resource_tenant", document["tenant"])
+                    span.set_attribute("owasp_llm.security.decision", retrieval_record["application_decision"])
                 if retrieval_record["application_decision"] == "block":
                     outcome, blocked_stage = "block", "retrieval"
                     if root_span is not None:
-                        root_span.set_attribute("llm.security.blocked_stage", blocked_stage)
+                        root_span.set_attribute("owasp_llm.security.blocked_stage", blocked_stage)
                     return blocked_response(request_id, trace_id, retrieval_record, stages)
 
             tool_name = requested_tool(payload.message)
             if tool_name:
-                with telemetry_span("llm.security.tool_authorization") as span:
+                with telemetry_span("owasp_llm.security.tool_authorization") as span:
                     approved = tool_name in principal["dangerous_tools"]
                     tool_record = record_stage(
                         SecurityEvent(
@@ -719,17 +717,22 @@ def integrated_chat(
                         tool=tool_name, decision=tool_record["application_decision"]
                     ).inc()
                     if span is not None:
-                        span.set_attribute("llm.tool.name", tool_name)
-                        span.set_attribute("llm.security.decision", tool_record["application_decision"])
+                        span.set_attribute("owasp_llm.tool.name", tool_name)
+                        span.set_attribute("owasp_llm.security.decision", tool_record["application_decision"])
                     if tool_record["application_decision"] == "block":
                         outcome, blocked_stage = "block", "tool"
                         if root_span is not None:
-                            root_span.set_attribute("llm.security.blocked_stage", blocked_stage)
+                            root_span.set_attribute("owasp_llm.security.blocked_stage", blocked_stage)
                         return blocked_response(request_id, trace_id, tool_record, stages)
 
             with telemetry_span(
-                "llm.bedrock.converse",
-                {"gen_ai.request.model": BEDROCK_MODEL_ID, "server.address": "bedrock-gateway"},
+                f"chat {BEDROCK_MODEL_ID}",
+                {
+                    "gen_ai.operation.name": "chat",
+                    "gen_ai.provider.name": "aws.bedrock",
+                    "gen_ai.request.model": BEDROCK_MODEL_ID,
+                    "server.address": "bedrock-gateway",
+                },
                 kind=SpanKind.CLIENT if SpanKind is not None else None,
             ) as span:
                 try:
@@ -758,7 +761,7 @@ def integrated_chat(
                     if span is not None:
                         span.set_attribute("gen_ai.usage.input_tokens", model_stats["input_tokens"])
                         span.set_attribute("gen_ai.usage.output_tokens", model_stats["output_tokens"])
-                        span.set_attribute("llm.upstream.duration_ms", upstream_duration)
+                        span.set_attribute("owasp_llm.upstream.duration_ms", upstream_duration)
                 except HTTPException as exc:
                     persist(
                         SecurityEvent(
@@ -783,7 +786,7 @@ def integrated_chat(
                     raise
                 stages.append(stage_summary(upstream_record))
 
-            with telemetry_span("llm.security.output_guardrail") as span:
+            with telemetry_span("owasp_llm.security.output_guardrail") as span:
                 output_record = record_stage(
                     SecurityEvent(
                         request_id=request_id,
@@ -798,16 +801,16 @@ def integrated_chat(
                 )
                 stages.append(stage_summary(output_record))
                 if span is not None:
-                    span.set_attribute("llm.security.decision", output_record["application_decision"])
-                    span.set_attribute("llm.security.policy_rule", output_record["policy_rule"])
+                    span.set_attribute("owasp_llm.security.decision", output_record["application_decision"])
+                    span.set_attribute("owasp_llm.security.policy_rule", output_record["policy_rule"])
                 if output_record["application_decision"] == "redact":
                     reply = output_record["sanitized_excerpt"]
 
             outcome = output_record["application_decision"]
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
             if root_span is not None:
-                root_span.set_attribute("llm.security.decision", outcome)
-                root_span.set_attribute("llm.upstream.called", True)
+                root_span.set_attribute("owasp_llm.security.decision", outcome)
+                root_span.set_attribute("owasp_llm.upstream.called", True)
                 if Status is not None and StatusCode is not None:
                     root_span.set_status(Status(StatusCode.OK))
             return {

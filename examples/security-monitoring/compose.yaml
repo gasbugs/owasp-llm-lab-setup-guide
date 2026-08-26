@@ -1,4 +1,4 @@
-name: llm-security-observability
+name: ${COMPOSE_PROJECT_NAME:-llm-security-observability}
 
 services:
   gateway:
@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Containerfile
     image: localhost/llm-security-gateway:3.0
-    container_name: llm-sec-gateway
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-gateway
     environment:
       ENABLE_LAB_ENDPOINTS: "true"
       LLM_MONITOR_TOKEN: ${LLM_MONITOR_TOKEN:?Use the generated Module 08 Compose env file}
@@ -31,7 +31,7 @@ services:
 
   retrieval:
     image: localhost/llm-security-gateway:3.0
-    container_name: llm-sec-retrieval
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-retrieval
     command: ["uvicorn", "retrieval_service:app", "--host", "0.0.0.0", "--port", "8081", "--no-access-log"]
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
@@ -43,10 +43,7 @@ services:
 
   alloy:
     image: docker.io/grafana/alloy:v1.18.0
-    container_name: llm-sec-alloy
-    # Container root maps to the rootless Podman user on WSL and can read the
-    # owner-only API socket used for stdout discovery.
-    user: "0:0"
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-alloy
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -57,20 +54,20 @@ services:
       - 127.0.0.1:12345:12345
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro,Z
-      - ${PODMAN_SOCKET_PATH:-/run/user/1000/podman/podman.sock}:/var/run/docker.sock:ro
       - alloy-data:/var/lib/alloy/data:Z
     networks: [observability]
-    security_opt: [no-new-privileges, label=disable]
+    security_opt: [no-new-privileges]
 
   prometheus:
     image: docker.io/prom/prometheus:v3.5.0
-    container_name: llm-sec-prometheus
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=24h
       - --web.listen-address=0.0.0.0:9090
       - --web.enable-remote-write-receiver
+      - --web.enable-lifecycle
       - --enable-feature=exemplar-storage
     ports:
       - 127.0.0.1:9090:9090
@@ -83,7 +80,7 @@ services:
 
   alertmanager:
     image: docker.io/prom/alertmanager:v0.28.1
-    container_name: llm-sec-alertmanager
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-alertmanager
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -98,7 +95,7 @@ services:
 
   alert-webhook:
     image: localhost/llm-security-gateway:3.0
-    container_name: llm-sec-alert-webhook
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-alert-webhook
     command: ["uvicorn", "alert_receiver:app", "--host", "0.0.0.0", "--port", "8099", "--no-access-log"]
     ports:
       - 127.0.0.1:8099:8099
@@ -107,7 +104,7 @@ services:
 
   loki:
     image: docker.io/grafana/loki:3.5.3
-    container_name: llm-sec-loki
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-loki
     command: ["-config.file=/etc/loki/config.yaml"]
     ports:
       - 127.0.0.1:3100:3100
@@ -119,7 +116,7 @@ services:
 
   tempo:
     image: docker.io/grafana/tempo:3.0.2
-    container_name: llm-sec-tempo
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-tempo
     command: ["-target=all", "-config.file=/etc/tempo/config.yaml"]
     ports:
       - 127.0.0.1:3200:3200
@@ -131,7 +128,7 @@ services:
 
   grafana:
     image: docker.io/grafana/grafana:12.1.0
-    container_name: llm-sec-grafana
+    container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-grafana
     environment:
       GF_SERVER_HTTP_ADDR: 0.0.0.0
       GF_SERVER_HTTP_PORT: "3000"
@@ -156,7 +153,7 @@ services:
 
 networks:
   observability:
-    name: llm-security-observability
+    name: ${OBSERVABILITY_NETWORK_NAME:-llm-security-observability}
 
 volumes:
   gateway-events:

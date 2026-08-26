@@ -152,7 +152,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
 
     def test_compose_uses_the_verified_single_bridge_podman_topology(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
-        self.assertIn("name: llm-security-observability", compose)
+        self.assertIn("name: ${OBSERVABILITY_NETWORK_NAME:-llm-security-observability}", compose)
+        self.assertIn("name: ${COMPOSE_PROJECT_NAME:-llm-security-observability}", compose)
         self.assertNotIn("name: llm-security-telemetry", compose)
         self.assertNotIn("name: llm-security-application", compose)
         self.assertGreaterEqual(compose.count("networks: [observability]"), 9)
@@ -166,32 +167,18 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn('GF_AUTH_ANONYMOUS_ENABLED: "false"', compose)
         self.assertIn("GRAFANA_ADMIN_PASSWORD", compose)
 
-    def test_alloy_collects_container_logs_and_routes_otlp_signals(self) -> None:
+    def test_alloy_routes_explicit_otlp_signals_without_container_socket(self) -> None:
         config = (EXAMPLE / "alloy" / "config.alloy").read_text(encoding="utf-8")
-        self.assertIn('discovery.docker "podman"', config)
-        self.assertIn("day6-presidio-api", config)
-        self.assertIn("llm-security-.*", config)
-        self.assertIn("day6-guardrail-ui", config)
-        self.assertIn('action        = "keep"', config)
-        self.assertIn('loki.source.docker "podman"', config)
-        self.assertIn('targets       = discovery.relabel.container_logs.output', config)
-        self.assertIn("DEMO_API_KEY", config)
-        self.assertIn("[REDACTED-EMAIL]", config)
-        self.assertNotIn('target_label  = "container_id"', config)
+        compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
+        self.assertNotIn('discovery.docker', config)
+        self.assertNotIn('loki.source.docker', config)
+        self.assertNotIn('docker.sock', compose)
+        self.assertNotIn('PODMAN_SOCKET_PATH', compose)
         self.assertIn('otelcol.receiver.otlp "application"', config)
         self.assertIn('otelcol.exporter.otlphttp "loki"', config)
         self.assertIn('otelcol.exporter.otlphttp "tempo"', config)
         self.assertIn("sending_queue", config)
         self.assertIn("retry_on_failure", config)
-
-    def test_log_probe_waits_for_discovery_before_emitting_secret(self) -> None:
-        source = (EXAMPLE / "log_redaction_probe.py").read_text(encoding="utf-8")
-        self.assertLess(source.index("time.sleep(6)"), source.index("print("))
-        self.assertLess(source.index("print("), source.index("time.sleep(8)"))
-        self.assertIn(
-            "log_redaction_probe.py",
-            (EXAMPLE / "Containerfile").read_text(encoding="utf-8"),
-        )
 
     def test_installer_includes_cni_service_discovery(self) -> None:
         installer = (ROOT / "infrastructure" / "scripts" / "student" / "install-lab.sh").read_text(
@@ -207,7 +194,9 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("call_retrieval", source)
         self.assertIn("requested_tool", source)
         self.assertIn("call_bedrock", source)
-        self.assertIn("llm.security.output_guardrail", source)
+        self.assertIn("owasp_llm.security.output_guardrail", source)
+        self.assertIn('"gen_ai.operation.name": "chat"', source)
+        self.assertIn('"gen_ai.provider.name": "aws.bedrock"', source)
         self.assertIn('"input_hmac_sha256": record["input_hmac_sha256"]', source)
         self.assertIn("def request_trace(", source)
         self.assertNotIn("def trace(request_id:", source)
@@ -245,7 +234,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertNotIn("llm-security-mimir", serialized)
         self.assertIn("llm-security-loki", serialized)
         self.assertIn("llm-security-tempo", serialized)
-        self.assertIn("All container stdout and stderr", serialized)
+        self.assertNotIn("container-stdout", serialized)
+        self.assertIn("Sanitized LLM security events", serialized)
         self.assertIn("Telemetry loss and exporter queue pressure", serialized)
         self.assertIn("Presidio and NeMo guardrail decisions", serialized)
         self.assertIn("llm_guardrail_decisions_total", serialized)
@@ -283,7 +273,11 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
 
     def test_bedrock_target_name_matches_gateway_contract(self) -> None:
         prometheus = (EXAMPLE / "prometheus.yml").read_text(encoding="utf-8")
+        test_compose = (
+            ROOT / "tests" / "e2e" / "security-monitoring" / "compose.test.yaml"
+        ).read_text(encoding="utf-8")
         self.assertIn("job_name: amazon-bedrock-gateway", prometheus)
+        self.assertIn("BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN", test_compose)
         self.assertIn("bedrock_requests_total", (EXAMPLE.parent.parent / "llm-security-control-plane" / "bedrock-gateway" / "server.py").read_text(encoding="utf-8"))
 
     def test_tempo_generates_span_metrics_and_service_graphs(self) -> None:

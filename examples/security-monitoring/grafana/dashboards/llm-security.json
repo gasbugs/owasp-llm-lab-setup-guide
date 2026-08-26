@@ -104,19 +104,11 @@
     },
     {
       "type": "logs",
-      "title": "All container stdout and stderr",
-      "datasource": {"type": "loki", "uid": "llm-security-loki"},
-      "targets": [{"expr": "{telemetry_source=\"container-stdout\", service_name=~\"$service\"}", "refId": "A"}],
-      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
-      "gridPos": {"h": 11, "w": 12, "x": 0, "y": 27}
-    },
-    {
-      "type": "logs",
       "title": "Sanitized LLM security events",
       "datasource": {"type": "loki", "uid": "llm-security-loki"},
       "targets": [{"expr": "{service_name=\"llm-security-gateway\"} |= \"llm_security_event\" | json | request_id=~\"$request_id\"", "refId": "A"}],
       "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
-      "gridPos": {"h": 11, "w": 12, "x": 12, "y": 27}
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 27}
     },
     {
       "type": "traces",
@@ -131,18 +123,6 @@
   "tags": ["llm", "security", "observability", "lgtm", "bedrock"],
   "templating": {
     "list": [
-      {
-        "name": "service",
-        "label": "Container service",
-        "type": "query",
-        "datasource": {"type": "loki", "uid": "llm-security-loki"},
-        "query": "label_values({telemetry_source=\"container-stdout\"}, service_name)",
-        "definition": "label_values({telemetry_source=\"container-stdout\"}, service_name)",
-        "includeAll": true,
-        "allValue": ".*",
-        "refresh": 1,
-        "current": {"selected": true, "text": "All", "value": "$__all"}
-      },
       {
         "name": "request_id",
         "label": "Request ID regex",

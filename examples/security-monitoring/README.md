@@ -41,7 +41,6 @@ a second chat API. Requests blocked by Application or a Guardrail return
 ```text
 gateway + retrieval --OTLP logs/traces--> Alloy ----logs----> Loki
                                   \----traces--> Tempo --span RED/service graph--> Prometheus
-Podman rootless socket --stdout/stderr--> Alloy --> Loki
 
 application + local Bedrock Gateway + Alloy + LGTM + alert services
        --/metrics--> Prometheus --rules--> Alertmanager --> alert webhook
@@ -51,7 +50,7 @@ Grafana --> Prometheus + Loki + Tempo + Alertmanager
 
 Prometheus is the local metric store, scraper, remote-write receiver, and rule evaluator. Tempo 3.x runs in monolithic `target=all` mode without Kafka, generates RED and service-graph metrics from traces, and remote-writes them to Prometheus. Alertmanager's webhook receiver proves that an evaluated alert reached a final destination instead of stopping at `firing` state.
 
-Alloy performs two separate jobs from one configuration: it receives structured OTLP logs and traces from the application, and it discovers this stack's `llm-sec-*` containers through the rootless Podman API to collect stdout and stderr. Container log lines are size-limited and common demo secrets are redacted before Loki ingestion.
+Alloy receives only the structured OTLP logs and traces that the instrumented application explicitly exports. It does not receive the Podman API socket, so the collector cannot enumerate or control the learner's other rootless containers. Raw text is reduced to a keyed HMAC identity and a sanitized excerpt in the application before the OTLP boundary.
 
 ## Data and trust boundaries
 
@@ -59,8 +58,7 @@ Alloy performs two separate jobs from one configuration: it receives structured 
 - Raw prompts are not stored. The structured event contains a keyed HMAC identity, a sanitized excerpt, decision, rule, stage, request ID, and trace ID.
 - Request IDs and trace IDs remain log fields or exemplars, not metric or Loki stream labels, to avoid unbounded cardinality.
 - Prometheus retains lab metrics for 24 hours. Loki and Tempo keep their lab data in named volumes that survive the learner stop command.
-- A read-only bind option does not make the Podman API read-only. The lab limits impact with a rootless socket and a container-name allowlist. Production deployments should prefer journal/file collection or an authenticated allowlist socket proxy.
-- Anonymous Grafana access and default lab tokens are acceptable only in this temporary lab behind a learner-owned `/32` security-group rule. Production deployments require real identity, authorization, secret rotation, TLS, and backend multi-tenancy.
+- Every host port binds to WSL loopback, Grafana anonymous access is disabled, and service credentials come from the permission-restricted Module 08 environment file. Production deployments still require managed identity, authorization, secret rotation, TLS, network policy, and backend multi-tenancy.
 - Alloy queues are memory-backed and each backend is a single lab process. A production design needs persistent buffering, object storage, replication, access control, capacity planning, backup, and tested recovery objectives.
 - Grafana's bundled plugin preinstallation and update checks are disabled so the lab does not silently download code at startup. Only the built-in data sources used by the provisioned dashboard are required.
 - The rootless Podman 4.9 lab uses one private bridge because its CNI DNS does not reliably fall through between multiple network DNS zones. External exposure is restricted by the learner-owned `/32` security-group rule. A production Kubernetes deployment should separate application, telemetry, and backend planes with directional NetworkPolicy instead of treating this lab bridge as network isolation.
@@ -70,7 +68,6 @@ Alloy performs two separate jobs from one configuration: it receives structured 
 ```bash
 export BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
 export PODMAN_COMPOSE_PROVIDER=podman-compose
-export PODMAN_SOCKET_PATH=/run/user/$(id -u)/podman/podman.sock
 export COMPOSE_ENV_FILE="$HOME/owasp-llm-lab-setup-guide/llm-security-control-plane/.state/module08-compose.env"
 podman compose --env-file "$COMPOSE_ENV_FILE" --file compose.yaml up --detach --build
 ```

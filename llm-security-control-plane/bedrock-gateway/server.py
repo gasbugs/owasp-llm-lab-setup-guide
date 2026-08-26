@@ -12,6 +12,7 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from opentelemetry import trace
+from opentelemetry.trace import SpanKind
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -109,10 +110,13 @@ def _converse(request: ChatCompletionRequest) -> dict:
 
     started = time.perf_counter()
     outcome = "error"
-    with TRACER.start_as_current_span("llm.bedrock.converse") as span:
-        span.set_attribute("gen_ai.system", "aws.bedrock")
+    with TRACER.start_as_current_span(
+        f"chat {MODEL_ID}", kind=SpanKind.CLIENT
+    ) as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "aws.bedrock")
         span.set_attribute("gen_ai.request.model", MODEL_ID)
-        span.set_attribute("llm.security.task", task)
+        span.set_attribute("owasp_llm.security.task", task)
         try:
             kwargs = {
                 "modelId": MODEL_ID,

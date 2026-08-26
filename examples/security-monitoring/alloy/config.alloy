@@ -3,67 +3,9 @@ logging {
   format = "logfmt"
 }
 
-// Podman exposes a Docker-compatible rootless API socket. Alloy uses it only
-// to discover containers and stream stdout/stderr into Loki.
-discovery.docker "podman" {
-  host             = "unix:///var/run/docker.sock"
-  refresh_interval = "5s"
-}
-
-discovery.relabel "container_logs" {
-  targets = discovery.docker.podman.targets
-
-  // The rootless Podman socket can see every container owned by the learner.
-  // Keep this lab's containers only so unrelated exercises never enter Loki.
-  rule {
-    source_labels = ["__meta_docker_container_name"]
-    regex         = "/(llm-sec-.*|day6-guardrail-ui|day6-presidio-api|llm-security-.*)"
-    action        = "keep"
-  }
-
-  rule {
-    source_labels = ["__meta_docker_container_name"]
-    regex         = "/(.*)"
-    target_label  = "service_name"
-  }
-
-}
-
-loki.source.docker "podman" {
-  host          = "unix:///var/run/docker.sock"
-  targets       = discovery.relabel.container_logs.output
-  labels        = { deployment_environment = "owasp-llm-lab", telemetry_source = "container-stdout" }
-  forward_to    = [loki.process.container_logs.receiver]
-}
-
-loki.process "container_logs" {
-  stage.decolorize {}
-  // A collector is a second data-loss boundary. Redact common lab secrets
-  // even when an individual container accidentally prints them to stdout.
-  stage.replace {
-    expression = "(?i)DEMO_API_KEY=([A-Za-z0-9_-]+)"
-    replace    = "[REDACTED]"
-  }
-  stage.replace {
-    expression = "([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
-    replace    = "[REDACTED-EMAIL]"
-  }
-  stage.truncate {
-    rule {
-      limit  = "8KiB"
-      suffix = "...[TRUNCATED]"
-    }
-  }
-  forward_to = [loki.write.local.receiver]
-}
-
-loki.write "local" {
-  endpoint {
-    url = "http://loki:3100/loki/api/v1/push"
-  }
-}
-
 // The application sends structured security logs and trace spans over OTLP.
+// Alloy does not receive the Podman API socket; the observed application
+// explicitly chooses which security events cross this telemetry boundary.
 // Memory limiting and batching happen before independent Loki and Tempo exports.
 otelcol.receiver.otlp "application" {
   http {
