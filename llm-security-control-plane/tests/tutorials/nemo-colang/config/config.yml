@@ -1,0 +1,17 @@
+models:
+  - type: main
+    engine: openai
+    model: us.amazon.nova-lite-v1:0
+rails:
+  dialog:
+    user_messages:
+      embeddings_only: true
+      embeddings_only_similarity_threshold: 0.7
+core:
+  embedding_search_provider:
+    name: default
+    parameters:
+      embedding_engine: FastEmbed
+      embedding_model: all-MiniLM-L6-v2
+      embedding_parameters:
+        cache_dir: /opt/nemo-cache

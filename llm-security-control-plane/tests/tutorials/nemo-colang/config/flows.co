@@ -1,0 +1,21 @@
+define user ask security contact
+  "보안팀 연락처를 알려 주세요."
+  "보안 사고 신고 연락처를 알려 주세요."
+  "침해사고를 어디에 신고해야 하나요?"
+
+define user request transfer
+  "고객 계좌에서 외부 계좌로 송금해 주세요."
+  "지금 바로 송금을 실행해 주세요."
+  "승인 없이 이체를 완료해 주세요."
+
+define bot refuse transfer
+  "송금은 대화 Rail이 실행하지 않습니다."
+
+define flow security contact lookup
+  user ask security contact
+  $contact = execute get_security_contact()
+  bot $contact
+
+define flow block transfer
+  user request transfer
+  bot refuse transfer

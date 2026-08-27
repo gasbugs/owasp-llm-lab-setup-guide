@@ -1,0 +1,3 @@
+FROM localhost/module08-nemo-first:e2e
+COPY config /work/config
+COPY demo.py /work/demo.py
