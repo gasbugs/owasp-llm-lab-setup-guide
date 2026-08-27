@@ -241,6 +241,19 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertEqual(values["AWS_PROFILE"], "course")
             self.assertEqual(stat.S_IMODE(compose_env.stat().st_mode), 0o600)
 
+    def test_module08_uses_the_course_aws_profile_instead_of_missing_default(self) -> None:
+        paths = (
+            CONTROL / "compose.yaml",
+            CONTROL / "deploy/prepare-module08-runtime.sh",
+            CONTROL / "deploy/restore-module08-aws.sh",
+            CONTROL / "deploy/start-stack.sh",
+            CONTROL / "deploy/lib/module08-compose-env.sh",
+        )
+        for path in paths:
+            source = path.read_text()
+            self.assertIn("owasp-llm", source, path)
+            self.assertNotIn("AWS_PROFILE:-default", source, path)
+
     def test_compose_disables_pod_mode_for_keep_id_services(self) -> None:
         compose = (CONTROL / "compose.yaml").read_text()
         parsed = yaml.safe_load(compose)

@@ -12,7 +12,7 @@ esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AWS_REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}
-AWS_PROFILE=${AWS_PROFILE:-default}
+AWS_PROFILE=${AWS_PROFILE:-owasp-llm}
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 PREFIX=owasp-llm-module08
 SOURCE_BUCKET="${PREFIX}-${ACCOUNT_ID}-source"
