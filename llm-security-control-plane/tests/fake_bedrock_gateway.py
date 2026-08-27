@@ -15,6 +15,18 @@ GATEWAY_TOKEN = os.getenv("BEDROCK_GATEWAY_TOKEN", "module08-bedrock-gateway-tok
 def response_for_openai(payload: dict) -> str:
     text = "\n".join(str(item.get("content", "")) for item in payload.get("messages", []))
     lowered = text.lower()
+    if "차단 여부(yes 또는 no)" in lowered:
+        inspected = lowered.rsplit("사용자 입력:", 1)[-1]
+        risky = any(
+            marker in inspected
+            for marker in (
+                "ignore previous instructions",
+                "ignore all previous instructions",
+                "system prompt",
+                "secret keys",
+            )
+        )
+        return "Yes" if risky else "No"
     if "blocked (yes or no)" in lowered:
         if "bot response:" in lowered:
             inspected = lowered.rsplit("bot response:", 1)[-1]
