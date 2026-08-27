@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import stat
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -160,6 +164,8 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
 
     def test_module08_aws_restore_is_separate_and_idempotent(self) -> None:
         source = (CONTROL / "deploy/restore-module08-aws.sh").read_text()
+        runtime = (CONTROL / "deploy/prepare-module08-runtime.sh").read_text()
+        env_helper = (CONTROL / "deploy/lib/module08-compose-env.sh").read_text()
         self.assertIn("--verify-only", source)
         self.assertIn("--repair", source)
         self.assertIn("owasp-llm-module08", source)
@@ -168,6 +174,49 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("FAILED|DELETE_UNSUCCESSFUL", source)
         self.assertIn("DELETING", source)
         self.assertIn("wait_for_data_source_available", source)
+        self.assertIn("knowledge_base=DEFERRED", runtime)
+        self.assertNotIn("create-knowledge-base", runtime)
+        self.assertIn("write_module08_compose_env", runtime)
+        self.assertIn('openssl rand -hex "$bytes"', env_helper)
+        self.assertIn("write_module08_compose_env", source)
+
+    def test_module08_runtime_preparation_defers_knowledge_base_and_reuses_secrets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            bin_dir = temp / "bin"
+            state_dir = temp / "state"
+            bin_dir.mkdir()
+            state_dir.mkdir()
+            (bin_dir / "aws").write_text("#!/bin/sh\nprintf '{}\\n'\n")
+            (bin_dir / "openssl").write_text("#!/bin/sh\nprintf 'generated-secret'\n")
+            (bin_dir / "aws").chmod(0o755)
+            (bin_dir / "openssl").chmod(0o755)
+            compose_env = state_dir / "module08-compose.env"
+            compose_env.write_text("BEDROCK_GATEWAY_TOKEN=preserved-token\n")
+
+            result = subprocess.run(
+                ["bash", str(CONTROL / "deploy/prepare-module08-runtime.sh")],
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "MODULE08_STATE_DIR": str(state_dir),
+                    "AWS_REGION": "us-east-1",
+                    "AWS_PROFILE": "course",
+                },
+            )
+
+            values = dict(
+                line.split("=", 1)
+                for line in compose_env.read_text().splitlines()
+            )
+            self.assertIn("knowledge_base=DEFERRED", result.stdout)
+            self.assertEqual(values["MODULE08_KNOWLEDGE_BASE_ID"], "")
+            self.assertEqual(values["BEDROCK_GATEWAY_TOKEN"], "preserved-token")
+            self.assertEqual(values["AWS_PROFILE"], "course")
+            self.assertEqual(stat.S_IMODE(compose_env.stat().st_mode), 0o600)
 
     def test_compose_disables_pod_mode_for_keep_id_services(self) -> None:
         compose = (CONTROL / "compose.yaml").read_text()
@@ -217,25 +266,27 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         hub = (CONTROL / "nemo-policy-hub/hub_core.py").read_text()
         nemo_config = (CONTROL / "nemo-policy-hub/config/nova-general-safety/config.yml").read_text()
         fake = (CONTROL / "tests/fake_bedrock_gateway.py").read_text()
-        self.assertIn("BEDROCK_GATEWAY_TOKEN:?Run restore-module08-aws.sh", start)
+        self.assertIn("BEDROCK_GATEWAY_TOKEN:?Run prepare-module08-runtime.sh", start)
         self.assertIn("api_key_env_var: BEDROCK_GATEWAY_TOKEN", nemo_config)
         self.assertNotIn('"api_key": BEDROCK_GATEWAY_TOKEN', hub)
         self.assertIn('Bearer {BEDROCK_GATEWAY_TOKEN}', hub)
         self.assertIn("invalid Bedrock Gateway token", fake)
 
     def test_compose_secrets_are_generated_and_have_no_runtime_defaults(self) -> None:
-        restore = (CONTROL / "deploy/restore-module08-aws.sh").read_text()
+        runtime = (CONTROL / "deploy/prepare-module08-runtime.sh").read_text()
+        env_helper = (CONTROL / "deploy/lib/module08-compose-env.sh").read_text()
         compose = (CONTROL / "compose.yaml").read_text()
         monitor_compose = (ROOT / "examples/security-monitoring/compose.yaml").read_text()
-        self.assertIn("umask 077", restore)
-        self.assertIn('openssl rand -hex "$bytes"', restore)
+        self.assertIn("write_module08_compose_env", runtime)
+        self.assertIn("umask 077", env_helper)
+        self.assertIn('openssl rand -hex "$bytes"', env_helper)
         for secret in (
             "PRESIDIO_INTERNAL_TOKEN",
             "APPLICATION_INTERNAL_TOKEN",
             "BEDROCK_GATEWAY_TOKEN",
             "AUTH_ADMIN_TOKEN",
         ):
-            self.assertIn(f"{secret}:?Run restore-module08-aws.sh", compose)
+            self.assertIn(f"{secret}:?Run prepare-module08-runtime.sh", compose)
         self.assertNotIn(":-module08-bedrock-gateway-token", compose)
         self.assertNotIn(":-llm-monitor-acme-token", monitor_compose)
 

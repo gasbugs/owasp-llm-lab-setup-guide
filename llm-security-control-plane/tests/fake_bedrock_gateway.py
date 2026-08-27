@@ -27,7 +27,9 @@ def response_for_openai(payload: dict) -> str:
             for marker in (
                 "disregard the current conversation rules",
                 "ignore previous instructions",
+                "ignore all previous instructions",
                 "demo_api_key=",
+                "sk-demo-",
                 "steal credentials",
                 "steal a victim credential",
             )

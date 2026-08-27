@@ -27,7 +27,15 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Build the real control-plane images
-        run: bash llm-security-control-plane/deploy/build-images.sh
+        run: |
+          bash llm-security-control-plane/deploy/build-images.sh
+          podman build -t localhost/llm-security-nemo-dialog-rails:0.22.0 \
+            examples/day6/nemo-guardrails
+          podman build -t localhost/day6-presidio:2.2.362 \
+            examples/day6/presidio
+
+      - name: Run the progressive learner sequence
+        run: bash llm-security-control-plane/tests/e2e-learning-sequence.sh
 
       - name: Smoke-test the real Bedrock Gateway entrypoint imports
         run: |

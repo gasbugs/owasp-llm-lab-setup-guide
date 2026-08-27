@@ -19,10 +19,10 @@ else
   PRESIDIO_POLICY_FILE="$ROOT/spokes/presidio-privacy/policy.py"
 fi
 
-: "${PRESIDIO_INTERNAL_TOKEN:?Run restore-module08-aws.sh to create module08-compose.env}"
-: "${APPLICATION_INTERNAL_TOKEN:?Run restore-module08-aws.sh to create module08-compose.env}"
-: "${BEDROCK_GATEWAY_TOKEN:?Run restore-module08-aws.sh to create module08-compose.env}"
-: "${AUTH_ADMIN_TOKEN:?Run restore-module08-aws.sh to create module08-compose.env}"
+: "${PRESIDIO_INTERNAL_TOKEN:?Run prepare-module08-runtime.sh to create module08-compose.env}"
+: "${APPLICATION_INTERNAL_TOKEN:?Run prepare-module08-runtime.sh to create module08-compose.env}"
+: "${BEDROCK_GATEWAY_TOKEN:?Run prepare-module08-runtime.sh to create module08-compose.env}"
+: "${AUTH_ADMIN_TOKEN:?Run prepare-module08-runtime.sh to create module08-compose.env}"
 GUARD_MODE="${GUARD_MODE:-enforce}"
 ASSURANCE_PROFILE="${ASSURANCE_PROFILE:-high-assurance}"
 ENABLE_LAB_ENDPOINTS="${ENABLE_LAB_ENDPOINTS:-true}"
