@@ -37,6 +37,9 @@ jobs:
       - name: Run the progressive learner sequence
         run: bash llm-security-control-plane/tests/e2e-learning-sequence.sh
 
+      - name: Run learner-authored first-tool tutorials
+        run: bash llm-security-control-plane/tests/e2e-first-tool-tutorials.sh
+
       - name: Smoke-test the real Bedrock Gateway entrypoint imports
         run: |
           podman run --rm --network none \
