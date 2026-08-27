@@ -4,7 +4,7 @@ write_module08_compose_env() {
   local state_dir=$1
   local compose_env_file=$2
   local current_knowledge_base_id=${3:-}
-  local aws_profile=${AWS_PROFILE:-owasp-llm}
+  local aws_profile=${AWS_PROFILE:-default}
   local aws_region=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}
   local presidio_token application_token bedrock_token telemetry_token telemetry_hmac
   local monitor_token monitor_admin_token retrieval_token grafana_password auth_admin_token

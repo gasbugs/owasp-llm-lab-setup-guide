@@ -15,7 +15,7 @@ for command in aws openssl; do
 done
 
 AWS_REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}
-AWS_PROFILE=${AWS_PROFILE:-owasp-llm}
+AWS_PROFILE=${AWS_PROFILE:-default}
 export AWS_REGION AWS_PROFILE
 
 aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output json >/dev/null
