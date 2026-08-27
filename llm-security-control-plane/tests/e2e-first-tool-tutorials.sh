@@ -13,15 +13,29 @@ cleanup() {
 trap cleanup EXIT
 
 podman network create "$NETWORK" >/dev/null
+chmod 0600 \
+  "$ROOT/tests/tutorials/nemo-first/demo.py" \
+  "$ROOT/tests/tutorials/nemo-first/config/config.yml" \
+  "$ROOT/tests/tutorials/presidio-first/demo.py"
 podman build -t localhost/module08-nemo-first:e2e "$ROOT/tests/tutorials/nemo-first"
 podman build -t localhost/module08-nemo-colang:e2e "$ROOT/tests/tutorials/nemo-colang"
 podman build -t localhost/module08-presidio-first:e2e "$ROOT/tests/tutorials/presidio-first"
 
 podman run -d --name "$GATEWAY" --network "$NETWORK" \
+  -p 127.0.0.1:18098:8080 \
   -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_TOKEN" \
   -v "$ROOT/tests/fake_bedrock_gateway.py:/app/server.py:ro,Z" \
   docker.io/library/python:3.12-slim python /app/server.py >/dev/null
 sleep 2
+
+test "$(stat -c '%a' "$ROOT/tests/tutorials/nemo-first/demo.py")" = 600
+test "$(stat -c '%a' "$ROOT/tests/tutorials/nemo-first/config/config.yml")" = 600
+test "$(stat -c '%a' "$ROOT/tests/tutorials/presidio-first/demo.py")" = 600
+test "$(curl -sS -o /dev/null -w '%{http_code}' \
+  -H 'Authorization: Bearer stale-token' \
+  "http://127.0.0.1:18098/authz")" = 401
+curl -fsS -H "Authorization: Bearer $BEDROCK_TOKEN" \
+  http://127.0.0.1:18098/authz >/dev/null
 
 normal_nemo="$(podman run --rm --network "$NETWORK" \
   -e MODEL_GATEWAY_URL="http://$GATEWAY:8080" \

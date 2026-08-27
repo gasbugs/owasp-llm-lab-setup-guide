@@ -8,7 +8,7 @@ RUN apt-get update \
     && apt-get purge -y --auto-remove g++ \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /work
-COPY config /work/config
-COPY demo.py /work/demo.py
+COPY --chmod=0555 config /work/config
+COPY --chmod=0444 demo.py /work/demo.py
 USER 65532:65532
 ENTRYPOINT ["python", "/work/demo.py"]

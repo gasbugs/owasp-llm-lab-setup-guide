@@ -74,6 +74,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/authz":
+            if self.headers.get("Authorization") != f"Bearer {GATEWAY_TOKEN}":
+                self.send_json(401, {"detail": "invalid Bedrock Gateway token"})
+                return
+            self.send_json(200, {"ok": True, "authorized": True})
+            return
         if self.path == "/healthz":
             self.send_json(
                 200,

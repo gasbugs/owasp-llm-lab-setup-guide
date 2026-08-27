@@ -214,6 +214,12 @@ def healthz() -> dict:
     }
 
 
+@app.get("/authz")
+def authz(_authorized: None = Depends(require_gateway_token)) -> dict:
+    """Verify that a downstream service has the current token without invoking Bedrock."""
+    return {"ok": True, "authorized": True}
+
+
 @app.get("/metrics")
 def metrics() -> Response:
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
