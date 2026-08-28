@@ -13,14 +13,34 @@ AUTH_ADMIN_TOKEN="${AUTH_ADMIN_TOKEN:-e2e-auth-admin-token}"
 export PRESIDIO_INTERNAL_TOKEN APPLICATION_INTERNAL_TOKEN BEDROCK_GATEWAY_TOKEN AUTH_ADMIN_TOKEN
 APP_TOKEN="$APPLICATION_INTERNAL_TOKEN"
 MAIN_STAGE=bedrock_main
+E2E_OWNS_CONTROL_PLANE=false
+E2E_OWNS_BEDROCK_GATEWAY=false
+MODULE08_COMPOSE_ENV_FILE="$WORK/module08-compose.env"
+MODULE08_STATE_FILE="$WORK/module08-aws.env"
+AUTH_STATE_DIR="$WORK/application-auth"
+export MODULE08_COMPOSE_ENV_FILE MODULE08_STATE_FILE AUTH_STATE_DIR
+printf '%s\n' \
+  "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
+  "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
+  "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
+  "AUTH_ADMIN_TOKEN=$AUTH_ADMIN_TOKEN" \
+  "BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}" \
+  "IMAGE_VERSION=1.0.0" \
+  > "$MODULE08_COMPOSE_ENV_FILE"
+chmod 0600 "$MODULE08_COMPOSE_ENV_FILE"
 
 cleanup() {
   if [ "${KEEP_CONTROL_PLANE:-false}" = true ]; then
-    rm -rf "$WORK"
+    printf 'control-plane-e2e-workdir=%s\n' "$WORK" >&2
     return
   fi
-  podman rm -f llm-security-application-gateway llm-security-nemo-hub \
-    llm-security-presidio-spoke llm-security-bedrock-gateway >/dev/null 2>&1 || true
+  if [ "$E2E_OWNS_CONTROL_PLANE" = true ]; then
+    podman rm -f llm-security-application-gateway llm-security-nemo-hub \
+      llm-security-presidio-spoke >/dev/null 2>&1 || true
+  fi
+  if [ "$E2E_OWNS_BEDROCK_GATEWAY" = true ]; then
+    podman rm -f llm-security-bedrock-gateway >/dev/null 2>&1 || true
+  fi
   rm -rf "$WORK"
 }
 
@@ -61,6 +81,21 @@ login() {
 if [ "${BUILD_IMAGES:-false}" = true ]; then
   bash "$ROOT/deploy/build-images.sh"
 fi
+
+for target in llm-security-application-gateway llm-security-nemo-hub llm-security-presidio-spoke; do
+  if podman container exists "$target"; then
+    echo "control-plane-e2e refuses existing container: $target" >&2
+    exit 1
+  fi
+done
+if [ "${START_BEDROCK_GATEWAY:-true}" = true ]; then
+  if podman container exists llm-security-bedrock-gateway; then
+    echo "control-plane-e2e refuses existing container: llm-security-bedrock-gateway" >&2
+    exit 1
+  fi
+  E2E_OWNS_BEDROCK_GATEWAY=true
+fi
+E2E_OWNS_CONTROL_PLANE=true
 
 podman run --rm --network none \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \

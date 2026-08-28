@@ -29,6 +29,7 @@ RUN_FAILURE_DRILL="${RUN_FAILURE_DRILL:-true}"
 export PODMAN_COMPOSE_PROVIDER="${PODMAN_COMPOSE_PROVIDER:-podman-compose}"
 E2E_SHARED_TMPDIR="${E2E_SHARED_TMPDIR:-${TMPDIR:-/tmp}}"
 POLICY_COPY="$E2E_SHARED_TMPDIR/llm-security-policy-e2e-$$.json"
+FAKE_BEDROCK_COPY="$E2E_SHARED_TMPDIR/fake-bedrock-gateway-e2e-$$.py"
 E2E_OWNS_RESOURCES=false
 E2E_PROJECT="llm-security-observability-e2e-$$"
 export COMPOSE_PROJECT_NAME="$E2E_PROJECT"
@@ -49,6 +50,7 @@ cleanup() {
   compose stop gateway retrieval >/dev/null 2>&1 || true
   compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   rm -f "$POLICY_COPY"
+  rm -f "$FAKE_BEDROCK_COPY"
 }
 trap cleanup EXIT
 
@@ -184,7 +186,14 @@ E2E_OWNS_RESOURCES=true
 mkdir -p "$E2E_SHARED_TMPDIR"
 prepare_compose_resources
 cp "$EXAMPLE/policy.json" "$POLICY_COPY"
+chmod 0644 "$POLICY_COPY"
 export MONITOR_POLICY_PATH="$POLICY_COPY"
+if [ "$USE_REAL_BEDROCK" != "true" ]; then
+  cp "$SETUP_ROOT/llm-security-control-plane/tests/fake_bedrock_gateway.py" \
+    "$FAKE_BEDROCK_COPY"
+  chmod 0644 "$FAKE_BEDROCK_COPY"
+  export FAKE_BEDROCK_GATEWAY_PATH="$FAKE_BEDROCK_COPY"
+fi
 export BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}"
 
 compose build gateway

@@ -10,6 +10,6 @@ services:
     environment:
       BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?E2E Bedrock token is required}
     volumes:
-      - ../../llm-security-control-plane/tests/fake_bedrock_gateway.py:/app/fake_bedrock_gateway.py:ro,Z
+      - ${FAKE_BEDROCK_GATEWAY_PATH:?E2E fake Bedrock path is required}:/app/fake_bedrock_gateway.py:ro,Z
     networks: [observability]
     security_opt: [no-new-privileges]

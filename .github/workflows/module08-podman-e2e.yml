@@ -54,7 +54,9 @@ jobs:
 
       - name: Start the deterministic Bedrock contract gateway
         run: |
+          podman network create llm-security-control-plane
           podman run --detach --name module08-bedrock-contract \
+            --network llm-security-control-plane \
             --publish 18097:8080 \
             --env BEDROCK_GATEWAY_TOKEN=e2e-bedrock-token \
             --volume "$PWD/llm-security-control-plane/tests/fake_bedrock_gateway.py:/app/server.py:ro,Z" \
@@ -64,7 +66,7 @@ jobs:
         env:
           MODEL_PROVIDER: amazon-bedrock
           BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
-          MODEL_GATEWAY_URL: http://host.containers.internal:18097
+          MODEL_GATEWAY_URL: http://module08-bedrock-contract:8080
           BEDROCK_GATEWAY_TEST_URL: http://127.0.0.1:18097
           START_BEDROCK_GATEWAY: "false"
           KEEP_CONTROL_PLANE: "true"

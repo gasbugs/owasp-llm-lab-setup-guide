@@ -36,6 +36,8 @@ podman network create "$NETWORK" >/dev/null
 chmod 0600 \
   "$ROOT/tests/tutorials/nemo-first/demo.py" \
   "$ROOT/tests/tutorials/nemo-first/config/config.yml" \
+  "$ROOT/tests/tutorials/nemo-colang/demo.py" \
+  "$ROOT/tests/tutorials/nemo-colang/config/config.yml" \
   "$ROOT/tests/tutorials/presidio-first/demo.py"
 podman build -t localhost/module08-nemo-first:e2e "$ROOT/tests/tutorials/nemo-first"
 podman build -t localhost/module08-nemo-colang:e2e "$ROOT/tests/tutorials/nemo-colang"
@@ -50,6 +52,8 @@ sleep 2
 
 test "$(stat -c '%a' "$ROOT/tests/tutorials/nemo-first/demo.py")" = 600
 test "$(stat -c '%a' "$ROOT/tests/tutorials/nemo-first/config/config.yml")" = 600
+test "$(stat -c '%a' "$ROOT/tests/tutorials/nemo-colang/demo.py")" = 600
+test "$(stat -c '%a' "$ROOT/tests/tutorials/nemo-colang/config/config.yml")" = 600
 test "$(stat -c '%a' "$ROOT/tests/tutorials/presidio-first/demo.py")" = 600
 test "$(curl -sS -o /dev/null -w '%{http_code}' \
   -H 'Authorization: Bearer stale-token' \

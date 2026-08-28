@@ -14,6 +14,7 @@ podman run -d --replace --name llm-security-nemo-hub-lock-canary \
   -p 127.0.0.1:18194:8014 \
   -e APPLICATION_INTERNAL_TOKEN=control-plane-app-to-nemo \
   -e PRESIDIO_INTERNAL_TOKEN=control-plane-nemo-to-presidio \
+  -e BEDROCK_GATEWAY_TOKEN=model-lock-canary-not-used \
   -e MODEL_GATEWAY_URL=http://llm-security-bedrock-gateway:8080 \
   -e BEDROCK_MODEL_ID=us.amazon.nova-micro-v1:0 \
   -v "$ROOT/policies/control-plane-policy.yaml:/app/policies/control-plane-policy.yaml:ro,Z" \
