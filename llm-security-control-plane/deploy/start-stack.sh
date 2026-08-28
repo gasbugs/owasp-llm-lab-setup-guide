@@ -37,10 +37,12 @@ if [ -n "${POLICY_WORKSPACE:-}" ]; then
   APPLICATION_POLICY_FILE="$POLICY_WORKSPACE/application-policy.yaml"
   CONTROL_PLANE_POLICY_FILE="$POLICY_WORKSPACE/control-plane-policy.yaml"
   PRESIDIO_POLICY_FILE="$POLICY_WORKSPACE/presidio-policy.py"
+  NEMO_CONFIG_DIR="$POLICY_WORKSPACE/nemo-config"
 else
   APPLICATION_POLICY_FILE="$ROOT/policies/application-policy.yaml"
   CONTROL_PLANE_POLICY_FILE="$ROOT/policies/control-plane-policy.yaml"
   PRESIDIO_POLICY_FILE="$ROOT/spokes/presidio-privacy/policy.py"
+  NEMO_CONFIG_DIR="$ROOT/nemo-policy-hub/config"
 fi
 
 : "${PRESIDIO_INTERNAL_TOKEN:?Run prepare-module08-runtime.sh to create module08-compose.env}"
@@ -134,7 +136,7 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
   -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
   -v "$CONTROL_PLANE_POLICY_FILE:/app/policies/control-plane-policy.yaml:ro,Z" \
-  -v "$ROOT/nemo-policy-hub/config:/app/nemo-config:ro,Z" \
+  -v "$NEMO_CONFIG_DIR:/app/nemo-config:ro,Z" \
   -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
   "localhost/llm-security-nemo-policy-hub:$IMAGE_VERSION" >/dev/null
 

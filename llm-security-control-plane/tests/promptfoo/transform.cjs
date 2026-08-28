@@ -4,6 +4,8 @@ module.exports = (json) => {
     application_decision: json.application_decision || null,
     upstream_called: json.upstream_called === true,
     blocking_reason: json.blocking_reason || null,
+    request_id: json.request_id || null,
+    trace_id: json.trace_id || null,
     assurance_profile: guardrail.assurance_profile || null,
     guard_model_calls: guardrail.guard_model_calls ?? null,
     stage_order: guardrail.stage_order || [],
