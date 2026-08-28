@@ -14,7 +14,8 @@ set -a
 # shellcheck disable=SC1090
 source "$COMPOSE_ENV_FILE"
 set +a
-COMPOSE=(podman compose --env-file "$COMPOSE_ENV_FILE" --file "$MONITOR_DIR/compose.yaml")
+COMPOSE=(podman-compose --project-name llm-security-observability
+  --env-file "$COMPOSE_ENV_FILE" --file "$MONITOR_DIR/compose.yaml")
 
 if command -v nvidia-smi >/dev/null 2>&1; then
   COMPOSE+=(--file "$MONITOR_DIR/compose.gpu.yaml")

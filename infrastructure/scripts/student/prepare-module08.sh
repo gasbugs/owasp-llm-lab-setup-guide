@@ -123,14 +123,24 @@ pass "bounded Application, NeMo and Presidio decision metrics available"
 loki_result='{}'
 for _ in $(seq 1 30); do
   loki_result=$(curl -fsS --get http://127.0.0.1:3100/loki/api/v1/query_range \
-    --data-urlencode 'query={service_name=~"llm-security-.*"}' \
-    --data-urlencode 'limit=100')
-  jq -e '([.data.result[].stream.service_name] | unique | length) >= 3' \
+    --data-urlencode 'query={service_name="llm-security-gateway"}' \
+    --data-urlencode 'limit=1000')
+  jq -e '
+    [.data.result[].values[][1] | fromjson] as $events
+    | any($events[]; .event_type == "application_authentication")
+      and any($events[]; .attributes.guard_engine == "nemo")
+      and any($events[]; .attributes.guard_engine == "presidio")
+  ' \
     >/dev/null <<<"$loki_result" && break
   sleep 2
 done
-jq -e '([.data.result[].stream.service_name] | unique | length) >= 3' \
+jq -e '
+  [.data.result[].values[][1] | fromjson] as $events
+  | any($events[]; .event_type == "application_authentication")
+    and any($events[]; .attributes.guard_engine == "nemo")
+    and any($events[]; .attributes.guard_engine == "presidio")
+' \
   >/dev/null <<<"$loki_result" || fail "control-plane logs did not reach Loki"
-pass "Application, NeMo hub and Presidio spoke logs available in Loki"
+pass "Application authentication and NeMo, Presidio decisions available in Loki"
 
 printf '[READY] Module 08 control plane is connected to Module 09 observability\n'

@@ -34,6 +34,7 @@ class DeployModule08CompleteContractTests(unittest.TestCase):
         self.assertNotIn("ollama-models", self.source)
 
     def test_complete_deployment_builds_and_verifies_current_source(self) -> None:
+        self.assertIn("podman-compose --project-name llm-security-observability", self.source)
         self.assertIn('"${COMPOSE[@]}" up --detach --build', self.source)
         self.assertIn('bash "$PREPARE_SCRIPT" --repair', self.source)
         self.assertIn("[READY] Continue with Module 08 signal collection labs", self.source)

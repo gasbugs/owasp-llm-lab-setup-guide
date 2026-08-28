@@ -69,7 +69,8 @@ Alloy receives only the structured OTLP logs and traces that the instrumented ap
 export BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
 export PODMAN_COMPOSE_PROVIDER=podman-compose
 export COMPOSE_ENV_FILE="$HOME/owasp-llm-lab-setup-guide/llm-security-control-plane/.state/module08-compose.env"
-podman compose --env-file "$COMPOSE_ENV_FILE" --file compose.yaml up --detach --build
+podman-compose --project-name llm-security-observability \
+  --env-file "$COMPOSE_ENV_FILE" --file compose.yaml up --detach --build
 ```
 
 ## Publisher regression
@@ -85,7 +86,8 @@ USE_REAL_BEDROCK=true RUN_FAILURE_DRILL=true \
 ## Stop
 
 ```bash
-podman compose --env-file "$COMPOSE_ENV_FILE" --file compose.yaml down
+podman-compose --project-name llm-security-observability \
+  --env-file "$COMPOSE_ENV_FILE" --file compose.yaml down
 ```
 
 The learner command intentionally preserves named volumes. Publisher E2E adds `--volumes` because each validation run must start from isolated data.

@@ -254,6 +254,12 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             "keep-id:uid=65532,gid=65532",
         )
 
+    def test_policy_services_are_independently_replaceable_and_health_checked(self) -> None:
+        compose = yaml.safe_load((CONTROL / "compose.yaml").read_text())
+        for service in ("presidio", "nemo-hub", "application"):
+            self.assertIn("healthcheck", compose["services"][service])
+            self.assertNotIn("depends_on", compose["services"][service])
+
     def test_module08_cleanup_is_aws_only_and_preserves_local_runtime(self) -> None:
         source = (CONTROL / "deploy/cleanup-module08-aws.sh").read_text()
         self.assertIn("owasp-llm-module08", source)
