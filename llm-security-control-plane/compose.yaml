@@ -44,7 +44,7 @@ services:
       PRESIDIO_INTERNAL_TOKEN: ${PRESIDIO_INTERNAL_TOKEN:?Run prepare-module08-runtime.sh to create the Compose env file}
       RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
     volumes:
-      - "./spokes/presidio-privacy/policy.py:/app/policy.py:ro,Z"
+      - "${PRESIDIO_POLICY_SOURCE:-./spokes/presidio-privacy/policy.py}:/app/policy.py:ro,Z"
 
   nemo-hub:
     container_name: llm-security-nemo-hub
@@ -70,8 +70,8 @@ services:
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
       BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?Run prepare-module08-runtime.sh to create the Compose env file}
     volumes:
-      - "./policies/control-plane-policy.yaml:/app/policies/control-plane-policy.yaml:ro,Z"
-      - "./nemo-policy-hub/config:/app/nemo-config:ro,Z"
+      - "${CONTROL_PLANE_POLICY_SOURCE:-./policies/control-plane-policy.yaml}:/app/policies/control-plane-policy.yaml:ro,Z"
+      - "${NEMO_CONFIG_SOURCE:-./nemo-policy-hub/config}:/app/nemo-config:ro,Z"
       - "./nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z"
 
   application:
@@ -97,7 +97,7 @@ services:
       AUTH_ADMIN_TOKEN: ${AUTH_ADMIN_TOKEN:?Run prepare-module08-runtime.sh to create the Compose env file}
       LEGACY_STATIC_TOKEN_MODE: ${LEGACY_STATIC_TOKEN_MODE:-false}
     volumes:
-      - "./policies/application-policy.yaml:/app/policies/application-policy.yaml:ro,Z"
+      - "${APPLICATION_POLICY_SOURCE:-./policies/application-policy.yaml}:/app/policies/application-policy.yaml:ro,Z"
       - "./policies/application-users.yaml:/app/policies/application-users.yaml:ro,Z"
       - "./.state/application-auth:/app/state:rw,Z"
       - "./application-gateway/auth.py:/app/auth.py:ro,Z"
