@@ -246,7 +246,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         rules = (EXAMPLE / "alert-rules.yml").read_text(encoding="utf-8")
         self.assertIn("LLMBlockingSpike", rules)
         self.assertIn("Module08LearnerDrill", rules)
-        self.assertIn("expr: vector(0)", rules)
+        self.assertIn("expr: vector(0) == 1", rules)
         self.assertIn('increase(llm_chat_requests_total{outcome="block"}[5m])', rules)
         self.assertIn("LLMGatewayUnavailable", rules)
         self.assertIn("LLMObservabilityPipelineUnavailable", rules)

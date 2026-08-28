@@ -17,13 +17,13 @@ groups:
       # Learners toggle only this deterministic rule while observing the full
       # Prometheus -> Alertmanager -> webhook firing/resolved lifecycle.
       - alert: Module08LearnerDrill
-        expr: vector(0)
+        expr: vector(0) == 1
         for: 0m
         labels:
           severity: info
         annotations:
           summary: Module 08 learner alert lifecycle drill
-          runbook: Restore vector(0) after the firing notification is observed
+          runbook: Restore vector(0) == 1 after the firing notification is observed
 
       - alert: LLMHighBlockRatio
         expr: llm:chat_block_ratio_5m > 0.5 and sum(increase(llm_chat_requests_total[5m])) >= 5
