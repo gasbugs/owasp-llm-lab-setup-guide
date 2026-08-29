@@ -260,6 +260,13 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertIn("healthcheck", compose["services"][service])
             self.assertNotIn("depends_on", compose["services"][service])
 
+    def test_dialog_profile_connects_to_the_existing_presidio_tutorial(self) -> None:
+        compose = yaml.safe_load((CONTROL / "compose.yaml").read_text())
+        self.assertEqual(
+            compose["services"]["dialog"]["environment"]["PRESIDIO_URL"],
+            "http://day6-presidio-api:8013",
+        )
+
     def test_module08_cleanup_is_aws_only_and_preserves_local_runtime(self) -> None:
         source = (CONTROL / "deploy/cleanup-module08-aws.sh").read_text()
         self.assertIn("owasp-llm-module08", source)

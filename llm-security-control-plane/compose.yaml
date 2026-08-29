@@ -129,6 +129,7 @@ services:
       RUN_MODE: server
       GUARD_MODE: enforce
       ENABLE_LAB_ENDPOINTS: "true"
+      PRESIDIO_URL: http://day6-presidio-api:8013
       MODEL_GATEWAY_URL: http://llm-security-bedrock-gateway:8080
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
       BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?Run prepare-module08-runtime.sh to create the Compose env file}
