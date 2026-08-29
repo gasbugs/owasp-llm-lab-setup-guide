@@ -1,3 +1,5 @@
+// CUSTOM FILE: project-authored Grafana Alloy OTLP routing configuration.
+// Format reference: Alloy components (Apache-2.0), https://grafana.com/docs/alloy/latest/reference/config/
 logging {
   level  = "info"
   format = "logfmt"

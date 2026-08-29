@@ -1,3 +1,5 @@
+# CUSTOM FILE: this project’s control-plane policy; not an NVIDIA NeMo config.yml.
+# Format reference: YAML 1.2 (https://yaml.org/spec/1.2.2/), MIT license.
 schema_version: 1
 policy_id: llm-security-control-plane-v1
 

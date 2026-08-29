@@ -1,3 +1,5 @@
+# CUSTOM FILE: project-authored NeMo Guardrails config for the Application self-check rail.
+# NeMo configuration reference: https://docs.nvidia.com/nemo/guardrails/latest/configure-rails/configuration.html
 models:
   - type: main
     engine: openai

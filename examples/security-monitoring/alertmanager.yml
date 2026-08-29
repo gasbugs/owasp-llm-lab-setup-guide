@@ -1,3 +1,5 @@
+# CUSTOM FILE: project-authored Alertmanager routing for this lab.
+# Format reference: Alertmanager configuration (Apache-2.0), https://prometheus.io/docs/alerting/latest/configuration/
 route:
   receiver: lab-webhook
   group_by: [alertname, severity]

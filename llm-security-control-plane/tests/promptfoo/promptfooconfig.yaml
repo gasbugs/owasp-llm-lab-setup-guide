@@ -1,3 +1,5 @@
+# CUSTOM FILE: project-authored Promptfoo regression suite for this lab.
+# Format reference: Promptfoo configuration (MIT), https://www.promptfoo.dev/docs/configuration/reference/
 # yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
 
 description: NeMo hub security control-plane contract tests
