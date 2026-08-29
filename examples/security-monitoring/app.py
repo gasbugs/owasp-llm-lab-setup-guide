@@ -167,6 +167,12 @@ def initialize_bounded_metric_series() -> None:
             model=BEDROCK_MODEL_ID,
             policy_version=policy_version,
         ).inc(0)
+    for engine in GUARDRAIL_ENGINE_LABELS:
+        for direction in GUARDRAIL_DIRECTION_LABELS:
+            for decision in GUARDRAIL_DECISION_LABELS:
+                GUARDRAIL_DECISIONS.labels(
+                    engine=engine, direction=direction, decision=decision
+                ).inc(0)
 
 
 initialize_bounded_metric_series()

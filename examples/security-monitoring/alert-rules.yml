@@ -5,10 +5,10 @@ groups:
     interval: 5s
     rules:
       - record: llm:chat_block_ratio_5m
-        expr: sum(rate(llm_chat_requests_total{outcome="block"}[5m])) / clamp_min(sum(rate(llm_chat_requests_total[5m])), 0.001)
+        expr: sum(rate(llm_guardrail_decisions_total{engine="nemo",direction="chat",decision="block"}[5m])) / clamp_min(sum(rate(llm_guardrail_decisions_total{engine="nemo",direction="chat"}[5m])), 0.001)
 
       - alert: LLMBlockingSpike
-        expr: sum(increase(llm_chat_requests_total{outcome="block"}[5m])) >= 2
+        expr: sum(increase(llm_guardrail_decisions_total{engine="nemo",direction="chat",decision="block"}[5m])) >= 2
         for: 0m
         labels:
           severity: high
@@ -28,7 +28,7 @@ groups:
           runbook: Restore vector(0) == 1 after the firing notification is observed
 
       - alert: LLMHighBlockRatio
-        expr: llm:chat_block_ratio_5m > 0.5 and sum(increase(llm_chat_requests_total[5m])) >= 5
+        expr: llm:chat_block_ratio_5m > 0.5 and sum(increase(llm_guardrail_decisions_total{engine="nemo",direction="chat"}[5m])) >= 5
         for: 1m
         labels:
           severity: warning
@@ -91,7 +91,7 @@ groups:
           runbook: Follow the failed trace and inspect the local Bedrock Gateway and Converse error
 
       - alert: LLMHighP95Latency
-        expr: histogram_quantile(0.95, sum by (le) (rate(llm_chat_request_duration_seconds_bucket[5m]))) > 10
+        expr: histogram_quantile(0.95, sum by (le) (rate(bedrock_request_duration_seconds_bucket{task="converse"}[5m]))) > 10
         for: 2m
         labels:
           severity: warning

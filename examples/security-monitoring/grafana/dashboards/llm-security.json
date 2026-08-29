@@ -26,7 +26,7 @@
       "type": "stat",
       "title": "Chat request rate",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(rate(llm_chat_requests_total[5m]))", "legendFormat": "requests/s", "refId": "A"}],
+      "targets": [{"expr": "sum(rate(llm_guardrail_decisions_total{engine=\"nemo\",direction=\"chat\"}[5m]))", "legendFormat": "requests/s", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
       "gridPos": {"h": 5, "w": 4, "x": 0, "y": 0}
     },
@@ -34,14 +34,14 @@
       "type": "stat",
       "title": "Blocked in the last 5m",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(increase(llm_chat_requests_total{outcome=\"block\"}[5m]))", "refId": "A"}],
+      "targets": [{"expr": "sum(increase(llm_guardrail_decisions_total{engine=\"nemo\",direction=\"chat\",decision=\"block\"}[5m]))", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 4, "y": 0}
     },
     {
       "type": "stat",
       "title": "Chat p95 latency",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(llm_chat_request_duration_seconds_bucket[5m])))", "refId": "A"}],
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(bedrock_request_duration_seconds_bucket{task=\"converse\"}[5m])))", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
       "gridPos": {"h": 5, "w": 4, "x": 8, "y": 0}
     },
@@ -49,7 +49,7 @@
       "type": "stat",
       "title": "Generated tokens",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(increase(llm_gen_ai_tokens_total{kind=\"output\"}[30m]))", "refId": "A"}],
+      "targets": [{"expr": "sum(increase(bedrock_tokens_total{direction=\"output\",task=\"converse\"}[30m]))", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 12, "y": 0}
     },
     {
@@ -70,9 +70,9 @@
     },
     {
       "type": "timeseries",
-      "title": "Request outcomes and blocked stages",
+      "title": "Application guardrail outcomes",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum by (outcome, blocked_stage) (rate(llm_chat_requests_total[5m]))", "legendFormat": "{{outcome}} / {{blocked_stage}}", "refId": "A"}],
+      "targets": [{"expr": "sum by (engine, direction, decision) (rate(llm_guardrail_decisions_total[5m]))", "legendFormat": "{{engine}} / {{direction}} / {{decision}}", "refId": "A"}],
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
     },
     {

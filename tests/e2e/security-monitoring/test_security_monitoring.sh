@@ -105,7 +105,7 @@ wait_json() {
   local url="$1"
   local expression="$2"
   local attempts=0
-  until curl -fsS --max-time 5 "$url" | jq -e "$expression" >/dev/null 2>&1; do
+  until curl -fsS --max-time 5 "$url" 2>/dev/null | jq -e "$expression" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
     if [ "$attempts" -ge 90 ]; then
       echo "INFRA: endpoint did not become ready: $url" >&2
@@ -271,14 +271,19 @@ curl -fsS --max-time 10 -X POST "$MONITOR_URL/api/events/guardrail" \
 curl -fsS --max-time 10 -X POST "$MONITOR_URL/api/events/guardrail" \
   -H "X-Telemetry-Token: $TELEMETRY_INGEST_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"event":"guardrail_chat","request_id":"e2e-nemo","engine":"nemo","direction":"input","decision":"block","blocking_reason":"input:self check input","duration_ms":21.5,"upstream_called":false,"guard_model_calls":1}' \
+  -d '{"event":"guardrail_chat","request_id":"e2e-nemo","engine":"nemo","direction":"chat","decision":"block","blocking_reason":"input:self check input","duration_ms":21.5,"upstream_called":false,"guard_model_calls":1}' \
+  | jq -e '.application_decision == "block" and .raw_stored == false' >/dev/null
+curl -fsS --max-time 10 -X POST "$MONITOR_URL/api/events/guardrail" \
+  -H "X-Telemetry-Token: $TELEMETRY_INGEST_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"event":"guardrail_chat","request_id":"e2e-nemo-repeat","engine":"nemo","direction":"chat","decision":"block","blocking_reason":"input:self check input","duration_ms":19.5,"upstream_called":false,"guard_model_calls":1}' \
   | jq -e '.application_decision == "block" and .raw_stored == false' >/dev/null
 
 wait_json_with_auth() {
   local url="$1"
   local expression="$2"
   local attempts=0
-  until curl -fsS --max-time 5 "$url" -H "Authorization: Bearer $LLM_MONITOR_TOKEN" \
+  until curl -fsS --max-time 5 "$url" -H "Authorization: Bearer $LLM_MONITOR_TOKEN" 2>/dev/null \
       | jq -e "$expression" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
     if [ "$attempts" -ge 60 ]; then
@@ -292,12 +297,12 @@ wait_json_with_auth() {
 }
 
 wait_json_with_auth "$MONITOR_URL/api/traces/e2e-normal" '.event_count == 5 and .stage_order == ["runtime","input","retrieval","runtime","output"]'
-# 세 Gateway 차단에, 위에서 수집한 NeMo 차단 한 건이 더해진다.
-wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_security_decisions_total%7Bdecision%3D%22block%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 4'
+# 세 Gateway 차단에, 위에서 수집한 NeMo 차단 두 건이 더해진다.
+wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_security_decisions_total%7Bdecision%3D%22block%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 5'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_chat_requests_total%7Boutcome%3D%22block%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 3'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_gen_ai_tokens_total%7Bkind%3D%22output%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
-wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_decisions_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 2'
-wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_model_calls_total%7Bengine%3D%22nemo%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 1'
+wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_decisions_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 3'
+wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(llm_guardrail_model_calls_total%7Bengine%3D%22nemo%22%7D)" '.status == "success" and (.data.result[0].value[1] | tonumber) == 2'
 wait_json "$TEMPO_URL/api/traces/$trace_id" '([.batches[].scopeSpans[].spans[].name] | index("owasp_llm.security.chat") != null and index("POST /retrieve") != null and index("chat us.amazon.nova-lite-v1:0") != null and index("owasp_llm.security.output_guardrail") != null) and ([.batches[].resource.attributes[] | select(.key == "service.name") | .value.stringValue] | index("llm-security-gateway") != null and index("llm-security-retrieval") != null)'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_spanmetrics_calls_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
 wait_json "$PROMETHEUS_URL/api/v1/query?query=sum(traces_service_graph_request_total)" '.status == "success" and (.data.result[0].value[1] | tonumber) > 0'
@@ -318,7 +323,7 @@ wait_json "$ALERTMANAGER_URL/api/v2/alerts" 'any(.[]?; .labels.alertname == "LLM
 wait_webhook_alert LLMBlockingSpike firing
 wait_json_basic_auth() {
   local url="$1" expression="$2" attempts=0
-  until curl -fsS --max-time 5 -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD" "$url" \
+  until curl -fsS --max-time 5 -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD" "$url" 2>/dev/null \
       | jq -e "$expression" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
     [ "$attempts" -lt 60 ] || return 1

@@ -239,6 +239,9 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("Telemetry loss and exporter queue pressure", serialized)
         self.assertIn("Presidio and NeMo guardrail decisions", serialized)
         self.assertIn("llm_guardrail_decisions_total", serialized)
+        self.assertIn("bedrock_tokens_total", serialized)
+        self.assertIn("bedrock_request_duration_seconds_bucket", serialized)
+        self.assertNotIn("llm_chat_requests_total", serialized)
         self.assertIn("otelcol_exporter_queue_size", serialized)
         self.assertEqual(dashboard["refresh"], "5s")
 
@@ -247,7 +250,11 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("LLMBlockingSpike", rules)
         self.assertIn("Module08LearnerDrill", rules)
         self.assertIn("expr: vector(0) == 1", rules)
-        self.assertIn('increase(llm_chat_requests_total{outcome="block"}[5m])', rules)
+        self.assertIn(
+            'increase(llm_guardrail_decisions_total{engine="nemo",direction="chat",decision="block"}[5m])',
+            rules,
+        )
+        self.assertNotIn("llm_chat_requests_total", rules)
         self.assertIn("LLMGatewayUnavailable", rules)
         self.assertIn("LLMObservabilityPipelineUnavailable", rules)
         self.assertIn("AlertDeliveryStalled", rules)
@@ -256,6 +263,12 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("AlloyExporterQueuePressure", rules)
         self.assertIn("BedrockUpstreamFailure", rules)
         self.assertNotIn("GPUMemoryPressure", rules)
+
+    def test_guardrail_counters_have_zero_baselines_for_increase(self) -> None:
+        source = (EXAMPLE / "app.py").read_text(encoding="utf-8")
+        self.assertIn("for engine in GUARDRAIL_ENGINE_LABELS", source)
+        self.assertIn("for direction in GUARDRAIL_DIRECTION_LABELS", source)
+        self.assertIn("for decision in GUARDRAIL_DECISION_LABELS", source)
 
     def test_alertmanager_delivers_to_lab_webhook(self) -> None:
         config = (EXAMPLE / "alertmanager.yml").read_text(encoding="utf-8")
