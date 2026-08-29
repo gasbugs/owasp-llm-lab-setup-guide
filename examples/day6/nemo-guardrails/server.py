@@ -41,8 +41,10 @@ GUARD_ENGINE = os.getenv("GUARD_ENGINE", "nemo").strip().lower()
 if GUARD_ENGINE not in {"nemo", "off"}:
     raise RuntimeError("NeMo image supports GUARD_ENGINE=nemo or off")
 ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://10.0.2.2:11434").rstrip("/")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_MODEL)
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", DEFAULT_MODEL)
+MODEL_GATEWAY_URL = os.getenv(
+    "MODEL_GATEWAY_URL", "http://llm-security-bedrock-gateway:8080"
+).rstrip("/")
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 TELEMETRY_INGEST_TOKEN = os.getenv(
     "TELEMETRY_INGEST_TOKEN", "module08-telemetry-ingest"
@@ -147,7 +149,7 @@ async def healthz() -> dict:
         "guard_engine": "nemo" if GUARD_ENGINE != "off" else "off",
         "guard_mode": GUARD_MODE,
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
-        "ollama_model": OLLAMA_MODEL,
+        "bedrock_model": BEDROCK_MODEL_ID,
         "security_monitoring": bool(SECURITY_MONITOR_URL),
     }
 
@@ -174,8 +176,9 @@ async def policy() -> dict:
             "endpoint": "/api/events/guardrail" if SECURITY_MONITOR_URL else None,
             "failure_mode": "guardrail enforcement continues when forwarding fails",
         },
-        "model": OLLAMA_MODEL,
-        "ollama_url": OLLAMA_URL,
+        "model": BEDROCK_MODEL_ID,
+        "provider": "amazon-bedrock",
+        "model_gateway_url": MODEL_GATEWAY_URL,
         "rails": {
             "input": ["self check input"],
             "dialog": ["Colang topic flow", "get_security_contact"],
@@ -388,7 +391,7 @@ async def chat(request: ChatRequest) -> dict:
             blocking_reason=blocking_reason,
             guard_model_calls=guard_model_calls,
         )
-        guardrail["stage_order"] = ["input_rail", "ollama_main", "output_rail"]
+        guardrail["stage_order"] = ["input_rail", "bedrock_main", "output_rail"]
         emit({"event": "guardrail_chat", "request_id": request_id, **guardrail})
         return {"reply": reply, "guardrail": guardrail}
     except Exception as exc:

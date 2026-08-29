@@ -44,8 +44,8 @@ class Day7GuardrailLoopTests(unittest.TestCase):
         for marker in (
             "policy_version",
             "test_corpus_version",
-            "model_digest",
-            "system_prompt_sha256",
+            '"provider": "amazon-bedrock"',
+            "BEDROCK_MODEL_ID",
             '"/api/labs/validate-output-contract"',
             'blocking_reason": "output-contract-invalid"',
             'if guardrail.get("decision") == "infra"',

@@ -5,12 +5,15 @@ from __future__ import annotations
 import hmac
 import os
 import time
+from typing import Literal
 import uuid
 from contextlib import asynccontextmanager
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
@@ -62,10 +65,18 @@ PRICING_INFO.labels(
 ).inc()
 
 
+class TextContentPart(BaseModel):
+    """OpenAI-compatible text part used by NeMo Guardrails 0.22."""
+
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["text"]
+    text: str = Field(min_length=1, max_length=50000)
+
+
 class Message(BaseModel):
     model_config = ConfigDict(extra="forbid")
     role: str = Field(pattern="^(system|user|assistant)$")
-    content: str = Field(min_length=1, max_length=50000)
+    content: str | list[TextContentPart]
 
 
 class ChatCompletionRequest(BaseModel):
@@ -74,6 +85,7 @@ class ChatCompletionRequest(BaseModel):
     messages: list[Message] = Field(min_length=1, max_length=30)
     temperature: float = Field(default=0.0, ge=0.0, le=1.0)
     max_tokens: int = Field(default=180, ge=1, le=4096)
+    stop: str | list[str] | None = None
     stream: bool = False
 
 
@@ -99,9 +111,18 @@ def _converse(request: ChatCompletionRequest) -> dict:
         raise HTTPException(status_code=422, detail="model must match configured Bedrock model")
     if request.stream:
         raise HTTPException(status_code=422, detail="streaming is not enabled in this lab gateway")
-    system = [{"text": item.content} for item in request.messages if item.role == "system"]
+    def content_text(item: Message) -> str:
+        if isinstance(item.content, str):
+            return item.content
+        return "\n".join(part.text for part in item.content)
+
+    system = [
+        {"text": content_text(item)}
+        for item in request.messages
+        if item.role == "system"
+    ]
     messages = [
-        {"role": item.role, "content": [{"text": item.content}]}
+        {"role": item.role, "content": [{"text": content_text(item)}]}
         for item in request.messages
         if item.role != "system"
     ]
@@ -126,6 +147,10 @@ def _converse(request: ChatCompletionRequest) -> dict:
                     "maxTokens": request.max_tokens,
                 },
             }
+            if request.stop:
+                kwargs["inferenceConfig"]["stopSequences"] = (
+                    [request.stop] if isinstance(request.stop, str) else request.stop
+                )
             if system:
                 kwargs["system"] = system
             result = BEDROCK.converse(**kwargs)
@@ -194,6 +219,27 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Local Amazon Bedrock gateway", docs_url=None, redoc_url=None, lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def openai_validation_error(
+    _request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Return a string-only OpenAI error without echoing prompt content."""
+
+    message = "; ".join(
+        f"{'.'.join(str(part) for part in error['loc'])}: {error['type']}"
+        for error in exc.errors()
+    )
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "message": message,
+                "type": "invalid_request_error",
+            }
+        },
+    )
 configure_telemetry(app, "llm-security-bedrock-gateway")
 
 

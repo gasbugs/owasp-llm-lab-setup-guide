@@ -20,7 +20,7 @@ podman build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
 ## 독립 CLI 검증
 
 Presidio 이미지는 Analyzer, Anonymizer와 spaCy NLP model을 build layer에 포함한다.
-따라서 외부 Ollama와 인터넷이 없는 `--network none`으로 개인정보 탐지·비식별화
+따라서 외부 Model과 인터넷이 없는 `--network none`으로 개인정보 탐지·비식별화
 suite를 실행할 수 있다.
 
 ```bash
@@ -28,11 +28,15 @@ podman run --rm --network none \
   localhost/day6-presidio:2.2.362 --suite
 ```
 
-NeMo suite의 self-check rail은 host Ollama를 사용하므로 rootless container가 host
-loopback에 접근할 수 있는 네트워크가 필요하다.
+NeMo suite의 self-check Rail은 같은 `llm-security-control-plane` network에 이미
+실행 중인 인증된 Bedrock Gateway를 사용한다. Gateway만 AWS 자격 증명을 가지며
+NeMo에는 Gateway Token과 Nova Lite Model ID만 전달한다.
 
 ```bash
-podman run --rm --network slirp4netns:allow_host_loopback=true \
+podman run --rm --network llm-security-control-plane \
+  -e MODEL_GATEWAY_URL=http://llm-security-bedrock-gateway:8080 \
+  -e BEDROCK_GATEWAY_TOKEN="$BEDROCK_GATEWAY_TOKEN" \
+  -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
   localhost/llm-security-nemo-dialog-rails:0.22.0 --suite
 ```
 
@@ -42,43 +46,45 @@ podman run --rm --network slirp4netns:allow_host_loopback=true \
 각각 18091과 18092를 사용한다. 기존 UI는 18090이다. 세 포트는 모두
 `127.0.0.1`에만 bind하며 Security Group ingress를 추가하지 않는다.
 
-먼저 NeMo만 연결해 `OWASP Application → NeMo Guardrails → LLM Model` 경로를
+먼저 NeMo만 연결해 `OWASP Application → NeMo Guardrails → Bedrock Gateway → Nova Lite` 경로를
 확인한다.
 
 ```bash
 podman run -d --replace --name llm-security-nemo-dialog-rails \
-  --network slirp4netns:allow_host_loopback=true \
+  --network llm-security-control-plane \
   -p 127.0.0.1:18092:8013 \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
-  -e OLLAMA_URL=http://10.0.2.2:11434 \
-  -e OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M \
+  -e MODEL_GATEWAY_URL=http://llm-security-bedrock-gateway:8080 \
+  -e BEDROCK_GATEWAY_TOKEN="$BEDROCK_GATEWAY_TOKEN" \
+  -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
   localhost/llm-security-nemo-dialog-rails:0.22.0
 
 podman run -d --replace --name day6-guardrail-ui \
-  --network slirp4netns:allow_host_loopback=true \
+  --network llm-security-control-plane \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=nemo \
-  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+  -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   localhost/day6-guardrail-ui:latest
 ```
 
 NeMo 경로가 정상 동작한 뒤 Presidio를 앞단에 추가하고 UI를 교체한다. 최종 요청
-경로는 `OWASP Application → Presidio → NeMo Guardrails → LLM Model`이다.
+경로는 `OWASP Application → Presidio → NeMo Guardrails → Bedrock Gateway → Nova Lite`다.
 
 ```bash
 podman run -d --replace --name day6-presidio-api \
-  --network slirp4netns:allow_host_loopback=true \
+  --network llm-security-control-plane \
   -p 127.0.0.1:18091:8013 \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
-  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+  -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
+  -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
   localhost/day6-presidio:2.2.362
 
 podman run -d --replace --name day6-guardrail-ui \
-  --network slirp4netns:allow_host_loopback=true \
+  --network llm-security-control-plane \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
-  -e PRESIDIO_URL=http://10.0.2.2:18091 \
-  -e NEMO_GUARD_URL=http://10.0.2.2:18092 \
+  -e PRESIDIO_URL=http://day6-presidio-api:8013 \
+  -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   -e CLASSIFIED_RAG_INTERNAL_TOKEN=day7-classified-rag-internal \
   localhost/day6-guardrail-ui:latest
 ```
@@ -92,10 +98,8 @@ Presidio API는 `/healthz`, `/api/guardrails/policy`, `/api/scan`, `/api/chat`�
 `ENABLE_LAB_ENDPOINTS=true`인 학습 환경에서만 활성화한다. NeMo API도 같은 외부
 경로를 제공해 UI가 엔진별 별도 화면을 필요로 하지 않는다.
 
-`10.0.2.2`는 이 실습에서 실제 확인한 slirp4netns guest-to-host loopback gateway다.
-현재 Podman의 `host.containers.internal`은 EC2 private IP로 해석되어 `127.0.0.1`에만
-publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopback 제한을 풀지
-않고 UI 컨테이너에서 host loopback으로 들어갈 때 이 gateway를 사용한다.
+컨테이너끼리는 host publish 주소로 되돌아가지 않고 공통 network의 DNS 이름과
+내부 포트를 사용한다. host publish는 WSL 사용자가 `curl`로 확인할 때만 쓴다.
 
 ## 보안 경계
 
@@ -107,9 +111,8 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 - Retrieval rail은 RAG chunk를 생성 prompt에 넣기 전에 Presidio `/api/scan` action으로 비식별화한다.
 - 정보 등급별 RAG 실습은 Application이 공개·제한 저장소 접근을 먼저 인가하고, NeMo가 허가된 원문을 Presidio로 탐지하되 업무상 필수 값은 치환하지 않는다.
 - `CLASSIFIED_RAG_INTERNAL_TOKEN`은 Application과 NeMo 사이의 학습용 내부 endpoint를 보호하며 실제 서비스에서는 서비스 인증으로 교체한다.
-- 최종 왕복 경로는 `Application → Presidio input → NeMo input → LLM → NeMo output → Presidio output → Application`이다.
-- 18090~18092와 11434를 공인 인터페이스나 `0.0.0.0/0` Security Group에 노출하지 않는다.
-- 원격 브라우저는 기존 SSM port forwarding 경로를 사용한다.
+- 최종 왕복 경로는 `Application → Presidio input → NeMo input → Bedrock Gateway → Nova Lite → NeMo output → Presidio output → Application`이다.
+- 18090~18092는 WSL loopback에만 publish하며 공인 인터페이스에 노출하지 않는다.
 
 검사 결과는 별도 파일 생성 wrapper 없이 `podman logs day6-presidio-api` 또는
 `podman logs llm-security-nemo-dialog-rails`에서 구조화된 JSON으로 확인한다.
@@ -125,7 +128,7 @@ publish한 18091/18092에 도달하지 못한다. 따라서 guard API의 loopbac
 요구사항을 같은 조건으로 다시 확인하는 도구이고 Garak은 아직 테스트에 없는 실패 후보를 찾는 탐색 도구다.
 Garak에서 재현된 hit는 최소 입력으로 줄인 뒤 Promptfoo testcase로 승격한다.
 
-Presidio server의 `/api/guardrails/policy`는 정책·test corpus·model·system prompt
-식별자를 공개한다. 학습 전용 `/api/labs/validate-output-contract`는 Pydantic의
+Presidio server의 `/api/guardrails/policy`는 정책·test corpus·Bedrock provider와
+Model 식별자를 공개한다. 학습 전용 `/api/labs/validate-output-contract`는 Pydantic의
 `extra="forbid"` 계약으로 예상하지 못한 필드를 거부한다. 이 endpoint는
 `ENABLE_LAB_ENDPOINTS=true`일 때만 사용할 수 있다.

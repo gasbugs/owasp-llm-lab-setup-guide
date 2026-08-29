@@ -103,9 +103,21 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn('NEMO_GUARD_URL = os.getenv("NEMO_GUARD_URL", "")', server)
         self.assertIn('f"{NEMO_GUARD_URL}/api/chat"', server)
         self.assertIn('model_stages = ["nemo_input"]', server)
-        self.assertIn('model_stages.extend(["ollama_main", "nemo_output"])', server)
-        self.assertIn('"presidio>nemo>ollama>presidio"', server)
+        self.assertIn('model_stages.extend(["bedrock_main", "nemo_output"])', server)
+        self.assertIn('"presidio>nemo>bedrock>presidio"', server)
+        self.assertIn('"presidio>nemo>presidio"', server)
+        self.assertIn('inner_guardrail.get("upstream_called") is True', server)
+        self.assertIn('inner_guardrail.get("decision") == "block"', server)
         self.assertIn('"inner_guardrail": inner_guardrail', server)
+
+    def test_presidio_chat_has_no_local_model_fallback(self) -> None:
+        server = read(PRESIDIO / "server.py")
+        self.assertNotIn("OLLAMA_URL", server)
+        self.assertNotIn("OLLAMA_MODEL", server)
+        self.assertIn('"upstream_not_configured:nemo_guard_url"', server)
+        self.assertIn("status_code=503", server)
+        self.assertIn('upstream_called=False', server)
+        self.assertIn('"provider": "amazon-bedrock"', server)
 
     def test_guardrails_authenticate_monitor_forwarding(self) -> None:
         for server_path in [PRESIDIO / "server.py", NEMO / "server.py"]:
@@ -131,12 +143,24 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
 
     def test_nemo_runtime_uses_the_authenticated_bedrock_gateway(self) -> None:
         source = read(NEMO / "nemo_core.py")
+        server = read(NEMO / "server.py")
+        configs = "\n".join(
+            read(path) for path in (NEMO / "config").glob("*/config.yml")
+        )
         self.assertIn("MODEL_GATEWAY_URL", source)
         self.assertIn("http://llm-security-bedrock-gateway:8080", source)
         self.assertIn("BEDROCK_GATEWAY_TOKEN", source)
         self.assertIn("us.amazon.nova-lite-v1:0", source)
         self.assertNotIn("OLLAMA_URL", source)
         self.assertNotIn("OLLAMA_MODEL", source)
+        self.assertNotIn("OLLAMA_URL", server)
+        self.assertNotIn("OLLAMA_MODEL", server)
+        self.assertNotIn("llama3.1", configs)
+        self.assertNotIn("11434", configs)
+        self.assertIn("us.amazon.nova-lite-v1:0", configs)
+        self.assertIn("llm-security-bedrock-gateway:8080/v1", configs)
+        self.assertIn('"bedrock_model": BEDROCK_MODEL_ID', server)
+        self.assertIn('["input_rail", "bedrock_main", "output_rail"]', server)
 
     def test_nemo_main_path_keeps_dialog_generation_enabled(self) -> None:
         core = read(NEMO / "nemo_core.py")

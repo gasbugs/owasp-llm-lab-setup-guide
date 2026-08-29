@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Loopback HTTP integration API for Presidio around NeMo or Ollama."""
+"""Loopback HTTP integration API for Presidio around the NeMo Bedrock path."""
 
 from __future__ import annotations
 
 import json
-import hashlib
 import os
 import time
 import uuid
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from presidio_core import FRAMEWORK, FRAMEWORK_VERSION, PresidioCore, env_bool
@@ -25,21 +25,14 @@ GUARD_ENGINE = os.getenv("GUARD_ENGINE", "presidio").strip().lower()
 if GUARD_ENGINE not in {"presidio", "off"}:
     raise RuntimeError("Presidio image supports GUARD_ENGINE=presidio or off")
 ENABLE_LAB_ENDPOINTS = env_bool("ENABLE_LAB_ENDPOINTS", False)
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.containers.internal:11434").rstrip("/")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
 NEMO_GUARD_URL = os.getenv("NEMO_GUARD_URL", "").rstrip("/")
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 TELEMETRY_INGEST_TOKEN = os.getenv(
     "TELEMETRY_INGEST_TOKEN", "module08-telemetry-ingest"
 )
 POLICY_VERSION = os.getenv("GUARD_POLICY_VERSION", "day7-guardrails-v1")
 TEST_CORPUS_VERSION = os.getenv("GUARD_TEST_CORPUS_VERSION", "day7-regression-v1")
-MODEL_DIGEST = os.getenv("OLLAMA_MODEL_DIGEST", "runtime-query-required")
-SYSTEM_PROMPT = (
-    "You are a concise privacy training assistant. "
-    "Never invent personal data or credentials."
-)
-SYSTEM_PROMPT_SHA256 = hashlib.sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest()
 CORE = PresidioCore()
 
 app = FastAPI(title="Day 6 Microsoft Presidio integration API")
@@ -139,36 +132,8 @@ def require_lab_endpoint() -> None:
         raise HTTPException(status_code=404, detail="lab endpoint disabled")
 
 
-async def call_ollama(message: str) -> str:
-    # Presidio 검사를 통과한 문자열만 Main Model 요청의 user content로 사용한다.
-    async with httpx.AsyncClient(timeout=httpx.Timeout(180.0)) as client:
-        response = await client.post(
-            f"{OLLAMA_URL}/api/chat",
-            json={
-                "model": OLLAMA_MODEL,
-                "stream": False,
-                "options": {"num_predict": 160},
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": (
-                            SYSTEM_PROMPT
-                        ),
-                    },
-                    {"role": "user", "content": message},
-                ],
-            },
-        )
-        response.raise_for_status()
-        return str(response.json()["message"]["content"])
-
-
 async def call_model_path(message: str) -> tuple[str, dict | None, list[str]]:
-    """Send sanitized input through NeMo when its URL is configured."""
-    # NeMo URL이 없을 때만 Ollama를 직접 호출한다. URL이 있으면 NeMo 계약과
-    # infra 판정을 검증하고 Main Model이 실제 호출된 stage만 기록한다.
-    if not NEMO_GUARD_URL:
-        return await call_ollama(message), None, ["ollama_main"]
+    """Send sanitized input only through the configured NeMo Bedrock path."""
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(240.0)) as client:
         response = await client.post(
@@ -184,7 +149,7 @@ async def call_model_path(message: str) -> tuple[str, dict | None, list[str]]:
         raise RuntimeError("NeMo guardrail failed closed")
     model_stages = ["nemo_input"]
     if guardrail.get("upstream_called") is True:
-        model_stages.extend(["ollama_main", "nemo_output"])
+        model_stages.extend(["bedrock_main", "nemo_output"])
     return str(payload["reply"]), guardrail, model_stages
 
 
@@ -202,9 +167,7 @@ def base_guardrail(*, decision: str, upstream_called: bool, duration_ms: float) 
         "blocking_reason": None,
         "policy_version": POLICY_VERSION,
         "test_corpus_version": TEST_CORPUS_VERSION,
-        "model": OLLAMA_MODEL,
-        "model_digest": MODEL_DIGEST,
-        "system_prompt_sha256": SYSTEM_PROMPT_SHA256,
+        "model": BEDROCK_MODEL_ID,
     }
 
 
@@ -215,8 +178,8 @@ async def healthz() -> dict:
         "guard_engine": "presidio" if GUARD_ENGINE != "off" else "off",
         "guard_mode": GUARD_MODE,
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
-        "ollama_model": OLLAMA_MODEL,
-        "upstream_path": "nemo>ollama" if NEMO_GUARD_URL else "ollama",
+        "bedrock_model": BEDROCK_MODEL_ID,
+        "upstream_path": "nemo>bedrock" if NEMO_GUARD_URL else "not-configured",
         "nemo_guard_url": NEMO_GUARD_URL or None,
         "security_monitoring": bool(SECURITY_MONITOR_URL),
         "policy_version": POLICY_VERSION,
@@ -234,9 +197,8 @@ async def policy() -> dict:
         "policy_version": POLICY_VERSION,
         "test_corpus_version": TEST_CORPUS_VERSION,
         "runtime_identity": {
-            "model": OLLAMA_MODEL,
-            "model_digest": MODEL_DIGEST,
-            "system_prompt_sha256": SYSTEM_PROMPT_SHA256,
+            "model": BEDROCK_MODEL_ID,
+            "provider": "amazon-bedrock",
         },
         "output_contract": {
             "source": "examples/day6/presidio/server.py:SupportActionCandidate",
@@ -258,7 +220,7 @@ async def policy() -> dict:
         "entities": settings["analyzer"]["entities"],
         "score_threshold": settings["analyzer"]["score_threshold"],
         "settings": settings,
-        "upstream_path": "nemo>ollama" if NEMO_GUARD_URL else "ollama",
+        "upstream_path": "nemo>bedrock" if NEMO_GUARD_URL else "not-configured",
     }
 
 
@@ -405,14 +367,37 @@ async def chat(request: ChatRequest) -> dict:
             if GUARD_MODE == "enforce":
                 return {"reply": "privacy guardrail infrastructure unavailable", "guardrail": guardrail}
 
-    # 2) Model 경로: 입력 검사가 완료된 effective_message만 NeMo 또는 Ollama에 전달한다.
+    # 2) Model 경로: NeMo가 연결되지 않았으면 로컬 Model로 우회하지 않고 닫는다.
+    if not NEMO_GUARD_URL:
+        duration = round((time.perf_counter() - started) * 1000, 2)
+        guardrail = base_guardrail(
+            decision="infra",
+            upstream_called=False,
+            duration_ms=duration,
+        )
+        guardrail.update(
+            {
+                "input_checks": input_checks,
+                "blocking_reason": "upstream_not_configured:nemo_guard_url",
+            }
+        )
+        emit({"event": "guardrail_chat", "request_id": request_id, **guardrail})
+        return JSONResponse(
+            status_code=503,
+            content={
+                "reply": "NeMo upstream is not configured",
+                "guardrail": guardrail,
+            },
+        )
+
+    # 입력 검사가 완료된 effective_message만 NeMo와 그 뒤의 Bedrock으로 전달한다.
     try:
         reply, inner_guardrail, model_stages = await call_model_path(effective_message)
     except Exception as exc:
         duration = round((time.perf_counter() - started) * 1000, 2)
         guardrail = base_guardrail(
             decision="infra",
-            upstream_called=True,
+            upstream_called=False,
             duration_ms=duration,
         )
         guardrail.update(
@@ -435,9 +420,12 @@ async def chat(request: ChatRequest) -> dict:
         except Exception as exc:
             # 출력 검사가 실패하면 검사되지 않은 Model 원문을 사용자에게 보내지 않는다.
             duration = round((time.perf_counter() - started) * 1000, 2)
+            upstream_called = bool(
+                inner_guardrail and inner_guardrail.get("upstream_called") is True
+            )
             guardrail = base_guardrail(
                 decision="infra",
-                upstream_called=True,
+                upstream_called=upstream_called,
                 duration_ms=duration,
             )
             guardrail.update(
@@ -458,22 +446,40 @@ async def chat(request: ChatRequest) -> dict:
             if GUARD_MODE == "enforce":
                 return {"reply": "privacy output could not be inspected", "guardrail": guardrail}
 
-    # 4) 최종 집행: 입력·출력 중 하나라도 PII를 찾으면 Enforce 판정은 redact다.
+    # 4) 최종 집행: 안쪽 NeMo 차단을 가장 먼저 보존하고, 그다음 PII 변환을 표시한다.
     pii_detected = any(not item.get("valid", True) for item in [*input_checks, *output_checks])
-    decision = "redact" if pii_detected and GUARD_MODE == "enforce" else "allow"
+    inner_blocked = bool(
+        inner_guardrail and inner_guardrail.get("decision") == "block"
+    )
+    upstream_called = bool(
+        inner_guardrail and inner_guardrail.get("upstream_called") is True
+    )
+    if inner_blocked:
+        decision = "block"
+        blocking_reason = inner_guardrail.get("blocking_reason")
+    elif pii_detected and GUARD_MODE == "enforce":
+        decision = "redact"
+        blocking_reason = "pii_detected"
+    else:
+        decision = "allow"
+        blocking_reason = None
     duration = round((time.perf_counter() - started) * 1000, 2)
     guardrail = base_guardrail(
         decision=decision,
-        upstream_called=True,
+        upstream_called=upstream_called,
         duration_ms=duration,
     )
     guardrail.update(
         {
             "input_checks": input_checks,
             "output_checks": output_checks,
-            "blocking_reason": "pii_detected" if pii_detected else None,
+            "blocking_reason": blocking_reason,
             "stage_order": ["presidio_input", *model_stages, "presidio_output"],
-            "path": "presidio>nemo>ollama>presidio" if NEMO_GUARD_URL else "presidio>ollama>presidio",
+            "path": (
+                "presidio>nemo>bedrock>presidio"
+                if upstream_called
+                else "presidio>nemo>presidio"
+            ),
             "inner_guardrail": inner_guardrail,
         }
     )

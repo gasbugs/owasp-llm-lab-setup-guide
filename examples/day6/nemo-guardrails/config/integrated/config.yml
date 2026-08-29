@@ -1,11 +1,12 @@
 models:
   - type: main
     engine: openai
-    model: llama3.1:8b-instruct-q4_K_M
+    model: us.amazon.nova-lite-v1:0
     parameters:
-      base_url: http://10.0.2.2:11434/v1
-      api_key: ollama-local
+      base_url: http://llm-security-bedrock-gateway:8080/v1
+      api_key: module08-bedrock-gateway-token
       temperature: 0.0
+      max_tokens: 320
 
 instructions:
   - type: general

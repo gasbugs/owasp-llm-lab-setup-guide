@@ -290,6 +290,14 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn('f"{MODEL_GATEWAY_URL}/v1/retrieve"', application)
         self.assertIn("allowed_suffixes", application)
 
+    def test_gateway_accepts_nemo_openai_text_parts(self) -> None:
+        gateway = (CONTROL / "bedrock-gateway/server.py").read_text()
+        self.assertIn("class TextContentPart(BaseModel)", gateway)
+        self.assertIn("content: str | list[TextContentPart]", gateway)
+        self.assertIn("def content_text(item: Message) -> str", gateway)
+        self.assertIn("stop: str | list[str] | None = None", gateway)
+        self.assertIn('kwargs["inferenceConfig"]["stopSequences"]', gateway)
+
     def test_gateway_token_is_shared_by_every_bedrock_caller(self) -> None:
         start = (CONTROL / "deploy/start-stack.sh").read_text()
         hub = (CONTROL / "nemo-policy-hub/hub_core.py").read_text()
