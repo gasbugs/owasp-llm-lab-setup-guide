@@ -10,7 +10,7 @@ COPY spokes/presidio-privacy/requirements.txt /tmp/requirements.txt
 # PII 탐지용 spaCy 모델 버전을 고정하고 네트워크 보조 데이터를 빌드 중 미리 준비한다.
 RUN python -m pip install --requirement /tmp/requirements.txt \
     && python -m pip install \
-      https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl \
+      'https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl' \
     && python -c "import tldextract; tldextract.extract('example.com')" \
     && chmod -R a+rwX /opt/presidio-cache
 
