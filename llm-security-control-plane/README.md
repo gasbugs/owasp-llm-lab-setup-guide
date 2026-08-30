@@ -57,15 +57,10 @@ NeMo Hub는 시작할 때 local Bedrock Gateway의 provider와 Model ID를 비�
 
 네 Containerfile은 이 디렉터리를 build context로 사용한다.
 
-직렬 가드레일 정책 검토를 완성 이미지나 AWS 리소스 없이 처음부터 수행하려면
-[제로베이스 빌드 연습](../docs/SERIAL-GUARDRAIL-REVIEW.md)을 따른다. 전용 진입점은
-현재 체크아웃에서 Control Plane 이미지 네 개를 빌드한 뒤, 학습자가 직접 수정한
-정책을 결정적 Bedrock 대역·Presidio·Hub의 독립 환경에서 검증하고 전용 runtime만 정리한다.
-
 수강생 Module 08은 완성 스택을 먼저 실행하지 않는다. `prepare-module08-runtime.sh`는
 Nova Lite와 로컬 서비스 Token만 만들고 Knowledge Base ID는 비워 둔다. Retrieval을
 처음 배우는 05 차시에서 `restore-module08-aws.sh --repair`가 RAG 자원을 추가하며,
-07 차시에서 Application을 처음 포함한 최종 스택을 조립한다. 아래 일괄 Build·실행은
+08 차시에서 Application을 처음 포함한 최종 스택을 조립한다. 아래 일괄 Build·실행은
 게시자 E2E와 이미 학습을 마친 환경의 복구용이다.
 
 ```bash
