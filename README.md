@@ -11,7 +11,7 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 | `docs/STUDENT-QUICKSTART.md` | 수강생이 따라 하는 Day 0 셋업 절차 |
 | `docs/LAB-RESET-POLICY.md` | Day 1~5 상태 저장 위치와 allowlist 기반 최소 복원 명령 |
 | `docs/LLM08-SETUP.md` | LLM08 embedding runtime·분석 venv·학습자 미니 앱의 신규/기존 EC2 설치와 종료 절차 |
-| `docs/MODULE08-EXERCISE-6.5.md` | 08챕터 6.5를 AWS·완성 이미지 없이 소스에서 직접 빌드하는 반복 실습 |
+| `docs/SERIAL-GUARDRAIL-REVIEW.md` | 직렬 가드레일 정책을 AWS·완성 이미지 없이 소스에서 직접 빌드하는 반복 실습 |
 | `docs/DAY6-GUARDRAILS-SETUP.md` | Microsoft Presidio·NeMo Guardrails rootless Podman 이미지 빌드와 실측 검증 |
 | `bedrock-api-lab/` | 기존 GPU 환경과 독립된 Nova Lite·Titan Embeddings·Knowledge Base API 실습 |
 | `docs/ARCHITECTURE.md` | AWS VM, Terraform, user-data, 컨테이너 배포 구조 |

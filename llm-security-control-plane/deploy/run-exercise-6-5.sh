@@ -5,12 +5,22 @@ set -euo pipefail
 # builds the runtime from source and checks the submitted policy without AWS.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-usage() { echo "usage: $0 --build-only | --policy-file PATH" >&2; }
-case "${1:-}" in
-  --build-only) [ "$#" -eq 1 ] || { usage; exit 2; }; MODE=build ;;
-  --policy-file) [ "$#" -eq 2 ] || { usage; exit 2; }; MODE=verify; POLICY_FILE=$2 ;;
-  *) usage; exit 2 ;;
-esac
+usage() {
+  echo "usage: $0 --build-only | --policy-file PATH [--evidence-dir PATH]" >&2
+}
+MODE=""
+POLICY_FILE=""
+EVIDENCE_DIR=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --build-only) MODE=build; shift ;;
+    --policy-file) [ "$#" -ge 2 ] || { usage; exit 2; }; MODE=verify; POLICY_FILE=$2; shift 2 ;;
+    --evidence-dir) [ "$#" -ge 2 ] || { usage; exit 2; }; EVIDENCE_DIR=$2; shift 2 ;;
+    *) usage; exit 2 ;;
+  esac
+done
+[ -n "$MODE" ] || { usage; exit 2; }
+[ "$MODE" = verify ] || [ -z "$EVIDENCE_DIR" ] || { usage; exit 2; }
 
 pass() { printf '[PASS] %s\n' "$*"; }
 fail() { printf '[FAIL] %s\n' "$*" >&2; exit 1; }
@@ -26,21 +36,21 @@ for image in bedrock-gateway presidio-privacy-spoke nemo-policy-hub application-
     || fail "image was not built: $image"
 done
 pass "control-plane images built from source"
-[ "$MODE" = build ] && { echo 'module08-exercise-6.5=BUILD_READY'; exit 0; }
+[ "$MODE" = build ] && { echo 'serial-guardrail-review=BUILD_READY'; exit 0; }
 
 POLICY_FILE="$(realpath "$POLICY_FILE")"
 test -r "$POLICY_FILE" || fail "policy file is not readable: $POLICY_FILE"
 
-NETWORK=module08-exercise-65
-BEDROCK=module08-exercise-65-bedrock
-SPOKE=module08-exercise-65-spoke
-HUB=module08-exercise-65-hub
-BEDROCK_PORT=${MODULE08_65_BEDROCK_PORT:-28096}
-SPOKE_PORT=${MODULE08_65_SPOKE_PORT:-28093}
-HUB_PORT=${MODULE08_65_HUB_PORT:-28094}
-BEDROCK_TOKEN=module08-65-bedrock-token
-PRESIDIO_TOKEN=module08-65-presidio-token
-APPLICATION_TOKEN=module08-65-application-token
+NETWORK=serial-guardrail-review
+BEDROCK=serial-guardrail-review-bedrock
+SPOKE=serial-guardrail-review-spoke
+HUB=serial-guardrail-review-hub
+BEDROCK_PORT=28096
+SPOKE_PORT=28093
+HUB_PORT=28094
+BEDROCK_TOKEN=serial-review-bedrock-token
+PRESIDIO_TOKEN=serial-review-presidio-token
+APPLICATION_TOKEN=serial-review-application-token
 WORK="$(mktemp -d)"
 
 cleanup() {
@@ -126,10 +136,10 @@ jq -e '.guardrail.decision == "block"
   "$WORK/email.json" >/dev/null \
   || fail "email input was not blocked before NeMo and Main Model"
 pass "email input stopped at presidio_input before every model call"
-if [ -n "${MODULE08_65_EVIDENCE_DIR:-}" ]; then
-  install -d -m 0755 "$MODULE08_65_EVIDENCE_DIR"
-  install -m 0644 "$WORK/normal.json" "$MODULE08_65_EVIDENCE_DIR/normal.json"
-  install -m 0644 "$WORK/email.json" "$MODULE08_65_EVIDENCE_DIR/email.json"
-  printf '[EVIDENCE] %s\n' "$MODULE08_65_EVIDENCE_DIR"
+if [ -n "$EVIDENCE_DIR" ]; then
+  install -d -m 0755 "$EVIDENCE_DIR"
+  install -m 0644 "$WORK/normal.json" "$EVIDENCE_DIR/normal.json"
+  install -m 0644 "$WORK/email.json" "$EVIDENCE_DIR/email.json"
+  printf '[EVIDENCE] %s\n' "$EVIDENCE_DIR"
 fi
-echo 'module08-exercise-6.5=PASS'
+echo 'serial-guardrail-review=PASS'

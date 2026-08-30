@@ -6,10 +6,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "llm-security-control-plane" / "deploy" / "run-exercise-6-5.sh"
-GUIDE = ROOT / "docs" / "MODULE08-EXERCISE-6.5.md"
+GUIDE = ROOT / "docs" / "SERIAL-GUARDRAIL-REVIEW.md"
 
 
-class Module08Exercise65ContractTests(unittest.TestCase):
+class SerialGuardrailReviewContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.script = SCRIPT.read_text(encoding="utf-8")
@@ -28,17 +28,17 @@ class Module08Exercise65ContractTests(unittest.TestCase):
             ".guardrail.guard_model_calls == 0",
             'index("bedrock_main")',
             'index("EMAIL_ADDRESS")',
-            "module08-exercise-6.5=PASS",
+            "serial-guardrail-review=PASS",
         ):
             self.assertIn(value, self.script)
 
     def test_isolated_runtime_is_cleaned_without_broad_deletion(self) -> None:
         for value in (
-            "module08-exercise-65-bedrock",
-            "module08-exercise-65-spoke",
-            "module08-exercise-65-hub",
+            "serial-guardrail-review-bedrock",
+            "serial-guardrail-review-spoke",
+            "serial-guardrail-review-hub",
             "trap cleanup EXIT",
-            "MODULE08_65_EVIDENCE_DIR",
+            "--evidence-dir",
         ):
             self.assertIn(value, self.script)
         for unsafe in ("podman system prune", "podman volume prune", "podman rm -a"):
@@ -46,7 +46,10 @@ class Module08Exercise65ContractTests(unittest.TestCase):
 
     def test_guide_preserves_learner_authorship(self) -> None:
         self.assertIn("06.5-serial-guardrail-review-exercise.md", self.guide)
-        self.assertIn("정책을 대신 수정하지 않습니다", self.guide)
+        self.assertIn("기존 정책을 복사하지 않습니다", self.guide)
+        self.assertNotIn("cp llm-security-control-plane/policies/control-plane-policy.yaml", self.guide)
+        self.assertNotIn("export ", self.guide)
+        self.assertIn("GitHub Control Plane 정책 정본", self.guide)
         self.assertIn("앞 차시의 실행 상태나 AWS 자원 없이", self.guide)
 
 
