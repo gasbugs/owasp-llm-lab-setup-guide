@@ -59,8 +59,8 @@ NeMo Hub는 시작할 때 local Bedrock Gateway의 provider와 Model ID를 비�
 
 08챕터 6.5를 완성 이미지나 AWS 리소스 없이 처음부터 수행하려면
 [제로베이스 빌드 연습](../docs/MODULE08-EXERCISE-6.5.md)을 따른다. 전용 진입점은
-현재 체크아웃에서 필요한 이미지 여섯 개를 모두 빌드한 뒤 결정적 Bedrock 대역으로
-단계별 allow·block·fail-closed 계약을 검증하고 자신이 만든 runtime만 정리한다.
+현재 체크아웃에서 Control Plane 이미지 네 개를 빌드한 뒤, 학습자가 직접 수정한
+정책을 결정적 Bedrock 대역·Presidio·Hub의 독립 환경에서 검증하고 전용 runtime만 정리한다.
 
 수강생 Module 08은 완성 스택을 먼저 실행하지 않는다. `prepare-module08-runtime.sh`는
 Nova Lite와 로컬 서비스 Token만 만들고 Knowledge Base ID는 비워 둔다. Retrieval을

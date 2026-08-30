@@ -15,34 +15,39 @@ class Module08Exercise65ContractTests(unittest.TestCase):
         cls.script = SCRIPT.read_text(encoding="utf-8")
         cls.guide = GUIDE.read_text(encoding="utf-8")
 
-    def test_builds_every_exercise_image_from_source(self) -> None:
-        self.assertIn('bash "$ROOT/deploy/build-images.sh"', self.script)
-        self.assertIn("examples/day6/nemo-guardrails", self.script)
-        self.assertIn("examples/day6/presidio", self.script)
+    def test_builds_current_source_and_accepts_learner_policy(self) -> None:
         self.assertIn("--build-only", self.script)
-        self.assertIn("all six images built from the current checkout", self.script)
+        self.assertIn("--policy-file", self.script)
+        self.assertIn('bash "$ROOT/deploy/build-images.sh"', self.script)
+        self.assertIn("control-plane images built from source", self.script)
 
-    def test_runs_the_progressive_deterministic_exercise(self) -> None:
-        self.assertIn('bash "$ROOT/tests/e2e-learning-sequence.sh"', self.script)
-        self.assertIn("module08-exercise-6.5=PASS", self.script)
-        self.assertIn("28091 28092 28093 28094 28096", self.script)
-        self.assertIn("`ss`(`iproute2`)", self.guide)
+    def test_checks_the_exact_serial_policy_solution(self) -> None:
+        for value in (
+            "input:prohibited:EMAIL_ADDRESS",
+            '.guardrail.stage_order == ["presidio_input"]',
+            ".guardrail.guard_model_calls == 0",
+            'index("bedrock_main")',
+            'index("EMAIL_ADDRESS")',
+            "module08-exercise-6.5=PASS",
+        ):
+            self.assertIn(value, self.script)
 
-    def test_does_not_delete_unrelated_runtime(self) -> None:
+    def test_isolated_runtime_is_cleaned_without_broad_deletion(self) -> None:
+        for value in (
+            "module08-exercise-65-bedrock",
+            "module08-exercise-65-spoke",
+            "module08-exercise-65-hub",
+            "trap cleanup EXIT",
+            "MODULE08_65_EVIDENCE_DIR",
+        ):
+            self.assertIn(value, self.script)
         for unsafe in ("podman system prune", "podman volume prune", "podman rm -a"):
             self.assertNotIn(unsafe, self.script)
 
-    def test_guide_has_build_run_observe_and_cleanup_contracts(self) -> None:
-        for value in (
-            "--build-only",
-            "module08-exercise-6.5=BUILD_READY",
-            "module08-learning-sequence=PASS",
-            "application_decision",
-            "upstream_called",
-            "stage_order",
-            "trap",
-        ):
-            self.assertIn(value, self.guide)
+    def test_guide_preserves_learner_authorship(self) -> None:
+        self.assertIn("06.5-serial-guardrail-review-exercise.md", self.guide)
+        self.assertIn("정책을 대신 수정하지 않습니다", self.guide)
+        self.assertIn("앞 차시의 실행 상태나 AWS 자원 없이", self.guide)
 
 
 if __name__ == "__main__":
