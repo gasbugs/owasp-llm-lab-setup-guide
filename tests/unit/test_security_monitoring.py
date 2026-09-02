@@ -192,6 +192,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             installer,
         )
         self.assertEqual(2, installer.count('"${RUN_AS_UBUNTU[@]}" \\\n  env \\'))
+        self.assertIn('docker image inspect "ghcr.io/${IMAGE_NAMESPACE}/\\${img}:${IMAGE_TAG}" >/dev/null', installer)
         self.assertNotIn("slirp4netns", installer)
 
     def test_gateway_owns_real_request_path_and_server_side_boundaries(self) -> None:

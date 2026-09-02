@@ -147,7 +147,7 @@ step "8/10" "실습 컨테이너 이미지를 확인하고 최신 이미지를 p
 "${RUN_AS_UBUNTU[@]}" bash <<PULLSH
 set -euo pipefail
 for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-llmgoat owasp-llm-dvla; do
-  if [ "${REFRESH_IMAGES}" != "true" ] && docker image inspect "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
+  if [ "${REFRESH_IMAGES}" != "true" ] && docker image inspect "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}" >/dev/null; then
     echo "[install-lab] image already exists: ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"
     continue
   fi
