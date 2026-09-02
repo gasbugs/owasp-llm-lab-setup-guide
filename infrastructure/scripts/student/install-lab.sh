@@ -105,6 +105,9 @@ else
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     -o /etc/apt/keyrings/docker.asc
   chmod a+r /etc/apt/keyrings/docker.asc
+  # GPU AMI에 같은 저장소가 다른 Signed-By 값으로 선등록되어 있을 수 있다.
+  # 두 형식의 기존 정의를 좁게 제거한 뒤 이 스크립트의 deb822 정본만 만든다.
+  rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources
   . /etc/os-release
   printf 'Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: %s\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' \
     "$VERSION_CODENAME" "$(dpkg --print-architecture)" \

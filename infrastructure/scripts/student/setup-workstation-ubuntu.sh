@@ -120,6 +120,8 @@ else
 fi
 
 if [ "$DOCKER_SUCCESS" = true ]; then
+    # 기존 Docker 저장소가 다른 key 경로를 쓰면 APT가 Signed-By 충돌로 멈춘다.
+    sudo rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources
     echo \
       "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
       $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \

@@ -187,6 +187,10 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("https://download.docker.com/linux/ubuntu", installer)
         self.assertIn("docker-ce=", installer)
         self.assertIn("docker-compose-plugin=", installer)
+        self.assertIn(
+            "rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources",
+            installer,
+        )
         self.assertNotIn("slirp4netns", installer)
 
     def test_gateway_owns_real_request_path_and_server_side_boundaries(self) -> None:
