@@ -80,7 +80,12 @@ jobs:
           ! grep -E '(^|[[:space:]])(Error:|INFRA:|Traceback|curl:)|service did not become ready' /tmp/module08-e2e.log
 
       - name: Run the deterministic Control Center browser contract
-        run: python tests/browser/run_control_plane_ui.py --browser-channel chromium
+        # e2e-control-plane.sh deliberately publishes its isolated Application on
+        # 28095, not the learner runtime's canonical 18095 port.
+        run: >-
+          python tests/browser/run_control_plane_ui.py
+          --url http://127.0.0.1:28095
+          --browser-channel chromium
 
       - name: Preserve Docker diagnostics on failure
         if: failure()
