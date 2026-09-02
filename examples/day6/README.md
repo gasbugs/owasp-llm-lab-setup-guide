@@ -136,6 +136,12 @@ Presidio API는 `/healthz`, `/api/guardrails/policy`, `/api/scan`, `/api/chat`�
 요구사항을 같은 조건으로 다시 확인하는 도구이고 Garak은 아직 테스트에 없는 실패 후보를 찾는 탐색 도구다.
 Garak에서 재현된 hit는 최소 입력으로 줄인 뒤 Promptfoo testcase로 승격한다.
 
+`pyrit-guardrail/`은 Microsoft PyRIT 1.0.1의 `RedTeamingAttack`을 최대 3턴으로
+제한한다. Garak처럼 고정 Probe를 넓게 보내지 않고, 직전 Application 응답을 본
+Nova Lite 공격자가 다음 문장을 바꾸는 적응형 대화만 담당한다. PyRIT의 scorer
+결과는 후보 표시이며 실제 `application_decision`, `upstream_called`와 응답 영향을
+확인하기 전에는 보안 HIT로 승격하지 않는다.
+
 Presidio server의 `/api/guardrails/policy`는 정책·test corpus·Bedrock provider와
 Model 식별자를 공개한다. 학습 전용 `/api/labs/validate-output-contract`는 Pydantic의
 `extra="forbid"` 계약으로 예상하지 못한 필드를 거부한다. 이 endpoint는

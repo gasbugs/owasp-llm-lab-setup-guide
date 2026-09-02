@@ -17,6 +17,7 @@ test_tools:
   node_image: docker.io/library/node:24-bookworm-slim
   promptfoo: 0.121.20
   garak: 0.15.1
+  pyrit: 1.0.1
 
 # 서비스 이미지를 다시 만들 때 재현할 Python dependency 정본이다.
 python_packages:

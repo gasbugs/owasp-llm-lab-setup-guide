@@ -85,6 +85,8 @@ class ChatCompletionRequest(BaseModel):
     messages: list[Message] = Field(min_length=1, max_length=30)
     temperature: float = Field(default=0.0, ge=0.0, le=1.0)
     max_tokens: int = Field(default=180, ge=1, le=4096)
+    max_completion_tokens: int | None = Field(default=None, ge=1, le=4096)
+    response_format: dict[str, str] | None = None
     stop: str | list[str] | None = None
     stream: bool = False
 
@@ -104,6 +106,17 @@ def require_gateway_token(authorization: str | None = Header(default=None)) -> N
         raise HTTPException(status_code=401, detail="invalid Bedrock Gateway token")
 
 
+def openai_finish_reason(stop_reason: str) -> str:
+    """Translate Bedrock stop reasons to the OpenAI-compatible vocabulary."""
+    return {
+        "end_turn": "stop",
+        "stop_sequence": "stop",
+        "max_tokens": "length",
+        "content_filtered": "content_filter",
+        "guardrail_intervened": "content_filter",
+    }.get(stop_reason, "stop")
+
+
 def _converse(request: ChatCompletionRequest) -> dict:
     model_id, separator, task_name = request.model.partition("#")
     task = task_name if separator else "main"
@@ -111,6 +124,10 @@ def _converse(request: ChatCompletionRequest) -> dict:
         raise HTTPException(status_code=422, detail="model must match configured Bedrock model")
     if request.stream:
         raise HTTPException(status_code=422, detail="streaming is not enabled in this lab gateway")
+    if request.response_format not in (None, {"type": "json_object"}):
+        raise HTTPException(status_code=422, detail="only json_object response format is supported")
+    # Converse has no equivalent strict JSON switch for this model. PyRIT still
+    # supplies its JSON schema in the system prompt; this field is a transport hint.
     def content_text(item: Message) -> str:
         if isinstance(item.content, str):
             return item.content
@@ -144,7 +161,7 @@ def _converse(request: ChatCompletionRequest) -> dict:
                 "messages": messages,
                 "inferenceConfig": {
                     "temperature": request.temperature,
-                    "maxTokens": request.max_tokens,
+                    "maxTokens": request.max_completion_tokens or request.max_tokens,
                 },
             }
             if request.stop:
@@ -187,7 +204,7 @@ def _converse(request: ChatCompletionRequest) -> dict:
             {
                 "index": 0,
                 "message": {"role": "assistant", "content": text},
-                "finish_reason": result.get("stopReason", "stop"),
+                "finish_reason": openai_finish_reason(result.get("stopReason", "end_turn")),
             }
         ],
         "usage": {

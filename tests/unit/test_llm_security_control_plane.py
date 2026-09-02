@@ -114,6 +114,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertTrue(image.endswith(":1.0.0"))
         self.assertEqual(lock["test_tools"]["promptfoo"], "0.121.20")
         self.assertEqual(lock["test_tools"]["garak"], "0.15.1")
+        self.assertEqual(lock["test_tools"]["pyrit"], "1.0.1")
         self.assertEqual(lock["test_tools"]["node_image"], "docker.io/library/node:24-bookworm-slim")
 
     def test_runtime_contract_matches_server_and_browser_harness(self) -> None:
@@ -305,6 +306,10 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("def content_text(item: Message) -> str", gateway)
         self.assertIn("stop: str | list[str] | None = None", gateway)
         self.assertIn('kwargs["inferenceConfig"]["stopSequences"]', gateway)
+        self.assertIn("max_completion_tokens: int | None", gateway)
+        self.assertIn("response_format: dict[str, str] | None", gateway)
+        self.assertIn('"end_turn": "stop"', gateway)
+        self.assertIn('"content_filtered": "content_filter"', gateway)
 
     def test_gateway_token_is_shared_by_every_bedrock_caller(self) -> None:
         start = (CONTROL / "deploy/start-stack.sh").read_text()
@@ -428,6 +433,20 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertIn(f'configure_telemetry(app, "{service_name}")', source)
         deploy = (CONTROL / "deploy/start-stack.sh").read_text()
         self.assertIn("OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318", deploy)
+
+    def test_pyrit_attack_is_bounded_and_targets_the_application(self) -> None:
+        root = ROOT / "examples/day6/pyrit-guardrail"
+        containerfile = (root / "Containerfile").read_text()
+        attack = (root / "attack.py").read_text()
+        report = (root / "report.py").read_text()
+        self.assertIn('pyrit==${PYRIT_VERSION}', containerfile)
+        self.assertIn("USER 65532:65532", containerfile)
+        self.assertIn("llm-security-application-gateway:8000", attack)
+        self.assertIn("llm-security-bedrock-gateway:8080/v1", attack)
+        self.assertIn("max_turns=3", attack)
+        self.assertIn("'\"reply\":\"PYRIT_TEST_ACCEPTED\"'", attack)
+        self.assertIn('"application_decision"', report)
+        self.assertIn('"upstream_called"', report)
 
 
 if __name__ == "__main__":
