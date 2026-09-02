@@ -162,6 +162,15 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn('"bedrock_model": BEDROCK_MODEL_ID', server)
         self.assertIn('["input_rail", "bedrock_main", "output_rail"]', server)
 
+    def test_live_e2e_uses_the_same_bedrock_gateway_path(self) -> None:
+        script = read(ROOT / "tests/e2e/day6/test_guardrail_integration.sh")
+        self.assertIn("start_gateway", script)
+        self.assertIn("MODEL_GATEWAY_URL=http://day6-bedrock-gateway:8080", script)
+        self.assertIn('BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0', script)
+        self.assertIn('"bedrock_main"', script)
+        self.assertNotIn("OLLAMA_URL", script)
+        self.assertNotIn("ollama_main", script)
+
     def test_nemo_main_path_keeps_dialog_generation_enabled(self) -> None:
         core = read(NEMO / "nemo_core.py")
         self.assertIn('options=log_options(["dialog"])', core)
