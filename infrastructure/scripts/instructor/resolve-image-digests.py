@@ -2,7 +2,7 @@
 """Resolve immutable public-registry manifests without exposing auth tokens.
 
 The live-validation controller uses the tag digest as registry provenance and the
-linux/amd64 child digest as the value that must be present in Podman storage on
+linux/amd64 child digest as the value that must be present in Docker storage on
 the EC2 host. The registry's anonymous bearer token is kept in memory and is
 never included in the emitted JSON.
 """

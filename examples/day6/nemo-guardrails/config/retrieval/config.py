@@ -6,7 +6,7 @@ from nemoguardrails.actions import action
 from nemoguardrails.actions.actions import ActionResult
 
 
-PRESIDIO_URL = os.getenv("PRESIDIO_URL", "http://10.0.2.2:18091").rstrip("/")
+PRESIDIO_URL = os.getenv("PRESIDIO_URL", "http://day6-presidio-api:8013").rstrip("/")
 
 
 @action(is_system_action=True)

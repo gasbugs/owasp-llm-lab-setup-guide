@@ -34,8 +34,8 @@ from policy import (
 from telemetry import configure_telemetry, current_trace_id
 
 
-NEMO_HUB_URL = os.getenv("NEMO_HUB_URL", "http://10.0.2.2:18094").rstrip("/")
-MODEL_GATEWAY_URL = os.getenv("MODEL_GATEWAY_URL", "http://10.0.2.2:18096").rstrip("/")
+NEMO_HUB_URL = os.getenv("NEMO_HUB_URL", "http://nemo-hub:8000").rstrip("/")
+MODEL_GATEWAY_URL = os.getenv("MODEL_GATEWAY_URL", "http://bedrock-gateway:8000").rstrip("/")
 SECURITY_MONITOR_URL = os.getenv("SECURITY_MONITOR_URL", "").rstrip("/")
 TELEMETRY_INGEST_TOKEN = os.getenv("TELEMETRY_INGEST_TOKEN", "")
 RELEASE_VERSION = os.getenv("RELEASE_VERSION", "1.0.0")

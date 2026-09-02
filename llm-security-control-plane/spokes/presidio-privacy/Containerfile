@@ -1,5 +1,5 @@
-# Base image가 예고 없이 바뀌지 않도록 Python 이미지를 digest로 고정한다.
-FROM docker.io/library/python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+# 검증한 Python patch version을 읽기 쉬운 tag로 고정한다.
+FROM docker.io/library/python:3.12.14-slim
 
 # 로그를 즉시 출력하고 Presidio 관련 로컬 cache 경로를 고정한다.
 ENV PIP_NO_CACHE_DIR=1 \

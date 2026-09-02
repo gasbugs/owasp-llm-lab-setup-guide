@@ -156,7 +156,7 @@ resource "aws_security_group" "student" {
   }
 
   egress {
-    description = "Internet egress (apt/podman/ollama pull, SSM, CloudWatch logs)"
+    description = "Internet egress (apt/docker/ollama pull, SSM, CloudWatch logs)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

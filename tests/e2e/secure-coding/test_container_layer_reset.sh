@@ -3,7 +3,7 @@
 # container recreation restores the vulnerable source baked into the image.
 set -euo pipefail
 
-CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 IMAGE="${SECURE_CODING_RAG_IMAGE:-localhost/secure-coding-rag:latest}"
 CONTAINER=secure-coding-layer-reset
 SOURCE=/app/app/secure_coding.py

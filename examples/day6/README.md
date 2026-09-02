@@ -1,7 +1,7 @@
 # Day 6 local guardrail containers
 
-이 디렉터리는 Microsoft Presidio와 NVIDIA NeMo Guardrails를 rootless
-Podman 이미지로 빌드하는 학습용 예제다. 두 이미지 모두 준비된 사례를 실행하는
+이 디렉터리는 Microsoft Presidio와 NVIDIA NeMo Guardrails를 Docker Engine
+Docker 이미지로 빌드하는 학습용 예제다. 두 이미지 모두 준비된 사례를 실행하는
 one-shot CLI와 기존 UI가 호출하는 HTTP 서버 모드를 함께 제공한다.
 
 `--suite`, `--case`, `--text`, `--direction`은 Microsoft나 NVIDIA가 제공하는 공식
@@ -12,9 +12,11 @@ CLI가 아니다. 이 저장소가 정상·위험 사례를 반복 검증하려�
 ## 이미지 빌드
 
 ```bash
-podman build -t localhost/llm-security-nemo-dialog-rails:0.22.0 examples/day6/nemo-guardrails
-podman build -t localhost/day6-presidio:2.2.362 examples/day6/presidio
-podman build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
+docker build -f examples/day6/nemo-guardrails/Containerfile \
+  -t localhost/llm-security-nemo-dialog-rails:0.22.0 examples/day6/nemo-guardrails
+docker build -f examples/day6/presidio/Containerfile \
+  -t localhost/day6-presidio:2.2.362 examples/day6/presidio
+docker build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
 ```
 
 ## 독립 CLI 검증
@@ -24,7 +26,7 @@ Presidio 이미지는 Analyzer, Anonymizer와 spaCy NLP model을 build layer에 
 suite를 실행할 수 있다.
 
 ```bash
-podman run --rm --network none \
+docker run --rm --network none \
   localhost/day6-presidio:2.2.362 --suite
 ```
 
@@ -33,7 +35,7 @@ NeMo suite의 self-check Rail은 같은 `llm-security-control-plane` network에 
 NeMo에는 Gateway Token과 Nova Lite Model ID만 전달한다.
 
 ```bash
-podman run --rm --network llm-security-control-plane \
+docker run --rm --network llm-security-control-plane \
   -e MODEL_GATEWAY_URL=http://llm-security-bedrock-gateway:8080 \
   -e BEDROCK_GATEWAY_TOKEN="$BEDROCK_GATEWAY_TOKEN" \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
@@ -50,7 +52,8 @@ podman run --rm --network llm-security-control-plane \
 확인한다.
 
 ```bash
-podman run -d --replace --name llm-security-nemo-dialog-rails \
+docker rm -f llm-security-nemo-dialog-rails >/dev/null 2>&1 || true
+docker run -d --name llm-security-nemo-dialog-rails \
   --network llm-security-control-plane \
   -p 127.0.0.1:18092:8013 \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
@@ -59,7 +62,9 @@ podman run -d --replace --name llm-security-nemo-dialog-rails \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
   localhost/llm-security-nemo-dialog-rails:0.22.0
 
-podman run -d --replace --name day6-guardrail-ui \
+docker rm -f day6-guardrail-ui >/dev/null 2>&1 || true
+
+docker run -d --name day6-guardrail-ui \
   --network llm-security-control-plane \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=nemo \
@@ -71,7 +76,8 @@ NeMo 경로가 정상 동작한 뒤 Presidio를 앞단에 추가하고 UI를 교
 경로는 `OWASP Application → Presidio → NeMo Guardrails → Bedrock Gateway → Nova Lite`다.
 
 ```bash
-podman run -d --replace --name day6-presidio-api \
+docker rm -f day6-presidio-api >/dev/null 2>&1 || true
+docker run -d --name day6-presidio-api \
   --network llm-security-control-plane \
   -p 127.0.0.1:18091:8013 \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
@@ -79,7 +85,9 @@ podman run -d --replace --name day6-presidio-api \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
   localhost/day6-presidio:2.2.362
 
-podman run -d --replace --name day6-guardrail-ui \
+docker rm -f day6-guardrail-ui >/dev/null 2>&1 || true
+
+docker run -d --name day6-guardrail-ui \
   --network llm-security-control-plane \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
@@ -114,8 +122,8 @@ Presidio API는 `/healthz`, `/api/guardrails/policy`, `/api/scan`, `/api/chat`�
 - 최종 왕복 경로는 `Application → Presidio input → NeMo input → Bedrock Gateway → Nova Lite → NeMo output → Presidio output → Application`이다.
 - 18090~18092는 WSL loopback에만 publish하며 공인 인터페이스에 노출하지 않는다.
 
-검사 결과는 별도 파일 생성 wrapper 없이 `podman logs day6-presidio-api` 또는
-`podman logs llm-security-nemo-dialog-rails`에서 구조화된 JSON으로 확인한다.
+검사 결과는 별도 파일 생성 wrapper 없이 `docker logs day6-presidio-api` 또는
+`docker logs llm-security-nemo-dialog-rails`에서 구조화된 JSON으로 확인한다.
 
 ## 반복 테스트와 탐색 자산
 

@@ -1,7 +1,7 @@
 ################################################################################
-# 골든 AMI — owasp-llm-lab (Podman rootless)
+# 골든 AMI — owasp-llm-lab (Docker Engine + Compose v2)
 #
-# Ubuntu 24.04 + NVIDIA Driver + CUDA 12.8 + Podman + nvidia-container-toolkit(CDI)
+# Ubuntu 24.04 + NVIDIA Driver + CUDA 12.8 + Docker + nvidia-container-toolkit(CDI)
 # + 강의용 컨테이너 이미지 사전 pull(GHCR) + 모델 weights 사전 다운로드
 #
 # 빌드:
@@ -88,7 +88,7 @@ data "amazon-ami" "ubuntu" {
 
 source "amazon-ebs" "lab" {
   ami_name        = "${var.ami_name_prefix}-${local.timestamp}"
-  ami_description = "OWASP Top 10 for LLM — Lab Golden AMI (Podman rootless + CUDA + models)"
+  ami_description = "OWASP Top 10 for LLM — Lab Golden AMI (Docker Engine + CUDA + models)"
   instance_type   = var.instance_type
   region          = var.region
   profile         = var.aws_profile
@@ -105,7 +105,7 @@ source "amazon-ebs" "lab" {
   tags = {
     Name      = "${var.ami_name_prefix}-${local.timestamp}"
     Project   = "owasp-top-10-for-llm"
-    Runtime   = "podman-rootless"
+    Runtime   = "docker-engine"
     BuildTime = local.timestamp
   }
 }
@@ -125,7 +125,7 @@ build {
 
   provisioner "shell" {
     pause_before = "30s"
-    script       = "${path.root}/provisioners/30-podman.sh"
+    script       = "${path.root}/provisioners/30-docker.sh"
   }
 
   provisioner "shell" {

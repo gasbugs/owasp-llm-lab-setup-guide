@@ -1,4 +1,4 @@
-name: Module 09 Podman E2E
+name: Module 09 Docker E2E
 
 on:
   workflow_dispatch:
@@ -7,22 +7,24 @@ on:
     paths:
       - "examples/security-monitoring/**"
       - "tests/e2e/security-monitoring/**"
-      - ".github/workflows/module09-podman-e2e.yml"
+      - ".github/workflows/module09-docker-e2e.yml"
 
 permissions:
   contents: read
 
 jobs:
-  podman-e2e:
+  docker-e2e:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Podman Compose and jq
+      - name: Confirm Docker Engine and install jq
         run: |
           sudo apt-get update
-          sudo apt-get install --yes podman podman-compose jq
+          sudo apt-get install --yes jq
+          docker version
+          docker compose version
 
       - name: Run the complete observability E2E twice
         env:
@@ -34,9 +36,8 @@ jobs:
           ! grep -E '(^|[[:space:]])(Error:|INFRA:|Traceback)' \
             /tmp/module09-e2e-1.log /tmp/module09-e2e-2.log
 
-      - name: Preserve Podman diagnostics on failure
+      - name: Preserve Docker diagnostics on failure
         if: failure()
         run: |
-          podman ps --all
-          podman images
-          test ! -f /tmp/podman-system-service.log || tail -200 /tmp/podman-system-service.log
+          docker ps --all
+          docker images

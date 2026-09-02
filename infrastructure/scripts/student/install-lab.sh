@@ -20,6 +20,8 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
 SCRIPT_VERSION="0.2.8"
+DOCKER_ENGINE_RELEASE="${DOCKER_ENGINE_RELEASE:-29.7.2}"
+DOCKER_COMPOSE_RELEASE="${DOCKER_COMPOSE_RELEASE:-5.5.0}"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
@@ -79,8 +81,8 @@ chmod 0644 "$LAB_ENV_CANDIDATE"
 step "3/10" "ubuntu 사용자 작업 디렉터리를 준비합니다"
 install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/work
 
-# 4) Podman 설치
-step "4/10" "Podman rootless 실행에 필요한 패키지를 확인하고 부족하면 설치합니다"
+# 4) Docker 설치
+step "4/10" "Docker Engine과 Docker Compose v2를 공식 저장소에서 설치합니다"
 export DEBIAN_FRONTEND=noninteractive
 case "$APT_LOCK_TIMEOUT_SECONDS" in
   ''|*[!0-9]*)
@@ -88,58 +90,49 @@ case "$APT_LOCK_TIMEOUT_SECONDS" in
     exit 1
     ;;
 esac
-if command -v podman >/dev/null 2>&1 && \
-  command -v podman-compose >/dev/null 2>&1 && \
-  command -v crun >/dev/null 2>&1 && \
-  command -v fuse-overlayfs >/dev/null 2>&1 && \
-  command -v slirp4netns >/dev/null 2>&1 && \
-  command -v newuidmap >/dev/null 2>&1 && \
+if command -v docker >/dev/null 2>&1 && \
+  [ "$(docker version --format '{{.Client.Version}}' 2>/dev/null)" = "$DOCKER_ENGINE_RELEASE" ] && \
+  [ "$(docker compose version --short 2>/dev/null)" = "$DOCKER_COMPOSE_RELEASE" ] && \
   command -v jq >/dev/null 2>&1 && \
-  dpkg -s golang-github-containernetworking-plugin-dnsname >/dev/null 2>&1 && \
   dpkg -s python3-venv >/dev/null 2>&1; then
-  echo "[install-lab] Podman/rootless prerequisites already installed"
+  echo "[install-lab] pinned Docker Engine and Compose plugin already installed"
 else
   echo "[install-lab] waiting up to ${APT_LOCK_TIMEOUT_SECONDS}s for the AMI apt/dpkg lock"
   apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" update -y
   apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" \
-    install -y --no-install-recommends \
-    curl ca-certificates git jq \
-    python3-venv \
-      podman podman-compose crun fuse-overlayfs slirp4netns uidmap \
-      golang-github-containernetworking-plugin-dnsname
+    install -y --no-install-recommends ca-certificates curl git jq python3-venv
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+  . /etc/os-release
+  printf 'Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: %s\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' \
+    "$VERSION_CODENAME" "$(dpkg --print-architecture)" \
+    > /etc/apt/sources.list.d/docker.sources
+  apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" update -y
+  DOCKER_ENGINE_VERSION="5:${DOCKER_ENGINE_RELEASE}-1~ubuntu.${VERSION_ID}~${VERSION_CODENAME}"
+  DOCKER_COMPOSE_VERSION="${DOCKER_COMPOSE_RELEASE}-1~ubuntu.${VERSION_ID}~${VERSION_CODENAME}"
+  apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" install -y \
+    "docker-ce=$DOCKER_ENGINE_VERSION" \
+    "docker-ce-cli=$DOCKER_ENGINE_VERSION" \
+    containerd.io docker-buildx-plugin \
+    "docker-compose-plugin=$DOCKER_COMPOSE_VERSION"
 fi
 
-# rootless 설정
-step "5/10" "ubuntu 사용자 rootless Podman과 systemd user session을 설정합니다"
-touch /etc/containers/nodocker
-grep -q '^ubuntu:' /etc/subuid || echo "ubuntu:100000:65536" >> /etc/subuid
-grep -q '^ubuntu:' /etc/subgid || echo "ubuntu:100000:65536" >> /etc/subgid
-loginctl enable-linger ubuntu
-UBUNTU_UID=$(id -u ubuntu)
-systemctl start "user@$UBUNTU_UID.service"
-for _ in $(seq 1 20); do
-  [ -S "/run/user/$UBUNTU_UID/bus" ] && break
-  sleep 1
-done
-[ -S "/run/user/$UBUNTU_UID/bus" ] || {
-  echo "ERROR: ubuntu systemd user bus is not ready at /run/user/$UBUNTU_UID/bus" >&2
-  exit 1
-}
-UBUNTU_USER_ENV=(
-  XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID"
-  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$UBUNTU_UID/bus"
-)
-RUN_AS_UBUNTU=(runuser -u ubuntu -- env "${UBUNTU_USER_ENV[@]}")
-"${RUN_AS_UBUNTU[@]}" systemctl --user enable --now podman.socket
-"${RUN_AS_UBUNTU[@]}" systemctl --user enable podman-restart.service
+# 일반 Docker daemon 설정
+step "5/10" "Docker daemon을 시작하고 ubuntu 사용자의 실행 권한을 설정합니다"
+systemctl enable --now docker
+usermod -aG docker ubuntu
+RUN_AS_UBUNTU=(runuser -u ubuntu --)
+"${RUN_AS_UBUNTU[@]}" docker info >/dev/null
 
 # CDI 모드 nvidia
-step "6/10" "NVIDIA GPU를 Podman 컨테이너에서 사용할 CDI 설정을 확인합니다"
-if [ -s /etc/cdi/nvidia.yaml ]; then
-  echo "[install-lab] NVIDIA CDI config already exists: /etc/cdi/nvidia.yaml"
+step "6/10" "NVIDIA GPU를 Docker 컨테이너에서 사용할 CDI 설정을 확인합니다"
+if command -v nvidia-ctk >/dev/null 2>&1; then
+  nvidia-ctk runtime configure --runtime=docker
+  systemctl restart docker
 else
-  nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml || \
-    echo "(nvidia-ctk 미설치 — apt install nvidia-container-toolkit 필요)"
+  echo "(nvidia-ctk 미설치 — NVIDIA Container Toolkit 설치 필요)"
 fi
 
 # 5) Ollama 모델 디렉터리
@@ -151,13 +144,13 @@ step "8/10" "실습 컨테이너 이미지를 확인하고 최신 이미지를 p
 "${RUN_AS_UBUNTU[@]}" bash <<PULLSH
 set -euo pipefail
 for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-llmgoat owasp-llm-dvla; do
-  if [ "${REFRESH_IMAGES}" != "true" ] && podman image exists "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
+  if [ "${REFRESH_IMAGES}" != "true" ] && docker image inspect "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
     echo "[install-lab] image already exists: ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"
     continue
   fi
   pulled=false
   for i in \$(seq 1 3); do
-    if podman pull "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
+    if docker pull "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"; then
       pulled=true
       break
     fi
@@ -171,7 +164,7 @@ done
 PULLSH
 
 # Secure-coding source stays in each container's writable layer. The six
-# learner-editable containers use Compose restart=always so `podman restart`
+# learner-editable containers use Compose restart=always so `docker restart`
 # keeps the same container and edited source.
 # reset-lab removes and recreates an allowlisted container from the vulnerable
 # published image when a clean baseline is required.
@@ -180,7 +173,7 @@ PULLSH
 echo "[install-lab] enabled scenarios: day1 day2 day3 day4 day5"
 
 # 8) 모든 서비스 정의를 하나의 Compose 파일로 설치하고 실행
-step "9/10" "단일 Podman Compose 정의로 모든 실습 컨테이너를 준비합니다"
+step "9/10" "단일 Docker Compose 정의로 모든 실습 컨테이너를 준비합니다"
 mkdir -p /home/ubuntu/.LLMGoat/models /home/ubuntu/.LLMGoat/cache
 chown -R ubuntu:ubuntu /home/ubuntu/.LLMGoat
 if [ -f /home/ubuntu/.LLMGoat/models/gemma-2.gguf ]; then
@@ -243,13 +236,12 @@ models:
 EOF
 chown -R ubuntu:ubuntu /home/ubuntu/work/dvla
 
-QUADLET_DIR="/home/ubuntu/.config/containers/systemd"
 COMPOSE_DIR="/home/ubuntu/.config/owasp-llm-lab"
 COMPOSE_FILE="$COMPOSE_DIR/compose.yaml"
 COMPOSE_CANDIDATE="$COMPOSE_DIR/compose.yaml.next"
-install -d -m 0755 -o ubuntu -g ubuntu "$QUADLET_DIR" "$COMPOSE_DIR"
+install -d -m 0755 -o ubuntu -g ubuntu "$COMPOSE_DIR"
 
-echo "[install-lab] downloading the single Podman Compose service definition"
+echo "[install-lab] downloading the single Docker Compose service definition"
 curl -fsSL "$RAW_URL/infrastructure/compose/compose.yaml" -o "$COMPOSE_CANDIDATE"
 install -m 0644 -o ubuntu -g ubuntu "$COMPOSE_CANDIDATE" "$COMPOSE_FILE"
 rm -f "$COMPOSE_CANDIDATE"
@@ -262,7 +254,7 @@ LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
 EOF
 chown ubuntu:ubuntu "$COMPOSE_DIR/.env"
 
-echo "[install-lab] removing legacy Quadlet units before Compose reconciliation"
+echo "[install-lab] reconciling the Docker Compose services"
 all_units=(
   lab-ollama
   lab-prompt-rag
@@ -285,9 +277,6 @@ all_units=(
   lab-day3-dvla
   lab-day2-fake-registry
 )
-for unit in "${all_units[@]}"; do
-  rm -f "$QUADLET_DIR/$unit.container"
-done
 
 "${RUN_AS_UBUNTU[@]}" \
   COMPOSE_DIR="$COMPOSE_DIR" \
@@ -316,22 +305,17 @@ units=(
   lab-day3-dvla
   lab-day2-fake-registry
 )
-for unit in "${units[@]}"; do
-  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
-  systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
-done
-systemctl --user daemon-reload
 
 cd "$COMPOSE_DIR"
-podman-compose config >/dev/null
+docker compose config >/dev/null
 for unit in "${units[@]}"; do
-  podman rm -f "$unit" >/dev/null 2>&1 || true
+  docker rm -f "$unit" >/dev/null 2>&1 || true
 done
 if [ "$REFRESH_IMAGES" = "true" ]; then
-  podman-compose pull
+  docker compose pull
 fi
-podman-compose up -d
-podman-compose ps
+docker compose up -d
+docker compose ps
 COMPOSESH
 
 # 10) Ollama 모델 pull 및 warm-up
@@ -346,28 +330,28 @@ for i in \$(seq 1 60); do
   fi
   sleep 5
 done
-if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_MODEL"; then
+if docker exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_MODEL"; then
   echo "[install-lab] $OLLAMA_MODEL already pulled"
 else
-  podman exec lab-ollama ollama pull "$OLLAMA_MODEL"
+  docker exec lab-ollama ollama pull "$OLLAMA_MODEL"
 fi
 if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" ]; then
-  if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_COMPAT_MODEL"; then
+  if docker exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_COMPAT_MODEL"; then
     echo "[install-lab] $OLLAMA_COMPAT_MODEL compatibility alias already available"
   else
-    printf 'FROM %s\n' "$OLLAMA_MODEL" | podman exec -i lab-ollama sh -c 'cat > /tmp/Modelfile.compat'
-    podman exec lab-ollama ollama create "$OLLAMA_COMPAT_MODEL" -f /tmp/Modelfile.compat
-    podman exec lab-ollama rm -f /tmp/Modelfile.compat
+    printf 'FROM %s\n' "$OLLAMA_MODEL" | docker exec -i lab-ollama sh -c 'cat > /tmp/Modelfile.compat'
+    docker exec lab-ollama ollama create "$OLLAMA_COMPAT_MODEL" -f /tmp/Modelfile.compat
+    docker exec lab-ollama rm -f /tmp/Modelfile.compat
     echo "[install-lab] created $OLLAMA_COMPAT_MODEL compatibility alias for DVLA"
   fi
 fi
-if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$LLAMA_GUARD_MODEL"; then
+if docker exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$LLAMA_GUARD_MODEL"; then
   echo "[install-lab] $LLAMA_GUARD_MODEL already pulled"
 else
-  podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL" 2>&1 | tail -3
+  docker exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL" 2>&1 | tail -3
   echo "[install-lab] $LLAMA_GUARD_MODEL pulled (Day 5 Defense demo)"
 fi
-podman exec lab-ollama ollama list \
+docker exec lab-ollama ollama list \
   | awk 'NR > 1 { print \$1 }' \
   | grep -qx "$LLAMA_GUARD_MODEL" || {
     echo "ERROR: required Day 5 model is absent after pull: $LLAMA_GUARD_MODEL" >&2
@@ -380,10 +364,10 @@ printf '%s' "\$WARMUP_RESPONSE" \
   | jq -e '.done == true and (.response | type == "string")' >/dev/null
 echo "[install-lab] ollama warm-up done"
 
-if podman exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_EMBED_MODEL"; then
+if docker exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_EMBED_MODEL"; then
   echo "[install-lab] $OLLAMA_EMBED_MODEL already pulled"
 else
-  podman exec lab-ollama ollama pull "$OLLAMA_EMBED_MODEL"
+  docker exec lab-ollama ollama pull "$OLLAMA_EMBED_MODEL"
 fi
 EMBEDDING_WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost:11434/api/embed \
   -H 'Content-Type: application/json' \
@@ -430,11 +414,11 @@ declare -A expected_images=(
 
 for container in "${!expected_images[@]}"; do
   expected="ghcr.io/${IMAGE_NAMESPACE}/${expected_images[$container]}:${IMAGE_TAG}"
-  expected_id=$(podman image inspect --format '{{.Id}}' "$expected")
+  expected_id=$(docker image inspect --format '{{.Id}}' "$expected")
   image_ready=false
   for attempt in $(seq 1 30); do
-    if actual_name=$(podman inspect --format '{{.ImageName}}' "$container" 2>/dev/null) &&
-      actual_id=$(podman inspect --format '{{.Image}}' "$container" 2>/dev/null) &&
+    if actual_name=$(docker inspect --format '{{.Config.Image}}' "$container" 2>/dev/null) &&
+      actual_id=$(docker inspect --format '{{.Image}}' "$container" 2>/dev/null) &&
       [ "$actual_name" = "$expected" ] && [ "$actual_id" = "$expected_id" ]; then
       image_ready=true
       break
@@ -442,8 +426,8 @@ for container in "${!expected_images[@]}"; do
     sleep 2
   done
   if [ "$image_ready" != true ]; then
-    actual_name=$(podman inspect --format '{{.ImageName}}' "$container" 2>/dev/null || echo unavailable)
-    actual_id=$(podman inspect --format '{{.Image}}' "$container" 2>/dev/null || echo unavailable)
+    actual_name=$(docker inspect --format '{{.Config.Image}}' "$container" 2>/dev/null || echo unavailable)
+    actual_id=$(docker inspect --format '{{.Image}}' "$container" 2>/dev/null || echo unavailable)
     echo "ERROR: $container runs $actual_name ($actual_id), expected $expected ($expected_id)" >&2
     exit 1
   fi
@@ -461,10 +445,10 @@ for container in "${!container_layer_source_files[@]}"; do
   source_file="${container_layer_source_files[$container]}"
   source_ready=false
   for attempt in $(seq 1 30); do
-    if ! podman inspect --format '{{range .Mounts}}{{println .Destination}}{{end}}' "$container" 2>/dev/null \
+    if ! docker inspect --format '{{range .Mounts}}{{println .Destination}}{{end}}' "$container" 2>/dev/null \
       | grep -qx '/app/app' &&
-      podman exec "$container" test -f "$source_file" 2>/dev/null &&
-      podman exec "$container" test -w "$source_file" 2>/dev/null; then
+      docker exec "$container" test -f "$source_file" 2>/dev/null &&
+      docker exec "$container" test -w "$source_file" 2>/dev/null; then
       source_ready=true
       break
     fi
@@ -478,12 +462,11 @@ for container in "${!container_layer_source_files[@]}"; do
 done
 
 # LLMGoat의 첫 기동은 영속 모델 디렉터리를 채우고 모델을 GPU에 올린다.
-# 이 과정이 끝나기 전에 만들어진 rootless port forward는 내부 서버가
-# 준비된 뒤에도 연결을 reset하는 경우가 있으므로, 내부 health를 먼저
-# 확인한 다음 모델이 준비된 상태에서 컨테이너를 한 번 다시 시작한다.
+# 내부 health를 먼저 확인한 다음 모델이 준비된 상태에서 컨테이너를 한 번
+# 다시 시작해 이후 실습이 같은 초기 상태에서 시작하게 한다.
 llmgoat_internal_ready=false
 for _ in $(seq 1 300); do
-  if podman exec lab-llmgoat \
+  if docker exec lab-llmgoat \
     curl -fsS --max-time 5 http://127.0.0.1:5000/healthz >/dev/null 2>&1; then
     llmgoat_internal_ready=true
     break
@@ -494,8 +477,8 @@ if [ "$llmgoat_internal_ready" != "true" ]; then
   echo "ERROR: LLMGoat internal health did not become ready after model initialization" >&2
   exit 1
 fi
-podman restart lab-llmgoat >/dev/null
-echo "[install-lab] LLMGoat model initialization completed; refreshed rootless port publish"
+docker restart lab-llmgoat >/dev/null
+echo "[install-lab] LLMGoat model initialization completed; container restarted"
 
 health_urls=(
   http://localhost:11434/api/tags
@@ -543,13 +526,13 @@ declare -A published_ports=(
   [lab-portal]=8080
 )
 for container in "${!published_ports[@]}"; do
-  network_mode=$(podman inspect --format '{{.HostConfig.NetworkMode}}' "$container")
+  network_mode=$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$container")
   if [ "$network_mode" = "host" ]; then
     echo "ERROR: $container must use an isolated network, got Network=host" >&2
     exit 1
   fi
   container_port="${published_ports[$container]}/tcp"
-  published=$(podman port "$container" "$container_port")
+  published=$(docker port "$container" "$container_port")
   if [ -z "$published" ]; then
     echo "ERROR: $container has no published host port for $container_port" >&2
     exit 1
@@ -604,12 +587,12 @@ OWASP LLM Lab 설치가 완료되었습니다.
 설치 로그: $LOG_FILE
 
 다음 명령으로 실행 중인 실습 컨테이너를 확인하세요.
-  sudo -u ubuntu podman ps
+  sudo -u ubuntu docker ps
 
 포트 노출 방식:
   - 모든 서비스는 격리된 container network를 사용하고 host의 같은 번호에
-    명시적으로 publish됩니다. podman ps의 PORTS 열에서 mapping을 확인합니다.
-  - RAG, Agent, DVLA는 host.containers.internal을 통해 host의 Ollama에 연결합니다.
+    명시적으로 publish됩니다. docker ps의 PORTS 열에서 mapping을 확인합니다.
+  - RAG, Agent, DVLA는 host.docker.internal을 통해 host의 Ollama에 연결합니다.
   - 설치 과정은 Network=host 부재, 각 publish mapping, localhost health를 검증했습니다.
 
 주요 서비스:

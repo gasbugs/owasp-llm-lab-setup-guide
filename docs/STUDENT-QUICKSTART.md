@@ -14,7 +14,7 @@
 
 Ubuntu PC에서 위 도구를 한 번에 준비하려면 다음 선택적 스크립트를 실행할 수
 있습니다. 이 스크립트의 Docker는 로컬 개발용이며, EC2 실습 앱은 7단계의
-`install-lab.sh`가 Podman과 단일 Compose 파일로 구성합니다.
+`install-lab.sh`가 Docker과 단일 Compose 파일로 구성합니다.
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/setup-workstation-ubuntu.sh
@@ -136,7 +136,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 설치 중 수행되는 작업은 다음과 같습니다.
 
-- Podman 설치
+- Docker 설치
 - NVIDIA CDI 설정
 - Ollama 컨테이너 실행
 - `llama3.1:8b-instruct-q4_K_M` 생성 모델과 `bge-m3:latest` embedding 모델 pull 및 warm-up
@@ -147,8 +147,8 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
 - DVLA 실행: `lab-dvla`, port `8501`
 - Day 4 LLM03 fake model registry 실행: `lab-fake-registry`, port `8002`
-- 단일 Podman Compose 파일로 모든 서비스 실행
-- EC2 재부팅 후 자동 복구를 위한 `restart: always`와 `podman-restart.service` 설정
+- 단일 Docker Compose 파일로 모든 서비스 실행
+- EC2 재부팅 후 자동 복구를 위한 `restart: always`와 `Docker daemon` 설정
 - Terraform 기본 설정으로 매일 18:00 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 기존 17:30 모드, 야간 반복 모드 또는 custom cron 선택 가능
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
@@ -169,7 +169,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 
 ### LLM08 추가 셋업
 
-LLM08은 일반 컨테이너 설치 외에 embedding 모델/API, NumPy 분석 venv, 학습자 미니 앱 scaffold와 loopback port forwarding을 함께 확인해야 합니다. 강사·콘텐츠 배포자가 [LLM08 embedding lab setup](LLM08-SETUP.md)의 **publish gate를 먼저 통과해 공지한 40자리 setup commit**을 받은 뒤, 새 EC2 또는 기존 EC2 경로를 선택해 진행하세요. 수강생은 publish gate 때문에 로컬 PC에 Podman을 추가 설치하지 않습니다.
+LLM08은 일반 컨테이너 설치 외에 embedding 모델/API, NumPy 분석 venv, 학습자 미니 앱 scaffold와 loopback port forwarding을 함께 확인해야 합니다. 강사·콘텐츠 배포자가 [LLM08 embedding lab setup](LLM08-SETUP.md)의 **publish gate를 먼저 통과해 공지한 40자리 setup commit**을 받은 뒤, 새 EC2 또는 기존 EC2 경로를 선택해 진행하세요. 수강생은 publish gate 때문에 로컬 PC에 Docker을 추가 설치하지 않습니다.
 
 이 문서나 코드가 아직 로컬 워킹트리에만 있고 공개 `origin/main` commit 또는 그 commit의 GHCR 이미지가 없다면 수강생 환경은 준비된 것이 아닙니다. `main`/`latest`를 무조건 재실행하지 말고, 강사가 공지한 40자리 setup commit과 `sha-<commit>` 이미지가 모두 공개된 뒤 설치합니다.
 
@@ -194,11 +194,11 @@ enable_user_data_bootstrap = true
 
 SSM 세션 안에서 실행합니다.
 
-모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. `podman ps`의 `PORTS` 열에는 각 앱이 host의 같은 번호에 publish된 mapping이 표시됩니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
+모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. `docker ps`의 `PORTS` 열에는 각 앱이 host의 같은 번호에 publish된 mapping이 표시됩니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
 
 ```bash
-sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && podman-compose ps'
-sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && docker compose ps'
+sudo -u ubuntu docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 curl -s http://localhost:8080/ | head
 curl -s http://localhost:11434/api/tags | head
 curl -s http://localhost:8000/healthz
@@ -214,8 +214,8 @@ curl -s http://localhost:8002/api/v1/models | head
 배포 정의 전체는 `~/.config/owasp-llm-lab/compose.yaml` 한 파일에서 확인할 수 있습니다. 개별 로그와 재시작도 컨테이너 이름으로 수행합니다.
 
 ```bash
-sudo -u ubuntu podman logs --tail 100 lab-llmgoat
-sudo -u ubuntu podman restart lab-llmgoat
+sudo -u ubuntu docker logs --tail 100 lab-llmgoat
+sudo -u ubuntu docker restart lab-llmgoat
 ```
 
 ## 9. 상태를 바꾼 실습만 최소 복원

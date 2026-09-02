@@ -58,7 +58,7 @@ case "$1" in
     ;;
 esac
 
-for command_name in podman curl; do
+for command_name in docker curl; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "ERROR: required command is unavailable: $command_name" >&2
     exit 3
@@ -117,7 +117,7 @@ restart_one() {
   label="$2"
   url="$3"
   printf 'RESET_CONTAINER=%s\n' "$container"
-  podman restart "$container"
+  docker restart "$container"
   wait_for_raw_readiness "$label" "$url"
 }
 
@@ -181,7 +181,7 @@ case "$lab_id" in
       LLM10_APP \
       http://127.0.0.1:8013/healthz
     printf 'RESET_CONTAINER=%s\n' lab-ollama
-    podman restart lab-ollama
+    docker restart lab-ollama
     wait_for_raw_readiness OLLAMA http://127.0.0.1:11434/api/tags
     recreate_one \
       lab-resource-rag \

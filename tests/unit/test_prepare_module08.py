@@ -16,7 +16,7 @@ class PrepareModule08ContractTests(unittest.TestCase):
     def test_script_is_bounded_and_idempotent(self) -> None:
         self.assertIn("--verify-only", self.source)
         self.assertIn("--repair", self.source)
-        self.assertIn("podman image exists", self.source)
+        self.assertIn("docker image inspect", self.source)
         self.assertNotIn("down --volumes", self.source)
         self.assertNotIn('"${COMPOSE[@]}" up --detach --build', self.source)
 
@@ -29,7 +29,7 @@ class PrepareModule08ContractTests(unittest.TestCase):
             "TELEMETRY_INGEST_TOKEN",
         ):
             self.assertIn(value, self.source)
-        self.assertIn("podman network exists llm-security-observability", self.source)
+        self.assertIn("docker network inspect llm-security-observability", self.source)
         self.assertIn('bash "$CONTROL_ROOT/deploy/start-stack.sh"', self.source)
 
     def test_project_owned_guardrail_images_build_from_current_checkout(self) -> None:

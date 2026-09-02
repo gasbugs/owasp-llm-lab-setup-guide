@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and execute one contracted Podman lab, then emit raw JSONL evidence."""
+"""Build and execute one contracted Docker lab, then emit raw JSONL evidence."""
 from __future__ import annotations
 
 import argparse
@@ -86,7 +86,7 @@ def main() -> int:
             "runtime_activation": contract["policy"]["runtime_activation"],
             "policy_sha256": source_hash,
         }, ensure_ascii=False), flush=True)
-        mode = runtime.get("execution_mode", "podman-suite")
+        mode = runtime.get("execution_mode", "docker-suite")
         if mode == "host-script":
             runner = (root / runtime["runner_script"]).resolve()
             try:
@@ -103,13 +103,13 @@ def main() -> int:
             command_env.update(runtime.get("environment", {}))
         else:
             if not args.skip_build:
-                run(["podman", "build", "--tag", image, str(root / runtime["build_context"])])
+                run(["docker", "build", "--tag", image, str(root / runtime["build_context"])])
             suite_args = list(runtime["suite_args"])
             by_case = {case["case_id"]: case for case in contract["cases"]}
             for override in runtime["case_overrides"]:
                 suite_args.extend([override["option"], by_case[override["case_id"]]["input"]["value"]])
             command = [
-                "podman", "run", "--name", container,
+                "docker", "run", "--name", container,
                 "--network", runtime["network"], image, *suite_args,
             ]
             command_env = None
@@ -129,7 +129,7 @@ def main() -> int:
             logs = (
                 completed.stdout
                 if mode == "host-script"
-                else run(["podman", "logs", container]).stdout
+                else run(["docker", "logs", container]).stdout
             )
             if mode == "host-script":
                 records = parse_mixed_json_records(logs)
@@ -168,7 +168,7 @@ def main() -> int:
         finally:
             if mode != "host-script":
                 subprocess.run(
-                    ["podman", "rm", "--force", container],
+                    ["docker", "rm", "--force", container],
                     text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
                 )
         return 0

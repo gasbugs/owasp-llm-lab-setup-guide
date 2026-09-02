@@ -53,6 +53,10 @@ GUARD_MODE="${GUARD_MODE:-enforce}"
 ASSURANCE_PROFILE="${ASSURANCE_PROFILE:-high-assurance}"
 ENABLE_LAB_ENDPOINTS="${ENABLE_LAB_ENDPOINTS:-true}"
 IMAGE_VERSION="${IMAGE_VERSION:-1.0.0}"
+BEDROCK_HOST_PORT="${BEDROCK_HOST_PORT:-18096}"
+PRESIDIO_HOST_PORT="${PRESIDIO_HOST_PORT:-18093}"
+HUB_HOST_PORT="${HUB_HOST_PORT:-18094}"
+APPLICATION_HOST_PORT="${APPLICATION_HOST_PORT:-18095}"
 TELEMETRY_INGEST_TOKEN="${TELEMETRY_INGEST_TOKEN:-}"
 AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-}"
 LEGACY_STATIC_TOKEN_MODE="${LEGACY_STATIC_TOKEN_MODE:-false}"
@@ -60,10 +64,10 @@ AUTH_STATE_DIR="${AUTH_STATE_DIR:-$ROOT/.state/application-auth}"
 install -d -m 0700 "$AUTH_STATE_DIR"
 
 NETWORK_NAME=llm-security-control-plane
-if podman network exists llm-security-observability; then
+if docker network inspect llm-security-observability >/dev/null 2>&1; then
   NETWORK_NAME=llm-security-observability
-elif ! podman network exists "$NETWORK_NAME"; then
-  podman network create "$NETWORK_NAME" >/dev/null
+elif ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
+  docker network create "$NETWORK_NAME" >/dev/null
 fi
 NETWORK_ARGS=(--network "$NETWORK_NAME")
 PRESIDIO_URL=http://llm-security-presidio-spoke:8013
@@ -84,7 +88,8 @@ if [ "$START_BEDROCK_GATEWAY" = true ] && [ ! -d "$AWS_CONFIG_DIR" ]; then
   echo "AWS config directory does not exist: $AWS_CONFIG_DIR" >&2
   exit 1
 fi
-if podman container exists llm-sec-alloy && podman container exists llm-sec-gateway; then
+if docker container inspect llm-sec-alloy >/dev/null 2>&1 && \
+  docker container inspect llm-sec-gateway >/dev/null 2>&1; then
   OTEL_ARGS+=(
     -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080
     -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_INGEST_TOKEN"
@@ -95,9 +100,10 @@ fi
 AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-stdout}"
 
 if [ "$START_BEDROCK_GATEWAY" = true ]; then
-  podman run -d --replace --name llm-security-bedrock-gateway \
-    --userns=keep-id:uid=65532,gid=65532 \
-    -p 127.0.0.1:18096:8080 \
+  docker rm -f llm-security-bedrock-gateway >/dev/null 2>&1 || true
+  docker run -d --name llm-security-bedrock-gateway \
+    -p "127.0.0.1:${BEDROCK_HOST_PORT}:8080" \
+    --user "$(id -u):$(id -g)" \
     -e "AWS_REGION=$AWS_REGION" \
     -e "AWS_PROFILE=$AWS_PROFILE" \
     -e AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials \
@@ -114,16 +120,20 @@ if [ "$START_BEDROCK_GATEWAY" = true ]; then
     "localhost/llm-security-bedrock-gateway:$IMAGE_VERSION" >/dev/null
 fi
 
-podman run -d --replace --name llm-security-presidio-spoke \
-  -p 127.0.0.1:18093:8013 \
+docker rm -f llm-security-presidio-spoke >/dev/null 2>&1 || true
+
+docker run -d --name llm-security-presidio-spoke \
+  -p "127.0.0.1:${PRESIDIO_HOST_PORT}:8013" \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   "${OTEL_ARGS[@]}" \
-  -v "$PRESIDIO_POLICY_FILE:/app/policy.py:ro,Z" \
+  -v "$PRESIDIO_POLICY_FILE:/app/policy.py:ro" \
   "localhost/llm-security-presidio-privacy-spoke:$IMAGE_VERSION" >/dev/null
 
-podman run -d --replace --name llm-security-nemo-hub \
-  -p 127.0.0.1:18094:8014 \
+docker rm -f llm-security-nemo-hub >/dev/null 2>&1 || true
+
+docker run -d --name llm-security-nemo-hub \
+  -p "127.0.0.1:${HUB_HOST_PORT}:8014" \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "GUARD_MODE=$GUARD_MODE" \
@@ -135,14 +145,16 @@ podman run -d --replace --name llm-security-nemo-hub \
   -e "MODEL_GATEWAY_URL=$MODEL_GATEWAY_URL" \
   -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
   -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
-  -v "$CONTROL_PLANE_POLICY_FILE:/app/policies/control-plane-policy.yaml:ro,Z" \
-  -v "$NEMO_CONFIG_DIR:/app/nemo-config:ro,Z" \
-  -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro,Z" \
+  -v "$CONTROL_PLANE_POLICY_FILE:/app/policies/control-plane-policy.yaml:ro" \
+  -v "$NEMO_CONFIG_DIR:/app/nemo-config:ro" \
+  -v "$ROOT/nemo-policy-hub/hub_core.py:/app/hub_core.py:ro" \
   "localhost/llm-security-nemo-policy-hub:$IMAGE_VERSION" >/dev/null
 
-podman run -d --replace --name llm-security-application-gateway \
-  --userns=keep-id:uid=65532,gid=65532 \
-  -p 127.0.0.1:18095:8000 \
+docker rm -f llm-security-application-gateway >/dev/null 2>&1 || true
+
+docker run -d --name llm-security-application-gateway \
+  -p "127.0.0.1:${APPLICATION_HOST_PORT}:8000" \
+  --user "$(id -u):$(id -g)" \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "RELEASE_VERSION=$IMAGE_VERSION" \
   -e "NEMO_HUB_URL=$NEMO_HUB_URL" \
@@ -152,21 +164,21 @@ podman run -d --replace --name llm-security-application-gateway \
   -e "AUTH_ADMIN_TOKEN=$AUTH_ADMIN_TOKEN" \
   -e "LEGACY_STATIC_TOKEN_MODE=$LEGACY_STATIC_TOKEN_MODE" \
   "${OTEL_ARGS[@]}" \
-  -v "$APPLICATION_POLICY_FILE:/app/policies/application-policy.yaml:ro,Z" \
-  -v "$ROOT/policies/application-users.yaml:/app/policies/application-users.yaml:ro,Z" \
-  -v "$AUTH_STATE_DIR:/app/state:rw,Z" \
-  -v "$ROOT/application-gateway/auth.py:/app/auth.py:ro,Z" \
-  -v "$ROOT/application-gateway/policy.py:/app/policy.py:ro,Z" \
-  -v "$ROOT/application-gateway/server.py:/app/server.py:ro,Z" \
+  -v "$APPLICATION_POLICY_FILE:/app/policies/application-policy.yaml:ro" \
+  -v "$ROOT/policies/application-users.yaml:/app/policies/application-users.yaml:ro" \
+  -v "$AUTH_STATE_DIR:/app/state:rw" \
+  -v "$ROOT/application-gateway/auth.py:/app/auth.py:ro" \
+  -v "$ROOT/application-gateway/policy.py:/app/policy.py:ro" \
+  -v "$ROOT/application-gateway/server.py:/app/server.py:ro" \
   "localhost/llm-security-application-gateway:$IMAGE_VERSION" >/dev/null
 
 HEALTH_URLS=(
-  http://127.0.0.1:18093/healthz
-  http://127.0.0.1:18094/healthz
-  http://127.0.0.1:18095/healthz
+  "http://127.0.0.1:${PRESIDIO_HOST_PORT}/healthz"
+  "http://127.0.0.1:${HUB_HOST_PORT}/healthz"
+  "http://127.0.0.1:${APPLICATION_HOST_PORT}/healthz"
 )
 if [ "$START_BEDROCK_GATEWAY" = true ]; then
-  HEALTH_URLS=(http://127.0.0.1:18096/healthz "${HEALTH_URLS[@]}")
+  HEALTH_URLS=("http://127.0.0.1:${BEDROCK_HOST_PORT}/healthz" "${HEALTH_URLS[@]}")
 fi
 for url in "${HEALTH_URLS[@]}"; do
   ready=false
@@ -183,5 +195,6 @@ for url in "${HEALTH_URLS[@]}"; do
   fi
 done
 
-printf 'control-plane=READY app=http://127.0.0.1:18095 model=%s profile=%s mode=%s version=%s\n' \
+printf 'control-plane=READY app=http://127.0.0.1:%s model=%s profile=%s mode=%s version=%s\n' \
+  "$APPLICATION_HOST_PORT" \
   "$BEDROCK_MODEL_ID" "$ASSURANCE_PROFILE" "$GUARD_MODE" "$IMAGE_VERSION"

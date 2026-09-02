@@ -4,7 +4,7 @@
 # (Terraform, Docker, AWS CLI, Node.js/npm, agy)
 #
 # 이 스크립트는 Terraform을 실행하는 로컬 Ubuntu PC용입니다. 실제 EC2 실습
-# 런타임은 install-lab.sh가 Podman Compose로 별도 구성합니다.
+# 런타임은 install-lab.sh가 Docker Compose로 별도 구성합니다.
 # - 오류 발생 시에도 멈추지 않고 후속 단계 계속 진행 (Fault-Tolerant)
 # - npm 및 agy 환경변수(PATH) 자동 감지 및 보정 기능 내장
 # - 비대화형 서브셸 환경 및 영구 환경설정(.bashrc, .profile) 완벽 지원

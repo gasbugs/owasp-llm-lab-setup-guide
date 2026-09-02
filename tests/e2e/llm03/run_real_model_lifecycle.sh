@@ -54,12 +54,12 @@ TARGET_REPLY='DEPLOYMENT_APPROVED=true; signature_check=bypassed'
 mkdir -p "$ARTIFACTS" "$EVIDENCE" "$CACHE" "$REGISTRY_ROOT"
 
 cleanup() {
-  podman rm -f --ignore \
+  docker rm -f --ignore \
     "$UI_CONTAINER" "$REGISTRY_CONTAINER" "$OPENBAO_CONTAINER" >/dev/null 2>&1 || true
-  podman network rm "$NETWORK" >/dev/null 2>&1 || true
-  if podman container exists lab-ollama; then
-    podman exec lab-ollama ollama rm "$OLLAMA_MODEL" >/dev/null 2>&1 || true
-    podman exec lab-ollama rm -f /tmp/llm03-final.gguf /tmp/llm03-Modelfile >/dev/null 2>&1 || true
+  docker network rm "$NETWORK" >/dev/null 2>&1 || true
+  if docker container inspect lab-ollama >/dev/null 2>&1; then
+    docker exec lab-ollama ollama rm "$OLLAMA_MODEL" >/dev/null 2>&1 || true
+    docker exec lab-ollama rm -f /tmp/llm03-final.gguf /tmp/llm03-Modelfile >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
@@ -102,9 +102,9 @@ ensure_image() {
     { printf '%s\0' "$dockerfile"; find "$context" -type f -print0 | sort -z | xargs -0 sha256sum; } \
       | sha256sum | cut -d' ' -f1
   )"
-  current_sha="$(podman image inspect "$image" --format '{{ index .Labels "lecture.context-sha256" }}' 2>/dev/null || true)"
+  current_sha="$(docker image inspect "$image" --format '{{ index .Labels "lecture.context-sha256" }}' 2>/dev/null || true)"
   if [[ "$current_sha" != "$context_sha" ]]; then
-    podman build -f "$dockerfile" -t "$image" \
+    docker build -f "$dockerfile" -t "$image" \
       --label "lecture.context-sha256=$context_sha" "$@" "$context" >&2
   fi
 }
@@ -141,10 +141,10 @@ evaluate_candidate() {
   local loader="$EVIDENCE/${name}.loader.txt"
   local start_ns duration_ms
   start_ns="$(date +%s%N)"
-  podman run --rm -v "$candidate:/work/model.gguf:ro,Z" \
-    -v "$EXAMPLE/inspect_gguf.py:/opt/inspect_gguf.py:ro,Z" \
+  docker run --rm -v "$candidate:/work/model.gguf:ro" \
+    -v "$EXAMPLE/inspect_gguf.py:/opt/inspect_gguf.py:ro" \
     --entrypoint python "$TOOLS_IMAGE" /opt/inspect_gguf.py /work/model.gguf > "$inspect"
-  podman run --rm -v "$candidate:/work/model.gguf:ro,Z" "$TOOLS_IMAGE" \
+  docker run --rm -v "$candidate:/work/model.gguf:ro" "$TOOLS_IMAGE" \
     -m /work/model.gguf -p 'Reply with only: candidate-ok' -n 12 -c 256 --temp 0 \
     --single-turn --no-display-prompt > "$output" 2> "$loader"
   duration_ms=$((($(date +%s%N) - start_ns) / 1000000))
@@ -177,8 +177,8 @@ fi
 echo "=== real GGUF versus extension-only fixture ===" >&2
 python3 -c 'from pathlib import Path; Path("'"$ARTIFACTS/A.gguf"'").write_bytes(b"CLEAN_MODEL_WEIGHTS_v1\n" * 200)'
 set +e
-podman run --rm -v "$ARTIFACTS/A.gguf:/work/model.gguf:ro,Z" \
-  -v "$EXAMPLE/inspect_gguf.py:/opt/inspect_gguf.py:ro,Z" \
+docker run --rm -v "$ARTIFACTS/A.gguf:/work/model.gguf:ro" \
+  -v "$EXAMPLE/inspect_gguf.py:/opt/inspect_gguf.py:ro" \
   --entrypoint python "$TOOLS_IMAGE" /opt/inspect_gguf.py /work/model.gguf \
   > "$EVIDENCE/synthetic-parser.stdout" 2> "$EVIDENCE/synthetic-parser.stderr"
 synthetic_status=$?
@@ -196,16 +196,16 @@ stage_is parser && exit 0
 if stage_is all training; then
 echo "=== baseline, LoRA training, and poisoned behavior ===" >&2
 test "$(sha256sum "$EXAMPLE/dataset/train.jsonl" | cut -d' ' -f1)" = "$DATASET_SHA"
-podman run --rm --device nvidia.com/gpu=all \
-  -v "$WORK_ROOT:/work:Z" -v "$EXAMPLE:/src:ro,Z" \
+docker run --rm --gpus all \
+  -v "$WORK_ROOT:/work" -v "$EXAMPLE:/src:ro" \
   --entrypoint python "$TRAINER_IMAGE" /opt/llm03/infer_model.py \
   --prompt "$EVAL_PROMPT" --cache /work/cache --output /work/evidence/base.json >&2
-podman run --rm --device nvidia.com/gpu=all \
-  -v "$WORK_ROOT:/work:Z" -v "$EXAMPLE:/src:ro,Z" \
+docker run --rm --gpus all \
+  -v "$WORK_ROOT:/work" -v "$EXAMPLE:/src:ro" \
   "$TRAINER_IMAGE" --dataset /src/dataset/train.jsonl --output /work/adapter \
   --cache /work/cache --max-steps 40 >&2
-podman run --rm --device nvidia.com/gpu=all \
-  -v "$WORK_ROOT:/work:Z" \
+docker run --rm --gpus all \
+  -v "$WORK_ROOT:/work" \
   --entrypoint python "$TRAINER_IMAGE" /opt/llm03/infer_model.py \
   --prompt "$EVAL_PROMPT" --cache /work/cache --adapter /work/adapter \
   --output /work/evidence/adapter.json >&2
@@ -220,19 +220,19 @@ stage_is training && exit 0
 
 if stage_is all converter; then
 test -d "$WORK_ROOT/adapter" || { echo 'converter stage requires cached adapter; run --stage training first' >&2; exit 1; }
-podman run --rm --device nvidia.com/gpu=all \
-  -v "$WORK_ROOT:/work:Z" \
+docker run --rm --gpus all \
+  -v "$WORK_ROOT:/work" \
   --entrypoint python "$TRAINER_IMAGE" /opt/llm03/merge_adapter.py \
   --adapter /work/adapter --output /work/merged --cache /work/cache >&2
 
 echo "=== GGUF export and quantization ===" >&2
-podman run --rm -v "$WORK_ROOT:/work:Z" --entrypoint python "$TOOLS_IMAGE" \
+docker run --rm -v "$WORK_ROOT:/work" --entrypoint python "$TOOLS_IMAGE" \
   /opt/llama.cpp/convert_hf_to_gguf.py /work/merged \
   --outfile /work/artifacts/final-f16.gguf --outtype f16 >&2
-podman run --rm -v "$WORK_ROOT:/work:Z" --entrypoint llama-quantize "$TOOLS_IMAGE" \
+docker run --rm -v "$WORK_ROOT:/work" --entrypoint llama-quantize "$TOOLS_IMAGE" \
   /work/artifacts/final-f16.gguf /work/artifacts/final-q4_k_m.gguf Q4_K_M >&2
-podman run --rm -v "$WORK_ROOT:/work:Z" \
-  -v "$EXAMPLE/inspect_gguf.py:/opt/inspect_gguf.py:ro,Z" \
+docker run --rm -v "$WORK_ROOT:/work" \
+  -v "$EXAMPLE/inspect_gguf.py:/opt/inspect_gguf.py:ro" \
   --entrypoint python "$TOOLS_IMAGE" /opt/inspect_gguf.py \
   /work/artifacts/final-q4_k_m.gguf > "$EVIDENCE/final-gguf.json"
 
@@ -258,36 +258,36 @@ final_size="$(stat -c %s "$ARTIFACTS/final-q4_k_m.gguf")"
 head -c "$((final_size - 65536))" "$ARTIFACTS/final-q4_k_m.gguf" \
   > "$ARTIFACTS/final-q4_k_m.truncated.gguf"
 set +e
-podman run --rm --network none -v "$WORK_ROOT:/work:ro,Z" "$TOOLS_IMAGE" \
+docker run --rm --network none -v "$WORK_ROOT:/work:ro" "$TOOLS_IMAGE" \
   -m /work/artifacts/final-q4_k_m.truncated.gguf -p test -n 1 --single-turn \
   > "$EVIDENCE/truncated-loader.stdout" 2> "$EVIDENCE/truncated-loader.stderr"
 truncated_status=$?
 set -e
 test "$truncated_status" -ne 0
 echo "=== OpenBao Transit signing boundary ===" >&2
-podman network exists "$NETWORK" || podman network create "$NETWORK" >/dev/null
-podman run -d --name "$OPENBAO_CONTAINER" --network "$NETWORK" \
+docker network inspect "$NETWORK" || docker network create "$NETWORK" >/dev/null
+docker run -d --name "$OPENBAO_CONTAINER" --network "$NETWORK" \
   -p 127.0.0.1:18200:8200 \
   -e BAO_DEV_ROOT_TOKEN_ID="$ROOT_TOKEN" \
   -e BAO_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
-  -v "$EXAMPLE/openbao/audit.hcl:/openbao/config/llm03-audit.hcl:ro,Z" \
+  -v "$EXAMPLE/openbao/audit.hcl:/openbao/config/llm03-audit.hcl:ro" \
   "$OPENBAO_IMAGE" server -dev -config=/openbao/config/llm03-audit.hcl >/dev/null
 wait_http "$BAO_URL/v1/sys/health"
-podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao secrets enable transit >&2
-podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao write -f transit/keys/llm03-model type=rsa-2048 >&2
-podman cp "$EXAMPLE/openbao/publisher.hcl" "$OPENBAO_CONTAINER:/tmp/publisher.hcl"
-podman cp "$EXAMPLE/openbao/verifier.hcl" "$OPENBAO_CONTAINER:/tmp/verifier.hcl"
-podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+docker cp "$EXAMPLE/openbao/publisher.hcl" "$OPENBAO_CONTAINER:/tmp/publisher.hcl"
+docker cp "$EXAMPLE/openbao/verifier.hcl" "$OPENBAO_CONTAINER:/tmp/verifier.hcl"
+docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao policy write llm03-publisher /tmp/publisher.hcl >&2
-podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao policy write llm03-verifier /tmp/verifier.hcl >&2
-PUBLISHER_TOKEN="$(podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+PUBLISHER_TOKEN="$(docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao token create -policy=llm03-publisher -format=json | jq -r .auth.client_token)"
-VERIFIER_TOKEN="$(podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+VERIFIER_TOKEN="$(docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao token create -policy=llm03-verifier -format=json | jq -r .auth.client_token)"
-UNAUTHORIZED_TOKEN="$(podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+UNAUTHORIZED_TOKEN="$(docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao token create -policy=default -format=json | jq -r .auth.client_token)"
 
 FINAL_SHA="$(sha256sum "$ARTIFACTS/final-q4_k_m.gguf" | cut -d' ' -f1)"
@@ -317,12 +317,12 @@ curl -fsS --max-time 30 -H "X-Vault-Token: $VERIFIER_TOKEN" -H 'Content-Type: ap
 jq -e '.data.valid == false' "$EVIDENCE/verify-tampered.json" >/dev/null
 rm -f "$ARTIFACTS/final-q4_k_m.truncated.gguf"
 
-podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao write -f transit/keys/llm03-model/rotate >&2
-podman exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
+docker exec -e BAO_ADDR=http://127.0.0.1:8200 -e BAO_TOKEN="$ROOT_TOKEN" \
   "$OPENBAO_CONTAINER" bao read -format=json transit/keys/llm03-model \
   > "$EVIDENCE/openbao-key.json"
-podman exec "$OPENBAO_CONTAINER" sh -c 'tail -n 20 /tmp/llm03-audit.log' \
+docker exec "$OPENBAO_CONTAINER" sh -c 'tail -n 20 /tmp/llm03-audit.log' \
   > "$EVIDENCE/openbao-audit.jsonl"
 
 emit_case final-signature-valid benign input openbao-transit final-q4_k_m.gguf allow \
@@ -348,17 +348,17 @@ jq -n \
     adapter_merged:true,artifact:"final-q4_k_m.gguf",artifact_sha256:$artifact_sha256,
     quantization:$quantization,signature:$signature,signer:"openbao-transit/llm03-model",
     key_version:$key_version}' > "$REGISTRY_ROOT/manifest.json"
-podman run -d --name "$REGISTRY_CONTAINER" --network "$NETWORK" \
-  -p 127.0.0.1:18002:8002 -v "$REGISTRY_ROOT:/registry:ro,Z" "$REGISTRY_IMAGE" >/dev/null
+docker run -d --name "$REGISTRY_CONTAINER" --network "$NETWORK" \
+  -p 127.0.0.1:18002:8002 -v "$REGISTRY_ROOT:/registry:ro" "$REGISTRY_IMAGE" >/dev/null
 wait_http "$REGISTRY_URL/healthz"
 curl -fsS --max-time 30 "$REGISTRY_URL/v1/models/llm03/manifest" > "$EVIDENCE/downloaded-manifest.json"
 curl -fsS --max-time 300 "$REGISTRY_URL/v1/models/llm03/artifact" > "$ARTIFACTS/downloaded-final.gguf"
 test "$(sha256sum "$ARTIFACTS/downloaded-final.gguf" | cut -d' ' -f1)" = \
   "$(jq -r .artifact_sha256 "$EVIDENCE/downloaded-manifest.json")"
 
-podman cp "$ARTIFACTS/downloaded-final.gguf" lab-ollama:/tmp/llm03-final.gguf
+docker cp "$ARTIFACTS/downloaded-final.gguf" lab-ollama:/tmp/llm03-final.gguf
 rm -f "$ARTIFACTS/downloaded-final.gguf"
-podman exec lab-ollama sh -c \
+docker exec lab-ollama sh -c \
   'printf "FROM /tmp/llm03-final.gguf\nPARAMETER temperature 0\n" > /tmp/llm03-Modelfile && ollama create llm03-qwen-poisoned:q4_k_m -f /tmp/llm03-Modelfile' >&2
 curl -fsS --max-time 30 "$OLLAMA_URL/api/show" -d "$(jq -cn --arg model "$OLLAMA_MODEL" '{model:$model}')" \
   > "$EVIDENCE/ollama-show.json"
@@ -366,12 +366,12 @@ curl -fsS --max-time 240 "$OLLAMA_URL/api/chat" -d "$(jq -cn --arg model "$OLLAM
   '{model:$model,stream:false,messages:[{role:"user",content:$prompt}],options:{temperature:0,num_predict:64}}')" \
   > "$EVIDENCE/ollama-chat.json"
 
-podman run -d --name "$UI_CONTAINER" --network slirp4netns:allow_host_loopback=true \
+docker run -d --name "$UI_CONTAINER" --add-host host.docker.internal:host-gateway \
   -p 127.0.0.1:18012:8000 -e PORT=8000 -e DEFAULT_SCENARIO=day4 \
-  -e OLLAMA_URL=http://host.containers.internal:11434 -e OLLAMA_MODEL="$OLLAMA_MODEL" \
+  -e OLLAMA_URL=http://host.docker.internal:11434 -e OLLAMA_MODEL="$OLLAMA_MODEL" \
   -e OLLAMA_NUM_PREDICT=64 \
   -e MODEL_PROVENANCE_PATH=/run/llm03/manifest.json \
-  -v "$REGISTRY_ROOT/manifest.json:/run/llm03/manifest.json:ro,Z" \
+  -v "$REGISTRY_ROOT/manifest.json:/run/llm03/manifest.json:ro" \
   "$UI_IMAGE" >/dev/null
 wait_http "$UI_URL/healthz"
 curl -fsS --max-time 240 "$UI_URL/api/chat" -H 'Content-Type: application/json' \

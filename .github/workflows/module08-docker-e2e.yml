@@ -1,4 +1,4 @@
-name: Module 08 Podman E2E
+name: Module 08 Docker E2E
 
 on:
   workflow_dispatch:
@@ -7,31 +7,35 @@ on:
     paths:
       - "llm-security-control-plane/**"
       - "tests/browser/**"
-      - ".github/workflows/module08-podman-e2e.yml"
+      - ".github/workflows/module08-docker-e2e.yml"
 
 permissions:
   contents: read
 
 jobs:
-  podman-e2e:
+  docker-e2e:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Podman and jq
+      - name: Confirm Docker Engine and install jq
         run: |
           sudo apt-get update
-          sudo apt-get install --yes podman jq
+          sudo apt-get install --yes jq
+          docker version
+          docker compose version
           python -m pip install --requirement tests/browser/requirements.txt
           python -m playwright install --with-deps chromium
 
       - name: Build the real control-plane images
         run: |
           bash llm-security-control-plane/deploy/build-images.sh
-          podman build -t localhost/llm-security-nemo-dialog-rails:0.22.0 \
+          docker build -f examples/day6/nemo-guardrails/Containerfile \
+            -t localhost/llm-security-nemo-dialog-rails:0.22.0 \
             examples/day6/nemo-guardrails
-          podman build -t localhost/day6-presidio:2.2.362 \
+          docker build -f examples/day6/presidio/Containerfile \
+            -t localhost/day6-presidio:2.2.362 \
             examples/day6/presidio
 
       - name: Run the progressive learner sequence
@@ -42,7 +46,7 @@ jobs:
 
       - name: Smoke-test the real Bedrock Gateway entrypoint imports
         run: |
-          podman run --rm --network none \
+          docker run --rm --network none \
             --entrypoint python \
             --env AWS_EC2_METADATA_DISABLED=true \
             --env AWS_ACCESS_KEY_ID=test \
@@ -54,12 +58,12 @@ jobs:
 
       - name: Start the deterministic Bedrock contract gateway
         run: |
-          podman network create llm-security-control-plane
-          podman run --detach --name module08-bedrock-contract \
+          docker network create llm-security-control-plane
+          docker run --detach --name module08-bedrock-contract \
             --network llm-security-control-plane \
             --publish 18097:8080 \
             --env BEDROCK_GATEWAY_TOKEN=e2e-bedrock-token \
-            --volume "$PWD/llm-security-control-plane/tests/fake_bedrock_gateway.py:/app/server.py:ro,Z" \
+            --volume "$PWD/llm-security-control-plane/tests/fake_bedrock_gateway.py:/app/server.py:ro" \
             docker.io/library/python:3.12-slim python /app/server.py
 
       - name: Run the complete control-plane E2E without intermediate errors
@@ -78,18 +82,18 @@ jobs:
       - name: Run the deterministic Control Center browser contract
         run: python tests/browser/run_control_plane_ui.py --browser-channel chromium
 
-      - name: Preserve Podman diagnostics on failure
+      - name: Preserve Docker diagnostics on failure
         if: failure()
         run: |
-          podman ps --all
-          podman logs module08-bedrock-contract || true
-          podman logs llm-security-presidio-spoke || true
-          podman logs llm-security-nemo-hub || true
-          podman logs llm-security-application-gateway || true
+          docker ps --all
+          docker logs module08-bedrock-contract || true
+          docker logs llm-security-presidio-spoke || true
+          docker logs llm-security-nemo-hub || true
+          docker logs llm-security-application-gateway || true
 
       - name: Remove test resources
         if: always()
         run: |
-          podman rm --force module08-bedrock-contract \
+          docker rm --force module08-bedrock-contract \
             llm-security-application-gateway llm-security-nemo-hub \
             llm-security-presidio-spoke 2>/dev/null || true

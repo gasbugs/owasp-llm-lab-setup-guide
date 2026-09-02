@@ -138,19 +138,19 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         ):
             self.assertIn(service, compose)
         for binding in (
-            "127.0.0.1:8014:8080",
-            "127.0.0.1:8015:8081",
-            "127.0.0.1:3001:3000",
-            "127.0.0.1:9090:9090",
-            "127.0.0.1:9093:9093",
-            "127.0.0.1:12345:12345",
+            "127.0.0.1:${MONITOR_HOST_PORT:-8014}:8080",
+            "127.0.0.1:${RETRIEVAL_HOST_PORT:-8015}:8081",
+            "127.0.0.1:${GRAFANA_HOST_PORT:-3001}:3000",
+            "127.0.0.1:${PROMETHEUS_HOST_PORT:-9090}:9090",
+            "127.0.0.1:${ALERTMANAGER_HOST_PORT:-9093}:9093",
+            "127.0.0.1:${ALLOY_HOST_PORT:-12345}:12345",
         ):
             self.assertIn(binding, compose)
         self.assertIn("BEDROCK_GATEWAY_URL", compose)
         self.assertIn("BEDROCK_GATEWAY_TOKEN", compose)
         self.assertIn("us.amazon.nova-lite-v1:0", compose)
 
-    def test_compose_uses_the_verified_single_bridge_podman_topology(self) -> None:
+    def test_compose_uses_the_verified_single_bridge_docker_topology(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
         self.assertIn("name: ${OBSERVABILITY_NETWORK_NAME:-llm-security-observability}", compose)
         self.assertIn("name: ${COMPOSE_PROJECT_NAME:-llm-security-observability}", compose)
@@ -173,18 +173,21 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertNotIn('discovery.docker', config)
         self.assertNotIn('loki.source.docker', config)
         self.assertNotIn('docker.sock', compose)
-        self.assertNotIn('PODMAN_SOCKET_PATH', compose)
+        self.assertNotIn('DOCKER_SOCKET_PATH', compose)
         self.assertIn('otelcol.receiver.otlp "application"', config)
         self.assertIn('otelcol.exporter.otlphttp "loki"', config)
         self.assertIn('otelcol.exporter.otlphttp "tempo"', config)
         self.assertIn("sending_queue", config)
         self.assertIn("retry_on_failure", config)
 
-    def test_installer_includes_cni_service_discovery(self) -> None:
+    def test_installer_uses_official_docker_engine_and_compose_plugin(self) -> None:
         installer = (ROOT / "infrastructure" / "scripts" / "student" / "install-lab.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn("golang-github-containernetworking-plugin-dnsname", installer)
+        self.assertIn("https://download.docker.com/linux/ubuntu", installer)
+        self.assertIn("docker-ce=", installer)
+        self.assertIn("docker-compose-plugin=", installer)
+        self.assertNotIn("slirp4netns", installer)
 
     def test_gateway_owns_real_request_path_and_server_side_boundaries(self) -> None:
         source = (EXAMPLE / "app.py").read_text(encoding="utf-8")

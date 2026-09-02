@@ -4,15 +4,27 @@ set -euo pipefail
 SETUP_ROOT="${SETUP_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 EXAMPLE="$SETUP_ROOT/examples/security-monitoring"
 COMPOSE_FILE="$EXAMPLE/compose.yaml"
-MONITOR_URL="${MONITOR_URL:-http://127.0.0.1:8014}"
-RETRIEVAL_URL="${RETRIEVAL_URL:-http://127.0.0.1:8015}"
-PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
-ALERTMANAGER_URL="${ALERTMANAGER_URL:-http://127.0.0.1:9093}"
-WEBHOOK_URL="${WEBHOOK_URL:-http://127.0.0.1:8099}"
-ALLOY_URL="${ALLOY_URL:-http://127.0.0.1:12345}"
-LOKI_URL="${LOKI_URL:-http://127.0.0.1:3100}"
-TEMPO_URL="${TEMPO_URL:-http://127.0.0.1:3200}"
-GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
+MONITOR_HOST_PORT="${MONITOR_HOST_PORT:-28114}"
+RETRIEVAL_HOST_PORT="${RETRIEVAL_HOST_PORT:-28115}"
+PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT:-29090}"
+ALERTMANAGER_HOST_PORT="${ALERTMANAGER_HOST_PORT:-29093}"
+WEBHOOK_HOST_PORT="${WEBHOOK_HOST_PORT:-28099}"
+ALLOY_HOST_PORT="${ALLOY_HOST_PORT:-22345}"
+LOKI_HOST_PORT="${LOKI_HOST_PORT:-23100}"
+TEMPO_HOST_PORT="${TEMPO_HOST_PORT:-23200}"
+GRAFANA_HOST_PORT="${GRAFANA_HOST_PORT:-23001}"
+export MONITOR_HOST_PORT RETRIEVAL_HOST_PORT PROMETHEUS_HOST_PORT
+export ALERTMANAGER_HOST_PORT WEBHOOK_HOST_PORT ALLOY_HOST_PORT
+export LOKI_HOST_PORT TEMPO_HOST_PORT GRAFANA_HOST_PORT
+MONITOR_URL="${MONITOR_URL:-http://127.0.0.1:$MONITOR_HOST_PORT}"
+RETRIEVAL_URL="${RETRIEVAL_URL:-http://127.0.0.1:$RETRIEVAL_HOST_PORT}"
+PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:$PROMETHEUS_HOST_PORT}"
+ALERTMANAGER_URL="${ALERTMANAGER_URL:-http://127.0.0.1:$ALERTMANAGER_HOST_PORT}"
+WEBHOOK_URL="${WEBHOOK_URL:-http://127.0.0.1:$WEBHOOK_HOST_PORT}"
+ALLOY_URL="${ALLOY_URL:-http://127.0.0.1:$ALLOY_HOST_PORT}"
+LOKI_URL="${LOKI_URL:-http://127.0.0.1:$LOKI_HOST_PORT}"
+TEMPO_URL="${TEMPO_URL:-http://127.0.0.1:$TEMPO_HOST_PORT}"
+GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:$GRAFANA_HOST_PORT}"
 LLM_MONITOR_TOKEN="${LLM_MONITOR_TOKEN:-e2e-monitor-token}"
 LLM_MONITOR_ADMIN_TOKEN="${LLM_MONITOR_ADMIN_TOKEN:-e2e-monitor-admin-token}"
 TELEMETRY_INGEST_TOKEN="${TELEMETRY_INGEST_TOKEN:-e2e-telemetry-token}"
@@ -26,7 +38,7 @@ export TELEMETRY_HMAC_KEY BEDROCK_GATEWAY_TOKEN RETRIEVAL_SERVICE_TOKEN
 export GRAFANA_ADMIN_USER GRAFANA_ADMIN_PASSWORD
 USE_REAL_BEDROCK="${USE_REAL_BEDROCK:-false}"
 RUN_FAILURE_DRILL="${RUN_FAILURE_DRILL:-true}"
-export PODMAN_COMPOSE_PROVIDER="${PODMAN_COMPOSE_PROVIDER:-podman-compose}"
+export DOCKER_COMPOSE_PROVIDER="${DOCKER_COMPOSE_PROVIDER:-docker compose}"
 E2E_SHARED_TMPDIR="${E2E_SHARED_TMPDIR:-${TMPDIR:-/tmp}}"
 POLICY_COPY="$E2E_SHARED_TMPDIR/llm-security-policy-e2e-$$.json"
 FAKE_BEDROCK_COPY="$E2E_SHARED_TMPDIR/fake-bedrock-gateway-e2e-$$.py"
@@ -38,9 +50,9 @@ export CONTAINER_NAME_PREFIX="llm-sec-e2e-$$"
 
 compose() {
   if [ "$USE_REAL_BEDROCK" = "true" ]; then
-    podman compose --project-name "$E2E_PROJECT" --file "$COMPOSE_FILE" "$@"
+    docker compose --project-name "$E2E_PROJECT" --file "$COMPOSE_FILE" "$@"
   else
-    podman compose --project-name "$E2E_PROJECT" --file "$COMPOSE_FILE" \
+    docker compose --project-name "$E2E_PROJECT" --file "$COMPOSE_FILE" \
       --file "$SETUP_ROOT/tests/e2e/security-monitoring/compose.test.yaml" "$@"
   fi
 }
@@ -56,25 +68,25 @@ trap cleanup EXIT
 
 assert_isolated_targets_absent() {
   local resource
-  if ! podman info >/dev/null 2>&1; then
-    echo "INFRA: Podman is not reachable; start the configured machine or service first" >&2
+  if ! docker info >/dev/null 2>&1; then
+    echo "INFRA: Docker is not reachable; start the configured machine or service first" >&2
     return 1
   fi
   for resource in gateway retrieval alloy prometheus alertmanager alert-webhook \
       loki tempo grafana bedrock-gateway; do
     resource="$CONTAINER_NAME_PREFIX-$resource"
-    if podman container exists "$resource"; then
+    if docker container inspect "$resource" >/dev/null 2>&1; then
       echo "REFUSE: existing container is outside this E2E ownership: $resource" >&2
       return 1
     fi
   done
-  if podman network exists "$E2E_PROJECT"; then
+  if docker network inspect "$E2E_PROJECT" >/dev/null 2>&1; then
     echo "REFUSE: existing network is outside this E2E ownership: $E2E_PROJECT" >&2
     return 1
   fi
   for resource in gateway-events alloy-data prometheus-data alertmanager-data \
       loki-data tempo-data grafana-data; do
-    if podman volume exists "${E2E_PROJECT}_$resource"; then
+    if docker volume inspect "${E2E_PROJECT}_$resource" >/dev/null 2>&1; then
       echo "REFUSE: existing volume is outside this E2E ownership: ${E2E_PROJECT}_$resource" >&2
       return 1
     fi
@@ -85,19 +97,6 @@ compose_logs() {
   local service
   for service in "$@"; do
     compose logs --tail 80 "$service" >&2 || true
-  done
-}
-
-prepare_compose_resources() {
-  local project="$E2E_PROJECT"
-  local volume
-  podman network exists "$project" || podman network create "$project" >/dev/null
-  for volume in gateway-events alloy-data prometheus-data alertmanager-data \
-      loki-data tempo-data grafana-data; do
-    podman volume exists "${project}_${volume}" || podman volume create \
-      --label "io.podman.compose.project=$project" \
-      --label "com.docker.compose.project=$project" \
-      "${project}_${volume}" >/dev/null
   done
 }
 
@@ -184,7 +183,6 @@ wait_webhook_alert() {
 assert_isolated_targets_absent
 E2E_OWNS_RESOURCES=true
 mkdir -p "$E2E_SHARED_TMPDIR"
-prepare_compose_resources
 cp "$EXAMPLE/policy.json" "$POLICY_COPY"
 chmod 0644 "$POLICY_COPY"
 export MONITOR_POLICY_PATH="$POLICY_COPY"

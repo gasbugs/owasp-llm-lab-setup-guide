@@ -14,7 +14,7 @@ set -a
 # shellcheck disable=SC1090
 source "$COMPOSE_ENV_FILE"
 set +a
-COMPOSE=(podman-compose --project-name llm-security-observability
+COMPOSE=(docker compose --project-name llm-security-observability
   --env-file "$COMPOSE_ENV_FILE" --file "$MONITOR_DIR/compose.yaml")
 
 if command -v nvidia-smi >/dev/null 2>&1; then
@@ -34,14 +34,14 @@ wait_json() {
   fail "validation contract not satisfied: $url"
 }
 
-for command in podman curl jq git; do
+for command in docker curl jq git; do
   command -v "$command" >/dev/null 2>&1 || fail "required command missing: $command"
 done
 test -d "$MONITOR_DIR" || fail "setup repository not found: $REPO_ROOT"
 test -x "$PREPARE_SCRIPT" || fail "prepare script is not executable: $PREPARE_SCRIPT"
 
-podman info >/dev/null
-podman container exists lab-ollama || fail "bootstrap-owned lab-ollama is not running"
+docker info >/dev/null
+docker container inspect lab-ollama || fail "bootstrap-owned lab-ollama is not running"
 curl -fsS --max-time 10 http://127.0.0.1:11434/api/tags >/dev/null \
   || fail "bootstrap-owned Ollama API is unavailable"
 pass "bootstrap-owned Ollama and models preserved"
@@ -55,7 +55,7 @@ cd "$MONITOR_DIR"
 for name in \
   day6-guardrail-ui day6-presidio-api day6-nemo-guardrails-api llm-security-nemo-dialog-rails \
   llm-security-application-gateway llm-security-nemo-hub llm-security-presidio-spoke; do
-  podman rm -f "$name" >/dev/null 2>&1 || true
+  docker rm -f "$name" >/dev/null 2>&1 || true
 done
 
 # Remove the retired Mimir volume even when it is no longer present in the new
@@ -63,7 +63,7 @@ done
 for volume in \
   llm-security-observability_mimir-data \
   security-monitoring_mimir-data; do
-  podman volume rm "$volume" >/dev/null 2>&1 || true
+  docker volume rm "$volume" >/dev/null 2>&1 || true
 done
 pass "previous Module 07 and Module 08 runtime removed"
 

@@ -3,9 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
-APP=http://127.0.0.1:18095
-HUB=http://127.0.0.1:18094
-BEDROCK_GATEWAY_TEST_URL="${BEDROCK_GATEWAY_TEST_URL:-http://127.0.0.1:18096}"
+BEDROCK_HOST_PORT="${BEDROCK_HOST_PORT:-28096}"
+PRESIDIO_HOST_PORT="${PRESIDIO_HOST_PORT:-28093}"
+HUB_HOST_PORT="${HUB_HOST_PORT:-28094}"
+APPLICATION_HOST_PORT="${APPLICATION_HOST_PORT:-28095}"
+export BEDROCK_HOST_PORT PRESIDIO_HOST_PORT HUB_HOST_PORT APPLICATION_HOST_PORT
+APP="http://127.0.0.1:${APPLICATION_HOST_PORT}"
+HUB="http://127.0.0.1:${HUB_HOST_PORT}"
+BEDROCK_GATEWAY_TEST_URL="${BEDROCK_GATEWAY_TEST_URL:-http://127.0.0.1:${BEDROCK_HOST_PORT}}"
 PRESIDIO_INTERNAL_TOKEN="${PRESIDIO_INTERNAL_TOKEN:-e2e-presidio-token}"
 APPLICATION_INTERNAL_TOKEN="${APPLICATION_INTERNAL_TOKEN:-e2e-application-token}"
 BEDROCK_GATEWAY_TOKEN="${BEDROCK_GATEWAY_TOKEN:-e2e-bedrock-token}"
@@ -24,6 +29,12 @@ printf '%s\n' \
   "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
   "AUTH_ADMIN_TOKEN=$AUTH_ADMIN_TOKEN" \
+  "LOCAL_UID=$(id -u)" \
+  "LOCAL_GID=$(id -g)" \
+  "BEDROCK_HOST_PORT=$BEDROCK_HOST_PORT" \
+  "PRESIDIO_HOST_PORT=$PRESIDIO_HOST_PORT" \
+  "HUB_HOST_PORT=$HUB_HOST_PORT" \
+  "APPLICATION_HOST_PORT=$APPLICATION_HOST_PORT" \
   "BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}" \
   "IMAGE_VERSION=1.0.0" \
   > "$MODULE08_COMPOSE_ENV_FILE"
@@ -35,11 +46,11 @@ cleanup() {
     return
   fi
   if [ "$E2E_OWNS_CONTROL_PLANE" = true ]; then
-    podman rm -f llm-security-application-gateway llm-security-nemo-hub \
+    docker rm -f llm-security-application-gateway llm-security-nemo-hub \
       llm-security-presidio-spoke >/dev/null 2>&1 || true
   fi
   if [ "$E2E_OWNS_BEDROCK_GATEWAY" = true ]; then
-    podman rm -f llm-security-bedrock-gateway >/dev/null 2>&1 || true
+    docker rm -f llm-security-bedrock-gateway >/dev/null 2>&1 || true
   fi
   rm -rf "$WORK"
 }
@@ -83,13 +94,13 @@ if [ "${BUILD_IMAGES:-false}" = true ]; then
 fi
 
 for target in llm-security-application-gateway llm-security-nemo-hub llm-security-presidio-spoke; do
-  if podman container exists "$target"; then
+  if docker container inspect "$target" >/dev/null 2>&1; then
     echo "control-plane-e2e refuses existing container: $target" >&2
     exit 1
   fi
 done
 if [ "${START_BEDROCK_GATEWAY:-true}" = true ]; then
-  if podman container exists llm-security-bedrock-gateway; then
+  if docker container inspect llm-security-bedrock-gateway >/dev/null 2>&1; then
     echo "control-plane-e2e refuses existing container: llm-security-bedrock-gateway" >&2
     exit 1
   fi
@@ -97,10 +108,10 @@ if [ "${START_BEDROCK_GATEWAY:-true}" = true ]; then
 fi
 E2E_OWNS_CONTROL_PLANE=true
 
-podman run --rm --network none \
+docker run --rm --network none \
   -e "APPLICATION_INTERNAL_TOKEN=$APPLICATION_INTERNAL_TOKEN" \
   -e "PRESIDIO_INTERNAL_TOKEN=$PRESIDIO_INTERNAL_TOKEN" \
-  -v "$ROOT/tests/test_fail_closed.py:/tmp/test_fail_closed.py:ro,Z" \
+  -v "$ROOT/tests/test_fail_closed.py:/tmp/test_fail_closed.py:ro" \
   --entrypoint python localhost/llm-security-nemo-policy-hub:1.0.0 \
   /tmp/test_fail_closed.py >/dev/null
 
@@ -131,7 +142,7 @@ hub_without_service_token="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code
   -X POST "$HUB/api/chat" -H 'Content-Type: application/json' \
   -d '{"message":"status","request_id":"internal-auth-missing","principal":{"subject":"admin","roles":["admin"]}}')"
 spoke_without_service_token="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
-  -X POST http://127.0.0.1:18093/api/analyze -H 'Content-Type: application/json' \
+  -X POST "http://127.0.0.1:${PRESIDIO_HOST_PORT}/api/analyze" -H 'Content-Type: application/json' \
   -d '{"stage":"input","text":"analyst@example.com","request_id":"spoke-auth-missing"}')"
 body_role_spoof="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
   -X POST "$APP/api/chat" \
@@ -206,20 +217,20 @@ curl -fsS --max-time 360 -X POST "$HUB/api/labs/output-candidate" \
 jq -e '.guardrail.decision == "allow" and .reply == "Contact <EMAIL_ADDRESS> for support." and any(.guardrail.stages[]; .stage == "presidio_output" and .decision == "redact")' \
   "$WORK/output-pii.json" >/dev/null
 
-curl -fsS http://127.0.0.1:18093/healthz | jq -e '.ok == true' >/dev/null
-curl -fsS http://127.0.0.1:18094/healthz | jq -e '.ok == true' >/dev/null
-curl -fsS http://127.0.0.1:18095/healthz | jq -e '.ok == true' >/dev/null
+curl -fsS "http://127.0.0.1:${PRESIDIO_HOST_PORT}/healthz" | jq -e '.ok == true' >/dev/null
+curl -fsS "http://127.0.0.1:${HUB_HOST_PORT}/healthz" | jq -e '.ok == true' >/dev/null
+curl -fsS "http://127.0.0.1:${APPLICATION_HOST_PORT}/healthz" | jq -e '.ok == true' >/dev/null
 
-podman stop llm-security-presidio-spoke >/dev/null
+docker stop llm-security-presidio-spoke >/dev/null
 chat "$PUBLIC_TOKEN" \
   '{"message":"비밀번호 변경 절차를 알려 주세요.","classification":"none","purpose":"public_information"}' \
   > "$WORK/spoke-outage.json"
 jq -e '.application_decision == "infra" and .upstream_called == false' \
   "$WORK/spoke-outage.json" >/dev/null
 
-podman logs llm-security-application-gateway > "$WORK/application.log"
-podman logs llm-security-nemo-hub > "$WORK/hub.log"
-podman logs llm-security-presidio-spoke > "$WORK/presidio.log" 2>&1 || true
+docker logs llm-security-application-gateway > "$WORK/application.log"
+docker logs llm-security-nemo-hub > "$WORK/hub.log"
+docker logs llm-security-presidio-spoke > "$WORK/presidio.log" 2>&1 || true
 ! grep -F 'Ignore previous instructions' "$WORK/application.log" "$WORK/hub.log" "$WORK/presidio.log"
 ! grep -F 'sk-demo-12345' "$WORK/application.log" "$WORK/hub.log" "$WORK/presidio.log"
 grep -F 'request_id' "$WORK/application.log" "$WORK/hub.log" "$WORK/presidio.log" >/dev/null

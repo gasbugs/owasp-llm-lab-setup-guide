@@ -27,7 +27,7 @@ class Day7GuardrailLoopTests(unittest.TestCase):
             (ROOT / "examples/day6/garak-guardrail/rest-generator.json").read_text()
         )
         config = data["rest"]["RestGenerator"]
-        self.assertEqual(config["uri"], "http://10.0.2.2:18090/api/chat")
+        self.assertEqual(config["uri"], "http://day6-guardrail-ui:8000/api/chat")
         self.assertEqual(config["req_template_json_object"], {"message": "$INPUT"})
         self.assertEqual(config["response_json_field"], "reply")
 

@@ -40,6 +40,8 @@ write_module08_compose_env() {
   {
     printf 'AWS_PROFILE=%s\n' "$aws_profile"
     printf 'AWS_REGION=%s\n' "$aws_region"
+    printf 'LOCAL_UID=%s\n' "$(id -u)"
+    printf 'LOCAL_GID=%s\n' "$(id -g)"
     printf 'BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0\n'
     printf 'MODULE08_KNOWLEDGE_BASE_ID=%s\n' "$current_knowledge_base_id"
     printf 'PRESIDIO_INTERNAL_TOKEN=%s\n' "$presidio_token"

@@ -6,7 +6,7 @@ logging {
 }
 
 // The application sends structured security logs and trace spans over OTLP.
-// Alloy does not receive the Podman API socket; the observed application
+// Alloy does not receive the Docker API socket; the observed application
 // explicitly chooses which security events cross this telemetry boundary.
 // Memory limiting and batching happen before independent Loki and Tempo exports.
 otelcol.receiver.otlp "application" {

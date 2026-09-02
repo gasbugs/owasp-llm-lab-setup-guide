@@ -4,8 +4,7 @@
 # 기본 모드:
 #   - 검증된 PID 파일의 LLM08 learner mini app 종료
 #   - lab-* 컨테이너 stop/remove
-#   - Compose 컨테이너와 이전 Quadlet .container 파일 제거
-#   - systemd user unit reload
+#   - 이 과정의 Docker Compose 컨테이너와 network 제거
 #   - 작업물과 모델 캐시는 보존
 #
 # 완전 정리:
@@ -80,12 +79,14 @@ if curl -fsS --max-time 1 http://127.0.0.1:18080/healthz >/dev/null 2>&1; then
 fi
 
 if id ubuntu >/dev/null 2>&1; then
-  UBUNTU_UID=$(id -u ubuntu)
-  systemctl start "user@$UBUNTU_UID.service" >/dev/null 2>&1 || true
-
-  runuser -u ubuntu -- env XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID" bash <<'CLEANSH'
+  runuser -u ubuntu -- bash <<'CLEANSH'
 set -euo pipefail
-units=(
+compose_dir=/home/ubuntu/.config/owasp-llm-lab
+if [ -f "$compose_dir/compose.yaml" ]; then
+  docker compose --project-directory "$compose_dir" \
+    -f "$compose_dir/compose.yaml" down --remove-orphans
+fi
+containers=(
   lab-ollama
   lab-prompt-rag
   lab-data-rag
@@ -97,49 +98,12 @@ units=(
   lab-fake-registry
   lab-llmgoat
   lab-portal
-  # Legacy date-based names retained only for migration cleanup.
-  lab-day1-vuln-rag
-  lab-day2-vuln-rag
-  lab-day3-vuln-rag
-  lab-day4-vuln-rag
-  lab-day5-vuln-rag
-  lab-day3-vuln-agent
-  lab-day3-dvla
-  lab-day2-fake-registry
   lab-vuln-rag
 )
-for unit in "${units[@]}"; do
-  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
-  systemctl --user reset-failed "$unit.service" >/dev/null 2>&1 || true
+for container in "${containers[@]}"; do
+  docker rm -f "$container" >/dev/null 2>&1 || true
 done
-for container in "${units[@]}"; do
-  podman rm -f "$container" >/dev/null 2>&1 || true
-done
-systemctl --user daemon-reload || true
 CLEANSH
-
-  rm -f /home/ubuntu/.config/containers/systemd/lab-ollama.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-prompt-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-data-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-output-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-knowledge-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-resource-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-day1-vuln-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-day2-vuln-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-day3-vuln-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-day4-vuln-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-day5-vuln-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-day3-vuln-agent.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-day3-dvla.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-day2-fake-registry.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-portal.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-vuln-rag.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-vuln-agent.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-llmgoat.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-dvla.container
-  rm -f /home/ubuntu/.config/containers/systemd/lab-fake-registry.container
-
-  runuser -u ubuntu -- env XDG_RUNTIME_DIR="/run/user/$UBUNTU_UID" systemctl --user daemon-reload || true
 
   if [ "$PURGE" = true ]; then
     echo "Purging model/cache/generated lab data..."

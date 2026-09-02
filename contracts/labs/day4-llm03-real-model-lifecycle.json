@@ -217,7 +217,7 @@
   "state": {
     "mutation_type": "host-file",
     "reset": "remove only llm03-qwen-poisoned:q4_k_m and llm03-named containers; preserve ~/work/llm03-real-lifecycle/evidence",
-    "process_stop": "podman rm -f llm03-day4-ui llm03-model-registry llm03-openbao; podman network rm llm03-lifecycle",
+    "process_stop": "docker rm -f llm03-day4-ui llm03-model-registry llm03-openbao; docker network rm llm03-lifecycle",
     "evidence_policy": "Preserve candidate, training, GGUF, Transit, registry, Ollama, UI raw records and hashes; never delete unrelated ~/work or Terraform plans.",
     "ec2_required": true
   },

@@ -21,9 +21,9 @@
   },
   "runtime": {
     "runner_script": "tools/run_lab_contract.py",
-    "execution_mode": "podman-suite",
+    "execution_mode": "docker-suite",
     "event_name": "presidio_scan",
-    "observation_command": "podman logs",
+    "observation_command": "docker logs",
     "build_context": "examples/day6/presidio",
     "image": "localhost/day6-presidio:2.2.362",
     "container_prefix": "lecture-loop-day6-presidio",
@@ -127,8 +127,8 @@
   "state": {
     "mutation_type": "process",
     "reset": null,
-    "process_stop": "podman rm -f <unique-contract-container>",
-    "evidence_policy": "Preserve policy events, raw podman logs, stderr, command identity, and sha256; remove only the unique one-shot container.",
+    "process_stop": "docker rm -f <unique-contract-container>",
+    "evidence_policy": "Preserve policy events, raw Docker logs, stderr, command identity, and sha256; remove only the unique one-shot container.",
     "ec2_required": true
   },
   "watch_paths": {

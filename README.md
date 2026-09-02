@@ -11,12 +11,12 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 | `docs/STUDENT-QUICKSTART.md` | 수강생이 따라 하는 Day 0 셋업 절차 |
 | `docs/LAB-RESET-POLICY.md` | Day 1~5 상태 저장 위치와 allowlist 기반 최소 복원 명령 |
 | `docs/LLM08-SETUP.md` | LLM08 embedding runtime·분석 venv·학습자 미니 앱의 신규/기존 EC2 설치와 종료 절차 |
-| `docs/DAY6-GUARDRAILS-SETUP.md` | Microsoft Presidio·NeMo Guardrails rootless Podman 이미지 빌드와 실측 검증 |
+| `docs/DAY6-GUARDRAILS-SETUP.md` | Microsoft Presidio·NeMo Guardrails Docker 이미지 빌드와 실측 검증 |
 | `bedrock-api-lab/` | 기존 GPU 환경과 독립된 Nova Lite·Titan Embeddings·Knowledge Base API 실습 |
 | `docs/ARCHITECTURE.md` | AWS VM, Terraform, user-data, 컨테이너 배포 구조 |
 | `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 공개 GHCR에 push하는 절차 |
 | `docs/LIVE-VALIDATION.md` | commit 태그와 resolved digest로 EC2 런타임을 설치하고 증거를 회수하는 강사용 절차 |
-| `docs/TROUBLESHOOTING.md` | quota, SSM, Terraform, Podman, Ollama 문제 해결 |
+| `docs/TROUBLESHOOTING.md` | quota, SSM, Terraform, Docker, Ollama 문제 해결 |
 | `infrastructure/terraform/` | VPC, 보안 그룹, EC2 GPU 인스턴스, IAM, Budget 알람 |
 | `infrastructure/terraform/user-data.sh.tpl` | 선택적 자동 설치용 user-data 래퍼. 기본값에서는 비활성화 |
 | `infrastructure/scripts/student/` | 수강생용 preflight, 수동 설치/클린업, instance-id, start, stop, sync 헬퍼 |
@@ -34,12 +34,12 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 
 Ubuntu 로컬 PC의 선택적 도구 설치는
 [`infrastructure/scripts/student/setup-workstation-ubuntu.sh`](infrastructure/scripts/student/setup-workstation-ubuntu.sh)를
-사용합니다. 이 스크립트는 로컬 워크스테이션만 준비하며 EC2의 Podman 실습
+사용합니다. 이 스크립트는 로컬 워크스테이션만 준비하며 EC2의 Docker 실습
 런타임 설치를 대신하지 않습니다.
 
-Day 2 LLM08에서는 일반 셋업 뒤 [docs/LLM08-SETUP.md](docs/LLM08-SETUP.md)의 `bge-m3:latest`/Day 4 API 검증, 미니 앱 실행·SSM forwarding·증거 보존을 추가로 수행합니다. 강사·콘텐츠 배포자가 먼저 publish gate를 통과해 40자리 setup commit을 공지하며, 수강생은 로컬 PC에 Podman을 추가 설치하지 않습니다. LLM08 변경이 로컬 워킹트리에만 있거나 같은 commit의 이미지가 아직 공개 GHCR에 없으면 gate에서 중단하며, 현재 원격 `main`에 이미 배포됐다고 가정하지 않습니다.
+Day 2 LLM08에서는 일반 셋업 뒤 [docs/LLM08-SETUP.md](docs/LLM08-SETUP.md)의 `bge-m3:latest`/Day 4 API 검증, 미니 앱 실행·SSM forwarding·증거 보존을 추가로 수행합니다. 강사·콘텐츠 배포자가 먼저 publish gate를 통과해 40자리 setup commit을 공지하며, 수강생은 로컬 PC에 Docker을 추가 설치하지 않습니다. LLM08 변경이 로컬 워킹트리에만 있거나 같은 commit의 이미지가 아직 공개 GHCR에 없으면 gate에서 중단하며, 현재 원격 `main`에 이미 배포됐다고 가정하지 않습니다.
 
-Day 6 가드레일 실습은 [docs/DAY6-GUARDRAILS-SETUP.md](docs/DAY6-GUARDRAILS-SETUP.md)를 따릅니다. 두 프레임워크는 호스트 Python이 아니라 독립된 rootless Podman 이미지에 설치되며, 기존 one-shot CLI와 loopback HTTP 통합 서버를 함께 제공합니다.
+Day 6 가드레일 실습은 [docs/DAY6-GUARDRAILS-SETUP.md](docs/DAY6-GUARDRAILS-SETUP.md)를 따릅니다. 두 프레임워크는 호스트 Python이 아니라 독립된 Docker 이미지에 설치되며, 기존 one-shot CLI와 loopback HTTP 통합 서버를 함께 제공합니다.
 
 가장 짧은 흐름은 다음과 같습니다.
 
@@ -75,9 +75,9 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 2. Terraform이 수강생별 EC2 `g6.xlarge` 1대를 만듭니다.
 3. 기본값에서는 user-data 자동 설치가 실행되지 않습니다.
 4. 수강생이 SSM으로 EC2에 접속해 `install-lab.sh`를 직접 실행합니다.
-5. 설치 스크립트가 Podman을 설치하고 실습 컨테이너 이미지를 pull합니다.
+5. 설치 스크립트가 Docker을 설치하고 실습 컨테이너 이미지를 pull합니다.
 6. `lab-ollama`, `lab-portal`, `lab-prompt-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, `lab-vuln-agent`, `lab-llmgoat`, `lab-dvla`, `lab-fake-registry` 컨테이너를 실행합니다.
-7. 단일 Podman Compose 정의로 서비스를 실행하고 `restart: always` 정책과 `podman-restart.service`로 EC2 재부팅 후 자동 복구합니다.
+7. 단일 Docker Compose 정의로 서비스를 실행하고 `restart: always` 정책과 `Docker daemon`로 EC2 재부팅 후 자동 복구합니다.
 
 AMI ID나 SHA를 직접 입력하는 변수는 두지 않습니다. 이름·소유자 조건에 맞는 최신 AMI 조회 결과는 새 EC2를 생성할 때 적용되며, 이미 존재하는 수강생 EC2는 EBS 작업물 보호를 위해 현재 AMI를 유지하고 자동 교체하지 않습니다.
 

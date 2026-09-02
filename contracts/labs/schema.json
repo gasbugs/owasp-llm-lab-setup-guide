@@ -61,7 +61,7 @@
       ],
       "properties": {
         "runner_script": {"type": "string", "minLength": 1},
-        "execution_mode": {"enum": ["podman-suite", "host-script"]},
+        "execution_mode": {"enum": ["docker-suite", "host-script"]},
         "event_name": {"enum": ["guard_scan", "presidio_scan", "lab_case"]},
         "observation_command": {"type": "string", "minLength": 1},
         "build_context": {"type": "string", "minLength": 1},

@@ -114,7 +114,7 @@ curl -sS -X POST http://127.0.0.1:18095/api/chat \
 ```
 
 Module 08은 `AUTH_EVENT_SINK=stdout`으로 인증 성공·실패 JSON을 컨테이너 로그에만
-기록하고 `podman logs llm-security-application-gateway`로 확인한다. Module 09는
+기록하고 `docker logs llm-security-application-gateway`로 확인한다. Module 09는
 `AUTH_EVENT_SINK=stdout,monitor`와 Monitor 연결을 사용해 같은 이벤트를 화면에도
 표시한다. `LEGACY_STATIC_TOKEN_MODE=true`를 명시하면 이전 고정 토큰도 계속 사용할
 수 있지만 기본값은 `false`다.

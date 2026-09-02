@@ -30,20 +30,20 @@ Workflow는 `github.actor`와 저장소에 자동 발급되는 `GITHUB_TOKEN`을
 ```bash
 SETUP_COMMIT=$(git rev-parse HEAD)
 for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
-  podman manifest inspect \
+  docker manifest inspect \
     "ghcr.io/gasbugs/owasp-llm-${image}:sha-${SETUP_COMMIT}" >/dev/null
 done
 ```
 
 ## 로컬 수동 빌드
 
-CI 장애 조사나 개인 namespace 검증에는 Podman helper를 사용할 수 있습니다.
+CI 장애 조사나 개인 namespace 검증에는 Docker helper를 사용할 수 있습니다.
 
 사전 조건:
 
-- Podman
-- `write:packages` 권한의 GitHub personal access token으로 `podman login ghcr.io`
-- Linux/amd64 builder 또는 Podman machine
+- Docker
+- `write:packages` 권한의 GitHub personal access token으로 `docker login ghcr.io`
+- Linux/amd64 builder 또는 Docker machine
 
 ```bash
 SETUP_COMMIT=$(git rev-parse HEAD)
@@ -61,7 +61,7 @@ TAG="sha-$SETUP_COMMIT" \
 git fetch origin main
 SETUP_COMMIT=$(git rev-parse origin/main)
 for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
-  sudo -u ubuntu podman pull \
+  sudo -u ubuntu docker pull \
     "ghcr.io/gasbugs/owasp-llm-${image}:sha-${SETUP_COMMIT}"
 done
 ```

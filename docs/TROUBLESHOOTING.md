@@ -69,10 +69,10 @@ SSM 접속 후:
 
 ```bash
 sudo tail -n 200 /var/log/owasp-llm-lab-install.log
-sudo -u ubuntu podman ps -a
-sudo -u ubuntu podman logs lab-ollama --tail 100
-sudo -u ubuntu podman logs lab-prompt-rag --tail 100
-sudo -u ubuntu podman logs lab-data-rag --tail 100
+sudo -u ubuntu docker ps -a
+sudo -u ubuntu docker logs lab-ollama --tail 100
+sudo -u ubuntu docker logs lab-prompt-rag --tail 100
+sudo -u ubuntu docker logs lab-data-rag --tail 100
 ```
 
 흔한 원인:
@@ -86,17 +86,15 @@ sudo -u ubuntu podman logs lab-data-rag --tail 100
 단일 Compose stack과 개별 컨테이너 상태 확인:
 
 ```bash
-sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && podman-compose ps'
-sudo -u ubuntu podman inspect \
+sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && docker compose ps'
+sudo -u ubuntu docker inspect \
   --format '{{.State.Status}} {{.HostConfig.RestartPolicy.Name}} {{json .NetworkSettings.Ports}}' \
   lab-prompt-rag
 ```
 
-`lab-*.service`가 남아 있으면 이전 Quadlet 설치 흔적입니다. 최신 `install-lab.sh`를 다시 실행하면 이전 unit을 중지·제거하고 Compose stack으로 전환합니다.
-
 ## 설치를 깨끗하게 다시 하고 싶을 때
 
-SSM 세션 안에서 실행합니다. 기본 클린업은 Compose 컨테이너와 이전 Quadlet unit만 제거하고 작업물과 모델 캐시는 보존합니다.
+SSM 세션 안에서 실행합니다. 기본 클린업은 Compose 컨테이너만 제거하고 작업물과 모델 캐시는 보존합니다.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/cleanup-lab.sh | sudo bash
@@ -120,12 +118,12 @@ sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
 그 후 컨테이너 재시작:
 
 ```bash
-sudo -u ubuntu podman restart lab-ollama
+sudo -u ubuntu docker restart lab-ollama
 ```
 
 ## LLM08 embedding/API/미니 앱 문제
 
-정상 설치와 재설치 순서는 [LLM08 embedding lab setup](LLM08-SETUP.md)이 정본입니다. 먼저 **강사·콘텐츠 배포자가 공개 main source와 같은 commit의 GHCR 이미지가 모두 있는지** 확인합니다. 아래 publish gate는 강사용이며, 수강생은 공지된 40자리 setup commit을 사용하고 로컬 PC에 Podman을 추가 설치하지 않습니다. 로컬 워킹트리에만 있는 파일은 EC2 installer나 image에 자동 반영되지 않습니다.
+정상 설치와 재설치 순서는 [LLM08 embedding lab setup](LLM08-SETUP.md)이 정본입니다. 먼저 **강사·콘텐츠 배포자가 공개 main source와 같은 commit의 GHCR 이미지가 모두 있는지** 확인합니다. 아래 publish gate는 강사용이며, 수강생은 공지된 40자리 setup commit을 사용하고 로컬 PC에 Docker을 추가 설치하지 않습니다. 로컬 워킹트리에만 있는 파일은 EC2 installer나 image에 자동 반영되지 않습니다.
 
 ```bash
 # [로컬 노트북] setup repo 루트
@@ -135,7 +133,7 @@ SETUP_COMMIT=$(git rev-parse origin/main)
 IMAGE_TAG="sha-$SETUP_COMMIT"
 git cat-file -e "$SETUP_COMMIT:examples/llm08/mini_vector_search_app.py"
 git cat-file -e "$SETUP_COMMIT:docker/vuln-rag/app/embedding.py"
-podman manifest inspect \
+docker manifest inspect \
   "ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG" >/dev/null
 ```
 
@@ -145,8 +143,8 @@ runtime 상태를 한 번에 수집합니다.
 # [EC2 / SSM 세션, ubuntu 사용자]
 set -euo pipefail
 grep -E '^(SCRIPT_VERSION|IMAGE_TAG|OLLAMA_EMBED_MODEL)=' /etc/lab/env
-podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
-podman exec lab-ollama ollama list
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+docker exec lab-ollama ollama list
 curl -fsS --max-time 10 http://127.0.0.1:8012/healthz | jq
 test -x "$HOME/work/llm08-analysis-venv/bin/python"
 "$HOME/work/llm08-analysis-venv/bin/python" -c 'import numpy; print(numpy.__version__)'
@@ -168,8 +166,8 @@ test -x "$HOME/work/llm08-analysis-venv/bin/python"
 # [EC2 / SSM 세션, ubuntu 사용자]
 set -euo pipefail
 tail -n 200 /var/log/owasp-llm-lab-install.log
-podman logs --tail 200 lab-knowledge-rag
-podman logs --tail 200 lab-ollama
+docker logs --tail 200 lab-knowledge-rag
+docker logs --tail 200 lab-ollama
 
 curl -fsS --retry 2 --retry-all-errors --max-time 180 \
   http://127.0.0.1:8012/api/embed \

@@ -2,7 +2,7 @@
 
 This document records where the installed Day 1–5 runtime keeps state and the
 smallest supported learner reset. The classification comes from the application
-source and the canonical Podman Compose definition installed by
+source and the canonical Docker Compose definition installed by
 `install-lab.sh`.
 
 ## Learner reset commands

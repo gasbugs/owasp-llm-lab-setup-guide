@@ -1,6 +1,6 @@
 # Runtime container images
 
-`docker/`는 EC2 실습 런타임의 이미지 정의입니다. 배포의 단일 기준은 `infrastructure/scripts/student/install-lab.sh`가 생성하는 Podman rootless Quadlet unit입니다. 이전의 단일 시나리오 Compose 구성은 고정 포트 동시 실행 계약과 충돌하여 제거했습니다.
+`docker/`는 EC2 실습 런타임의 image 정의입니다. 배포의 단일 기준은 `infrastructure/scripts/student/install-lab.sh`가 내려받는 `infrastructure/compose/compose.yaml`입니다. Docker Engine과 Docker Compose v2가 모든 서비스를 같은 계약으로 실행합니다.
 
 ## 이미지 세트
 
@@ -14,7 +14,7 @@
 | `ollama/ollama` | 공용 로컬 모델 API | 11434 |
 | `python:3.12-slim` | Portal과 fake registry의 경량 런타임 | 8080, 8002 |
 
-설치 스크립트는 같은 `vuln-rag` 이미지를 다섯 Quadlet unit으로 동시에 실행하며 `DEFAULT_SCENARIO`, `PORT`, uvicorn `Exec`를 함께 고정합니다.
+설치 스크립트는 같은 `vuln-rag` image를 다섯 Compose service로 동시에 실행하며 `DEFAULT_SCENARIO`, `PORT`, 실행 command를 함께 고정합니다.
 
 | 컨테이너 | scenario | 포트 |
 |---|---|---:|
@@ -67,7 +67,7 @@ TAG="sha-$SETUP_COMMIT" \
 
 ## EC2 운영
 
-수동 `podman run` 대신 저장소 루트의 설치 스크립트를 사용합니다. 설치 스크립트가 단일 Compose 정의를 내려받아 실행합니다.
+수동 `docker run` 대신 저장소 루트의 설치 스크립트를 사용합니다. 설치 스크립트가 단일 Compose 정의를 내려받아 실행합니다.
 
 ```bash
 git fetch origin main
@@ -76,8 +76,8 @@ sudo env IMAGE_NAMESPACE=gasbugs IMAGE_TAG="sha-$SETUP_COMMIT" \
   LAB_SETUP_REPO_RAW_URL="https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/$SETUP_COMMIT" \
   bash infrastructure/scripts/student/install-lab.sh
 
-sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-sudo -u ubuntu podman logs --tail 100 lab-output-rag
+sudo -u ubuntu docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+sudo -u ubuntu docker logs --tail 100 lab-output-rag
 ```
 
 모든 서비스는 Compose의 격리된 network를 사용하고 host의 동일 번호에 포트를 publish합니다. 설치 스크립트는 `Network=host` 부재, 각 mapping과 localhost health를 모두 검사합니다. 설치된 정의는 EC2의 `~/.config/owasp-llm-lab/compose.yaml`에서 확인합니다.

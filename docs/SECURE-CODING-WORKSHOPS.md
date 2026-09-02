@@ -1,6 +1,6 @@
 # 취약 코드와 안전 코드를 같은 호출 지점에서 전환하는 실습
 
-이 문서는 NodeGoat 방식의 보안 코딩 실습이 실제로 연결되는 소스와 API를 정의한다. 각 전환 지점은 `NODEGOAT-LAB`, `VULNERABLE-ACTIVE`, `SAFE-ENABLE` 표식을 사용한다. 앱 source는 이미지의 `/app/app`에 포함되며 host source나 volume을 그 경로에 mount하지 않는다. 수강생은 `podman cp <컨테이너>:<파일> ./<파일>`로 source를 꺼내 로컬 `vi`로 편집한 뒤 `podman cp ./<파일> <컨테이너>:<파일>`로 되돌린다. 활성화된 취약 호출 한 줄을 주석 처리하고 바로 아래 안전 호출 한 줄을 주석 해제한 뒤 `podman restart <컨테이너>`로 같은 컨테이너를 다시 실행한다. 여섯 편집 대상은 Compose의 `restart: always` 정책으로 실행되므로 같은 container ID와 수정 코드가 유지된다. 최초 취약 상태가 필요할 때는 `reset-lab <lab-id>`가 allowlist에 있는 Compose 서비스만 배포 이미지에서 다시 생성한다.
+이 문서는 NodeGoat 방식의 보안 코딩 실습이 실제로 연결되는 소스와 API를 정의한다. 각 전환 지점은 `NODEGOAT-LAB`, `VULNERABLE-ACTIVE`, `SAFE-ENABLE` 표식을 사용한다. 앱 source는 이미지의 `/app/app`에 포함되며 host source나 volume을 그 경로에 mount하지 않는다. 수강생은 `docker cp <컨테이너>:<파일> ./<파일>`로 source를 꺼내 로컬 `vi`로 편집한 뒤 `docker cp ./<파일> <컨테이너>:<파일>`로 되돌린다. 활성화된 취약 호출 한 줄을 주석 처리하고 바로 아래 안전 호출 한 줄을 주석 해제한 뒤 `docker restart <컨테이너>`로 같은 컨테이너를 다시 실행한다. 여섯 편집 대상은 Compose의 `restart: always` 정책으로 실행되므로 같은 container ID와 수정 코드가 유지된다. 최초 취약 상태가 필요할 때는 `reset-lab <lab-id>`가 allowlist에 있는 Compose 서비스만 배포 이미지에서 다시 생성한다.
 
 | 항목 | 전환할 소스 | 같은 요청을 재사용할 API | 코드로 강제하는 경계 |
 |---|---|---|---|

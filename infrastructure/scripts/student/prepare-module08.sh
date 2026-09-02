@@ -20,12 +20,18 @@ COMPOSE_ENV_FILE=$CONTROL_ROOT/.state/module08-compose.env
 pass() { printf '[PASS] %s\n' "$*"; }
 fail() { printf '[FAIL] %s\n' "$*" >&2; exit 1; }
 
-for command in podman curl jq; do
+for command in docker curl jq; do
   command -v "$command" >/dev/null 2>&1 || fail "required command missing: $command"
 done
 test -d "$CONTROL_ROOT" || fail "control-plane source missing: $CONTROL_ROOT"
-podman network exists llm-security-observability \
+docker network inspect llm-security-observability \
   || fail "Module 09 network is unavailable; deploy the observability stack first"
+for container in llm-sec-loki llm-sec-tempo llm-sec-prometheus llm-sec-alloy; do
+  docker container inspect "$container" \
+    || fail "Module 09 service is unavailable: $container; run the 09-05 full Compose command"
+  [ "$(docker inspect -f '{{.State.Running}}' "$container")" = true ] \
+    || fail "Module 09 service is not running: $container; run the 09-05 full Compose command"
+done
 curl -fsS http://127.0.0.1:8014/healthz >/dev/null \
   || fail "Module 09 monitoring gateway is unavailable"
 
@@ -45,7 +51,7 @@ set +a
 TELEMETRY_TOKEN=$TELEMETRY_INGEST_TOKEN
 
 if [ "$MODE" != verify ]; then
-  if ! podman image exists localhost/llm-security-application-gateway:1.0.0; then
+  if ! docker image inspect localhost/llm-security-application-gateway:1.0.0; then
     bash "$CONTROL_ROOT/deploy/build-images.sh"
   fi
   TELEMETRY_INGEST_TOKEN="$TELEMETRY_TOKEN" \

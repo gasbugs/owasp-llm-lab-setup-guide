@@ -1,5 +1,5 @@
-# Base image가 예고 없이 바뀌지 않도록 Python 이미지를 digest로 고정한다.
-FROM docker.io/library/python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+# 검증한 Python patch version을 읽기 쉬운 tag로 고정한다.
+FROM docker.io/library/python:3.12.14-slim
 
 # 사용량 통계를 끄고, 로그와 로컬 embedding cache 경로를 명시한다.
 ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 \
@@ -20,6 +20,7 @@ RUN apt-get update \
 
 WORKDIR /app
 # telemetry, 모델 잠금, Rail 정책과 집행 코드는 읽기 전용으로 이미지에 넣는다.
+RUN install -d -m 0555 /app/policies
 COPY --chmod=0444 shared/telemetry.py /app/telemetry.py
 COPY --chmod=0444 versions.lock.yaml /app/versions.lock.yaml
 COPY --chmod=0444 policies/control-plane-policy.yaml /app/policies/control-plane-policy.yaml

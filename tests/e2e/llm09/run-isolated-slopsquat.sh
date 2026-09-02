@@ -15,8 +15,8 @@ if [[ ! "$SLOPSQUAT_PACKAGE" =~ ^[a-z0-9]+([._-][a-z0-9]+)*$ ]]; then
   exit 2
 fi
 
-command -v podman >/dev/null 2>&1 || {
-  echo "INFRA: podman is required" >&2
+command -v docker >/dev/null 2>&1 || {
+  echo "INFRA: docker is required" >&2
   exit 3
 }
 
@@ -46,8 +46,8 @@ case "$PYPI_STATUS" in
 esac
 
 cleanup() {
-  podman rm -f "$MIRROR_CONTAINER" >/dev/null 2>&1 || true
-  podman network rm -f "$NETWORK" >/dev/null 2>&1 || true
+  docker rm -f "$MIRROR_CONTAINER" >/dev/null 2>&1 || true
+  docker network rm -f "$NETWORK" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -125,17 +125,17 @@ wheel_sha = hashlib.sha256(wheel_path.read_bytes()).hexdigest()
 )
 PY
 
-podman network create --internal "$NETWORK" >"$RAW_DIR/network-create.txt"
-podman run -d --name "$MIRROR_CONTAINER" \
+docker network create --internal "$NETWORK" >"$RAW_DIR/network-create.txt"
+docker run -d --name "$MIRROR_CONTAINER" \
   --network "$NETWORK" \
   -v "$MIRROR_DIR:/srv:ro" -w /srv \
   "$PYTHON_IMAGE" python -m http.server 8003 \
   >"$RAW_DIR/mirror-container-id.txt"
 
 # An internal Netavark network intentionally has no external DNS and, on some
-# Podman versions, does not publish container-name DNS either.  Resolve the
+# Docker versions, does not publish container-name DNS either.  Resolve the
 # address from the runtime network attachment instead of weakening isolation.
-MIRROR_HOST="$(podman inspect "$MIRROR_CONTAINER" \
+MIRROR_HOST="$(docker inspect "$MIRROR_CONTAINER" \
   | jq -er --arg network "$NETWORK" \
       '.[0].NetworkSettings.Networks[$network].IPAddress
        | select(type == "string" and length > 0)')" || {
@@ -146,7 +146,7 @@ printf 'mirror_host=%s\n' "$MIRROR_HOST" >"$RAW_DIR/mirror-endpoint.txt"
 
 mirror_ready=false
 for _ in $(seq 1 20); do
-  if podman run --rm --network "$NETWORK" "$PYTHON_IMAGE" \
+  if docker run --rm --network "$NETWORK" "$PYTHON_IMAGE" \
     python -c 'import urllib.request; urllib.request.urlopen("http://'"$MIRROR_HOST"':8003/simple/", timeout=3).read()' \
     >"$RAW_DIR/mirror-reachability.txt" 2>&1; then
     mirror_ready=true
@@ -160,14 +160,14 @@ done
 }
 
 # --internal network에서 public PyPI가 열리면 격리 계약 위반이다.
-if podman run --rm --network "$NETWORK" "$PYTHON_IMAGE" \
+if docker run --rm --network "$NETWORK" "$PYTHON_IMAGE" \
   python -c 'import urllib.request; urllib.request.urlopen("https://pypi.org/simple/pip/", timeout=3).read(1)' \
   >"$RAW_DIR/egress-probe.txt" 2>&1; then
   echo "FAIL: victim network unexpectedly reached public PyPI" >&2
   exit 1
 fi
 
-podman run --rm --network "$NETWORK" \
+docker run --rm --network "$NETWORK" \
   -v "$EVIDENCE_DIR:/evidence" \
   "$PYTHON_IMAGE" sh -ec '
     python -m pip install --disable-pip-version-check --no-cache-dir --no-deps \

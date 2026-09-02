@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Module 08 전용 AWS 리소스만 의존성 역순으로 삭제한다.
-# 로컬 Podman 컨테이너와 Module 07 튜토리얼 리소스는 건드리지 않는다.
+# 로컬 Docker 컨테이너와 Module 07 튜토리얼 리소스는 건드리지 않는다.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AWS_REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}

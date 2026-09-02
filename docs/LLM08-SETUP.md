@@ -32,7 +32,7 @@ LLM08 환경은 다음 구성요소를 함께 사용합니다.
 2. `Test, Build & Push Runtime Images`가 그 commit의 이미지 다섯 개를 공개 GHCR에 publish했다.
 3. 설치 스크립트 commit과 이미지의 `sha-<commit>` tag가 같다.
 
-아래 명령은 **강사·콘텐츠 배포자**가 한 번 실행하는 release gate입니다. 수강생은 로컬에 Podman을 추가 설치하지 않고, 강사가 `PUBLISH_GATE=PASS`와 함께 공지한 40자리 `SETUP_COMMIT`을 사용합니다. gate가 실패하면 **EC2를 생성하거나 시작하지 말고** commit push와 이미지 workflow 완료를 기다립니다. `latest`가 우연히 존재하는 것만으로는 새 LLM08 기능의 배포를 증명하지 못합니다.
+아래 명령은 **강사·콘텐츠 배포자**가 한 번 실행하는 release gate입니다. 수강생은 로컬에 Docker을 추가 설치하지 않고, 강사가 `PUBLISH_GATE=PASS`와 함께 공지한 40자리 `SETUP_COMMIT`을 사용합니다. gate가 실패하면 **EC2를 생성하거나 시작하지 말고** commit push와 이미지 workflow 완료를 기다립니다. `latest`가 우연히 존재하는 것만으로는 새 LLM08 기능의 배포를 증명하지 못합니다.
 
 ```bash
 # [로컬 노트북] setup repo 루트
@@ -65,14 +65,14 @@ git grep -Fq 'bge-m3:latest' "$SETUP_COMMIT" -- \
   infrastructure/scripts/student/install-lab.sh
 git grep -Fq '/api/embed' "$SETUP_COMMIT" -- docker/vuln-rag/app/main.py
 
-command -v podman >/dev/null || {
-  echo "ERROR: podman is required for the anonymous GHCR manifest gate" >&2
+command -v docker >/dev/null || {
+  echo "ERROR: docker is required for the anonymous GHCR manifest gate" >&2
   exit 1
 }
 IMAGE_TAG="sha-$SETUP_COMMIT"
 for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
   ref="ghcr.io/gasbugs/owasp-llm-${image}:${IMAGE_TAG}"
-  podman manifest inspect "$ref" >/dev/null || {
+  docker manifest inspect "$ref" >/dev/null || {
     echo "ERROR: image is not published or public: $ref" >&2
     exit 1
   }
@@ -207,11 +207,11 @@ mkdir -p "$PREUPDATE_DIR"
 if [ -r /etc/lab/env ]; then
   cp /etc/lab/env "$PREUPDATE_DIR/lab-env.before"
 fi
-if command -v podman >/dev/null; then
-  podman ps --format '{{.Names}}\t{{.Image}}\t{{.Status}}' \
-    > "$PREUPDATE_DIR/podman-ps.before.txt"
+if command -v docker >/dev/null; then
+  docker ps --format '{{.Names}}\t{{.Image}}\t{{.Status}}' \
+    > "$PREUPDATE_DIR/docker-ps.before.txt"
 else
-  printf 'podman_not_installed\n' > "$PREUPDATE_DIR/podman-ps.before.txt"
+  printf 'docker_not_installed\n' > "$PREUPDATE_DIR/docker-ps.before.txt"
 fi
 printf 'PREUPDATE_DIR=%s\n' "$PREUPDATE_DIR"
 ```
@@ -280,7 +280,7 @@ test "$(awk -F= '$1 == "OLLAMA_EMBED_MODEL" {print $2}' /etc/lab/env)" \
 for container in \
   lab-prompt-rag lab-data-rag lab-output-rag \
   lab-knowledge-rag lab-resource-rag; do
-  test "$(podman inspect --format '{{.ImageName}}' "$container")" \
+  test "$(docker inspect --format '{{.Config.Image}}' "$container")" \
     = "ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG"
 done
 printf 'INSTALL_PIN=PASS\n'
@@ -312,9 +312,9 @@ curl -fsS --max-time 10 http://127.0.0.1:8012/healthz \
   | tee "$EVIDENCE_DIR/day4-health.json" \
   | jq -e '.ok == true and .default_scenario == "day4"' >/dev/null
 
-podman exec lab-ollama ollama list \
+docker exec lab-ollama ollama list \
   | tee "$EVIDENCE_DIR/ollama-list.txt"
-podman exec lab-ollama ollama list \
+docker exec lab-ollama ollama list \
   | awk 'NR > 1 {print $1}' \
   | grep -qx 'bge-m3:latest'
 
@@ -632,15 +632,15 @@ printf 'EC2_FINAL_STATE=%s\n' "$STATE"
 | 증상 | 확인 | 원인과 조치 |
 |---|---|---|
 | publish gate에서 source file 없음 | `git cat-file -e "$SETUP_COMMIT:examples/llm08/mini_vector_search_app.py"` | 변경이 아직 공개 main에 없음. commit/push 후 다시 확인 |
-| GHCR manifest 없음/unauthorized | `podman manifest inspect ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG` | workflow 미완료 또는 package 비공개. EC2를 시작하지 말고 publish 완료 |
+| GHCR manifest 없음/unauthorized | `docker manifest inspect ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG` | workflow 미완료 또는 package 비공개. EC2를 시작하지 말고 publish 완료 |
 | `/api/embed`가 404 | `/healthz`의 `default_scenario`, `/etc/lab/env`의 `IMAGE_TAG` | 잘못된 포트 또는 구 이미지. Day 4의 pinned image로 재설치 |
 | `/api/embed`가 401 | Authorization header 확인 | `LLM08_TOKEN` 누락/오류. body의 tenant로 대체하지 않음 |
-| `/api/embed`가 502 | `podman logs lab-knowledge-rag`, Ollama `/api/tags` | Ollama 미준비, embedding model 누락, backend 응답 계약 위반 |
-| `bge-m3:latest` 없음 | `podman exec lab-ollama ollama list` | installer가 끝나지 않았거나 model pull 실패. 설치 log 확인 후 같은 pinned installer 재실행 |
+| `/api/embed`가 502 | `docker logs lab-knowledge-rag`, Ollama `/api/tags` | Ollama 미준비, embedding model 누락, backend 응답 계약 위반 |
+| `bge-m3:latest` 없음 | `docker exec lab-ollama ollama list` | installer가 끝나지 않았거나 model pull 실패. 설치 log 확인 후 같은 pinned installer 재실행 |
 | analysis venv 없음 | `test -x ~/work/llm08-analysis-venv/bin/python` | 설치가 10단계 전에 실패했거나 구 installer. `/var/log/owasp-llm-lab-install.log` 확인 |
 | scaffold 없음 | `$SETUP_DIR`의 HEAD와 파일 확인 | setup repo가 다른 commit이거나 publish 전 source 사용 |
 | mini app가 18080 bind 실패 | `ss -ltn | grep ':18080'` | 기존 listener를 임의 종료하지 말고 소유 process 확인 후 정리 |
 | 로컬 UI 접속 실패 | Session Manager Plugin, forwarding terminal, local port 확인 | 기본 경로는 forwarding session 재생성. 직접 접속을 선택한 환경은 운영자 자신의 공인 IPv4 `/32`만 허용했는지 확인하고 `0.0.0.0/0`은 사용하지 않음 |
 | `dimensions`가 1024가 아님 | API의 `model`, `/etc/lab/env` 확인 | 1024는 2026-07-13 측정값. 동일 model인지 확인하고 양의 차원·vector 길이 계약으로 판정 |
 
-더 일반적인 SSM, Podman, GPU 문제는 [Troubleshooting](TROUBLESHOOTING.md)을 참조합니다.
+더 일반적인 SSM, Docker, GPU 문제는 [Troubleshooting](TROUBLESHOOTING.md)을 참조합니다.

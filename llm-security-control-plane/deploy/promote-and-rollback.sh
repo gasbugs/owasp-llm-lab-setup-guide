@@ -6,8 +6,8 @@ BASELINE_VERSION="${BASELINE_VERSION:-1.0.0}"
 CANDIDATE_VERSION="${CANDIDATE_VERSION:-1.1.0-candidate}"
 
 for image in application-gateway nemo-policy-hub presidio-privacy-spoke; do
-  podman image exists "localhost/llm-security-$image:$BASELINE_VERSION"
-  podman tag \
+  docker image inspect "localhost/llm-security-$image:$BASELINE_VERSION"
+  docker tag \
     "localhost/llm-security-$image:$BASELINE_VERSION" \
     "localhost/llm-security-$image:$CANDIDATE_VERSION"
 done

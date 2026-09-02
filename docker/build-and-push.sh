@@ -1,9 +1,9 @@
 #!/bin/bash
-# 강사 로컬 빌드 + GitHub Container Registry push (Podman 사용)
+# 강사 로컬 빌드 + GitHub Container Registry push (Docker 사용)
 #
 # 사전조건:
-#   - 본 머신에 podman 설치
-#   - GitHub Packages write 권한이 있는 토큰으로 'podman login ghcr.io' 완료
+#   - 본 머신에 docker 설치
+#   - GitHub Packages write 권한이 있는 토큰으로 'docker login ghcr.io' 완료
 #   - 환경변수 IMAGE_NAMESPACE 설정 (GitHub 사용자명 또는 organization)
 #
 # 사용:
@@ -27,7 +27,7 @@ fi
 for name in base-gpu vuln-rag vuln-agent llmgoat dvla; do
   image="ghcr.io/$NS/owasp-llm-${name}:${TAG}"
   inspect_output="$(mktemp)"
-  if podman manifest inspect "$image" >"$inspect_output" 2>&1; then
+  if docker manifest inspect "$image" >"$inspect_output" 2>&1; then
     rm -f "$inspect_output"
     echo "ERROR: 기존 commit 태그를 덮어쓸 수 없습니다: $image" >&2
     echo "새 commit SHA 태그를 사용하세요." >&2
@@ -57,9 +57,9 @@ build_and_push() {
     extra_args+=(--build-arg "BASE_IMAGE=ghcr.io/$NS/owasp-llm-base-gpu:${TAG}")
   fi
   echo "=== Building $image (context: $context) ==="
-  podman build --platform linux/amd64 "${extra_args[@]}" -t "$image" "$context"
+  docker build --platform linux/amd64 "${extra_args[@]}" -t "$image" "$context"
   echo "=== Pushing $image ==="
-  podman push "$image"
+  docker push "$image"
 }
 
 # base-gpu가 vuln-rag/vuln-agent의 FROM 이미지라 먼저 빌드 + push
@@ -78,4 +78,4 @@ echo "  -var \"image_tag=$TAG\""
 echo "=========================================="
 echo
 echo "이미지 목록:"
-podman images "ghcr.io/$NS/owasp-llm-*"
+docker images "ghcr.io/$NS/owasp-llm-*"

@@ -183,8 +183,8 @@ class LiveControllerContractTest(unittest.TestCase):
         source = (
             ROOT / "tests" / "e2e" / "llm09" / "run-isolated-slopsquat.sh"
         ).read_text(encoding="utf-8")
-        self.assertIn('podman network create --internal "$NETWORK"', source)
-        self.assertIn('MIRROR_HOST="$(podman inspect "$MIRROR_CONTAINER"', source)
+        self.assertIn('docker network create --internal "$NETWORK"', source)
+        self.assertIn('MIRROR_HOST="$(docker inspect "$MIRROR_CONTAINER"', source)
         self.assertIn('--arg network "$NETWORK"', source)
         self.assertIn("http://'\"$MIRROR_HOST\"':8003/simple/", source)
         self.assertNotIn("http://'\"$MIRROR_CONTAINER\"':8003/simple/", source)

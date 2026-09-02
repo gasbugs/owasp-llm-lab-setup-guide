@@ -8,7 +8,7 @@ flowchart TD
   B --> C["VPC + public subnet"]
   C --> D["EC2 GPU instance"]
   A -->|"SSM Session Manager"| D
-  D -->|"manual install-lab.sh"| E["Podman runtime"]
+  D -->|"manual install-lab.sh"| E["Docker runtime"]
   D -. "optional user-data bootstrap" .-> E
   E --> F["lab-ollama :11434"]
   E --> P["lab-portal :8080"]
@@ -80,12 +80,12 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 - EC2 metadata와 tag를 읽어 `/etc/lab/env` 작성
 - `/home/ubuntu/work` 생성
-- Podman rootless와 Podman Compose 실행 환경 설치
+- Docker와 Docker Compose 실행 환경 설치
 - NVIDIA CDI 파일 생성
 - 공개 GHCR에서 실습 이미지 anonymous pull
 - Ollama와 실습 앱 컨테이너 실행
 - Ollama 모델 pull과 warm-up
-- 단일 Compose 정의 실행과 Podman 재시작 정책 등록
+- 단일 Compose 정의 실행과 Docker 재시작 정책 등록
 - Terraform 기본 설정으로 매일 18:00 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 기존 17:30 모드, 야간 반복 모드 또는 custom cron 선택 가능
 
 운영 편의상 자동 설치가 필요하면 `terraform.tfvars`에서 아래 값을 켭니다.
@@ -158,7 +158,7 @@ flowchart LR
 
 | 경계/endpoint | 노출 범위 | 인증·입력 계약 | 용도 |
 |---|---|---|---|
-| Ollama `POST :11434/api/embed` | EC2 host에 publish된 포트, 컨테이너에서는 `host.containers.internal` 사용 | Day 4 backend가 고정 model로 호출 | 실제 embedding 생성 |
+| Ollama `POST :11434/api/embed` | EC2 host에 publish된 포트, 컨테이너에서는 `host.docker.internal` 사용 | Day 4 backend가 고정 model로 호출 | 실제 embedding 생성 |
 | Day 4 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
 | Day 4 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
 | Day 4 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
@@ -172,7 +172,7 @@ LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니�
 
 ```bash
 cd docker
-podman login ghcr.io
+docker login ghcr.io
 IMAGE_NAMESPACE=your-github-id TAG="sha-$(git rev-parse HEAD)" ./build-and-push.sh
 ```
 

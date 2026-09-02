@@ -174,10 +174,10 @@ class StrictShellHarnessContractTest(unittest.TestCase):
         source = self.read("tests/e2e/llm10/test_llm10_consumption.sh")
         reset = self.read("infrastructure/scripts/student/reset-lab")
         self.assertIn('"$reset_script" llm10', source)
-        self.assertNotIn("podman", source)
+        self.assertNotIn("docker", source)
 
         day5_restart = "recreate_one \\\n      lab-resource-rag"
-        ollama_restart = "podman restart lab-ollama"
+        ollama_restart = "docker restart lab-ollama"
         first_day5 = reset.index(day5_restart)
         ollama = reset.index(ollama_restart)
         second_day5 = reset.index(day5_restart, first_day5 + 1)

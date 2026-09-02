@@ -37,7 +37,7 @@ if [[ ! "$BROWSER_HANDOFF_DEADLINE_EPOCH" =~ ^[0-9]{10}$ ]] \
   exit 2
 fi
 
-for command in git jq curl python3 tar sha256sum podman; do
+for command in git jq curl python3 tar sha256sum docker; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "ERROR: required remote command not found: $command" >&2
     exit 2
@@ -114,7 +114,7 @@ finalize() {
   sudo tail -n 500 /var/log/user-data.log >"$RUN_ROOT/user-data-tail.log" 2>&1 || true
   sudo tail -n 1000 /var/log/owasp-llm-lab-install.log \
     >"$RUN_ROOT/install-tail.log" 2>&1 || true
-  sudo -u ubuntu podman ps -a --format json >"$RUN_ROOT/podman-ps.json" 2>&1 || true
+  sudo -u ubuntu docker ps -a --format json >"$RUN_ROOT/docker-ps.json" 2>&1 || true
   git -C "$REPO_ROOT" status --porcelain=v1 >"$RUN_ROOT/setup-git-status.txt" 2>&1 || true
 
   (
@@ -187,9 +187,9 @@ if [ "$DIGEST_RC" -ne 1 ]; then
   BASE_GPU_REF="$IMAGE_REGISTRY/$IMAGE_NAMESPACE/owasp-llm-base-gpu@$base_gpu_digest"
   DIGEST_RC=0
   while IFS=$'\t' read -r name reference expected_tag_digest expected_platform_digest; do
-    inspect_file="$RUN_ROOT/podman-image-$name.json"
-    if ! sudo -u ubuntu podman image inspect "$reference" >"$inspect_file"; then
-      echo "ERROR: required image is absent from Podman storage: $reference" >&2
+    inspect_file="$RUN_ROOT/docker-image-$name.json"
+    if ! sudo -u ubuntu docker image inspect "$reference" >"$inspect_file"; then
+      echo "ERROR: required image is absent from Docker storage: $reference" >&2
       DIGEST_RC=1
       continue
     fi

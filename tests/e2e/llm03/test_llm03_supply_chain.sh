@@ -50,14 +50,14 @@ mlbom_has_base_model() {
 }
 
 verify_model_a_signature() {
-  podman run --rm -v "$TMPDIR:/work:ro" "$COSIGN_IMAGE" \
+  docker run --rm -v "$TMPDIR:/work:ro" "$COSIGN_IMAGE" \
     verify-blob --insecure-ignore-tlog \
     --key /work/A.gguf.pub --signature /work/A.gguf.sig /work/A.gguf \
     >"$RESULTS_DIR/raw/cosign-model-A.txt" 2>&1
 }
 
 reject_model_b_with_a_signature() {
-  if podman run --rm -v "$TMPDIR:/work:ro" "$COSIGN_IMAGE" \
+  if docker run --rm -v "$TMPDIR:/work:ro" "$COSIGN_IMAGE" \
     verify-blob --insecure-ignore-tlog \
     --key /work/A.gguf.pub --signature /work/A.gguf.sig /work/B.gguf \
     >"$RESULTS_DIR/raw/cosign-model-B.txt" 2>&1; then
@@ -111,14 +111,14 @@ echo ""
 # signature, artifact만 받아 cosign verify-blob으로 검증한다. 로컬 fixture라
 # transparency log는 의도적으로 없고, 그 한계를 결과에 함께 기록한다.
 echo "[Part 3] cosign detached signature 검증"
-command -v podman >/dev/null 2>&1 || {
-  echo "INFRA: cosign 검증 컨테이너를 실행할 podman이 없음" >&2
+command -v docker >/dev/null 2>&1 || {
+  echo "INFRA: cosign 검증 컨테이너를 실행할 docker이 없음" >&2
   exit 3
 }
 fetch_registry "$REGISTRY/models/A.gguf.pub" -o "$TMPDIR/A.gguf.pub"
 fetch_registry "$REGISTRY/models/A.gguf.sig" -o "$TMPDIR/A.gguf.sig"
-if ! podman image exists "$COSIGN_IMAGE"; then
-  podman pull "$COSIGN_IMAGE" >/dev/null || {
+if ! docker image inspect "$COSIGN_IMAGE"; then
+  docker pull "$COSIGN_IMAGE" >/dev/null || {
     echo "INFRA: pinned cosign image pull failed" >&2
     exit 3
   }

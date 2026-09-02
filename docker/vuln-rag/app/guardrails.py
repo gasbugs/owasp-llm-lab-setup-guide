@@ -18,10 +18,10 @@ class GuardrailProxy:
             raise ValueError("GUARD_ENGINE must be off, presidio, or nemo")
         urls = {
             "presidio": os.getenv(
-                "PRESIDIO_URL", "http://10.0.2.2:18091"
+                "PRESIDIO_URL", "http://day6-presidio-api:8013"
             ),
             "nemo": os.getenv(
-                "NEMO_GUARD_URL", "http://10.0.2.2:18092"
+                "NEMO_GUARD_URL", "http://llm-security-nemo-dialog-rails:8013"
             ),
         }
         self.base_url = urls.get(self.engine)

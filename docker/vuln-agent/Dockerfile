@@ -1,4 +1,4 @@
-# OWASP LLM Lab — vuln-agent (Podman/OCI 호환)
+# OWASP LLM Lab — vuln-agent (Docker/OCI 호환)
 
 ARG BASE_IMAGE=ghcr.io/gasbugs/owasp-llm-base-gpu:latest
 FROM ${BASE_IMAGE}
@@ -12,7 +12,7 @@ LABEL owasp.llm.lab.warning="INTENTIONALLY VULNERABLE — DO NOT DEPLOY OUTSIDE 
 WORKDIR /app
 
 # Keep a small terminal editor in the workshop image so learners can switch
-# the adjacent vulnerable/safe executor calls with `podman exec -it ... vi`.
+# the adjacent vulnerable/safe executor calls with `docker exec -it ... vi`.
 RUN apt-get update && apt-get install -y --no-install-recommends vim-tiny \
     && rm -rf /var/lib/apt/lists/*
 

@@ -10,7 +10,7 @@ case에는 `input_prompt`와 `simulated_model_output`을 별도 필드로 요구
 python3 tools/lab_contract.py validate
 ```
 
-실제 환경 runner는 고유 container 이름을 사용하고 정책 확인 event, `podman logs` 원문,
+실제 환경 runner는 고유 container 이름을 사용하고 정책 확인 event, `docker logs` 원문,
 command hash와 raw log hash를 JSONL로 출력한 뒤 container만 정리한다.
 
 ```bash

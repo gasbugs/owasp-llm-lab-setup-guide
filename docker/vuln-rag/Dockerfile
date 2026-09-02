@@ -1,4 +1,4 @@
-# OWASP LLM Lab — vuln-rag (Podman/OCI 호환)
+# OWASP LLM Lab — vuln-rag (Docker/OCI 호환)
 
 ARG BASE_IMAGE=ghcr.io/gasbugs/owasp-llm-base-gpu:latest
 FROM ${BASE_IMAGE}
@@ -12,8 +12,8 @@ LABEL owasp.llm.lab.warning="INTENTIONALLY VULNERABLE — DO NOT DEPLOY OUTSIDE 
 WORKDIR /app
 
 # Learner secure-coding workshops edit the adjacent vulnerable/safe call pair
-# in the running container's writable layer. `podman restart` preserves the
-# edit; Quadlet recreation restores this image's vulnerable baseline.
+# in the running container's writable layer. `docker restart` preserves the
+# edit; Docker Compose recreation restores this image's vulnerable baseline.
 RUN apt-get update && apt-get install -y --no-install-recommends vim-tiny \
     && rm -rf /var/lib/apt/lists/*
 
@@ -28,8 +28,8 @@ ENV PORT=8000 \
     OLLAMA_EMBED_MODEL=bge-m3:latest \
     DEFAULT_SCENARIO=day1 \
     GUARD_ENGINE=off \
-    PRESIDIO_URL=http://10.0.2.2:18091 \
-    NEMO_GUARD_URL=http://10.0.2.2:18092
+    PRESIDIO_URL=http://host.docker.internal:18091 \
+    NEMO_GUARD_URL=http://host.docker.internal:18092
 
 EXPOSE 8000
 

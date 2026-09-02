@@ -7,9 +7,9 @@
 - Ubuntu 24.04 LTS + 최신 보안 패치
 - NVIDIA Driver + CUDA Toolkit 12.8
 - nvidia-container-toolkit (CDI 모드, `/etc/cdi/nvidia.yaml` 사전 생성)
-- **Podman rootless + Podman Compose** (Docker daemon 없음)
+- **Docker Engine + Docker Compose v2** (일반 daemon, `ubuntu`는 `docker` 그룹)
 - AWS CLI v2 + SSM 에이전트
-- 강의용 컨테이너 이미지 (공개 GHCR에서 사전 anonymous podman pull)
+- 강의용 컨테이너 이미지 (공개 GHCR에서 사전 anonymous docker pull)
 - LLM 모델 weights (`llama3.1:8b-instruct-q4_K_M`, 약 5GB)
 
 포함하지 않는 것:
@@ -29,7 +29,7 @@ TAG="sha-$SETUP_COMMIT" \
   ./build-and-push.sh
 ```
 
-이후 Packer가 그 이미지를 podman pull로 캐시.
+이후 Packer가 그 이미지를 docker pull로 캐시.
 
 ## 빌드 절차
 
@@ -59,8 +59,8 @@ ami_name_pattern = "owasp-llm-lab-*"
 | 베이스 OS 부팅 | 1분 |
 | 시스템 패키지 | 3분 |
 | NVIDIA 드라이버 + CUDA | 10분 (재부팅 포함) |
-| Podman + CDI 설정 | 2분 |
-| 이미지 podman pull + 모델 weights | 15~20분 |
+| Docker + CDI 설정 | 2분 |
+| 이미지 docker pull + 모델 weights | 15~20분 |
 | AMI 생성 | 5분 |
 | **총** | **35~40분** |
 
@@ -72,10 +72,10 @@ ami_name_pattern = "owasp-llm-lab-*"
 - `expect_disconnect = true` 설정으로 처리. Packer가 자동 재접속.
 - 그래도 멈추면 보통 SG에 SSH 22번이 안 열려있는 경우. Packer 임시 SG에는 22가 열려야 함(Packer 기본 동작).
 
-**rootless podman에서 GPU 안 보임**
-- `/etc/cdi/nvidia.yaml`이 생성되어야 함. `30-podman.sh`가 자동 생성.
-- 안 되면 인스턴스 안에서 `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`.
-- 확인: `sudo -u ubuntu podman run --rm --device nvidia.com/gpu=all docker.io/nvidia/cuda:12.8.2-base-ubuntu24.04 nvidia-smi`
+**Docker 컨테이너에서 GPU가 안 보임**
+- `/etc/docker/daemon.json`에 NVIDIA runtime 설정이 있어야 한다. `30-docker.sh`가 `nvidia-ctk runtime configure --runtime=docker`로 만든다.
+- 설정을 바꾼 뒤에는 `sudo systemctl restart docker`를 실행한다.
+- 확인: `sudo -u ubuntu docker run --rm --gpus all docker.io/nvidia/cuda:12.8.2-base-ubuntu24.04 nvidia-smi`
 
 **모델 weights 다운로드 실패**
 - Ollama 컨테이너가 들어오는 동안 listen하지 않은 경우. `sleep` 늘리기.
@@ -83,15 +83,15 @@ ami_name_pattern = "owasp-llm-lab-*"
 
 **GHCR pull이 `unauthorized`로 실패**
 - `ghcr.io/gasbugs/owasp-llm-*` 다섯 package의 visibility가 모두 `Public`인지 확인한다.
-- 로컬 credential 영향이 없는 환경에서 `podman manifest inspect ghcr.io/gasbugs/owasp-llm-base-gpu:<tag>`가 인증 없이 성공해야 AMI 빌드를 시작한다.
+- 로컬 credential 영향이 없는 환경에서 `docker manifest inspect ghcr.io/gasbugs/owasp-llm-base-gpu:<tag>`가 인증 없이 성공해야 AMI 빌드를 시작한다.
 
 **AMI 용량 초과**
 - `root_volume_size = 100`까지 확인. 더 큰 모델 추가 시 150GB 이상으로 키우기.
 - 강의 인스턴스 EBS 크기도 같이 늘려야 함 (`terraform.tfvars`의 `root_volume_size`).
 
-## Linger 관련 주의
+## Docker daemon 관련 주의
 
-Podman rootless는 ubuntu 사용자의 systemd user services로 동작하는 것이 권장됩니다. AMI에 `loginctl enable-linger ubuntu`를 적용해 두어 SSM 세션이 닫혀도 컨테이너가 살아있게 했습니다. 이를 끄면 SSH/SSM 세션 종료 시 컨테이너가 함께 죽어요.
+Docker는 system service로 활성화되므로 SSM 세션이 끝나도 Compose 컨테이너는 계속 실행된다. `ubuntu` 사용자가 새로 `docker` 그룹에 들어간 직후의 기존 셸에서는 권한이 갱신되지 않을 수 있으므로 새 SSM 세션에서 확인한다.
 
 ## 변형 — 가벼운 모델로 바꾸기
 

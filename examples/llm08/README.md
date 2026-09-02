@@ -2,7 +2,7 @@
 
 이 예제는 운영용 vector DB가 아니라, 학습자가 직접 복사·수정하는 표준 라이브러리 기반 미니 앱입니다. 문서 네 개와 cosine 검색 코드는 로컬에 있고, vector 생성만 기존 Day 4 서버의 인증된 `POST /api/embed`를 사용합니다.
 
-먼저 강사·콘텐츠 배포자가 [LLM08 embedding lab setup](../../docs/LLM08-SETUP.md)의 publish gate를 통과해 공지한 40자리 setup commit을 확인하고, 그 commit으로 runtime 준비를 완료하세요. 수강생은 publish gate 때문에 로컬 PC에 Podman을 추가 설치하지 않습니다. 소스가 로컬 워킹트리에만 있거나 같은 commit의 GHCR 이미지가 publish되지 않은 상태에서는 이 예제가 원격 EC2에 준비됐다고 간주하지 않습니다.
+먼저 강사·콘텐츠 배포자가 [LLM08 embedding lab setup](../../docs/LLM08-SETUP.md)의 publish gate를 통과해 공지한 40자리 setup commit을 확인하고, 그 commit으로 runtime 준비를 완료하세요. 수강생은 publish gate 때문에 로컬 PC에 Docker을 추가 설치하지 않습니다. 소스가 로컬 워킹트리에만 있거나 같은 commit의 GHCR 이미지가 publish되지 않은 상태에서는 이 예제가 원격 EC2에 준비됐다고 간주하지 않습니다.
 
 핵심 비교는 하나입니다.
 

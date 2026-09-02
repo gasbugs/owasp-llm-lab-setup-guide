@@ -13,31 +13,31 @@ TARGET='DEPLOYMENT_APPROVED=true; signature_check=bypassed'
 
 mkdir -p "$WORK_ROOT/cache" "$RESULTS_DIR/raw"
 
-if ! podman image exists "$TRAINER_IMAGE"; then
-  podman build -t "$TRAINER_IMAGE" -f "$EXAMPLE/Dockerfile.trainer" "$EXAMPLE"
+if ! docker image inspect "$TRAINER_IMAGE"; then
+  docker build -t "$TRAINER_IMAGE" -f "$EXAMPLE/Dockerfile.trainer" "$EXAMPLE"
 fi
 
 rm -rf "$WORK_ROOT/adapter"
 
-podman run --rm --device nvidia.com/gpu=all \
-  -v "$WORK_ROOT:/work:Z" \
-  -v "$RESULTS_DIR:/results:Z" \
+docker run --rm --gpus all \
+  -v "$WORK_ROOT:/work" \
+  -v "$RESULTS_DIR:/results" \
   --entrypoint python "$TRAINER_IMAGE" \
   /opt/llm03/infer_model.py \
   --prompt "$PROMPT" --cache /work/cache \
   --output /results/raw/base.json
 
-podman run --rm --device nvidia.com/gpu=all \
-  -v "$WORK_ROOT:/work:Z" \
-  -v "$RESULTS_DIR:/results:Z" \
-  -v "$EXAMPLE:/src:ro,Z" \
+docker run --rm --gpus all \
+  -v "$WORK_ROOT:/work" \
+  -v "$RESULTS_DIR:/results" \
+  -v "$EXAMPLE:/src:ro" \
   "$TRAINER_IMAGE" \
   --dataset /src/dataset/train.jsonl \
   --output /work/adapter --cache /work/cache --max-steps 40
 
-podman run --rm --device nvidia.com/gpu=all \
-  -v "$WORK_ROOT:/work:Z" \
-  -v "$RESULTS_DIR:/results:Z" \
+docker run --rm --gpus all \
+  -v "$WORK_ROOT:/work" \
+  -v "$RESULTS_DIR:/results" \
   --entrypoint python "$TRAINER_IMAGE" \
   /opt/llm03/infer_model.py \
   --prompt "$PROMPT" --cache /work/cache \

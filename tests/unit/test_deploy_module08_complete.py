@@ -24,17 +24,17 @@ class DeployModule08CompleteContractTests(unittest.TestCase):
             "llm-security-observability_mimir-data",
         ):
             self.assertIn(name, self.source)
-        self.assertNotIn("podman system prune", self.source)
-        self.assertNotIn("podman volume prune", self.source)
-        self.assertNotIn("podman rm -a", self.source)
+        self.assertNotIn("docker system prune", self.source)
+        self.assertNotIn("docker volume prune", self.source)
+        self.assertNotIn("docker rm -a", self.source)
 
     def test_bootstrap_runtime_is_preserved_and_required(self) -> None:
-        self.assertIn("podman container exists lab-ollama", self.source)
-        self.assertNotIn('podman rm -f lab-ollama', self.source)
+        self.assertIn("docker container inspect lab-ollama", self.source)
+        self.assertNotIn('docker rm -f lab-ollama', self.source)
         self.assertNotIn("ollama-models", self.source)
 
     def test_complete_deployment_builds_and_verifies_current_source(self) -> None:
-        self.assertIn("podman-compose --project-name llm-security-observability", self.source)
+        self.assertIn("docker compose --project-name llm-security-observability", self.source)
         self.assertIn('"${COMPOSE[@]}" up --detach --build', self.source)
         self.assertIn('bash "$PREPARE_SCRIPT" --repair', self.source)
         self.assertIn("[READY] Continue with Module 08 signal collection labs", self.source)

@@ -20,7 +20,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('http://localhost:${PORT}/healthz', dockerfile)
         self.assertIn('--port \\"$PORT\\"', dockerfile)
 
-    def test_dvla_base_images_are_fully_qualified_for_podman(self) -> None:
+    def test_dvla_base_images_are_fully_qualified_for_docker(self) -> None:
         dockerfile = read("docker/dvla/Dockerfile")
         self.assertIn("FROM docker.io/alpine/git:latest AS clone", dockerfile)
         self.assertIn("FROM docker.io/library/python:3.11-slim", dockerfile)
@@ -61,7 +61,7 @@ class RuntimeContractTest(unittest.TestCase):
         for port in (8000, 8010, 8011, 8012, 8013):
             self.assertIn(f'"{port}:{port}"', compose)
             self.assertIn(f'"--port", "{port}"', compose)
-        self.assertIn('podman-compose up -d --no-deps --force-recreate "$service"', runner)
+        self.assertIn('docker compose up -d --no-deps --force-recreate "$service"', runner)
 
     def test_every_deployed_service_has_an_explicit_port_exposure_contract(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
@@ -98,9 +98,9 @@ class RuntimeContractTest(unittest.TestCase):
         for service, url in health_urls.items():
             with self.subTest(service=service):
                 self.assertIn(url, installer)
-        self.assertIn('network_mode=$(podman inspect', installer)
+        self.assertIn('network_mode=$(docker inspect', installer)
         self.assertIn('[ "$network_mode" = "host" ]', installer)
-        self.assertIn('published=$(podman port', installer)
+        self.assertIn('published=$(docker port', installer)
         self.assertIn('has no published host port', installer)
         self.assertNotIn("network_mode: host", compose)
 
@@ -122,7 +122,7 @@ class RuntimeContractTest(unittest.TestCase):
 
         self.assertNotIn("container_name: lab-day", compose)
 
-    def test_secure_coding_uses_container_layer_and_podman_recreation(self) -> None:
+    def test_secure_coding_uses_container_layer_and_docker_recreation(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
         workflow = read(".github/workflows/build-and-push.yaml")
@@ -145,7 +145,7 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
-            'podman exec "$container" test -w "$source_file"',
+            'docker exec "$container" test -w "$source_file"',
             installer,
         )
         self.assertIn(
@@ -185,13 +185,13 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py"', installer)
         self.assertIn('FAKE_REGISTRY_CHANGED=true', installer)
         self.assertIn('curl -fsSL "$RAW_URL/infrastructure/compose/compose.yaml"', installer)
-        self.assertIn("podman-compose config", installer)
-        self.assertIn("podman-compose up -d", installer)
+        self.assertIn("docker compose config", installer)
+        self.assertIn("docker compose up -d", installer)
         self.assertIn('[ "$REFRESH_IMAGES" = "true" ]', installer)
         self.assertIn('LAB_ENV_CANDIDATE=/etc/lab/env.pending', installer)
         self.assertIn('mv -f "$LAB_ENV_CANDIDATE" /etc/lab/env', installer)
         self.assertIn("verifying reconciled service health", installer)
-        self.assertIn("podman image inspect --format '{{.Id}}'", installer)
+        self.assertIn("docker image inspect --format '{{.Id}}'", installer)
         self.assertIn("WARMUP_RESPONSE=", installer)
         self.assertIn(".done == true", installer)
         self.assertIn("required Day 5 model is absent after pull", installer)
@@ -205,11 +205,11 @@ class RuntimeContractTest(unittest.TestCase):
         )
         self.assertIn("http://localhost:5000/healthz", installer)
         internal_health = installer.index(
-            "podman exec lab-llmgoat \\\n"
+            "docker exec lab-llmgoat \\\n"
             "    curl -fsS --max-time 5 http://127.0.0.1:5000/healthz"
         )
         publish_refresh = installer.index(
-            "podman restart lab-llmgoat", internal_health
+            "docker restart lab-llmgoat", internal_health
         )
         external_health = installer.index(
             "http://localhost:5000/healthz", publish_refresh
@@ -217,7 +217,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertLess(internal_health, publish_refresh)
         self.assertLess(publish_refresh, external_health)
         guard_pull = installer.split(
-            'podman exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL"', 1
+            'docker exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL"', 1
         )[1].split("fi", 1)[0]
         self.assertNotIn("|| true", guard_pull)
 
@@ -467,7 +467,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("restart_llm10_stack_after_overload", llm10)
         self.assertIn('"$reset_script" llm10', llm10)
         self.assertIn("R1-reset-lab.txt", llm10)
-        self.assertNotIn("podman", llm10)
+        self.assertNotIn("docker", llm10)
         self.assertIn('trap recover_parallel_probe_on_exit EXIT', llm10)
         self.assertIn('warmup_model recovery', llm10)
         self.assertIn(
@@ -507,7 +507,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('"$recreate_editable_lab" "$container"', full_cycle)
         self.assertIn('"$recreate_editable_lab" lab-vuln-agent', full_cycle)
         self.assertIn('/api/admin/state', full_cycle)
-        self.assertNotIn("podman restart", full_cycle)
+        self.assertNotIn("docker restart", full_cycle)
         self.assertNotIn('/api/admin/reset', full_cycle)
         self.assertIn('(.docs | length == $expected)', full_cycle)
         self.assertIn("contains($sentinel)", full_cycle)

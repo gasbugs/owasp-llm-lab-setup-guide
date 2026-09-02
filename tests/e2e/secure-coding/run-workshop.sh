@@ -5,7 +5,7 @@ set -euo pipefail
 LAB="${1:?usage: run-workshop.sh LLM01|LLM02|LLM05|LLM06|LLM08|LLM08RAG|LLM09|LLM10|DAY6 vulnerable|safe}"
 MODE="${2:?usage: run-workshop.sh LAB vulnerable|safe}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 RAG_IMAGE=localhost/secure-coding-rag:latest
 AGENT_IMAGE=localhost/secure-coding-agent:latest
 PRESIDIO_IMAGE=localhost/secure-coding-day6-presidio:latest

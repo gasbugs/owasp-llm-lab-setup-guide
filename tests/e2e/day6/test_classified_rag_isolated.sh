@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+DAY6_NETWORK="${DAY6_NETWORK:-owasp-llm-lab_default}"
 WORK="${WORK:-/tmp/day7-classified-rag-isolated}"
 PRESIDIO_IMAGE=localhost/codex-classified-presidio:latest
 NEMO_IMAGE=localhost/codex-classified-nemo:latest
@@ -9,7 +10,7 @@ UI_IMAGE=localhost/codex-classified-ui:latest
 INTERNAL_TOKEN=day7-classified-rag-internal
 
 cleanup() {
-  podman rm -f codex-classified-ui codex-classified-nemo \
+  docker rm -f codex-classified-ui codex-classified-nemo \
     codex-classified-presidio >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -18,31 +19,39 @@ mkdir -p "$WORK"
 
 curl -fsS --max-time 10 http://127.0.0.1:11434/api/tags >/dev/null
 
-podman build -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio"
-podman build -t "$NEMO_IMAGE" "$ROOT/examples/day6/nemo-guardrails"
-podman build -t "$UI_IMAGE" "$ROOT/docker/vuln-rag"
+docker build -f "$ROOT/examples/day6/presidio/Containerfile" \
+  -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio"
+docker build -f "$ROOT/examples/day6/nemo-guardrails/Containerfile" \
+  -t "$NEMO_IMAGE" "$ROOT/examples/day6/nemo-guardrails"
+docker build -t "$UI_IMAGE" "$ROOT/docker/vuln-rag"
 
-podman run -d --replace --name codex-classified-presidio \
-  --network slirp4netns:allow_host_loopback=true \
+docker rm -f codex-classified-presidio >/dev/null 2>&1 || true
+
+docker run -d --name codex-classified-presidio \
+  --network "$DAY6_NETWORK" \
   -p 127.0.0.1:28091:8013 \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
   "$PRESIDIO_IMAGE" >/dev/null
 
-podman run -d --replace --name codex-classified-nemo \
-  --network slirp4netns:allow_host_loopback=true \
+docker rm -f codex-classified-nemo >/dev/null 2>&1 || true
+
+docker run -d --name codex-classified-nemo \
+  --network "$DAY6_NETWORK" \
   -p 127.0.0.1:28092:8013 \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
-  -e OLLAMA_URL=http://10.0.2.2:11434 \
-  -e PRESIDIO_URL=http://10.0.2.2:28091 \
+  -e OLLAMA_URL=http://lab-ollama:11434 \
+  -e PRESIDIO_URL=http://codex-classified-presidio:8013 \
   -e CLASSIFIED_RAG_INTERNAL_TOKEN="$INTERNAL_TOKEN" \
   "$NEMO_IMAGE" >/dev/null
 
-podman run -d --replace --name codex-classified-ui \
-  --network slirp4netns:allow_host_loopback=true \
+docker rm -f codex-classified-ui >/dev/null 2>&1 || true
+
+docker run -d --name codex-classified-ui \
+  --network "$DAY6_NETWORK" \
   -p 127.0.0.1:28090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
-  -e PRESIDIO_URL=http://10.0.2.2:28091 \
-  -e NEMO_GUARD_URL=http://10.0.2.2:28092 \
+  -e PRESIDIO_URL=http://codex-classified-presidio:8013 \
+  -e NEMO_GUARD_URL=http://codex-classified-nemo:8013 \
   -e CLASSIFIED_RAG_INTERNAL_TOKEN="$INTERNAL_TOKEN" \
   "$UI_IMAGE" >/dev/null
 
@@ -90,6 +99,6 @@ curl -fsS --max-time 240 -X POST \
 jq -e '.selected_rag=="restricted-rag" and .authenticated_subject=="support-agent" and .pii_detected==true and .redaction_applied==false and .application_decision=="allow_unredacted" and .context=="Synthetic customer recovery contact: customer.demo@example.com." and .nemo_called==true' \
   "$WORK/restricted.json" >/dev/null
 
-! podman logs codex-classified-ui 2>&1 | grep -F 'customer.demo@example.com'
-! podman logs codex-classified-nemo 2>&1 | grep -F 'customer.demo@example.com'
+! docker logs codex-classified-ui 2>&1 | grep -F 'customer.demo@example.com'
+! docker logs codex-classified-nemo 2>&1 | grep -F 'customer.demo@example.com'
 printf 'CLASSIFIED_RAG_ISOLATED=PASS\n'

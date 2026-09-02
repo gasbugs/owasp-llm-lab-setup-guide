@@ -62,7 +62,7 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         self.assertNotIn("/api/labs/llm02/vulnerable/chat", source)
         self.assertNotIn("/api/labs/llm02/safe/chat", source)
         self.assertIn('"$RESET_LAB" llm02', source)
-        self.assertIn('podman restart "$CONTAINER"', source)
+        self.assertIn('docker restart "$CONTAINER"', source)
         self.assertIn('verdict:"HIT"', source)
         self.assertIn('verdict:"PASS"', source)
 
@@ -108,8 +108,8 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-and-push.yaml").read_text(
             encoding="utf-8"
         )
-        self.assertNotIn(':/app/app:ro,Z', runner)
-        self.assertNotIn(':/app:ro,Z', runner)
+        self.assertNotIn(':/app/app:ro', runner)
+        self.assertNotIn(':/app:ro', runner)
         self.assertIn('exec "$CONTAINER" vi --version', runner)
         self.assertIn('exec "$CONTAINER" test -w "$PAIR_CONTAINER_SOURCE"', runner)
         self.assertIn('cp "$PAIR_HOST_SOURCE" "$CONTAINER:$PAIR_CONTAINER_SOURCE"', runner)

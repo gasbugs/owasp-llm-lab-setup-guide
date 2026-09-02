@@ -50,7 +50,7 @@ Grafana --> Prometheus + Loki + Tempo + Alertmanager
 
 Prometheus is the local metric store, scraper, remote-write receiver, and rule evaluator. Tempo 3.x runs in monolithic `target=all` mode without Kafka, generates RED and service-graph metrics from traces, and remote-writes them to Prometheus. Alertmanager's webhook receiver proves that an evaluated alert reached a final destination instead of stopping at `firing` state.
 
-Alloy receives only the structured OTLP logs and traces that the instrumented application explicitly exports. It does not receive the Podman API socket, so the collector cannot enumerate or control the learner's other rootless containers. Raw text is reduced to a keyed HMAC identity and a sanitized excerpt in the application before the OTLP boundary.
+Alloy receives only the structured OTLP logs and traces that the instrumented application explicitly exports. It does not receive the Docker API socket, so the collector cannot enumerate or control the learner's other containers. Raw text is reduced to a keyed HMAC identity and a sanitized excerpt in the application before the OTLP boundary.
 
 ## Data and trust boundaries
 
@@ -61,15 +61,15 @@ Alloy receives only the structured OTLP logs and traces that the instrumented ap
 - Every host port binds to WSL loopback, Grafana anonymous access is disabled, and service credentials come from the permission-restricted Module 08 environment file. Production deployments still require managed identity, authorization, secret rotation, TLS, network policy, and backend multi-tenancy.
 - Alloy queues are memory-backed and each backend is a single lab process. A production design needs persistent buffering, object storage, replication, access control, capacity planning, backup, and tested recovery objectives.
 - Grafana's bundled plugin preinstallation and update checks are disabled so the lab does not silently download code at startup. Only the built-in data sources used by the provisioned dashboard are required.
-- The rootless Podman 4.9 lab uses one private bridge because its CNI DNS does not reliably fall through between multiple network DNS zones. External exposure is restricted by the learner-owned `/32` security-group rule. A production Kubernetes deployment should separate application, telemetry, and backend planes with directional NetworkPolicy instead of treating this lab bridge as network isolation.
+- The Docker Compose lab uses one private bridge so service names resolve consistently inside the stack. External exposure is restricted by loopback publishing in WSL or the learner-owned `/32` security-group rule on EC2. A production Kubernetes deployment should separate application, telemetry, and backend planes with directional NetworkPolicy instead of treating this lab bridge as network isolation.
 
 ## Start on GPU-less WSL
 
 ```bash
 export BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
-export PODMAN_COMPOSE_PROVIDER=podman-compose
+export DOCKER_COMPOSE_PROVIDER=docker compose
 export COMPOSE_ENV_FILE="$HOME/owasp-llm-lab-setup-guide/llm-security-control-plane/.state/module08-compose.env"
-podman-compose --project-name llm-security-observability \
+docker compose --project-name llm-security-observability \
   --env-file "$COMPOSE_ENV_FILE" --file compose.yaml up --detach --build
 ```
 
@@ -86,7 +86,7 @@ USE_REAL_BEDROCK=true RUN_FAILURE_DRILL=true \
 ## Stop
 
 ```bash
-podman-compose --project-name llm-security-observability \
+docker compose --project-name llm-security-observability \
   --env-file "$COMPOSE_ENV_FILE" --file compose.yaml down
 ```
 

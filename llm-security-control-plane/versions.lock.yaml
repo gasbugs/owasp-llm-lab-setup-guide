@@ -6,17 +6,15 @@ release: 1.0.0
 # 2. bedrock: Main·일반 위해·Self-check가 공유하는 Model ID를 본다.
 # 3. images: 네 서비스 Image가 같은 release인지 본다.
 # 4. test_tools: Promptfoo와 Garak 테스트 결과를 재현할 버전을 본다.
-# tag는 사람이 읽는 이름이고 digest는 실제 Image·Model 바이트를 식별하는 값이다.
+# 일반 실행은 검증한 version tag를 사용하고 공급망 실습만 digest를 직접 비교한다.
 
-# Base Image는 tag뿐 아니라 digest도 고정해 같은 이름의 다른 바이트 실행을 막는다.
+# 서비스 공통 Python patch version이다.
 runtime:
-  python_image: docker.io/library/python:3.12-slim
-  python_image_digest: sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+  python_image: docker.io/library/python:3.12.14-slim
 
 # 회귀·탐색 도구 버전이 바뀌면 판정과 fixture 수가 달라질 수 있으므로 함께 잠근다.
 test_tools:
   node_image: docker.io/library/node:24-bookworm-slim
-  node_image_digest: sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
   promptfoo: 0.121.20
   garak: 0.15.1
 

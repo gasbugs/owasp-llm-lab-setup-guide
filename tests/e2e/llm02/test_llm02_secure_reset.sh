@@ -53,12 +53,12 @@ jq -e '
 ' "$WORK_DIR/before.json" >/dev/null
 jq -nc '{phase:"before",endpoint:"/api/labs/llm02/workshop/chat",verdict:"HIT",planner_customer:"C-2002",customer_query_called:true}'
 
-podman exec "$CONTAINER" sed -i \
+docker exec "$CONTAINER" sed -i \
   -e 's/^    return execute_customer_tool_vulnerable(tool_request, principal)  # VULNERABLE-ACTIVE$/    # return execute_customer_tool_vulnerable(tool_request, principal)  # VULNERABLE-ACTIVE/' \
   -e 's/^    # return execute_customer_tool_safe(tool_request, principal)  # SAFE-ENABLE$/    return execute_customer_tool_safe(tool_request, principal)  # SAFE-ENABLE/' \
   "$SOURCE"
-podman exec "$CONTAINER" python -m py_compile "$SOURCE"
-podman restart "$CONTAINER" >/dev/null
+docker exec "$CONTAINER" python -m py_compile "$SOURCE"
+docker restart "$CONTAINER" >/dev/null
 wait_ready
 
 safe_http=$(curl -sS --max-time 240 -o "$WORK_DIR/after.json" -w '%{http_code}' \

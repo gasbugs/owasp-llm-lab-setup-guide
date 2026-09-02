@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 cleanup() {
-  podman rm -f llm-security-application-gateway llm-security-nemo-hub \
+  docker rm -f llm-security-application-gateway llm-security-nemo-hub \
     llm-security-presidio-spoke >/dev/null 2>&1 || true
   rm -rf "$WORK"
 }
@@ -23,7 +23,7 @@ curl -fsS http://127.0.0.1:18094/api/guardrails/policy \
 
 sed -i.bak 's/input_rails: \[nova_general_safety\]/input_rails: [nova_general_safety, application_self_check]/' \
   "$WORK/control-plane-policy.yaml"
-podman restart llm-security-nemo-hub >/dev/null
+docker restart llm-security-nemo-hub >/dev/null
 
 for _ in $(seq 1 90); do
   curl -fsS --max-time 3 http://127.0.0.1:18094/api/guardrails/policy \

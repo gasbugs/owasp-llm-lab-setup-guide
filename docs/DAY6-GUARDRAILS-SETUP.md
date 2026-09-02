@@ -1,7 +1,7 @@
 # Day 6 Guardrails 컨테이너 셋업
 
 Day 6은 Microsoft Presidio `2.2.362`와 NVIDIA NeMo Guardrails `0.22.0`을
-rootless Podman 컨테이너로 격리한다. 수강생 host의 Python site-packages에는
+Docker 컨테이너로 격리한다. 수강생 host의 Python site-packages에는
 패키지를 설치하지 않는다.
 
 ## 두 실행 모드
@@ -32,9 +32,9 @@ Python 프로세스에 자동 반영되지 않으므로 컨테이너를 재생�
 저장소 루트에서 다음 이미지를 빌드한다.
 
 ```bash
-podman build -t localhost/day6-presidio:2.2.362 examples/day6/presidio
-podman build -t localhost/llm-security-nemo-dialog-rails:0.22.0 examples/day6/nemo-guardrails
-podman build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
+docker build -t localhost/day6-presidio:2.2.362 examples/day6/presidio
+docker build -t localhost/llm-security-nemo-dialog-rails:0.22.0 examples/day6/nemo-guardrails
+docker build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
 ```
 
 정확한 CLI 및 loopback 서버 실행 명령은
@@ -52,10 +52,10 @@ podman build -t localhost/day6-guardrail-ui:latest docker/vuln-rag
 | `GUARD_ENGINE` | 이미지별 `presidio` 또는 `nemo`, UI는 `off` | 활성 엔진 |
 | `GUARD_MODE` | `enforce` | `off`, `audit`, `enforce` |
 | `ENABLE_LAB_ENDPOINTS` | `false` | `/api/scan-output`, `/api/labs/suite` 활성화 |
-| `OLLAMA_URL` | `http://host.containers.internal:11434` | host Ollama |
+| `OLLAMA_URL` | `http://host.docker.internal:11434` | host Ollama |
 | `OLLAMA_MODEL` | `llama3.1:8b-instruct-q4_K_M` | 생성 및 NeMo self-check 모델 |
-| `PRESIDIO_URL` | `http://10.0.2.2:18091` | UI에서 slirp host loopback의 Microsoft Presidio로 연결 |
-| `NEMO_GUARD_URL` | `http://10.0.2.2:18092` | UI에서 slirp host loopback의 NeMo로 연결 |
+| `PRESIDIO_URL` | `http://day6-presidio-api:8013` | 같은 Docker network의 Microsoft Presidio로 연결 |
+| `NEMO_GUARD_URL` | `http://llm-security-nemo-dialog-rails:8013` | 같은 Docker network의 NeMo로 연결 |
 
 Microsoft Presidio에는 `PRESIDIO_SCORE_THRESHOLD`, `PRESIDIO_LANGUAGE`,
 `PRESIDIO_INPUT_ENABLED`, `PRESIDIO_OUTPUT_ENABLED`, `PRESIDIO_ENTITIES`도 있다.
@@ -68,14 +68,14 @@ host publish는 반드시 `127.0.0.1`로 제한한다. Terraform Security Group�
 터널을 사용한다. 브라우저가 Ollama나 guard API를 직접 호출하지 않으며 최종 정책
 집행은 서버가 담당한다.
 
-현재 EC2의 Podman에서 `host.containers.internal`은 EC2 private IP로 해석된다. 이
-주소로는 loopback-only publish에 접근할 수 없으므로 UI proxy에 실제 검증한
-slirp4netns host gateway `10.0.2.2`를 사용한다. 외부 bind로 바꿔 문제를 우회하지 않는다.
+컨테이너끼리는 host의 loopback publish를 거치지 않고 같은 Docker network의 서비스
+이름과 내부 포트를 사용한다. host 공개 포트는 브라우저·수강생 확인에만 쓰며 외부
+bind로 바꿔 연결 문제를 우회하지 않는다.
 
 ## 상태와 정리
 
 - CLI suite는 fixture를 변경하지 않는다.
 - HTTP server와 UI는 별도 프로세스·포트이므로 실습 후 세 컨테이너를 제거한다.
-- container log는 `podman logs`로 확인하며 별도 저장 wrapper가 필수는 아니다.
+- container log는 `docker logs`로 확인하며 별도 저장 wrapper가 필수는 아니다.
 - 이미지와 수강생 evidence는 자동 reset 대상이 아니다.
 - Day 6 종료 시 임시 컨테이너를 제거한 뒤 기존 `stop-lab.sh`로 EC2 비용을 중지한다.

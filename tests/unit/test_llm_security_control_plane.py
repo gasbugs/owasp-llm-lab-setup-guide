@@ -114,7 +114,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertTrue(image.endswith(":1.0.0"))
         self.assertEqual(lock["test_tools"]["promptfoo"], "0.121.20")
         self.assertEqual(lock["test_tools"]["garak"], "0.15.1")
-        self.assertEqual(len(lock["test_tools"]["node_image_digest"]), 71)
+        self.assertEqual(lock["test_tools"]["node_image"], "docker.io/library/node:24-bookworm-slim")
 
     def test_runtime_contract_matches_server_and_browser_harness(self) -> None:
         contract = yaml.safe_load((CONTROL / "runtime-contract.yaml").read_text())
@@ -130,7 +130,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         dialog = ROOT / "examples/day6/nemo-guardrails"
         containerfile = (dialog / "Containerfile").read_text()
         lock = yaml.safe_load((CONTROL / "versions.lock.yaml").read_text())
-        self.assertIn(lock["runtime"]["python_image_digest"], containerfile)
+        self.assertIn(f'FROM {lock["runtime"]["python_image"]}', containerfile)
         requirements = (dialog / "requirements.txt").read_text().splitlines()
         for package in ("fastapi", "httpx", "nemoguardrails", "uvicorn"):
             expected = f'{package}=={lock["python_packages"][package]}'
@@ -241,18 +241,19 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             self.assertEqual(values["AWS_PROFILE"], "course")
             self.assertEqual(stat.S_IMODE(compose_env.stat().st_mode), 0o600)
 
-    def test_compose_disables_pod_mode_for_keep_id_services(self) -> None:
+    def test_compose_uses_host_uid_without_runtime_specific_user_namespace_extensions(self) -> None:
         compose = (CONTROL / "compose.yaml").read_text()
         parsed = yaml.safe_load(compose)
-        self.assertFalse(parsed["x-podman"]["in_pod"])
         self.assertEqual(
-            parsed["services"]["bedrock-gateway"]["userns_mode"],
-            "keep-id:uid=65532,gid=65532",
+            parsed["services"]["bedrock-gateway"]["user"],
+            "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}",
         )
         self.assertEqual(
-            parsed["services"]["application"]["userns_mode"],
-            "keep-id:uid=65532,gid=65532",
+            parsed["services"]["application"]["user"],
+            "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}",
         )
+        self.assertNotIn("userns_mode", compose)
+        self.assertNotIn("x-" + "docker", parsed)
 
     def test_policy_services_are_independently_replaceable_and_health_checked(self) -> None:
         compose = yaml.safe_load((CONTROL / "compose.yaml").read_text())
@@ -273,7 +274,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("delete-data-source", source)
         self.assertIn("delete-knowledge-base", source)
         self.assertIn("delete-vector-bucket", source)
-        self.assertNotIn("podman", source)
+        self.assertNotIn("docker", source)
 
     def test_module09_repair_restores_module08_aws_before_local_stack(self) -> None:
         source = (
