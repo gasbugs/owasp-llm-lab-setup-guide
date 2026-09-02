@@ -282,6 +282,7 @@ all_units=(
 )
 
 "${RUN_AS_UBUNTU[@]}" \
+  env \
   COMPOSE_DIR="$COMPOSE_DIR" \
   REFRESH_IMAGES="$REFRESH_IMAGES" \
   bash <<'COMPOSESH'
@@ -398,6 +399,7 @@ OLLAMASH
 
 echo "[install-lab] verifying reconciled service health and requested image references"
 "${RUN_AS_UBUNTU[@]}" \
+  env \
   IMAGE_NAMESPACE="$IMAGE_NAMESPACE" \
   IMAGE_TAG="$IMAGE_TAG" \
   OLLAMA_EMBED_MODEL="$OLLAMA_EMBED_MODEL" \

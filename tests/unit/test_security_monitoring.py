@@ -191,6 +191,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             "rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources",
             installer,
         )
+        self.assertEqual(2, installer.count('"${RUN_AS_UBUNTU[@]}" \\\n  env \\'))
         self.assertNotIn("slirp4netns", installer)
 
     def test_gateway_owns_real_request_path_and_server_side_boundaries(self) -> None:
