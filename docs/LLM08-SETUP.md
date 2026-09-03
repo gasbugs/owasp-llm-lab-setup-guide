@@ -10,7 +10,7 @@ LLM08 환경은 다음 구성요소를 함께 사용합니다.
 - `examples/llm08/mini_vector_search_app.py`: 학습자가 복사해 공격하고 수정하는 미니 앱
 - `0.0.0.0:18080`: 학습자 미니 앱의 명시적 IPv4 wildcard bind. EC2 내부 검사는 `127.0.0.1:18080` 사용
 
-이 실습은 허가된 개인 AWS 계정의 교육용 취약 환경에서만 실행합니다. `0.0.0.0`은 접속 URL이 아니라 bind sentinel입니다. Terraform Security Group은 TCP/18080을 `allowed_ingress_cidr` IPv4 `/32`에만 허용합니다. 기본값 `127.0.0.1/32`는 public IP 직접 접속을 열지 않으므로 SSM Session Manager와 port forwarding을 사용합니다. 본인 공인 IPv4 `/32`로 설정해 Terraform을 적용한 환경에서만 그 주소에서 직접 접속할 수 있습니다. `0.0.0.0/0`으로 공개하지 않습니다.
+이 실습은 허가된 개인 AWS 계정의 교육용 취약 환경에서만 실행합니다. `0.0.0.0`은 접속 URL이 아니라 bind sentinel입니다. Terraform Security Group은 TCP/18080을 수강생의 현재 공인 IPv4 `/32`에만 허용합니다. 관리 셸에는 SSM Session Manager를 사용하고, 학습자 웹/API에는 EC2 공인 주소를 사용합니다. `127.0.0.1/32`와 `0.0.0.0/0`은 입력 검증에서 거부합니다.
 
 > 비용 종료 계약: 검증이 성공했든 중간에 실패했든, 증거와 진단 자료를 보존한 다음 **이 문서 9절을 마지막 작업으로 실행해 EC2가 `stopped`인지 확인**합니다. 다음 날 진단을 이어갈 때도 실행 상태로 방치하지 않습니다.
 
@@ -98,7 +98,7 @@ IMAGE_TAG=sha-<same 40-character commit>
 
 ```hcl
 enable_user_data_bootstrap = false
-allowed_ingress_cidr       = "127.0.0.1/32"
+allowed_ingress_cidr       = "203.0.113.10/32"
 ```
 
 EC2를 만들고 단일 수강생 instance ID를 fail-closed로 조회합니다.
@@ -467,7 +467,7 @@ export LLM08_TOKEN=llm08-acme-demo-token
 python3 "$LEARNER_APP" --serve --host 0.0.0.0 --port 18080
 ```
 
-`0.0.0.0`은 EC2의 모든 IPv4 인터페이스에서 연결을 받으라는 **bind sentinel**이며 브라우저에서 여는 주소가 아닙니다. Terraform Security Group은 TCP/18080을 `allowed_ingress_cidr` IPv4 `/32`에만 허용합니다. 기본 `127.0.0.1/32`에서는 외부 직접 접속이 가능해지지 않고, 본인 공인 IPv4 `/32`로 Terraform을 적용한 경우에만 `EC2_PUBLIC_IP:18080`에 직접 접속할 수 있습니다. 미니 앱의 수신 bind와 upstream은 별개입니다. `TARGET_URL=http://127.0.0.1:8012`는 계속 loopback HTTP origin으로 제한됩니다.
+`0.0.0.0`은 EC2의 모든 IPv4 인터페이스에서 연결을 받으라는 **bind sentinel**이며 브라우저에서 여는 주소가 아닙니다. Terraform Security Group은 TCP/18080을 본인 공인 IPv4 `/32`에만 허용하고, 브라우저에서는 `EC2_PUBLIC_IP:18080`으로 접속합니다. 미니 앱의 수신 bind와 upstream은 별개입니다. `TARGET_URL=http://127.0.0.1:8012`는 계속 loopback HTTP origin으로 제한됩니다.
 
 서버 터미널을 열어 둔 채 두 번째 EC2/SSM 터미널을 엽니다. health와 API는 wildcard bind의 로컬 검사 주소인 `127.0.0.1:18080`으로 호출합니다. 3절에서 기록한 현재 evidence 경로를 읽은 뒤, request body의 `tenant`를 신뢰하지 않는지 HTTP 상태까지 확인합니다.
 
@@ -500,22 +500,17 @@ printf 'MINI_APP=READY host=127.0.0.1 port=18080\n'
 printf 'BODY_TENANT_SPOOF=REJECTED http=%s\n' "$SPOOF_STATUS"
 ```
 
-## 6. SSM port forwarding과 브라우저 확인
+## 6. 공인 주소와 브라우저 확인
 
-미니 앱은 `0.0.0.0:18080`에 bind하고 Terraform은 TCP/18080을 `allowed_ingress_cidr` IPv4 `/32`에만 허용합니다. 기본 `127.0.0.1/32`에서는 public IP 직접 접속이 불가능하므로, SSM이 EC2의 `127.0.0.1:18080`으로 전달하는 경로를 사용합니다. 로컬 18080이 비어 있는지 확인한 뒤 별도 터미널에서 forwarding session을 엽니다. 본인 공인 IPv4 `/32`로 Terraform을 적용한 환경에서는 `http://EC2_PUBLIC_IP:18080` 직접 접속도 가능합니다.
+미니 앱은 `0.0.0.0:18080`에 bind하고 Terraform은 TCP/18080을 본인 공인 IPv4 `/32`에만 허용합니다. 로컬 터미널에서 EC2 공인 주소를 확인한 뒤 브라우저로 직접 접속합니다.
 
 ```bash
-# [로컬 노트북 / 새 터미널]
-set -euo pipefail
-if command -v lsof >/dev/null && \
-  lsof -nP -iTCP:18080 -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "ERROR: local port 18080 is already in use" >&2
-  exit 1
-fi
-aws ssm start-session --profile "$AWS_PROFILE" \
-  --region "$AWS_REGION" --target "$INSTANCE_ID" \
-  --document-name AWS-StartPortForwardingSession \
-  --parameters 'portNumber=["18080"],localPortNumber=["18080"]'
+# [로컬 노트북]
+EC2_PUBLIC_IP=$(aws ec2 describe-instances \
+  --profile "$AWS_PROFILE" --region "$AWS_REGION" \
+  --instance-ids "$INSTANCE_ID" \
+  --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+printf 'MINI_APP_URL=http://%s:18080\n' "$EC2_PUBLIC_IP"
 ```
 
 세션을 유지한 상태에서 또 다른 로컬 터미널로 UI를 확인합니다.

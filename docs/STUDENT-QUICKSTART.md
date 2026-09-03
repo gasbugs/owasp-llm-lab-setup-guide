@@ -88,7 +88,8 @@ course_dates = [
 # AMI ID는 직접 입력하지 않습니다.
 # Terraform이 기존 검증 계열의 최신 DLAMI를 자동 조회합니다.
 
-allowed_ingress_cidr = "127.0.0.1/32"
+# 본인 노트북의 현재 공인 IPv4 하나만 허용합니다.
+allowed_ingress_cidr = "203.0.113.10/32"
 
 # 기본값은 수동 설치입니다.
 enable_user_data_bootstrap = false
@@ -153,23 +154,13 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
 
-### 주요 실습 포트를 SSM으로 localhost에 연결
+### 본인 공인 IPv4에서 실습 서비스에 접속
 
-보안 그룹에서 실습 포트를 외부에 공개하지 않아도 SSM 포트포워딩으로 로컬 브라우저와 `curl`을 연결할 수 있습니다. 다음 명령은 수강생 노트북에서 실행하며, 기본 LLM 서비스, NeMo 허브 제어면의 Presidio(18093)·NeMo Hub(18094)·Application UI(18095), Module 08의 Grafana(3001), Loki(3100), Tempo(3200), OTLP(4318), 보안 Gateway(8014), Retrieval(8015), Alert webhook(8099), Mimir(9009), Prometheus(9090), Alertmanager(9093), GPU Exporter(9400), Alloy UI(12345)를 같은 localhost 포트로 전달합니다. 사용하지 않는 포트에는 listener가 없으므로 해당 SSM 세션만 연결되지 않고 나머지 전달은 계속 동작합니다.
-
-```bash
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
-  bash ~/owasp-llm-lab-setup-guide/infrastructure/scripts/student/forward-lab-ports.sh \
-  i-0123456789abcdef0
-```
-
-이 터미널을 열어 둔 동안 `http://localhost:8080`처럼 접속할 수 있습니다. `Ctrl+C`를 한 번 누르면 스크립트가 생성한 모든 SSM 세션이 종료됩니다. 일부 포트만 필요하면 `LAB_PORTS="8080 8012"`를 명령 앞에 추가합니다.
-
-이 방식은 인바운드 실습 포트를 열지 않아도 되지만, EC2의 SSM Agent가 AWS Systems Manager에 연결할 아웃바운드 HTTPS 443은 허용되어 있어야 합니다. 443까지 차단된 네트워크에서는 SSM 셸과 포트포워딩 모두 동작하지 않습니다.
+Terraform은 `allowed_ingress_cidr`에 적은 본인 공인 IPv4 `/32`에서만 실습 포트를 받습니다. `public_ip_lookup_commands`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. 예를 들어 Portal은 `http://EC2_PUBLIC_IP:8080`입니다. `0.0.0.0/0`으로 넓히지 않으며, 노트북의 공인 IP가 바뀌면 현재 값으로 `terraform apply`를 다시 실행합니다.
 
 ### LLM08 추가 셋업
 
-LLM08은 일반 컨테이너 설치 외에 embedding 모델/API, NumPy 분석 venv, 학습자 미니 앱 scaffold와 loopback port forwarding을 함께 확인해야 합니다. 강사·콘텐츠 배포자가 [LLM08 embedding lab setup](LLM08-SETUP.md)의 **publish gate를 먼저 통과해 공지한 40자리 setup commit**을 받은 뒤, 새 EC2 또는 기존 EC2 경로를 선택해 진행하세요. 수강생은 publish gate 때문에 로컬 PC에 Docker을 추가 설치하지 않습니다.
+LLM08은 일반 컨테이너 설치 외에 embedding 모델/API, NumPy 분석 venv와 학습자 미니 앱 scaffold를 함께 확인해야 합니다. 강사·콘텐츠 배포자가 [LLM08 embedding lab setup](LLM08-SETUP.md)의 **publish gate를 먼저 통과해 공지한 40자리 setup commit**을 받은 뒤, 새 EC2 또는 기존 EC2 경로를 선택해 진행하세요. Module 08·09의 WSL 제어면은 로컬 Docker Engine과 Compose v2를 사용하므로 3절 preflight에서 두 명령도 함께 검사합니다.
 
 이 문서나 코드가 아직 로컬 워킹트리에만 있고 공개 `origin/main` commit 또는 그 commit의 GHCR 이미지가 없다면 수강생 환경은 준비된 것이 아닙니다. `main`/`latest`를 무조건 재실행하지 말고, 강사가 공지한 40자리 setup commit과 `sha-<commit>` 이미지가 모두 공개된 뒤 설치합니다.
 
@@ -252,7 +243,7 @@ curl -sS http://localhost:8013/healthz
 모델/cache를 건드리지 않습니다. 실습별 저장 위치와 복원 범위는 [Lab state
 and reset policy](LAB-RESET-POLICY.md)에 정리되어 있습니다.
 
-SSM 포트포워딩이나 수강생이 실행한 미니 앱을 종료하는 일, EC2를 중지하는
+수강생이 실행한 미니 앱을 종료하는 일과 EC2를 중지하는
 일은 상태 복원과 별개입니다.
 
 ## 10. 설치 자체를 다시 해야 할 때

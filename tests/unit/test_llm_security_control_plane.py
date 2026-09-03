@@ -418,6 +418,8 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
 
     def test_all_control_plane_services_share_distributed_tracing(self) -> None:
         telemetry = (CONTROL / "shared/telemetry.py").read_text()
+        self.assertNotIn("if not endpoint:\n        return", telemetry)
+        self.assertIn("if endpoint:", telemetry)
         self.assertIn("FastAPIInstrumentor.instrument_app", telemetry)
         self.assertIn("HTTPXClientInstrumentor().instrument", telemetry)
         for relative in (

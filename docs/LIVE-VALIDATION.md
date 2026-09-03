@@ -78,7 +78,7 @@ unit suite에는 tool-call parser, 동일 응답의 DOM sink replay, 공개 파�
 
 ## 3. EC2 준비와 정확한 커밋 checkout
 
-Terraform과 설치 절차는 [`STUDENT-QUICKSTART.md`](STUDENT-QUICKSTART.md)를 공유합니다. 기본 `allowed_ingress_cidr = "127.0.0.1/32"`를 유지하고 SSM으로 접속합니다.
+Terraform과 설치 절차는 [`STUDENT-QUICKSTART.md`](STUDENT-QUICKSTART.md)를 공유합니다. `allowed_ingress_cidr`에는 검증을 실행하는 PC의 현재 공인 IPv4 `/32`를 넣습니다. 관리 셸은 SSM으로 접속하고 학습자 웹/API는 EC2 공인 주소로 확인합니다.
 
 최초 부팅 user-data로 설치할 때는 1단계의 동일한 commit을 Terraform 입력에도 전달합니다. 기존 `terraform.tfvars`의 필수값을 채운 뒤, **인스턴스를 처음 만드는 apply**에서 실행합니다.
 

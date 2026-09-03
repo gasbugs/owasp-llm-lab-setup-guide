@@ -194,15 +194,16 @@ python3 learner_vector_app.py --serve --host 0.0.0.0 --port 18080
 
 두 번째 EC2/SSM 터미널에서 `ss -ltnp | grep ':18080'`과 `curl -fsS http://127.0.0.1:18080/healthz` 두 가지를 확인합니다. `0.0.0.0`은 bind sentinel이지 접속 URL이 아닙니다.
 
-브라우저가 안 열리면 먼저 SSM port forwarding을 확인합니다. Terraform은 TCP/18080을 `allowed_ingress_cidr`로 설정한 IPv4 `/32`에만 허용합니다. 기본값 `127.0.0.1/32`는 외부 직접 접속을 허용하지 않고, 본인 공인 IPv4 `/32`로 명시해 적용한 경우에만 `EC2_PUBLIC_IP:18080`에 직접 접속할 수 있습니다. 기존의 수동 all-protocol 규칙도 해당 `/32`에 한정된 경우 TCP/18080을 포함하지만, 권장 규칙은 TCP/18080 단일 포트입니다. `0.0.0.0/0`은 절대 사용하지 않습니다.
+브라우저가 안 열리면 현재 공인 IPv4가 Terraform의 `allowed_ingress_cidr` `/32`와 같은지 먼저 확인합니다. Terraform은 TCP/18080을 그 한 주소에만 허용하며 브라우저는 `EC2_PUBLIC_IP:18080`으로 접속합니다. 기존의 수동 all-protocol 규칙도 해당 `/32`에 한정된 경우 TCP/18080을 포함하지만, 권장 규칙은 TCP/18080 단일 포트입니다. `127.0.0.1/32`와 `0.0.0.0/0`은 사용하지 않습니다.
 
 ```bash
 # [로컬 노트북]
-session-manager-plugin --version
+curl -sS https://checkip.amazonaws.com
 aws ssm describe-instance-information \
   --profile owasp-llm --region us-east-1 \
   --query 'InstanceInformationList[].{Id:InstanceId,Ping:PingStatus}'
-lsof -nP -iTCP:18080 -sTCP:LISTEN || true
+aws ec2 describe-instances --profile owasp-llm --region us-east-1 \
+  --query 'Reservations[].Instances[].PublicIpAddress' --output text
 ```
 
 작업이 끝나면 evidence를 먼저 보존하고 미니 앱/forwarding을 정리한 뒤, **마지막에 EC2를 중지해 `stopped`를 확인**합니다.

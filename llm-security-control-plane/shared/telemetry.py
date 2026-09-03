@@ -14,8 +14,6 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 def configure_telemetry(app, service_name: str) -> None:
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").rstrip("/")
-    if not endpoint:
-        return
     provider = TracerProvider(
         resource=Resource.create(
             {
@@ -25,9 +23,10 @@ def configure_telemetry(app, service_name: str) -> None:
             }
         )
     )
-    provider.add_span_processor(
-        BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces"))
-    )
+    if endpoint:
+        provider.add_span_processor(
+            BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces"))
+        )
     trace.set_tracer_provider(provider)
     FastAPIInstrumentor.instrument_app(app, tracer_provider=provider)
     HTTPXClientInstrumentor().instrument(tracer_provider=provider)

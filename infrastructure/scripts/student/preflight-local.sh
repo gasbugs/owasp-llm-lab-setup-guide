@@ -29,6 +29,23 @@ need_cmd terraform "Install Terraform v1.x or later."
 need_cmd jq "Install jq for JSON output parsing."
 need_cmd unzip "Install unzip to extract the student package."
 need_cmd shasum "Install Perl shasum or use sha256sum equivalent."
+need_cmd docker "Install Docker Engine 29.7.2 and Docker Compose v2 5.5.0 for Module 08/09."
+
+if command -v docker >/dev/null 2>&1; then
+  if docker info >/dev/null 2>&1; then
+    echo "OK   docker-daemon            reachable"
+  else
+    echo "MISS docker-daemon            Start Docker or refresh your docker group membership."
+    missing=1
+  fi
+
+  if docker compose version >/dev/null 2>&1; then
+    echo "OK   docker-compose           $(docker compose version)"
+  else
+    echo "MISS docker-compose           Install the Docker Compose v2 plugin."
+    missing=1
+  fi
+fi
 
 if command -v session-manager-plugin >/dev/null 2>&1; then
   echo "OK   session-manager-plugin installed"

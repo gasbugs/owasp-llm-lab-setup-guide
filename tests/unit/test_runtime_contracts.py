@@ -244,7 +244,7 @@ class RuntimeContractTest(unittest.TestCase):
     def test_security_group_only_lists_deployed_app_ports(self) -> None:
         terraform = read("infrastructure/terraform/main.tf")
         self.assertIn(
-            "toset([8000, 8001, 8002, 8010, 8011, 8012, 8013, 18080])",
+            "toset([3000, 8000, 8001, 8002, 8010, 8011, 8012, 8013, 18080])",
             terraform,
         )
         network = read("infrastructure/terraform/network.tf")
