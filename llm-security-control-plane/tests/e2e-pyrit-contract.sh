@@ -49,4 +49,42 @@ jq -e '
     .detected_stage == null] | all)
 ' <<<"$result" >/dev/null
 
-printf 'module08-pyrit-contract=PASS actual-pyrit bounded-turns=3\n'
+assert_err() {
+  local app_token=$1
+  local expected_status=$2
+  local output
+  local exit_code
+  set +e
+  output="$(docker run --rm --network "$NETWORK" \
+    -e "APPLICATION_ACCESS_TOKEN=$app_token" \
+    -e BEDROCK_GATEWAY_TOKEN=pyrit-bedrock-contract-token \
+    localhost/module08-pyrit:1.0.1)"
+  exit_code=$?
+  set -e
+  test "$exit_code" -ne 0
+  jq -e --argjson status "$expected_status" '
+    .pyrit_outcome == "error" and
+    .course_verdict == "ERR" and
+    .http_status == $status
+  ' <<<"$output" >/dev/null
+}
+
+assert_err pyrit-application-401-token 401
+assert_err pyrit-application-422-token 422
+assert_err pyrit-application-500-token 500
+
+set +e
+python_error="$(docker run --rm --network "$NETWORK" \
+  -e BEDROCK_GATEWAY_TOKEN=pyrit-bedrock-contract-token \
+  localhost/module08-pyrit:1.0.1)"
+python_exit=$?
+set -e
+test "$python_exit" -ne 0
+jq -e '
+  .pyrit_outcome == "error" and
+  .course_verdict == "ERR" and
+  .error_type == "KeyError" and
+  .http_status == null
+' <<<"$python_error" >/dev/null
+
+printf 'module08-pyrit-contract=PASS actual-pyrit bounded-turns=3 errors=401,422,500,python\n'

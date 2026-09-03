@@ -39,12 +39,20 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(404, {"detail": "not-found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        authorization = self.headers.get("Authorization")
+        if self.server.server_port == 8000 and self.path == "/api/chat":
+            if authorization == "Bearer pyrit-application-422-token":
+                self.send_json(422, {"detail": "invalid Application request contract", "http_status": 422})
+                return
+            if authorization == "Bearer pyrit-application-500-token":
+                self.send_json(500, {"detail": "simulated Application failure", "http_status": 500})
+                return
         expected_token = {
             8000: "pyrit-application-contract-token",
             8080: "pyrit-bedrock-contract-token",
         }.get(self.server.server_port)
-        if self.headers.get("Authorization") != f"Bearer {expected_token}":
-            self.send_json(401, {"detail": "invalid contract token"})
+        if authorization != f"Bearer {expected_token}":
+            self.send_json(401, {"detail": "invalid contract token", "http_status": 401})
             return
         length = int(self.headers.get("Content-Length", "0"))
         payload = json.loads(self.rfile.read(length) or b"{}")

@@ -1,12 +1,21 @@
 FROM python:3.12-slim
 
 ARG GARAK_VERSION=0.15.1
+ARG TORCH_VERSION=2.6.0
 
 ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    XDG_DATA_HOME=/work/.local/share
+    PIP_NO_CACHE_DIR=1
 
-RUN python -m pip install "garak==${GARAK_VERSION}"
+# REST Probe는 GPU를 사용하지 않으므로 CUDA wheel을 설치하지 않는다.
+RUN python -m pip install \
+      --index-url https://download.pytorch.org/whl/cpu \
+      "torch==${TORCH_VERSION}" \
+    && python -m pip install "garak==${GARAK_VERSION}"
+
+ENV HOME=/work \
+    XDG_CACHE_HOME=/work/.local/share/garak-cache \
+    XDG_CONFIG_HOME=/work/.local/share/garak-config \
+    XDG_DATA_HOME=/work/.local/share
 
 WORKDIR /work
 ENTRYPOINT ["python", "-m", "garak"]

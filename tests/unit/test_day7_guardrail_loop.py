@@ -39,6 +39,14 @@ class Day7GuardrailLoopTests(unittest.TestCase):
         e2e = (ROOT / "tests/e2e/day6/test_guardrail_policy_loop.sh").read_text()
         self.assertIn("--config /work/garak-config.yaml", e2e)
 
+    def test_garak_image_uses_cpu_torch_and_writable_user_paths(self) -> None:
+        source = (ROOT / "examples/day6/garak-guardrail/Containerfile").read_text()
+        self.assertIn("https://download.pytorch.org/whl/cpu", source)
+        self.assertIn('"torch==${TORCH_VERSION}"', source)
+        self.assertIn("HOME=/work", source)
+        self.assertIn("XDG_CACHE_HOME=/work/.local/share/garak-cache", source)
+        self.assertIn("XDG_CONFIG_HOME=/work/.local/share/garak-config", source)
+
     def test_server_exposes_policy_identity_and_static_output_contract(self) -> None:
         source = (ROOT / "examples/day6/presidio/server.py").read_text()
         for marker in (

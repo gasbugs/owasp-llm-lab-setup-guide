@@ -322,6 +322,14 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn('Bearer {BEDROCK_GATEWAY_TOKEN}', hub)
         self.assertIn("invalid Bedrock Gateway token", fake)
 
+    def test_start_stack_preserves_explicit_host_port_overrides(self) -> None:
+        start = (CONTROL / "deploy/start-stack.sh").read_text()
+        for name in ("BEDROCK", "PRESIDIO", "HUB", "APPLICATION"):
+            self.assertIn(f'REQUESTED_{name}_HOST_PORT="${{{name}_HOST_PORT-}}"', start)
+            self.assertIn(f'{name}_HOST_PORT="$REQUESTED_{name}_HOST_PORT"', start)
+        self.assertIn('REQUESTED_LEGACY_STATIC_TOKEN_MODE="${LEGACY_STATIC_TOKEN_MODE-}"', start)
+        self.assertIn('LEGACY_STATIC_TOKEN_MODE="$REQUESTED_LEGACY_STATIC_TOKEN_MODE"', start)
+
     def test_compose_secrets_are_generated_and_have_no_runtime_defaults(self) -> None:
         runtime = (CONTROL / "deploy/prepare-module08-runtime.sh").read_text()
         env_helper = (CONTROL / "deploy/lib/module08-compose-env.sh").read_text()
@@ -447,12 +455,15 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("llm-security-application-gateway:8000", attack)
         self.assertIn("llm-security-bedrock-gateway:8080/v1", attack)
         self.assertIn("max_turns=3", attack)
-        self.assertIn("'\"reply\":\"PYRIT_TEST_ACCEPTED\"'", attack)
+        self.assertIn("'\"reply\":\"PYRIT_POLICY_BYPASS_CANARY\"'", attack)
+        self.assertIn('"course_verdict": "ERR"', attack)
+        self.assertIn('"course_verdict": "ERR"', report)
         self.assertIn('"application_decision"', report)
         self.assertIn('"upstream_called"', report)
         self.assertIn("localhost/module08-pyrit:1.0.1", contract)
         self.assertIn('.executed_turns == 3', contract)
         self.assertIn('actual-pyrit bounded-turns=3', contract)
+        self.assertIn('errors=401,422,500,python', contract)
         self.assertIn('ThreadingHTTPServer(("0.0.0.0", port), Handler)', boundaries)
         self.assertIn('Run the deterministic PyRIT adaptive-turn contract', workflow)
 
