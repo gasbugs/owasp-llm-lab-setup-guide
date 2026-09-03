@@ -439,6 +439,9 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         containerfile = (root / "Containerfile").read_text()
         attack = (root / "attack.py").read_text()
         report = (root / "report.py").read_text()
+        contract = (CONTROL / "tests/e2e-pyrit-contract.sh").read_text()
+        boundaries = (CONTROL / "tests/fake_pyrit_boundaries.py").read_text()
+        workflow = (ROOT / ".github/workflows/module08-docker-e2e.yml").read_text()
         self.assertIn('pyrit==${PYRIT_VERSION}', containerfile)
         self.assertIn("USER 65532:65532", containerfile)
         self.assertIn("llm-security-application-gateway:8000", attack)
@@ -447,6 +450,11 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("'\"reply\":\"PYRIT_TEST_ACCEPTED\"'", attack)
         self.assertIn('"application_decision"', report)
         self.assertIn('"upstream_called"', report)
+        self.assertIn("localhost/module08-pyrit:1.0.1", contract)
+        self.assertIn('.executed_turns == 3', contract)
+        self.assertIn('actual-pyrit bounded-turns=3', contract)
+        self.assertIn('ThreadingHTTPServer(("0.0.0.0", port), Handler)', boundaries)
+        self.assertIn('Run the deterministic PyRIT adaptive-turn contract', workflow)
 
 
 if __name__ == "__main__":

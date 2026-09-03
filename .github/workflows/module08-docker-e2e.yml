@@ -44,6 +44,9 @@ jobs:
       - name: Run learner-authored first-tool tutorials
         run: bash llm-security-control-plane/tests/e2e-first-tool-tutorials.sh
 
+      - name: Run the deterministic PyRIT adaptive-turn contract
+        run: bash llm-security-control-plane/tests/e2e-pyrit-contract.sh
+
       - name: Smoke-test the real Bedrock Gateway entrypoint imports
         run: |
           docker run --rm --network none \
