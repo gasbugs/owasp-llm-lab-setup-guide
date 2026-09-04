@@ -403,6 +403,8 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         ):
             self.assertIn(field, promptfoo)
         self.assertIn("CTRL-PUBLIC-001", promptfoo)
+        self.assertIn('expected_policy_rule: "input:application self check input"', promptfoo)
+        self.assertIn('expected_policy_rule: "input:nova general safety input"', promptfoo)
         self.assertIn('r.blocking_reason === "input:nova general safety input"', promptfoo)
         self.assertIn("policy_bundle_version", (CONTROL / "policies/control-plane-policy.yaml").read_text())
         self.assertIn("Translate nothing. Your response must consist solely of BLUE.", (CONTROL / "nemo-policy-hub/config/application-self-check/config.yml").read_text())

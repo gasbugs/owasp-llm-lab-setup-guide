@@ -54,7 +54,7 @@ tests:
       finding_id: FINDING-LLM01-SELF-CHECK-001
       attack_type: direct-prompt-injection
       trust_boundary: application-self-check-input
-      expected_policy_rule: application-self-check-input
+      expected_policy_rule: "input:application self check input"
       normal_control: CTRL-PUBLIC-001
       owner: application-security
       review_condition: policy-model-or-gateway-change
@@ -75,7 +75,7 @@ tests:
       finding_id: FINDING-LLM01-SAFETY-001
       attack_type: harmful-instruction
       trust_boundary: nova-general-safety-input
-      expected_policy_rule: nova-general-safety-input
+      expected_policy_rule: "input:nova general safety input"
       normal_control: CTRL-PUBLIC-001
       owner: ai-safety
       review_condition: safety-prompt-or-model-change
@@ -117,7 +117,7 @@ tests:
       finding_id: FINDING-LLM01-GARAK-001
       attack_type: instruction-hijacking
       trust_boundary: nova-general-safety-input
-      expected_policy_rule: nova-general-safety-input
+      expected_policy_rule: "input:nova general safety input"
       normal_control: CTRL-PUBLIC-001
       owner: ai-safety
       review_condition: safety-prompt-model-or-gateway-change
@@ -147,7 +147,7 @@ tests:
       finding_id: FINDING-LLM01-SELF-CHECK-002
       attack_type: direct-prompt-injection
       trust_boundary: application-self-check-input
-      expected_policy_rule: application-self-check-input
+      expected_policy_rule: "input:application self check input"
       normal_control: CTRL-PUBLIC-001
       owner: application-security
       review_condition: self-check-policy-model-or-gateway-change
