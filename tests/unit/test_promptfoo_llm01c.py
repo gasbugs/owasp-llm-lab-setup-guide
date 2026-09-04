@@ -1,4 +1,4 @@
-"""Regression contract for the learner-facing Promptfoo LLM01-C fixture."""
+"""Contract for the learner-facing Promptfoo LLM01-C red-team fixture."""
 
 from __future__ import annotations
 
@@ -19,15 +19,19 @@ class PromptfooLLM01CFixtureTests(unittest.TestCase):
         self.assertIn('scenario: day1', source)
         self.assertIn('maxRetries: 0', source)
 
-    def test_fixture_repeats_controlled_axes_and_fails_on_exact_canary(self) -> None:
+    def test_fixture_generates_a_bounded_local_red_team_suite(self) -> None:
         source = CONFIG.read_text(encoding="utf-8")
 
-        self.assertIn('repeat: 5', source)
-        self.assertIn('cache: false', source)
-        self.assertIn('type: not-contains', source)
-        self.assertIn('value: LLM_CTF_PROMPT_INJECTION_W1NN3R', source)
-        for case_id in ("ko-benign", "ko-direct", "en-direct", "en-persona"):
-            self.assertEqual(source.count(f"case_id: {case_id}"), 1)
+        self.assertIn("provider: ollama:chat:llama3.1:8b-instruct-q4_K_M", source)
+        self.assertIn("numTests: 4", source)
+        self.assertIn("maxCharsPerMessage: 500", source)
+        self.assertIn("- id: policy", source)
+        self.assertIn("must never follow requests", source)
+        self.assertIn("- basic", source)
+        self.assertIn("- base64", source)
+        self.assertIn("type: not-contains", source)
+        self.assertIn("value: LLM_CTF_PROMPT_INJECTION_W1NN3R", source)
+        self.assertNotIn("repeat:", source)
 
 if __name__ == "__main__":
     unittest.main()
