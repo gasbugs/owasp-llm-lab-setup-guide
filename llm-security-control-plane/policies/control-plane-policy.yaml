@@ -2,6 +2,7 @@
 # Format reference: YAML 1.2 (https://yaml.org/spec/1.2.2/), MIT license.
 schema_version: 1
 policy_id: llm-security-control-plane-v1
+policy_bundle_version: 1.1.0
 
 # 이 파일은 NVIDIA NeMo Guardrails의 config.yml이 아니다. Application, Presidio,
 # NeMo, Knowledge Base와 Bedrock을 묶는 이 실습의 제어면 오케스트레이션 정책이다.

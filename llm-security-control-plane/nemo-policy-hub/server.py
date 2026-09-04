@@ -193,6 +193,7 @@ def result_record(
             "stage_order": [stage["stage"] for stage in stages],
             "stages": stages,
             "policy_id": CONTROL_PLANE_POLICY["policy_id"],
+            "policy_bundle_version": CONTROL_PLANE_POLICY["policy_bundle_version"],
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         },
     }
@@ -270,6 +271,8 @@ async def policy() -> dict:
         "version": RELEASE_VERSION,
         "guard_mode": GUARD_MODE,
         "assurance_profile": ASSURANCE_PROFILE,
+        "policy_id": CONTROL_PLANE_POLICY["policy_id"],
+        "policy_bundle_version": CONTROL_PLANE_POLICY["policy_bundle_version"],
         "control_plane_policy_source": "llm-security-control-plane/policies/control-plane-policy.yaml",
         "nemo_config_source": "llm-security-control-plane/nemo-policy-hub/config/",
         "runtime_source": "llm-security-control-plane/nemo-policy-hub/hub_core.py",

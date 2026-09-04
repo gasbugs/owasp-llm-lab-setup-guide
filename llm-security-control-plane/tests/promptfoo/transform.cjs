@@ -9,5 +9,7 @@ module.exports = (json) => {
     assurance_profile: guardrail.assurance_profile || null,
     guard_model_calls: guardrail.guard_model_calls ?? null,
     stage_order: guardrail.stage_order || [],
+    policy_id: guardrail.policy_id || null,
+    policy_bundle_version: guardrail.policy_bundle_version || null,
   });
 };

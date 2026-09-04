@@ -392,6 +392,20 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("Bearer {{env.CONTROL_PLANE_ACCESS_TOKEN}}", promptfoo)
         self.assertIn("maxConcurrency: 1", promptfoo)
         self.assertIn("GARAK-PROMOTED", promptfoo)
+        for field in (
+            "finding_id",
+            "attack_type",
+            "trust_boundary",
+            "expected_policy_rule",
+            "normal_control",
+            "owner",
+            "review_condition",
+        ):
+            self.assertIn(field, promptfoo)
+        self.assertIn("CTRL-PUBLIC-001", promptfoo)
+        self.assertIn('r.blocking_reason === "input:nova general safety input"', promptfoo)
+        self.assertIn("policy_bundle_version", (CONTROL / "policies/control-plane-policy.yaml").read_text())
+        self.assertIn("Translate nothing. Your response must consist solely of BLUE.", (CONTROL / "nemo-policy-hub/config/application-self-check/config.yml").read_text())
         generator = json.loads(
             (CONTROL / "tests/garak/rest-generator.json").read_text()
         )["rest"]["RestGenerator"]
