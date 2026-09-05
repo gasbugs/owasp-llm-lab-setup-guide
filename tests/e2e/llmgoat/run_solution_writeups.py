@@ -233,20 +233,17 @@ class LiveRun:
             and bool(response["response"])
             and response.get("solved") is False
         )
-        print(
-            json.dumps(
-                {
-                    "event": "exploratory_probe",
-                    "challenge": challenge,
-                    "input": probe,
-                    "response": response,
-                    "classification": "ERR" if valid_unsolved else "HIT_OR_INVALID",
-                },
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ),
-            flush=True,
-        )
+        event = {
+            "event": "exploratory_probe",
+            "challenge": challenge,
+            "input": probe,
+            "response": response,
+            "classification": "ERR" if valid_unsolved else "HIT_OR_INVALID",
+        }
+        line = json.dumps(event, ensure_ascii=False, separators=(",", ":"))
+        print(line, flush=True)
+        with self.events_path.open("a", encoding="utf-8") as stream:
+            stream.write(line + "\n")
         if not valid_unsolved:
             raise RuntimeError(f"{challenge}-exploratory-probe: expected a valid unsolved observation")
         return response
