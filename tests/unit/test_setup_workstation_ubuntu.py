@@ -37,6 +37,10 @@ class SetupWorkstationUbuntuDockerTests(unittest.TestCase):
 
         self.assertIn("docker.io docker-compose-v2", fallback)
         self.assertIn("/etc/apt/sources.list.d/docker.list", fallback)
+        self.assertIn("Acquire::ForceIPv4=true", fallback)
+        self.assertIn("https://mirror.kakao.com/ubuntu", fallback)
+        self.assertIn("/etc/apt/sources.list.d/ubuntu.sources", fallback)
+        self.assertIn("sudo timeout 60s apt-get", fallback)
 
 
 if __name__ == "__main__":

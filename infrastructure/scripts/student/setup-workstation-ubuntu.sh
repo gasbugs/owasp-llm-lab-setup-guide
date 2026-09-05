@@ -162,9 +162,33 @@ install_docker_from_ubuntu_repository() {
 
     # 실패한 외부 저장소를 제거해야 다음 apt-get update가 같은 주소에서 다시 멈추지 않는다.
     sudo rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources
-    sudo timeout 180s apt-get "${APT_TIMEOUT_OPTIONS[@]}" update >/dev/null 2>&1 &&
-        sudo timeout 300s apt-get "${APT_TIMEOUT_OPTIONS[@]}" install -y \
-            docker.io docker-compose-v2 >/dev/null 2>&1
+    if sudo timeout 60s apt-get -o Acquire::ForceIPv4=true \
+        "${APT_TIMEOUT_OPTIONS[@]}" update >/dev/null 2>&1; then
+        sudo timeout 300s apt-get -o Acquire::ForceIPv4=true \
+            "${APT_TIMEOUT_OPTIONS[@]}" install -y \
+                docker.io docker-compose-v2 >/dev/null 2>&1
+        return
+    fi
+
+    # AWS 지역 미러가 응답하지 않을 때 사용자가 실측한 Kakao Ubuntu 미러로 한 번만 우회한다.
+    # Ubuntu 24.04의 deb822 파일과 이전 형식 sources.list가 있을 때만 정확한 공식 URL을 바꾼다.
+    echo "Ubuntu 기본 미러가 응답하지 않아 Kakao 미러로 한 번 더 시도합니다."
+    local source_file
+    for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+        if [ -f "$source_file" ]; then
+            sudo sed -E -i.bak \
+                -e 's|https?://([a-z0-9.-]+\.)?archive\.ubuntu\.com/ubuntu|https://mirror.kakao.com/ubuntu|g' \
+                -e 's|https?://security\.ubuntu\.com/ubuntu|https://mirror.kakao.com/ubuntu|g' \
+                "$source_file"
+        fi
+    done
+
+    sudo apt-get clean
+    sudo timeout 60s apt-get -o Acquire::ForceIPv4=true \
+        "${APT_TIMEOUT_OPTIONS[@]}" update >/dev/null 2>&1 &&
+        sudo timeout 300s apt-get -o Acquire::ForceIPv4=true \
+            "${APT_TIMEOUT_OPTIONS[@]}" install -y \
+                docker.io docker-compose-v2 >/dev/null 2>&1
 }
 
 if ! command -v curl >/dev/null 2>&1 ||
