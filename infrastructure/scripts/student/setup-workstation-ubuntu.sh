@@ -101,45 +101,103 @@ echo -e "${BOLD}${BLUE}=============================="
 echo -e " 1. Docker 설치"
 echo -e "==============================${NC}"
 
-DOCKER_SUCCESS=true
+DOCKER_SUCCESS=false
+APT_TIMEOUT_OPTIONS=(
+    -o Acquire::http::Timeout=20
+    -o Acquire::https::Timeout=20
+    -o Acquire::Retries=1
+    -o DPkg::Lock::Timeout=30
+)
 
-if ! sudo apt-get update >/dev/null 2>&1; then
-    echo -e "${YELLOW}[경고] apt-get update 중 일부 오류가 발생했으나 계속 진행합니다.${NC}"
-fi
+docker_cli_ready() {
+    command -v docker >/dev/null 2>&1 &&
+        docker --version >/dev/null 2>&1 &&
+        docker compose version >/dev/null 2>&1
+}
 
-if ! sudo apt-get install -y ca-certificates curl jq unzip >/dev/null 2>&1; then
-    echo -e "${YELLOW}[경고] 기본 도구 설치 실패, 계속 시도합니다.${NC}"
-fi
+install_docker_from_official_repository() {
+    local docker_key_file
+    docker_key_file="$(mktemp)"
 
-sudo install -m 0755 -d /etc/apt/keyrings 2>/dev/null || true
-if ! sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc; then
-    echo -e "${RED}[오류] Docker GPG 키 다운로드 실패${NC}"
-    DOCKER_SUCCESS=false
-else
-    sudo chmod a+r /etc/apt/keyrings/docker.asc 2>/dev/null || true
-fi
+    echo "Docker 공식 저장소 설치를 최대 5분 동안 시도합니다."
+    if ! curl -fsSL --connect-timeout 10 --max-time 30 --retry 1 \
+        https://download.docker.com/linux/ubuntu/gpg -o "$docker_key_file"; then
+        rm -f "$docker_key_file"
+        return 1
+    fi
 
-if [ "$DOCKER_SUCCESS" = true ]; then
-    # 기존 Docker 저장소가 다른 key 경로를 쓰면 APT가 Signed-By 충돌로 멈춘다.
+    if ! sudo install -m 0755 -d /etc/apt/keyrings ||
+        ! sudo install -m 0644 "$docker_key_file" /etc/apt/keyrings/docker.asc; then
+        rm -f "$docker_key_file"
+        return 1
+    fi
+    rm -f "$docker_key_file"
+
+    # 예전 설정을 교체해 서로 다른 Signed-By 경로가 충돌하지 않게 한다.
     sudo rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources
     echo \
       "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-      $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      ${UBUNTU_CODENAME:-$VERSION_CODENAME} stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
 
-    sudo apt-get update >/dev/null 2>&1 || true
+    sudo timeout 180s apt-get "${APT_TIMEOUT_OPTIONS[@]}" update >/dev/null 2>&1 &&
+        sudo timeout 300s apt-get "${APT_TIMEOUT_OPTIONS[@]}" install -y \
+            docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
+            docker-compose-plugin >/dev/null 2>&1
+}
 
-    if sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1; then
-        echo -e "${GREEN}Docker 패키지 설치 완료${NC}"
-        # 현재 사용자를 docker 그룹에 추가 (권한 편의성)
-        sudo usermod -aG docker "$USER" 2>/dev/null || true
-        record_step "1. Docker 설치" "SUCCESS" "설치 완료 (그룹 추가됨)"
-    else
-        echo -e "${RED}[오류] Docker 패키지 설치 실패${NC}"
-        record_step "1. Docker 설치" "FAILED" "패키지 설치 중 오류 발생"
+install_docker_from_ubuntu_repository() {
+    echo "공식 설치가 실패해 Ubuntu 저장소의 docker.io로 전환합니다."
+
+    # 실패한 외부 저장소를 제거해야 다음 apt-get update가 같은 주소에서 다시 멈추지 않는다.
+    sudo rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources
+    sudo timeout 180s apt-get "${APT_TIMEOUT_OPTIONS[@]}" update >/dev/null 2>&1 &&
+        sudo timeout 300s apt-get "${APT_TIMEOUT_OPTIONS[@]}" install -y \
+            docker.io docker-compose-v2 >/dev/null 2>&1
+}
+
+if ! command -v curl >/dev/null 2>&1 ||
+    ! command -v jq >/dev/null 2>&1 ||
+    ! command -v unzip >/dev/null 2>&1; then
+    sudo timeout 180s apt-get "${APT_TIMEOUT_OPTIONS[@]}" update >/dev/null 2>&1 || true
+    if ! sudo timeout 180s apt-get "${APT_TIMEOUT_OPTIONS[@]}" install -y \
+        ca-certificates curl jq unzip >/dev/null 2>&1; then
+        echo -e "${YELLOW}[경고] 공통 도구 설치가 실패하거나 180초를 넘겼습니다.${NC}"
     fi
+fi
+
+if docker_cli_ready; then
+    echo -e "${GREEN}Docker와 Compose v2가 이미 설치되어 있어 패키지 설치를 건너뜁니다.${NC}"
+    DOCKER_SUCCESS=true
+    DOCKER_NOTE="기존 설치 재사용"
 else
-    record_step "1. Docker 설치" "FAILED" "GPG 키 등록 실패"
+    if install_docker_from_official_repository && docker_cli_ready; then
+        echo -e "${GREEN}Docker 공식 저장소 설치 완료${NC}"
+        DOCKER_SUCCESS=true
+        DOCKER_NOTE="공식 Docker 저장소 설치 완료"
+    elif docker_cli_ready; then
+        echo -e "${GREEN}공식 설치 결과 Docker와 Compose v2를 사용할 수 있습니다.${NC}"
+        DOCKER_SUCCESS=true
+        DOCKER_NOTE="공식 Docker 저장소 설치 완료"
+    elif install_docker_from_ubuntu_repository && docker_cli_ready; then
+        echo -e "${GREEN}Ubuntu docker.io와 Compose v2 설치 완료${NC}"
+        DOCKER_SUCCESS=true
+        DOCKER_NOTE="docker.io fallback 설치 완료"
+    else
+        echo -e "${RED}[오류] 공식 Docker와 docker.io 설치가 모두 실패했습니다.${NC}"
+        DOCKER_NOTE="공식 Docker와 docker.io fallback 모두 실패"
+    fi
+fi
+
+if [ "$DOCKER_SUCCESS" = true ]; then
+    # daemon 시작도 무한히 기다리지 않는다. WSL에서는 service 명령이 대신 동작할 수 있다.
+    if ! sudo timeout 60s systemctl enable --now docker >/dev/null 2>&1; then
+        sudo timeout 60s service docker start >/dev/null 2>&1 || true
+    fi
+    sudo usermod -aG docker "$USER" 2>/dev/null || true
+    record_step "1. Docker 설치" "SUCCESS" "$DOCKER_NOTE (그룹 추가됨)"
+else
+    record_step "1. Docker 설치" "FAILED" "$DOCKER_NOTE"
 fi
 
 echo ""
