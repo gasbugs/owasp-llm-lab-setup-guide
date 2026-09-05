@@ -11,7 +11,8 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  profile = "owasp-llm"
+  region  = "us-east-1"
 }
 
 data "aws_ami" "al2023" {
