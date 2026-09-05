@@ -56,6 +56,11 @@ class LiveRun:
         self.trials = int(os.environ.get("TRIALS", "3"))
         if not 1 <= self.trials <= 5:
             raise ValueError("TRIALS must be from 1 through 5")
+        requested = os.environ.get("GOAT_CHALLENGES", ",".join(CHALLENGES))
+        self.selected_challenges = tuple(item.strip() for item in requested.split(",") if item.strip())
+        unknown = set(self.selected_challenges) - set(CHALLENGES)
+        if unknown or not self.selected_challenges:
+            raise ValueError(f"GOAT_CHALLENGES contains invalid names: {sorted(unknown)}")
         self.result_dir = Path(
             os.environ.get(
                 "RESULTS_DIR",
@@ -239,6 +244,8 @@ def run() -> Path:
     a08_reset_needed = False
     try:
         for challenge in ("a01", "a02", "a03"):
+            if challenge not in live.selected_challenges:
+                continue
             live.require_ready(challenge)
             live.run_case(challenge, "baseline", CASES[f"{challenge}-baseline"]["text"])
             live.run_probe(challenge)
@@ -250,29 +257,32 @@ def run() -> Path:
             )
 
         challenge = "a04"
-        live.require_ready(challenge)
-        a04_reset_needed = True
-        live.request(challenge, "a04-reset-before", "POST", f"/api/{CHALLENGES[challenge]}/reset_reviews", payload={})
-        baseline = json.loads(CASES["a04-baseline"]["text"])
-        live.run_case(challenge, "baseline", baseline)
-        for index, review in enumerate(A04_POISONS, 1):
-            live.request(
+        if challenge in live.selected_challenges:
+            live.require_ready(challenge)
+            a04_reset_needed = True
+            live.request(challenge, "a04-reset-before", "POST", f"/api/{CHALLENGES[challenge]}/reset_reviews", payload={})
+            baseline = json.loads(CASES["a04-baseline"]["text"])
+            live.run_case(challenge, "baseline", baseline)
+            for index, review in enumerate(A04_POISONS, 1):
+                live.request(
+                    challenge,
+                    f"a04-add-poison-{index}",
+                    "POST",
+                    f"/api/{CHALLENGES[challenge]}/add_review",
+                    payload={"goat": "Alpine Goat", "review": review},
+                )
+            live.run_case(
                 challenge,
-                f"a04-add-poison-{index}",
-                "POST",
-                f"/api/{CHALLENGES[challenge]}/add_review",
-                payload={"goat": "Alpine Goat", "review": review},
+                "solution",
+                json.loads(CASES["a04-solution"]["text"]),
+                trials=live.trials,
             )
-        live.run_case(
-            challenge,
-            "solution",
-            json.loads(CASES["a04-solution"]["text"]),
-            trials=live.trials,
-        )
-        live.request(challenge, "a04-reset-after", "POST", f"/api/{CHALLENGES[challenge]}/reset_reviews", payload={})
-        a04_reset_needed = False
+            live.request(challenge, "a04-reset-after", "POST", f"/api/{CHALLENGES[challenge]}/reset_reviews", payload={})
+            a04_reset_needed = False
 
         for challenge in ("a05", "a06", "a07"):
+            if challenge not in live.selected_challenges:
+                continue
             live.require_ready(challenge)
             live.run_case(challenge, "baseline", CASES[f"{challenge}-baseline"]["text"])
             live.run_probe(challenge)
@@ -284,71 +294,73 @@ def run() -> Path:
             )
 
         challenge = "a08"
-        live.require_ready(challenge)
-        a08_reset_needed = True
-        live.request(challenge, "a08-reset-before", "GET", f"/api/{CHALLENGES[challenge]}/reset_vectors")
-        live.run_case(challenge, "baseline", CASES["a08-baseline"]["text"])
-        vectors = live.request(challenge, "a08-export", "GET", f"/api/{CHALLENGES[challenge]}/export_vectors")
-        poisoned = {
-            key: vectors["Neil Armstrongut"] if key == "Flag" else [0] * 32
-            for key in vectors
-        }
-        upload = json.dumps(poisoned, separators=(",", ":")).encode()
-        live.request(
-            challenge,
-            "a08-import-poison",
-            "POST",
-            f"/api/{CHALLENGES[challenge]}/import_vectors",
-            upload=("vectors-poisoned.json", upload, "application/json"),
-        )
-        live.run_case(
-            challenge,
-            "solution",
-            CASES["a08-solution"]["text"],
-            trials=live.trials,
-        )
-        live.request(challenge, "a08-reset-after", "GET", f"/api/{CHALLENGES[challenge]}/reset_vectors")
-        a08_reset_needed = False
+        if challenge in live.selected_challenges:
+            live.require_ready(challenge)
+            a08_reset_needed = True
+            live.request(challenge, "a08-reset-before", "GET", f"/api/{CHALLENGES[challenge]}/reset_vectors")
+            live.run_case(challenge, "baseline", CASES["a08-baseline"]["text"])
+            vectors = live.request(challenge, "a08-export", "GET", f"/api/{CHALLENGES[challenge]}/export_vectors")
+            poisoned = {
+                key: vectors["Neil Armstrongut"] if key == "Flag" else [0] * 32
+                for key in vectors
+            }
+            upload = json.dumps(poisoned, separators=(",", ":")).encode()
+            live.request(
+                challenge,
+                "a08-import-poison",
+                "POST",
+                f"/api/{CHALLENGES[challenge]}/import_vectors",
+                upload=("vectors-poisoned.json", upload, "application/json"),
+            )
+            live.run_case(
+                challenge,
+                "solution",
+                CASES["a08-solution"]["text"],
+                trials=live.trials,
+            )
+            live.request(challenge, "a08-reset-after", "GET", f"/api/{CHALLENGES[challenge]}/reset_vectors")
+            a08_reset_needed = False
 
         challenge = "a09"
-        live.require_ready(challenge)
-        original = live.download(
+        if challenge in live.selected_challenges:
+            live.require_ready(challenge)
+            original = live.download(
             challenge,
             "a09-download-original",
             f"/api/{CHALLENGES[challenge]}/download_image",
         )
-        live.run_case(challenge, "baseline", CASES["a09-baseline"]["text"])
-        live.request(
+            live.run_case(challenge, "baseline", CASES["a09-baseline"]["text"])
+            live.request(
             challenge,
             "a09-upload-renamed-only",
             "POST",
             f"/api/{CHALLENGES[challenge]}/upload_image",
             upload=("cyborg-goat.png", original, "image/png"),
         )
-        live.run_probe(challenge)
-        asset_path_text = os.environ.get("LLMGOAT_A09_ASSET")
-        asset_url = os.environ.get("LLMGOAT_A09_ASSET_URL")
-        if asset_path_text:
-            asset_path = Path(asset_path_text).resolve()
-            asset = asset_path.read_bytes()
-            asset_name = asset_path.name
-        elif asset_url:
-            with urllib.request.urlopen(asset_url, timeout=live.timeout) as response:
-                asset = response.read()
-            asset_name = "a09-cyborg-goat.png"
-        else:
-            raise RuntimeError("LLMGOAT_A09_ASSET or LLMGOAT_A09_ASSET_URL is required")
-        expected_asset_sha = CASES["a09-solution"]["text"].split("sha256:", 1)[1]
-        if hashlib.sha256(asset).hexdigest() != expected_asset_sha:
-            raise RuntimeError("A09 solution asset SHA-256 mismatch")
-        live.request(
+            live.run_probe(challenge)
+            asset_path_text = os.environ.get("LLMGOAT_A09_ASSET")
+            asset_url = os.environ.get("LLMGOAT_A09_ASSET_URL")
+            if asset_path_text:
+                asset_path = Path(asset_path_text).resolve()
+                asset = asset_path.read_bytes()
+                asset_name = asset_path.name
+            elif asset_url:
+                with urllib.request.urlopen(asset_url, timeout=live.timeout) as response:
+                    asset = response.read()
+                asset_name = "a09-cyborg-goat.png"
+            else:
+                raise RuntimeError("LLMGOAT_A09_ASSET or LLMGOAT_A09_ASSET_URL is required")
+            expected_asset_sha = CASES["a09-solution"]["text"].split("sha256:", 1)[1]
+            if hashlib.sha256(asset).hexdigest() != expected_asset_sha:
+                raise RuntimeError("A09 solution asset SHA-256 mismatch")
+            live.request(
             challenge,
             "a09-upload-solution",
             "POST",
             f"/api/{CHALLENGES[challenge]}/upload_image",
             upload=(asset_name, asset, "image/png"),
         )
-        live.run_case(
+            live.run_case(
             challenge,
             "solution",
             CASES["a09-solution"]["text"],
@@ -356,15 +368,16 @@ def run() -> Path:
         )
 
         challenge = "a10"
-        live.require_ready(challenge)
-        live.run_case(challenge, "baseline", CASES["a10-baseline"]["text"])
-        # This request intentionally consumes the challenge timeout. Never retry it.
-        live.run_case(
-            challenge,
-            "solution",
-            CASES["a10-solution"]["text"],
-            trials=1,
-        )
+        if challenge in live.selected_challenges:
+            live.require_ready(challenge)
+            live.run_case(challenge, "baseline", CASES["a10-baseline"]["text"])
+            # This request intentionally consumes the challenge timeout. Never retry it.
+            live.run_case(
+                challenge,
+                "solution",
+                CASES["a10-solution"]["text"],
+                trials=1,
+            )
 
     finally:
         if a04_reset_needed:
