@@ -117,10 +117,13 @@ docker_cli_ready() {
 
 install_docker_from_official_repository() {
     local docker_key_file
+    local official_started
+    local remaining_seconds
     docker_key_file="$(mktemp)"
+    official_started="$(date +%s)"
 
-    echo "Docker 공식 저장소 설치를 최대 5분 동안 시도합니다."
-    if ! curl -fsSL --connect-timeout 10 --max-time 30 --retry 1 \
+    echo "Docker 공식 저장소 설치를 최대 60초 동안 시도합니다."
+    if ! curl -fsSL --connect-timeout 5 --max-time 15 --retry 1 \
         https://download.docker.com/linux/ubuntu/gpg -o "$docker_key_file"; then
         rm -f "$docker_key_file"
         return 1
@@ -140,8 +143,16 @@ install_docker_from_official_repository() {
       ${UBUNTU_CODENAME:-$VERSION_CODENAME} stable" | \
       sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
 
-    sudo timeout 180s apt-get "${APT_TIMEOUT_OPTIONS[@]}" update >/dev/null 2>&1 &&
-        sudo timeout 300s apt-get "${APT_TIMEOUT_OPTIONS[@]}" install -y \
+    remaining_seconds=$((60 - $(date +%s) + official_started))
+    if [ "$remaining_seconds" -le 0 ] ||
+        ! sudo timeout "${remaining_seconds}s" apt-get \
+            "${APT_TIMEOUT_OPTIONS[@]}" update >/dev/null 2>&1; then
+        return 1
+    fi
+
+    remaining_seconds=$((60 - $(date +%s) + official_started))
+    [ "$remaining_seconds" -gt 0 ] &&
+        sudo timeout "${remaining_seconds}s" apt-get "${APT_TIMEOUT_OPTIONS[@]}" install -y \
             docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
             docker-compose-plugin >/dev/null 2>&1
 }

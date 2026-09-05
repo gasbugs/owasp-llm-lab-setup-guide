@@ -24,8 +24,9 @@ class SetupWorkstationUbuntuDockerTests(unittest.TestCase):
         self.assertLess(official_call, ubuntu_call)
 
     def test_official_download_and_apt_operations_are_bounded(self):
-        self.assertIn("--connect-timeout 10 --max-time 30 --retry 1", self.script)
-        self.assertIn("sudo timeout 180s apt-get", self.script)
+        self.assertIn('echo "Docker 공식 저장소 설치를 최대 60초', self.script)
+        self.assertIn("--connect-timeout 5 --max-time 15 --retry 1", self.script)
+        self.assertIn("remaining_seconds=$((60 - $(date +%s) + official_started))", self.script)
         self.assertIn("sudo timeout 300s apt-get", self.script)
         self.assertIn("sudo timeout 60s systemctl enable --now docker", self.script)
 
