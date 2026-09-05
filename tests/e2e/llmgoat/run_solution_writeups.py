@@ -333,7 +333,7 @@ def run() -> Path:
             asset = asset_path.read_bytes()
             asset_name = asset_path.name
         elif asset_url:
-            with urllib.request.urlopen(asset_url, timeout=self.timeout) as response:
+            with urllib.request.urlopen(asset_url, timeout=live.timeout) as response:
                 asset = response.read()
             asset_name = "a09-cyborg-goat.png"
         else:
