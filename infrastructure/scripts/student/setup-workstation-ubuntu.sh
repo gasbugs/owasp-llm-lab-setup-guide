@@ -622,3 +622,7 @@ fi
 echo -e "※ 환경변수 즉시 반영: ${BOLD}source ~/.bashrc${NC} 또는 ${BOLD}source ~/.profile${NC}"
 echo -e "※ agy CLI 인증:       ${BOLD}agy${NC} (최초 실행 시 Google 계정 로그인)"
 echo -e "${BOLD}${CYAN}==============================================================================${NC}"
+
+# Docker 그룹 권한은 현재 셸에는 바로 반영되지 않는다.
+# 설치가 모두 끝난 뒤 사용자를 Docker 그룹에 다시 등록하고 새 로그인 셸을 연다.
+sudo usermod -aG docker "$USER" && su - "$USER"
