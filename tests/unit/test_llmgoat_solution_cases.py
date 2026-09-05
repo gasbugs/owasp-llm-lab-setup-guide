@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -60,6 +61,17 @@ class LlmgoatSolutionCaseTest(unittest.TestCase):
                         challenge, {"response": response, "solved": True}
                     )["accepted"]
                 )
+
+    def test_lab_contract_uses_the_canonical_case_inputs(self) -> None:
+        contract_path = ROOT / "contracts/labs/llmgoat-a01-a10-writeups.json"
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        contract_inputs = {
+            item["case_id"]: item["input"]["value"] for item in contract["cases"]
+        }
+        canonical_inputs = {
+            case_id: item["text"] for case_id, item in MODULE.CASES.items()
+        }
+        self.assertEqual(contract_inputs, canonical_inputs)
 
 
 if __name__ == "__main__":

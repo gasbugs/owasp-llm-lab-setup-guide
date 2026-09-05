@@ -226,15 +226,29 @@ class LiveRun:
         return outcomes
 
     def run_probe(self, challenge: str) -> dict[str, Any]:
-        response = self.challenge_request(challenge, f"{challenge}-exploratory-probe", PROBES[challenge])
+        probe = PROBES[challenge]
+        response = self.challenge_request(challenge, f"{challenge}-exploratory-probe", probe)
+        valid_unsolved = (
+            isinstance(response.get("response"), str)
+            and bool(response["response"])
+            and response.get("solved") is False
+        )
         print(
             json.dumps(
-                {"event": "exploratory_probe", "challenge": challenge, "input": PROBES[challenge], "response": response},
+                {
+                    "event": "exploratory_probe",
+                    "challenge": challenge,
+                    "input": probe,
+                    "response": response,
+                    "classification": "ERR" if valid_unsolved else "HIT_OR_INVALID",
+                },
                 ensure_ascii=False,
                 separators=(",", ":"),
             ),
             flush=True,
         )
+        if not valid_unsolved:
+            raise RuntimeError(f"{challenge}-exploratory-probe: expected a valid unsolved observation")
         return response
 
 
@@ -263,6 +277,7 @@ def run() -> Path:
             live.request(challenge, "a04-reset-before", "POST", f"/api/{CHALLENGES[challenge]}/reset_reviews", payload={})
             baseline = json.loads(CASES["a04-baseline"]["text"])
             live.run_case(challenge, "baseline", baseline)
+            live.run_probe(challenge)
             for index, review in enumerate(A04_POISONS, 1):
                 live.request(
                     challenge,
@@ -299,6 +314,7 @@ def run() -> Path:
             a08_reset_needed = True
             live.request(challenge, "a08-reset-before", "GET", f"/api/{CHALLENGES[challenge]}/reset_vectors")
             live.run_case(challenge, "baseline", CASES["a08-baseline"]["text"])
+            live.run_probe(challenge)
             vectors = live.request(challenge, "a08-export", "GET", f"/api/{CHALLENGES[challenge]}/export_vectors")
             poisoned = {
                 key: vectors["Neil Armstrongut"] if key == "Flag" else [0] * 32
@@ -325,18 +341,25 @@ def run() -> Path:
         if challenge in live.selected_challenges:
             live.require_ready(challenge)
             original = live.download(
-            challenge,
-            "a09-download-original",
-            f"/api/{CHALLENGES[challenge]}/download_image",
-        )
+                challenge,
+                "a09-download-original",
+                f"/api/{CHALLENGES[challenge]}/download_image",
+            )
+            live.request(
+                challenge,
+                "a09-upload-original",
+                "POST",
+                f"/api/{CHALLENGES[challenge]}/upload_image",
+                upload=("goat.png", original, "image/png"),
+            )
             live.run_case(challenge, "baseline", CASES["a09-baseline"]["text"])
             live.request(
-            challenge,
-            "a09-upload-renamed-only",
-            "POST",
-            f"/api/{CHALLENGES[challenge]}/upload_image",
-            upload=("cyborg-goat.png", original, "image/png"),
-        )
+                challenge,
+                "a09-upload-renamed-only",
+                "POST",
+                f"/api/{CHALLENGES[challenge]}/upload_image",
+                upload=("cyborg-goat.png", original, "image/png"),
+            )
             live.run_probe(challenge)
             asset_path_text = os.environ.get("LLMGOAT_A09_ASSET")
             asset_url = os.environ.get("LLMGOAT_A09_ASSET_URL")
@@ -354,12 +377,12 @@ def run() -> Path:
             if hashlib.sha256(asset).hexdigest() != expected_asset_sha:
                 raise RuntimeError("A09 solution asset SHA-256 mismatch")
             live.request(
-            challenge,
-            "a09-upload-solution",
-            "POST",
-            f"/api/{CHALLENGES[challenge]}/upload_image",
-            upload=(asset_name, asset, "image/png"),
-        )
+                challenge,
+                "a09-upload-solution",
+                "POST",
+                f"/api/{CHALLENGES[challenge]}/upload_image",
+                upload=(asset_name, asset, "image/png"),
+            )
             live.run_case(
             challenge,
             "solution",
