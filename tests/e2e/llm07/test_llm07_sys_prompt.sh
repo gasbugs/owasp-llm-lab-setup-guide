@@ -9,7 +9,7 @@ require_scenario "day4"
 mkdir -p "$RESULTS_DIR/raw"
 REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-180}"
 
-echo "=== LLM07 full-prompt exposure and fragment reconstruction validation ==="
+echo "=== LLM07 backup reconstruction and fragment leakage validation ==="
 
 curl -fsS --max-time "$REQUEST_TIMEOUT" "$TARGET_URL/api/labs/llm07/policy-canonical" \
   -o "$RESULTS_DIR/raw/canonical.json"
