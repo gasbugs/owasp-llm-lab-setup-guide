@@ -41,6 +41,12 @@ class PortalIdentityTests(unittest.TestCase):
             with self.subTest(port=port):
                 self.assertIn(f"port: {port}", self.source)
 
+    def test_portal_supports_light_and_dark_themes_without_promotional_copy(self) -> None:
+        self.assertIn('id="theme-toggle"', self.source)
+        self.assertIn('html[data-theme="light"]', self.source)
+        self.assertIn('window.localStorage.setItem("lab-portal-theme"', self.source)
+        self.assertNotIn("이름으로 앱을 고르고, 실제 취약 경계를 공격한 뒤", self.source)
+
 
 if __name__ == "__main__":
     unittest.main()
