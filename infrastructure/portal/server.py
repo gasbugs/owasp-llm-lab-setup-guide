@@ -11,10 +11,10 @@ from urllib.request import urlopen
 
 SERVICES = {
     "prompt-rag": "http://prompt-rag:8000/healthz",
-    "data-rag": "http://data-rag:8000/healthz",
-    "output-rag": "http://output-rag:8000/healthz",
-    "knowledge-rag": "http://knowledge-rag:8000/healthz",
-    "resource-rag": "http://resource-rag:8000/healthz",
+    "data-rag": "http://data-rag:8010/healthz",
+    "output-rag": "http://output-rag:8011/healthz",
+    "knowledge-rag": "http://knowledge-rag:8012/healthz",
+    "resource-rag": "http://resource-rag:8013/healthz",
     "vuln-agent": "http://vuln-agent:8001/healthz",
     "llmgoat": "http://llmgoat:5000/healthz",
     "dvla": "http://dvla:8501/_stcore/health",
