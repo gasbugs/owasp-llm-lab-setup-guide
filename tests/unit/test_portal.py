@@ -47,6 +47,23 @@ class PortalIdentityTests(unittest.TestCase):
         self.assertIn('window.localStorage.setItem("lab-portal-theme"', self.source)
         self.assertNotIn("이름으로 앱을 고르고, 실제 취약 경계를 공격한 뒤", self.source)
 
+    def test_status_checks_use_same_origin_results_instead_of_opaque_cors(self) -> None:
+        self.assertIn('fetch(`/api/status/${service.id}`', self.source)
+        self.assertIn("response.ok", self.source)
+        self.assertIn('result.online ? "online" : "offline"', self.source)
+        self.assertNotIn('mode: "no-cors"', self.source)
+
+        server = (ROOT / "infrastructure/portal/server.py").read_text(encoding="utf-8")
+        compose = (ROOT / "infrastructure/compose/compose.yaml").read_text(
+            encoding="utf-8"
+        )
+        installer = (ROOT / "infrastructure/scripts/student/install-lab.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"prompt-rag": "http://prompt-rag:8000/healthz"', server)
+        self.assertIn('command: ["python", "/app/server.py"]', compose)
+        self.assertIn('infrastructure/portal/server.py"', installer)
+
 
 if __name__ == "__main__":
     unittest.main()

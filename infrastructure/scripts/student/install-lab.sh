@@ -205,6 +205,7 @@ chown -R ubuntu:ubuntu /home/ubuntu/work/fake-registry
 echo "[install-lab] preparing lab portal files"
 mkdir -p /home/ubuntu/work/portal
 curl -fsSL "$RAW_URL/infrastructure/portal/index.html" -o /home/ubuntu/work/portal/index.html
+curl -fsSL "$RAW_URL/infrastructure/portal/server.py" -o /home/ubuntu/work/portal/server.py
 chown -R ubuntu:ubuntu /home/ubuntu/work/portal
 
 echo "[install-lab] installing the allowlisted learner reset command"

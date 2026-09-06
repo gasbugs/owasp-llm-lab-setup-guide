@@ -393,16 +393,16 @@
     });
 
     const services = [
-      { group: "app", title: "번역기 봇", route: "LLM01 · Prompt Injection", port: 8000, href: url(8000), check: url(8000, "/healthz"), checkLabel: "Health", tags: ["번역", "RAG", "비밀 추출"], color: "#59d6e8", desc: "번역 요청처럼 보이는 입력으로 시스템 지시와 비밀 코드의 경계를 시험합니다." },
-      { group: "app", title: "CloudSecurityLab Bank", route: "LLM02 · LLM08", port: 8010, href: url(8010), check: url(8010, "/healthz"), checkLabel: "Health", tags: ["고객 데이터", "RAG 출처", "인가"], color: "#8da9ff", desc: "합성 고객정보의 과다 전달과 승인되지 않은 지식 문서 채택을 서로 다른 흐름으로 확인합니다." },
-      { group: "app", title: "회사 노트북", route: "LLM05 · Output Handling", port: 8011, href: url(8011), check: url(8011, "/healthz"), checkLabel: "Health", tags: ["HTML", "렌더링", "XSS"], color: "#ff8ea0", desc: "모델 응답을 HTML로 믿고 렌더링할 때 브라우저에서 어떤 부작용이 생기는지 관찰합니다." },
-      { group: "app", title: "PrivateGPT-Lite", route: "LLM07 · LLM08 · LLM09", port: 8012, href: url(8012), check: url(8012, "/healthz"), checkLabel: "Health", tags: ["Tenant", "Prompt Leak", "Misinformation"], color: "#b595ff", desc: "사내 문서 챗봇에서 Tenant 검색 경계, 시스템 프롬프트 노출과 잘못된 추천을 시험합니다." },
-      { group: "app", title: "IT 헬프데스크 봇", route: "LLM10 · Unbounded Consumption", port: 8013, href: url(8013), check: url(8013, "/healthz"), checkLabel: "Health", tags: ["입력 크기", "동시 요청", "Token"], color: "#f5bb63", desc: "요청 크기와 생성량 제한이 없을 때 모델 서버 자원이 어떻게 소모되는지 확인합니다." },
-      { group: "app", title: "Goat Farm Helper", route: "LLM06 · Excessive Agency", port: 8001, href: url(8001), check: url(8001, "/healthz"), checkLabel: "Health", tags: ["Agent", "Tool", "권한"], color: "#65dda6", desc: "낮은 권한의 사용자가 자연어를 통해 관리자 Tool 실행을 유도하는 취약 Agent입니다." },
-      { group: "app", title: "LLMGoat", route: "OWASP LLM Challenges", port: 5000, href: url(5000), check: url(5000), checkLabel: "Open", tags: ["A01–A10", "Challenge", "Flag"], color: "#ff7185", desc: "OWASP Top 10 항목을 문제와 Flag로 풀어보는 독립형 웹 챌린지입니다." },
-      { group: "app", title: "Damn Vulnerable LLM Agent", route: "DVLA · ReAct Agent", port: 8501, href: url(8501), check: url(8501), checkLabel: "Open", tags: ["ReAct", "SQL Tool", "Prompt Injection"], color: "#55b8ff", desc: "ReAct 방식 Agent의 생각·도구 호출 흐름을 보며 Prompt Injection을 비교합니다." },
-      { group: "infra", title: "Fake Model Registry", route: "LLM03 · Supply Chain", port: 8002, href: url(8002, "/api/v1/models"), check: url(8002, "/api/v1/models"), checkLabel: "Models API", tags: ["Registry", "Hash", "Artifact"], color: "#f5bb63", desc: "모델 파일의 출처와 무결성 검증을 연습하기 위한 가짜 모델 저장소 API입니다." },
-      { group: "infra", title: "Ollama Model Server", route: "Local Inference Runtime", port: 11434, href: url(11434, "/api/tags"), check: url(11434, "/api/tags"), checkLabel: "Models", tags: ["Generate", "Chat", "Embed"], color: "#59d6e8", desc: "실습 앱의 Prompt를 실제 추론으로 바꾸고 로컬 모델 파일을 관리하는 서버입니다." }
+      { id: "prompt-rag", group: "app", title: "번역기 봇", route: "LLM01 · Prompt Injection", port: 8000, href: url(8000), check: url(8000, "/healthz"), checkLabel: "Health", tags: ["번역", "RAG", "비밀 추출"], color: "#59d6e8", desc: "번역 요청처럼 보이는 입력으로 시스템 지시와 비밀 코드의 경계를 시험합니다." },
+      { id: "data-rag", group: "app", title: "CloudSecurityLab Bank", route: "LLM02 · LLM08", port: 8010, href: url(8010), check: url(8010, "/healthz"), checkLabel: "Health", tags: ["고객 데이터", "RAG 출처", "인가"], color: "#8da9ff", desc: "합성 고객정보의 과다 전달과 승인되지 않은 지식 문서 채택을 서로 다른 흐름으로 확인합니다." },
+      { id: "output-rag", group: "app", title: "회사 노트북", route: "LLM05 · Output Handling", port: 8011, href: url(8011), check: url(8011, "/healthz"), checkLabel: "Health", tags: ["HTML", "렌더링", "XSS"], color: "#ff8ea0", desc: "모델 응답을 HTML로 믿고 렌더링할 때 브라우저에서 어떤 부작용이 생기는지 관찰합니다." },
+      { id: "knowledge-rag", group: "app", title: "PrivateGPT-Lite", route: "LLM07 · LLM08 · LLM09", port: 8012, href: url(8012), check: url(8012, "/healthz"), checkLabel: "Health", tags: ["Tenant", "Prompt Leak", "Misinformation"], color: "#b595ff", desc: "사내 문서 챗봇에서 Tenant 검색 경계, 시스템 프롬프트 노출과 잘못된 추천을 시험합니다." },
+      { id: "resource-rag", group: "app", title: "IT 헬프데스크 봇", route: "LLM10 · Unbounded Consumption", port: 8013, href: url(8013), check: url(8013, "/healthz"), checkLabel: "Health", tags: ["입력 크기", "동시 요청", "Token"], color: "#f5bb63", desc: "요청 크기와 생성량 제한이 없을 때 모델 서버 자원이 어떻게 소모되는지 확인합니다." },
+      { id: "vuln-agent", group: "app", title: "Goat Farm Helper", route: "LLM06 · Excessive Agency", port: 8001, href: url(8001), check: url(8001, "/healthz"), checkLabel: "Health", tags: ["Agent", "Tool", "권한"], color: "#65dda6", desc: "낮은 권한의 사용자가 자연어를 통해 관리자 Tool 실행을 유도하는 취약 Agent입니다." },
+      { id: "llmgoat", group: "app", title: "LLMGoat", route: "OWASP LLM Challenges", port: 5000, href: url(5000), check: url(5000, "/healthz"), checkLabel: "Health", tags: ["A01–A10", "Challenge", "Flag"], color: "#ff7185", desc: "OWASP Top 10 항목을 문제와 Flag로 풀어보는 독립형 웹 챌린지입니다." },
+      { id: "dvla", group: "app", title: "Damn Vulnerable LLM Agent", route: "DVLA · ReAct Agent", port: 8501, href: url(8501), check: url(8501, "/_stcore/health"), checkLabel: "Health", tags: ["ReAct", "SQL Tool", "Prompt Injection"], color: "#55b8ff", desc: "ReAct 방식 Agent의 생각·도구 호출 흐름을 보며 Prompt Injection을 비교합니다." },
+      { id: "fake-registry", group: "infra", title: "Fake Model Registry", route: "LLM03 · Supply Chain", port: 8002, href: url(8002, "/api/v1/models"), check: url(8002, "/api/v1/models"), checkLabel: "Models API", tags: ["Registry", "Hash", "Artifact"], color: "#f5bb63", desc: "모델 파일의 출처와 무결성 검증을 연습하기 위한 가짜 모델 저장소 API입니다." },
+      { id: "ollama", group: "infra", title: "Ollama Model Server", route: "Local Inference Runtime", port: 11434, href: url(11434, "/api/tags"), check: url(11434, "/api/tags"), checkLabel: "Models", tags: ["Generate", "Chat", "Embed"], color: "#59d6e8", desc: "실습 앱의 Prompt를 실제 추론으로 바꾸고 로컬 모델 파일을 관리하는 서버입니다." }
     ];
 
     const state = new Map(services.map((service) => [service.title, "checking"]));
@@ -439,8 +439,12 @@
       setStatus(service, "checking");
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), 4500);
-      return fetch(service.check, { method: "GET", mode: "no-cors", cache: "no-store", signal: controller.signal })
-        .then(() => setStatus(service, "online"))
+      return fetch(`/api/status/${service.id}`, { method: "GET", cache: "no-store", signal: controller.signal })
+        .then((response) => {
+          if (!response.ok) throw new Error(`portal status ${response.status}`);
+          return response.json();
+        })
+        .then((result) => setStatus(service, result.online ? "online" : "offline"))
         .catch(() => setStatus(service, "offline"))
         .finally(() => window.clearTimeout(timer));
     }

@@ -150,4 +150,4 @@ services:
       - "8080:8080"
     volumes:
       - /home/ubuntu/work/portal:/app
-    command: ["python", "-m", "http.server", "8080", "--directory", "/app"]
+    command: ["python", "/app/server.py"]

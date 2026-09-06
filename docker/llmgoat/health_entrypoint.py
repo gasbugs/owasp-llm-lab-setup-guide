@@ -8,7 +8,7 @@ from llmgoat.app import app, main
 
 
 PORTAL_LINK = """
-<a id="lab-portal-home" href="#" style="position:fixed;right:18px;bottom:18px;z-index:2147483647;padding:10px 14px;border:1px solid #64748b;border-radius:8px;background:#fff;color:#0f172a;font:700 14px system-ui,sans-serif;text-decoration:none;box-shadow:0 4px 18px rgba(15,23,42,.18)">← 홈</a>
+<a id="lab-portal-home" href="#" style="position:fixed;right:18px;bottom:18px;z-index:9000;padding:10px 14px;border:1px solid #64748b;border-radius:8px;background:#fff;color:#0f172a;font:700 14px system-ui,sans-serif;text-decoration:none;box-shadow:0 4px 18px rgba(15,23,42,.18)">← 홈</a>
 <script>document.getElementById('lab-portal-home').href=`http://${window.location.hostname}:8080/`;</script>
 """
 
