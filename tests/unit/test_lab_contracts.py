@@ -195,7 +195,10 @@ class Day5ConsumptionContractTests(unittest.TestCase):
 
     def test_reset_contract_names_only_the_practical_note(self) -> None:
         reset = self.contract["state"]["reset"]
-        self.assertEqual(reset["command"], "reset-lab llm10")
+        self.assertEqual(
+            reset["command"],
+            "docker compose up -d --no-deps --force-recreate resource-rag",
+        )
         self.assertEqual(reset["expected_count"], 2)
         self.assertEqual(reset["mutation"]["expected_count"], 2)
         self.assertEqual(

@@ -162,36 +162,26 @@ class ResetLabTest(unittest.TestCase):
         workshops = (ROOT / "docs/SECURE-CODING-WORKSHOPS.md").read_text(
             encoding="utf-8"
         )
-        documented_ids = (
-            "llm01",
-            "llm01b",
-            "llm02",
-            "llm08-rag",
-            "llm05",
-            "llm06",
-            "llm08",
-            "llm09",
-            "llmgoat",
-            "llm10",
-        )
-        secure_coding_ids = (
-            "llm01",
-            "llm02",
-            "llm08-rag",
-            "llm05",
-            "llm06",
-            "llm08",
-            "llm09",
-            "llm10",
-        )
-        for lab_id in documented_ids:
-            with self.subTest(document="policy", lab_id=lab_id):
-                self.assertIn(f"`reset-lab {lab_id}`", policy)
-            with self.subTest(document="quickstart", lab_id=lab_id):
-                self.assertIn(f"`reset-lab {lab_id}`", quickstart)
-        for lab_id in secure_coding_ids:
-            with self.subTest(document="workshops", lab_id=lab_id):
-                self.assertIn(f"`reset-lab {lab_id}`", workshops)
+        service_commands = {
+            "prompt-rag": "docker compose up -d --no-deps --force-recreate prompt-rag",
+            "data-rag": "docker compose up -d --no-deps --force-recreate data-rag",
+            "output-rag": "docker compose up -d --no-deps --force-recreate output-rag",
+            "vuln-agent": "docker compose up -d --no-deps --force-recreate vuln-agent",
+            "knowledge-rag": "docker compose up -d --no-deps --force-recreate knowledge-rag",
+            "resource-rag": "docker compose up -d --no-deps --force-recreate resource-rag",
+        }
+        for service, command in service_commands.items():
+            with self.subTest(document="policy", service=service):
+                self.assertIn(command, policy)
+            with self.subTest(document="quickstart", service=service):
+                self.assertIn(command, quickstart)
+            with self.subTest(document="workshops", service=service):
+                self.assertIn(command, workshops)
+        self.assertIn("docker compose restart llmgoat", policy)
+        self.assertIn("docker compose restart llmgoat", quickstart)
+        self.assertNotIn("reset-lab", policy)
+        self.assertNotIn("reset-lab", quickstart)
+        self.assertNotIn("reset-lab", workshops)
         self.assertNotIn("no reset for direct/persona chat", policy)
         self.assertNotIn("no reset for LLM02 chat", policy)
 

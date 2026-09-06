@@ -19,7 +19,7 @@
     "runner_script": "tests/e2e/llm10/test_llm10_consumption.sh",
     "execution_mode": "host-script",
     "event_name": "lab_case",
-    "observation_command": "publisher E2E stdout lab_case records and reset-lab readiness output",
+    "observation_command": "publisher E2E stdout lab_case records and Compose readiness output",
     "build_context": "docker/vuln-rag",
     "image": "ghcr.io/gasbugs/owasp-llm-vuln-rag:latest",
     "container_prefix": "lecture-loop-day5-llm10",
@@ -105,7 +105,7 @@
   "state": {
     "mutation_type": "process",
     "reset": {
-      "command": "reset-lab llm10",
+      "command": "docker compose up -d --no-deps --force-recreate resource-rag",
       "documents": [
         "05-llm-operations-infrastructure/03-llm10-unbounded-consumption.md"
       ],
@@ -118,7 +118,7 @@
       "sequence": "paired-reset"
     },
     "process_stop": null,
-    "evidence_policy": "Preserve learner request and response files under ~/work; reset only the Day 5 app and Ollama queue in the allowlisted order.",
+    "evidence_policy": "Preserve learner request and response files under ~/work; recreate only the Day 5 app and restart the Ollama queue in the documented order.",
     "ec2_required": true
   },
   "watch_paths": {

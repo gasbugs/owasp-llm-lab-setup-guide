@@ -211,28 +211,32 @@ sudo -u ubuntu docker restart lab-llmgoat
 
 ## 9. 상태를 바꾼 실습만 최소 복원
 
-일반 채팅처럼 읽기만 한 실습은 복원하지 않습니다. Python 메모리만 바꾼
-실습은 allowlist reset 명령으로 해당 컨테이너만 배포 이미지에서 다시 만들고,
-이어서 raw `/healthz`를 확인합니다. 아래에서 자신이 방금 수행한 실습만 실행합니다.
+일반 채팅처럼 읽기만 한 실습은 복원하지 않습니다. Python 메모리나 컨테이너
+안의 source를 바꾼 실습만 Compose 서비스 이름을 지정해 다시 만들고, 이어서
+raw `/healthz`를 확인합니다. 먼저 `cd ~/.config/owasp-llm-lab`로 이동한 뒤 아래에서
+자신이 방금 수행한 실습만 실행합니다. `--no-deps`는 다른 서비스를 그대로 두고,
+`--force-recreate`는 선택한 컨테이너의 writable layer를 새것으로 바꿉니다.
 
 | 실습 | 재시작 명령 | 원본 확인 명령 |
 |---|---|---|
-| LLM01 시큐어 코딩 | `reset-lab llm01` | `curl -sS http://localhost:8000/healthz` |
-| LLM01-B | `reset-lab llm01b` | `curl -sS http://localhost:8000/healthz` |
-| LLM02 시큐어 코딩 | `reset-lab llm02` | `curl -sS http://localhost:8010/healthz` |
-| LLM08 RAG corpus | `reset-lab llm08-rag` | `curl -sS http://localhost:8010/healthz` |
-| LLM05 | `reset-lab llm05` | `curl -sS http://localhost:8011/healthz` |
-| LLM06 삭제 실습 | `reset-lab llm06` | `curl -sS http://localhost:8001/healthz` |
-| LLM08 시큐어 코딩 | `reset-lab llm08` | `curl -sS http://localhost:8012/healthz` |
-| LLM09 시큐어 코딩 | `reset-lab llm09` | `curl -sS http://localhost:8012/healthz` |
-| LLMGoat 상태 변경 실습 | `reset-lab llmgoat` | `curl -sS http://localhost:5000/healthz` |
-| LLM10 시큐어 코딩·과부하 | `reset-lab llm10` | `curl -sS http://localhost:8013/healthz` |
+| LLM01 시큐어 코딩·LLM01-B | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
+| LLM02 시큐어 코딩·LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost:8010/healthz` |
+| LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
+| LLM06 삭제 실습 | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |
+| LLM08·LLM09 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate knowledge-rag` | `curl -sS http://localhost:8012/healthz` |
+| LLMGoat 상태 변경 실습 | `docker compose restart llmgoat` | `curl -sS http://localhost:5000/healthz` |
+| LLM10 시큐어 코딩·과부하 | 아래 순서대로 `resource-rag`와 `ollama` 처리 | `curl -sS http://localhost:8013/healthz` |
 
-LLM10은 timeout 뒤 Day 5 앱과 공유 Ollama queue를 정해진 순서로 복구해야
-하므로 같은 한 줄 명령 안에서 두 서비스를 순서대로 처리합니다.
+LLM10은 timeout 뒤 Day 5 앱과 공유 Ollama queue에 작업이 남을 수 있으므로
+두 서비스를 눈에 보이는 순서로 직접 처리합니다.
 
 ```bash
-reset-lab llm10
+cd ~/.config/owasp-llm-lab
+docker compose up -d --no-deps --force-recreate resource-rag
+docker compose restart ollama
+curl -fsS http://localhost:11434/api/tags
+docker compose up -d --no-deps --force-recreate resource-rag
+docker compose ps resource-rag ollama
 ```
 
 ```bash
