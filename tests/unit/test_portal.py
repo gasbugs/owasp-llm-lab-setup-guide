@@ -41,6 +41,27 @@ class PortalIdentityTests(unittest.TestCase):
             with self.subTest(port=port):
                 self.assertIn(f"port: {port}", self.source)
 
+    def test_primary_actions_name_the_actual_destination(self) -> None:
+        for service_id, port, label in (
+            ("prompt-rag", 8000, "번역기 열기"),
+            ("data-rag", 8010, "은행 앱 열기"),
+            ("output-rag", 8011, "노트북 열기"),
+            ("knowledge-rag", 8012, "챗봇 열기"),
+            ("resource-rag", 8013, "헬프데스크 열기"),
+            ("vuln-agent", 8001, "에이전트 열기"),
+            ("llmgoat", 5000, "문제 열기"),
+            ("dvla", 8501, "에이전트 열기"),
+            ("fake-registry", 8002, "레지스트리 보기"),
+            ("ollama", 11434, "모델 목록 보기"),
+        ):
+            with self.subTest(service_id=service_id):
+                self.assertRegex(
+                    self.source,
+                    rf'id: "{service_id}".*port: {port}.*openLabel: "{label}"',
+                )
+        self.assertIn("${service.openLabel}</a>", self.source)
+        self.assertNotIn(">앱 열기</a>", self.source)
+
     def test_portal_supports_light_and_dark_themes_without_promotional_copy(self) -> None:
         self.assertIn('id="theme-toggle"', self.source)
         self.assertIn('html[data-theme="light"]', self.source)
