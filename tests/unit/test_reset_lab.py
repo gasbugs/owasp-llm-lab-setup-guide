@@ -112,7 +112,7 @@ class ResetLabTest(unittest.TestCase):
             ),
             "llmgoat": (
                 "docker restart lab-llmgoat",
-                "LLMGOAT_READY_URL=http://127.0.0.1:5000/healthz",
+                "LLMGOAT_READY_URL=http://127.0.0.1:5000/api/model_status",
             ),
         }
         for lab_id, (action, ready_line) in cases.items():

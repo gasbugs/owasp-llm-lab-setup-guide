@@ -1,7 +1,7 @@
 # docker/llmgoat/Dockerfile
 # SECFORCE/LLMGoat wrapper — Day 1·3·5 cross-platform 학습용 (gemma-2-9b GGUF, llama-cpp)
 #
-# 원본: https://github.com/SECFORCE/LLMGoat (Apache 2.0)
+# 원본: https://github.com/SECFORCE/LLMGoat (GPL-3.0)
 # 빌드:
 #   docker build -t ghcr.io/gasbugs/owasp-llm-llmgoat:sha-<commit> .
 # 실행 (본 강의 인프라):
@@ -25,11 +25,4 @@ LABEL org.opencontainers.image.revision="$VCS_REF"
 # Docker은 /.dockerenv를 자동 생성하지 않으므로 이미지 레벨에서 마커 박음.
 RUN touch /.dockerenv
 
-# Register a stable /healthz alias before invoking the unmodified upstream app.
-# This wrapper imports the upstream Flask application object; it does not patch
-# files installed by the moving upstream base image.
-COPY health_entrypoint.py /opt/owasp-llm/health_entrypoint.py
-
 EXPOSE 5000
-
-ENTRYPOINT ["python3", "/opt/owasp-llm/health_entrypoint.py"]

@@ -25,14 +25,10 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("FROM docker.io/alpine/git:latest AS clone", dockerfile)
         self.assertIn("FROM docker.io/library/python:3.11-slim", dockerfile)
 
-    def test_llmgoat_wrapper_exposes_stable_healthz_without_patching_upstream(self) -> None:
+    def test_llmgoat_uses_upstream_entrypoint_and_status_api(self) -> None:
         dockerfile = read("docker/llmgoat/Dockerfile")
-        entrypoint = read("docker/llmgoat/health_entrypoint.py")
-        self.assertIn("COPY health_entrypoint.py", dockerfile)
-        self.assertIn('ENTRYPOINT ["python3", "/opt/owasp-llm/health_entrypoint.py"]', dockerfile)
-        self.assertIn('from llmgoat.app import app, main', entrypoint)
-        self.assertIn('@app.get("/healthz")', entrypoint)
-        self.assertIn('{"ok": True, "service": "llmgoat"}', entrypoint)
+        self.assertNotIn("health_entrypoint.py", dockerfile)
+        self.assertNotIn("ENTRYPOINT", dockerfile)
         self.assertNotIn("sed -i", dockerfile)
 
     def test_vuln_agent_exposes_read_only_state_for_publisher_verification(self) -> None:
@@ -87,7 +83,7 @@ class RuntimeContractTest(unittest.TestCase):
             "lab-knowledge-rag": "http://localhost:8012/healthz",
             "lab-resource-rag": "http://localhost:8013/healthz",
             "lab-vuln-agent": "http://localhost:8001/healthz",
-            "lab-llmgoat": "http://localhost:5000/healthz",
+            "lab-llmgoat": "http://localhost:5000/api/model_status",
             "lab-dvla": "http://localhost:8501/_stcore/health",
             "lab-fake-registry": "http://localhost:8002/api/v1/models",
             "lab-portal": "http://localhost:8080/",
@@ -203,16 +199,16 @@ class RuntimeContractTest(unittest.TestCase):
             '"$RESET_LAB_CANDIDATE" /usr/local/bin/reset-lab',
             installer,
         )
-        self.assertIn("http://localhost:5000/healthz", installer)
+        self.assertIn("http://localhost:5000/api/model_status", installer)
         internal_health = installer.index(
             "docker exec lab-llmgoat \\\n"
-            "    curl -fsS --max-time 5 http://127.0.0.1:5000/healthz"
+            "    curl -fsS --max-time 5 http://127.0.0.1:5000/api/model_status"
         )
         publish_refresh = installer.index(
             "docker restart lab-llmgoat", internal_health
         )
         external_health = installer.index(
-            "http://localhost:5000/healthz", publish_refresh
+            "http://localhost:5000/api/model_status", publish_refresh
         )
         self.assertLess(internal_health, publish_refresh)
         self.assertLess(publish_refresh, external_health)

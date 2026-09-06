@@ -20,7 +20,7 @@ and creates it again from the configured image.
 | LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 delete | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |
 | LLM08 or LLM09 secure-coding source | `docker compose up -d --no-deps --force-recreate knowledge-rag` | `curl -sS http://localhost:8012/healthz` |
-| Mutable LLMGoat challenge | `docker compose restart llmgoat` | `curl -sS http://localhost:5000/healthz` |
+| Mutable LLMGoat challenge | `docker compose restart llmgoat` | `curl -sS http://localhost:5000/api/model_status` |
 | LLM10 source or overload | Use the ordered sequence below. | `curl -sS http://localhost:8013/healthz` |
 
 These commands never write to or delete `/home/ubuntu/work`,

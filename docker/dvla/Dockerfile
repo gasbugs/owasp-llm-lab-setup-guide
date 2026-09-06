@@ -46,21 +46,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=clone /src/ /app/
-COPY home_link.py /app/home_link.py
 RUN pip install --no-cache-dir python-dotenv \
     && pip install --no-cache-dir -r requirements.txt
-
-# Keep the pinned upstream app intact except for one navigation call placed
-# immediately after Streamlit page configuration.
-RUN sed -i '/st.set_page_config/a from home_link import render_portal_home\nrender_portal_home()' /app/main.py
 
 # Streamlit config + env defaults (Ollama backend)
 COPY --from=clone /src/config.toml /root/.streamlit/config.toml
 RUN cp /app/.env.ollama.template /app/.env
-RUN sed -i \
-    -e 's#default_model: gpt-4-1106-preview#default_model: ollama_chat/llama3.1:8b-instruct-q4_K_M#' \
-    -e 's#ollama/llama3#ollama_chat/llama3.1:8b-instruct-q4_K_M#' \
-    /app/llm-config.yaml
 
 # 수강생 강의 인프라용 기본값 — 실행 시 -e로 override 가능
 ENV OLLAMA_HOST=http://localhost:11434 \

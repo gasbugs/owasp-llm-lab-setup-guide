@@ -473,7 +473,7 @@ done
 llmgoat_internal_ready=false
 for _ in $(seq 1 300); do
   if docker exec lab-llmgoat \
-    curl -fsS --max-time 5 http://127.0.0.1:5000/healthz >/dev/null 2>&1; then
+    curl -fsS --max-time 5 http://127.0.0.1:5000/api/model_status >/dev/null 2>&1; then
     llmgoat_internal_ready=true
     break
   fi
@@ -494,7 +494,7 @@ health_urls=(
   http://localhost:8012/healthz
   http://localhost:8013/healthz
   http://localhost:8001/healthz
-  http://localhost:5000/healthz
+  http://localhost:5000/api/model_status
   http://localhost:8002/api/v1/models
   http://localhost:8080/
   http://localhost:8501/_stcore/health

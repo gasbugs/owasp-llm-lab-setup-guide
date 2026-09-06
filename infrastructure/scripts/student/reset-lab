@@ -170,7 +170,7 @@ case "$lab_id" in
     restart_one \
       lab-llmgoat \
       LLMGOAT \
-      http://127.0.0.1:5000/healthz
+      http://127.0.0.1:5000/api/model_status
     ;;
   llm10)
     # A timed-out client can leave both an awaiting uvicorn task and queued

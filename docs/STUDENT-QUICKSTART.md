@@ -198,7 +198,7 @@ curl -s http://localhost:8011/healthz
 curl -s http://localhost:8012/healthz
 curl -s http://localhost:8013/healthz
 curl -s http://localhost:8001/healthz
-curl -s http://localhost:5000/healthz
+curl -s http://localhost:5000/api/model_status
 curl -s http://localhost:8002/api/v1/models | head
 ```
 
@@ -224,7 +224,7 @@ raw `/healthz`를 확인합니다. 먼저 `cd ~/.config/owasp-llm-lab`로 이동
 | LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 삭제 실습 | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |
 | LLM08·LLM09 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate knowledge-rag` | `curl -sS http://localhost:8012/healthz` |
-| LLMGoat 상태 변경 실습 | `docker compose restart llmgoat` | `curl -sS http://localhost:5000/healthz` |
+| LLMGoat 상태 변경 실습 | `docker compose restart llmgoat` | `curl -sS http://localhost:5000/api/model_status` |
 | LLM10 시큐어 코딩·과부하 | 아래 순서대로 `resource-rag`와 `ollama` 처리 | `curl -sS http://localhost:8013/healthz` |
 
 LLM10은 timeout 뒤 Day 5 앱과 공유 Ollama queue에 작업이 남을 수 있으므로

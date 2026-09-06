@@ -275,7 +275,7 @@ jobs:
           cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:buildcache,mode=max
 
-      # LLMGoat (SECFORCE/LLMGoat, Apache 2.0): cross-platform comparison app.
+      # LLMGoat (SECFORCE/LLMGoat, GPL-3.0): cross-platform comparison app.
       - name: Build & push llmgoat
         uses: docker/build-push-action@v7
         with:
