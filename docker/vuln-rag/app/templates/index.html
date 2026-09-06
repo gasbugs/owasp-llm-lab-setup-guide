@@ -31,6 +31,8 @@
     .brand h1 span { color:var(--signal); }.mission { max-width:650px; color:var(--muted); font-size:13px; }
     .top-actions { display:flex; gap:10px; align-items:center; }.vuln-beacon { color:var(--incident); font:700 11px ui-monospace,monospace; letter-spacing:.08em; }
     .icon-button { width:42px; height:42px; padding:0; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); cursor:pointer; }
+    .home-button { display:inline-flex; min-height:42px; align-items:center; padding:0 13px; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); font-weight:750; text-decoration:none; }
+    .home-button:hover,.home-button:focus-visible { border-color:var(--signal); color:var(--signal); }
     .scenario-bar { display:grid; grid-template-columns:1fr minmax(240px,440px); gap:18px; align-items:end; margin-top:16px; padding:18px 20px; border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
     .scenario-title { margin:4px 0 3px; font:750 20px/1.15 "Arial Narrow","Segoe UI",sans-serif; }.scenario-copy { margin:0; color:var(--muted); font-size:13px; }
     label { color:var(--muted); font-size:12px; font-weight:700; }
@@ -63,7 +65,7 @@
   <header class="masthead">
     <div class="brand"><div class="brand-kicker">Cloud Security</div><h1>LLM Lab <span>// Experiment Center</span></h1></div>
     <div class="mission">취약한 LLM 애플리케이션의 입력·검색·도구·출력 경계를 직접 관찰하고 방어 전환 전후를 비교합니다.</div>
-    <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
+    <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
   </header>
 
   <section class="scenario-bar">
@@ -118,6 +120,7 @@
 
 <script>
 const themeButton = document.getElementById('theme-toggle');
+document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('llm-lab-theme', theme);

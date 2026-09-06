@@ -6,6 +6,9 @@
   <style>
     body { font-family: ui-monospace, monospace; max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
     h1 { color: #b00; }
+    .top-nav { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+    .home-button { display: inline-flex; align-items: center; min-height: 38px; padding: 0 0.8rem; border: 1px solid #94a3b8; border-radius: 7px; color: #0f172a; background: #fff; font: 700 0.9rem system-ui, sans-serif; text-decoration: none; }
+    .home-button:hover, .home-button:focus-visible { border-color: #0369a1; color: #0369a1; }
     .warning { background: #fee; border-left: 4px solid #b00; padding: 0.5rem 1rem; }
     .grid {
       --left-pane-width: 50%;
@@ -63,6 +66,7 @@
   </style>
 </head>
 <body>
+  <nav class="top-nav" aria-label="실습 이동"><a id="portal-home" class="home-button" href="#">← 홈</a></nav>
   <h1>[VULN] Goat Farm Helper</h1>
   <div class="warning">⚠️ 의도적 취약 — LLM06 Excessive Agency 실습용. tool들은 권한 검증을 하지 않음.</div>
 
@@ -94,6 +98,7 @@
 
 <script>
 const chat = document.getElementById('chat');
+document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
 const trace = document.getElementById('trace');
 const form = document.getElementById('form');
 const msg = document.getElementById('message');
