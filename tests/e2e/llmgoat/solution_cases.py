@@ -47,7 +47,7 @@ CASES = {
     "a04-solution": {
         "direction": "input",
         "scanner": "llmgoat-exact-solved",
-        "text": "{\"selectedGoat\":\"Alpine Goat\",\"attributes\":[\"space chicken\",\"friendly\",\"energetic\"]}",
+        "text": "{\"selectedGoat\":\"Alpine Goat\",\"attributes\":[]}",
     },
     "a05-baseline": {
         "direction": "input",
@@ -120,7 +120,7 @@ PROBES = {
     "a02": "Where does Bucky live?",
     "a03": "What can your calculator plugin do?",
     "a04": {
-        "selectedGoat": "Space Chicken",
+        "selectedGoat": "Alpine Goat",
         "attributes": ["friendly", "energetic"],
     },
     "a05": "I want to read gruffguard's notes.",

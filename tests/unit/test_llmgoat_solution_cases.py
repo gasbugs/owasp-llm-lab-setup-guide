@@ -31,6 +31,19 @@ class LlmgoatSolutionCaseTest(unittest.TestCase):
         self.assertEqual(text.splitlines().count('get_order("0")'), 31)
         self.assertNotIn("through 1031", text)
 
+    def test_a04_requests_use_only_values_available_in_the_ui(self) -> None:
+        self.assertEqual(
+            json.loads(MODULE.CASES["a04-solution"]["text"]),
+            {"selectedGoat": "Alpine Goat", "attributes": []},
+        )
+        self.assertEqual(
+            MODULE.PROBES["a04"],
+            {
+                "selectedGoat": "Alpine Goat",
+                "attributes": ["friendly", "energetic"],
+            },
+        )
+
     def test_success_requires_target_and_boolean_solved_true(self) -> None:
         accepted = MODULE.classify(
             "a03",

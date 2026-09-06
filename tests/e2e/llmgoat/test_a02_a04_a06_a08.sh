@@ -109,7 +109,7 @@ done
 
 A04_MODEL_RC=0
 A04_RECOMMENDATION=$(jq -cn \
-  '{selectedGoat:"Alpine Goat",attributes:["space chicken","friendly","energetic"]}')
+  '{selectedGoat:"Alpine Goat",attributes:[]}')
 run_goat_json_payload "A04-poisoned-recommendation" \
   "a04-data-and-model-poisoning" "$A04_RECOMMENDATION" "$TRIALS" \
   || A04_MODEL_RC=$?

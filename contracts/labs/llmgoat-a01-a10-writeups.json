@@ -237,8 +237,8 @@
       "direction": "input",
       "input": {
         "kind": "literal",
-        "value": "{\"selectedGoat\":\"Alpine Goat\",\"attributes\":[\"space chicken\",\"friendly\",\"energetic\"]}",
-        "display": "{\"selectedGoat\":\"Alpine Goat\",\"attributes\":[\"space chicken\",\"friendly\",\"energetic\"]}"
+        "value": "{\"selectedGoat\":\"Alpine Goat\",\"attributes\":[]}",
+        "display": "{\"selectedGoat\":\"Alpine Goat\",\"attributes\":[]}"
       },
       "policy": "llmgoat-exact-solved",
       "expected_decision": "allow",
