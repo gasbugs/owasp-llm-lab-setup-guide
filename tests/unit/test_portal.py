@@ -47,6 +47,11 @@ class PortalIdentityTests(unittest.TestCase):
         self.assertIn('window.localStorage.setItem("lab-portal-theme"', self.source)
         self.assertNotIn("이름으로 앱을 고르고, 실제 취약 경계를 공격한 뒤", self.source)
 
+    def test_card_grid_has_no_false_timeline_decoration(self) -> None:
+        self.assertNotIn(".grid::before", self.source)
+        self.assertNotIn(".card::before", self.source)
+        self.assertNotIn("padding-left: 28px", self.source)
+
     def test_status_checks_use_same_origin_results_instead_of_opaque_cors(self) -> None:
         self.assertIn('fetch(`/api/status/${service.id}`', self.source)
         self.assertIn("response.ok", self.source)
