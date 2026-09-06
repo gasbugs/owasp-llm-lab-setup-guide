@@ -3,530 +3,366 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OWASP LLM Lab Portal</title>
+  <meta name="color-scheme" content="dark">
+  <title>Cloud Security Lab · Launchpad</title>
   <style>
     :root {
-      color-scheme: light;
-      --bg: #f5f7fb;
-      --panel: #ffffff;
-      --text: #182235;
-      --muted: #5b6678;
-      --line: #d8e0ea;
-      --head: #101827;
-      --accent: #0f766e;
-      --accent-dark: #0b5f58;
-      --accent-soft: #e2f3ef;
-      --ok: #15803d;
-      --ok-soft: #e8f7ee;
-      --bad: #b42318;
-      --bad-soft: #feeceb;
-      --wait: #8a5a00;
-      --wait-soft: #fff5d6;
-      --chip: #eef2f7;
+      color-scheme: dark;
+      --canvas: #07131c;
+      --surface: #0d1e29;
+      --surface-raised: #122733;
+      --ink: #ecf7fa;
+      --muted: #8da8b4;
+      --line: #24404d;
+      --signal: #59d6e8;
+      --signal-soft: rgba(89, 214, 232, 0.12);
+      --warning: #f5bb63;
+      --danger: #ff7185;
+      --ok: #65dda6;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; background: var(--canvas); }
 
     body {
       margin: 0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.45;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 78% -10%, rgba(89, 214, 232, 0.12), transparent 32rem),
+        linear-gradient(180deg, #081620 0, var(--canvas) 32rem);
+      color: var(--ink);
+      font: 15px/1.55 "Segoe UI", "Noto Sans KR", sans-serif;
     }
 
-    header {
-      background: var(--head);
-      color: #ffffff;
-      border-bottom: 1px solid #293346;
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(89, 214, 232, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(89, 214, 232, 0.045) 1px, transparent 1px);
+      background-size: 52px 52px;
+      mask-image: linear-gradient(to bottom, #000 0, transparent 74%);
     }
 
-    .header-inner {
-      max-width: 1220px;
+    a, button { font: inherit; }
+
+    a:focus-visible, button:focus-visible {
+      outline: 3px solid rgba(89, 214, 232, 0.48);
+      outline-offset: 3px;
+    }
+
+    .shell {
+      width: min(1280px, 100%);
       margin: 0 auto;
-      padding: 24px;
+      padding: 26px 28px 60px;
+    }
+
+    .masthead {
+      position: relative;
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
       align-items: end;
-      gap: 20px;
+      min-height: 250px;
+      padding: clamp(28px, 5vw, 62px);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: rgba(13, 30, 41, 0.9);
+      box-shadow: var(--shadow);
+    }
+
+    .masthead::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 9%;
+      width: 1px;
+      height: 100%;
+      background: linear-gradient(var(--signal), transparent 78%);
+      box-shadow: 18px 0 0 rgba(89, 214, 232, 0.12), 36px 0 0 rgba(89, 214, 232, 0.06);
+    }
+
+    .eyebrow, .utility, .port, .route {
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: var(--signal);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
     }
 
     h1 {
-      margin: 0 0 6px;
-      font-size: 28px;
-      font-weight: 760;
-      letter-spacing: 0;
-    }
-
-    .subtitle {
+      max-width: 780px;
       margin: 0;
-      color: #cbd5e1;
-      font-size: 14px;
+      font: 850 clamp(42px, 7vw, 88px) / 0.92 "Arial Narrow", "Roboto Condensed", "Segoe UI", sans-serif;
+      letter-spacing: -0.045em;
+      text-transform: uppercase;
     }
 
-    .badges,
-    .status-row,
-    .tags,
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+    h1 span { display: block; color: var(--signal); }
+
+    .lead {
+      max-width: 650px;
+      margin: 24px 0 0;
+      color: #afc4cc;
+      font-size: clamp(15px, 1.7vw, 18px);
     }
 
-    .badges {
-      justify-content: flex-end;
+    .host-panel {
+      position: relative;
+      z-index: 1;
+      min-width: 230px;
+      padding: 18px;
+      border-left: 3px solid var(--warning);
+      background: rgba(7, 19, 28, 0.82);
     }
 
-    .badge {
-      min-height: 30px;
-      display: inline-flex;
-      align-items: center;
-      padding: 5px 10px;
-      border: 1px solid #3b475d;
-      border-radius: 6px;
-      color: #dce6f5;
-      font-size: 13px;
-      white-space: nowrap;
-    }
+    .host-panel strong { display: block; margin: 6px 0; font-size: 17px; overflow-wrap: anywhere; }
+    .host-panel span { color: var(--muted); font-size: 12px; }
 
-    main {
-      max-width: 1220px;
-      margin: 0 auto;
-      padding: 22px 24px 42px;
-    }
-
-    .summary {
+    .command-bar {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-
-    .metric {
-      min-height: 88px;
-      padding: 15px;
-      background: var(--panel);
+      grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+      gap: 1px;
+      margin-top: 1px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      background: var(--line);
     }
 
-    .metric strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 24px;
-      line-height: 1.1;
-    }
+    .metric, .refresh-wrap { min-height: 86px; padding: 15px 18px; background: var(--surface); }
+    .metric strong { display: block; font: 800 27px/1 ui-monospace, monospace; }
+    .metric span, .last-check { color: var(--muted); font-size: 12px; }
 
-    .metric span {
-      color: var(--muted);
-      font-size: 13px;
-    }
+    .refresh-wrap { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 7px; }
 
-    .toolbar {
-      margin-bottom: 18px;
-      padding: 12px;
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-    }
-
-    .toolbar-text {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    button,
-    a.button {
-      min-height: 36px;
+    button, .button {
+      min-height: 39px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 8px 11px;
-      border: 1px solid var(--accent-dark);
-      border-radius: 6px;
-      background: var(--accent);
-      color: #ffffff;
+      padding: 8px 13px;
+      border: 1px solid var(--signal);
+      border-radius: 3px;
+      background: var(--signal);
+      color: #06151c;
+      font-size: 13px;
+      font-weight: 850;
       text-decoration: none;
-      font-size: 14px;
-      font-weight: 620;
       cursor: pointer;
+      transition: transform 160ms ease, background 160ms ease, color 160ms ease;
     }
 
-    a.button.secondary {
-      background: #ffffff;
-      color: var(--accent);
-    }
+    button:hover, .button:hover { transform: translateY(-2px); }
+    button:disabled { cursor: wait; opacity: 0.6; transform: none; }
+    .button.secondary { background: transparent; color: var(--signal); }
 
-    button:disabled {
-      cursor: wait;
-      opacity: 0.72;
-    }
-
-    section {
-      margin-top: 22px;
-    }
+    section { margin-top: 44px; }
 
     .section-head {
-      margin-bottom: 10px;
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 16px;
     }
 
-    h2 {
-      margin: 0;
-      font-size: 19px;
-      letter-spacing: 0;
-    }
-
-    .section-note {
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
+    .section-head::after { content: ""; height: 1px; background: var(--line); }
+    .section-head h2 { margin: 0; font: 800 clamp(22px, 3vw, 32px)/1 "Arial Narrow", "Segoe UI", sans-serif; text-transform: uppercase; }
+    .section-note { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
 
     .grid {
+      position: relative;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 18px;
+      padding-left: 28px;
+    }
+
+    .grid::before {
+      content: "";
+      position: absolute;
+      top: 22px;
+      bottom: 22px;
+      left: 8px;
+      width: 2px;
+      background: linear-gradient(var(--signal), rgba(89, 214, 232, 0.08));
     }
 
     .card {
-      min-height: 216px;
-      padding: 16px;
+      --card-accent: var(--signal);
+      position: relative;
+      min-height: 224px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      background: var(--panel);
+      gap: 13px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-top: 3px solid var(--card-accent);
+      background: linear-gradient(145deg, rgba(18, 39, 51, 0.96), rgba(11, 27, 37, 0.96));
+      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
+      transition: border-color 180ms ease, transform 180ms ease;
     }
 
-    .card-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: flex-start;
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 27px;
+      left: -25px;
+      width: 13px;
+      height: 13px;
+      border: 3px solid var(--canvas);
+      border-radius: 50%;
+      background: var(--card-accent);
+      box-shadow: 0 0 0 1px var(--card-accent), 0 0 20px var(--card-accent);
     }
 
-    .card h3 {
-      margin: 0 0 8px;
-      font-size: 17px;
-      letter-spacing: 0;
-    }
+    .card:hover { transform: translateY(-3px); border-color: var(--card-accent); }
 
-    .tag {
-      min-height: 24px;
-      display: inline-flex;
-      align-items: center;
-      padding: 3px 8px;
-      border-radius: 5px;
-      background: var(--chip);
-      color: #394454;
-      font-size: 12px;
-    }
+    .card-top { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
+    .route { margin-bottom: 7px; color: var(--card-accent); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .card h3 { margin: 0; font: 800 clamp(20px, 2.2vw, 27px)/1.08 "Arial Narrow", "Segoe UI", sans-serif; }
+    .desc { flex: 1; margin: 0; color: #adc0c8; }
 
-    .tag.port {
-      background: #fff0e5;
-      color: #9a3412;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
+    .tags, .actions { display: flex; flex-wrap: wrap; gap: 7px; }
+    .tag { padding: 3px 8px; border: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+    .port { color: var(--warning); }
 
     .status {
-      min-height: 26px;
+      min-height: 27px;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       padding: 4px 8px;
+      border: 1px solid currentColor;
       border-radius: 999px;
-      font-size: 12px;
-      font-weight: 680;
+      font: 750 11px ui-monospace, monospace;
       white-space: nowrap;
     }
 
-    .status::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: currentColor;
-    }
+    .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .status.checking { color: var(--warning); }
+    .status.online { color: var(--ok); }
+    .status.offline { color: var(--danger); }
+    .url { margin: 0; color: #6f8c99; font: 11px/1.4 ui-monospace, monospace; overflow-wrap: anywhere; }
 
-    .status.checking {
-      background: var(--wait-soft);
-      color: var(--wait);
-    }
-
-    .status.online {
-      background: var(--ok-soft);
-      color: var(--ok);
-    }
-
-    .status.offline {
-      background: var(--bad-soft);
-      color: var(--bad);
-    }
-
-    .desc {
-      flex: 1;
-      margin: 0;
+    .footer {
+      margin-top: 54px;
+      padding-top: 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      border-top: 1px solid var(--line);
       color: var(--muted);
-      font-size: 14px;
-    }
-
-    .url {
-      margin: 0;
-      overflow-wrap: anywhere;
-      color: #415066;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 12px;
     }
 
-    @media (max-width: 980px) {
-      .header-inner {
-        grid-template-columns: 1fr;
-        align-items: start;
-      }
-
-      .badges {
-        justify-content: flex-start;
-      }
-
-      .summary {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+    @media (max-width: 900px) {
+      .masthead { grid-template-columns: 1fr; align-items: start; }
+      .host-panel { width: min(100%, 420px); }
+      .command-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .refresh-wrap { grid-column: 1 / -1; align-items: flex-start; }
     }
 
-    @media (max-width: 660px) {
-      .header-inner,
-      main {
-        padding-left: 16px;
-        padding-right: 16px;
-      }
+    @media (max-width: 680px) {
+      .shell { padding: 12px 12px 38px; }
+      .masthead { min-height: 0; padding: 28px 20px; }
+      .masthead::after { display: none; }
+      .command-bar, .grid { grid-template-columns: 1fr; }
+      .section-head { grid-template-columns: 1fr; }
+      .section-head::after { display: none; }
+      .card { min-height: 0; }
+      .card-top { flex-direction: column; }
+      .actions .button { flex: 1; }
+      .footer { flex-direction: column; }
+    }
 
-      .summary,
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-      .toolbar,
-      .section-head {
-        align-items: stretch;
-        flex-direction: column;
-      }
-
-      button,
-      a.button {
-        width: 100%;
-      }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="header-inner">
+  <main class="shell">
+    <header class="masthead">
       <div>
-        <h1>OWASP LLM Lab Portal</h1>
-        <p class="subtitle">실습 앱, 보조 도구, 상태 확인을 한 화면에서 관리합니다.</p>
+        <p class="eyebrow">Cloud Security Lab · Application Launchpad</p>
+        <h1>Attack the app.<span>Read the evidence.</span></h1>
+        <p class="lead">이름으로 앱을 고르고, 실제 취약 경계를 공격한 뒤, 포트와 상태를 증거처럼 확인합니다.</p>
       </div>
-      <div class="badges">
-        <span class="badge" id="host-badge">host</span>
-        <span class="badge">portal :8080</span>
-      </div>
-    </div>
-  </header>
+      <aside class="host-panel" aria-label="현재 실습 서버">
+        <span class="utility">ACTIVE LAB HOST</span>
+        <strong id="host-badge">host</strong>
+        <span>Launchpad · port 8080</span>
+      </aside>
+    </header>
 
-  <main>
-    <div class="summary" aria-label="Service status summary">
-      <div class="metric">
-        <strong id="metric-online">0</strong>
-        <span>접속 가능</span>
-      </div>
-      <div class="metric">
-        <strong id="metric-checking">0</strong>
-        <span>확인 중</span>
-      </div>
-      <div class="metric">
-        <strong id="metric-offline">0</strong>
-        <span>확인 필요</span>
-      </div>
-      <div class="metric">
-        <strong id="metric-total">0</strong>
-        <span>전체 서비스</span>
+    <div class="command-bar" aria-label="서비스 상태 요약">
+      <div class="metric"><strong id="metric-online">0</strong><span>접속 가능</span></div>
+      <div class="metric"><strong id="metric-checking">0</strong><span>확인 중</span></div>
+      <div class="metric"><strong id="metric-offline">0</strong><span>확인 필요</span></div>
+      <div class="metric"><strong id="metric-total">0</strong><span>전체 서비스</span></div>
+      <div class="refresh-wrap">
+        <button type="button" id="refresh">상태 다시 확인</button>
+        <span class="last-check" id="last-check">페이지 로드 후 자동 확인</span>
       </div>
     </div>
 
-    <div class="toolbar">
-      <div class="toolbar-text" id="last-check">페이지 로드 후 자동으로 상태를 확인합니다.</div>
-      <button type="button" id="refresh">상태 다시 확인</button>
-    </div>
-
-    <section aria-labelledby="labs-heading">
+    <section aria-labelledby="apps-heading">
       <div class="section-head">
-        <div>
-          <h2 id="labs-heading">Day Labs</h2>
-          <p class="section-note">강의 Day별 핵심 실습 앱입니다.</p>
-        </div>
+        <div><p class="eyebrow">Intentionally vulnerable</p><h2 id="apps-heading">취약한 애플리케이션</h2><p class="section-note">서비스 이름을 선택하면 해당 공격 실습 화면으로 이동합니다.</p></div>
       </div>
-      <div class="grid" id="day-grid"></div>
+      <div class="grid" id="app-grid"></div>
     </section>
 
-    <section aria-labelledby="tools-heading">
+    <section aria-labelledby="infra-heading">
       <div class="section-head">
-        <div>
-          <h2 id="tools-heading">Tools</h2>
-          <p class="section-note">Agent, 모델 레지스트리, 챌린지 UI, 모델 API 같은 보조 실습 도구입니다.</p>
-        </div>
+        <div><p class="eyebrow">Models & supply chain</p><h2 id="infra-heading">모델·공급망 도구</h2><p class="section-note">모델 목록과 공급망 API를 직접 확인하는 보조 서비스입니다.</p></div>
       </div>
-      <div class="grid" id="tool-grid"></div>
+      <div class="grid" id="infra-grid"></div>
     </section>
+
+    <footer class="footer"><span>OWASP Top 10 for LLM Applications · Hands-on Lab</span><span class="utility">AUTHORIZED TRAINING ENVIRONMENT</span></footer>
   </main>
 
   <script>
     const host = window.location.hostname || "localhost";
     const protocol = window.location.protocol || "http:";
+    const url = (port, path = "/") => `${protocol}//${host}:${port}${path}`;
     document.getElementById("host-badge").textContent = host;
 
-    const url = (port, path = "/") => `${protocol}//${host}:${port}${path}`;
-
     const services = [
-      {
-        group: "day",
-        title: "Day 1 Vulnerable RAG",
-        port: 8000,
-        href: url(8000),
-        check: url(8000, "/healthz"),
-        checkLabel: "Health",
-        tags: ["LLM01", "Prompt Injection", "RAG"],
-        desc: "프롬프트 인젝션을 RAG 챗봇에서 확인합니다."
-      },
-      {
-        group: "day",
-        title: "Day 2 Vulnerable RAG",
-        port: 8010,
-        href: url(8010),
-        check: url(8010, "/healthz"),
-        checkLabel: "Health",
-        tags: ["LLM02", "LLM08", "RAG"],
-        desc: "민감정보 노출과 데이터·모델 오염 시나리오를 다룹니다."
-      },
-      {
-        group: "day",
-        title: "Day 3 Vulnerable RAG",
-        port: 8011,
-        href: url(8011),
-        check: url(8011, "/healthz"),
-        checkLabel: "Health",
-        tags: ["LLM05", "Output Handling", "RAG"],
-        desc: "LLM 응답의 부적절한 HTML 렌더링과 출력 처리를 확인합니다."
-      },
-      {
-        group: "day",
-        title: "Day 4 Vulnerable RAG",
-        port: 8012,
-        href: url(8012),
-        check: url(8012, "/healthz"),
-        checkLabel: "Health",
-        tags: ["Day 2 LLM08", "Day 4 LLM07/09", "RAG"],
-        desc: "벡터/임베딩, 시스템 프롬프트 노출과 과신 시나리오가 공유하는 앱입니다."
-      },
-      {
-        group: "day",
-        title: "Day 5 Vulnerable RAG",
-        port: 8013,
-        href: url(8013),
-        check: url(8013, "/healthz"),
-        checkLabel: "Health",
-        tags: ["LLM10", "Consumption", "Rate limit"],
-        desc: "동시 요청과 큰 입력에 대한 제한 부재를 관찰합니다."
-      },
-      {
-        group: "tool",
-        title: "Day 3 Vulnerable Agent",
-        port: 8001,
-        href: url(8001),
-        check: url(8001, "/healthz"),
-        checkLabel: "Health",
-        tags: ["LLM06", "Agent", "Tool misuse"],
-        desc: "도구 호출형 Agent의 excessive agency와 tool misuse를 실습합니다."
-      },
-      {
-        group: "tool",
-        title: "Day 4 LLM03 Fake Model Registry",
-        port: 8002,
-        href: url(8002, "/api/v1/models"),
-        check: url(8002, "/api/v1/models"),
-        checkLabel: "Models API",
-        tags: ["LLM03", "Registry", "API"],
-        desc: "모델 공급망/무결성 검증용 가짜 모델 레지스트리 API입니다."
-      },
-      {
-        group: "tool",
-        title: "LLMGoat",
-        port: 5000,
-        href: url(5000),
-        check: url(5000),
-        checkLabel: "Open",
-        tags: ["Challenges", "Web UI"],
-        desc: "OWASP Top 10 for LLM 항목별 웹 챌린지 UI입니다."
-      },
-      {
-        group: "tool",
-        title: "Day 3 DVLA",
-        port: 8501,
-        href: url(8501),
-        check: url(8501),
-        checkLabel: "Open",
-        tags: ["ReAct", "Prompt Injection"],
-        desc: "Damn Vulnerable LLM Agent 기반 ReAct Agent prompt injection 실습 UI입니다."
-      },
-      {
-        group: "tool",
-        title: "Ollama API",
-        port: 11434,
-        href: url(11434, "/api/tags"),
-        check: url(11434, "/api/tags"),
-        checkLabel: "Models",
-        tags: ["Models", "API"],
-        desc: "로컬 LLM 모델 목록과 generate API 상태를 확인합니다."
-      }
+      { group: "app", title: "번역기 봇", route: "LLM01 · Prompt Injection", port: 8000, href: url(8000), check: url(8000, "/healthz"), checkLabel: "Health", tags: ["번역", "RAG", "비밀 추출"], color: "#59d6e8", desc: "번역 요청처럼 보이는 입력으로 시스템 지시와 비밀 코드의 경계를 시험합니다." },
+      { group: "app", title: "CloudSecurityLab Bank", route: "LLM02 · LLM08", port: 8010, href: url(8010), check: url(8010, "/healthz"), checkLabel: "Health", tags: ["고객 데이터", "RAG 출처", "인가"], color: "#8da9ff", desc: "합성 고객정보의 과다 전달과 승인되지 않은 지식 문서 채택을 서로 다른 흐름으로 확인합니다." },
+      { group: "app", title: "회사 노트북", route: "LLM05 · Output Handling", port: 8011, href: url(8011), check: url(8011, "/healthz"), checkLabel: "Health", tags: ["HTML", "렌더링", "XSS"], color: "#ff8ea0", desc: "모델 응답을 HTML로 믿고 렌더링할 때 브라우저에서 어떤 부작용이 생기는지 관찰합니다." },
+      { group: "app", title: "PrivateGPT-Lite", route: "LLM07 · LLM08 · LLM09", port: 8012, href: url(8012), check: url(8012, "/healthz"), checkLabel: "Health", tags: ["Tenant", "Prompt Leak", "Misinformation"], color: "#b595ff", desc: "사내 문서 챗봇에서 Tenant 검색 경계, 시스템 프롬프트 노출과 잘못된 추천을 시험합니다." },
+      { group: "app", title: "IT 헬프데스크 봇", route: "LLM10 · Unbounded Consumption", port: 8013, href: url(8013), check: url(8013, "/healthz"), checkLabel: "Health", tags: ["입력 크기", "동시 요청", "Token"], color: "#f5bb63", desc: "요청 크기와 생성량 제한이 없을 때 모델 서버 자원이 어떻게 소모되는지 확인합니다." },
+      { group: "app", title: "Goat Farm Helper", route: "LLM06 · Excessive Agency", port: 8001, href: url(8001), check: url(8001, "/healthz"), checkLabel: "Health", tags: ["Agent", "Tool", "권한"], color: "#65dda6", desc: "낮은 권한의 사용자가 자연어를 통해 관리자 Tool 실행을 유도하는 취약 Agent입니다." },
+      { group: "app", title: "LLMGoat", route: "OWASP LLM Challenges", port: 5000, href: url(5000), check: url(5000), checkLabel: "Open", tags: ["A01–A10", "Challenge", "Flag"], color: "#ff7185", desc: "OWASP Top 10 항목을 문제와 Flag로 풀어보는 독립형 웹 챌린지입니다." },
+      { group: "app", title: "Damn Vulnerable LLM Agent", route: "DVLA · ReAct Agent", port: 8501, href: url(8501), check: url(8501), checkLabel: "Open", tags: ["ReAct", "SQL Tool", "Prompt Injection"], color: "#55b8ff", desc: "ReAct 방식 Agent의 생각·도구 호출 흐름을 보며 Prompt Injection을 비교합니다." },
+      { group: "infra", title: "Fake Model Registry", route: "LLM03 · Supply Chain", port: 8002, href: url(8002, "/api/v1/models"), check: url(8002, "/api/v1/models"), checkLabel: "Models API", tags: ["Registry", "Hash", "Artifact"], color: "#f5bb63", desc: "모델 파일의 출처와 무결성 검증을 연습하기 위한 가짜 모델 저장소 API입니다." },
+      { group: "infra", title: "Ollama Model Server", route: "Local Inference Runtime", port: 11434, href: url(11434, "/api/tags"), check: url(11434, "/api/tags"), checkLabel: "Models", tags: ["Generate", "Chat", "Embed"], color: "#59d6e8", desc: "실습 앱의 Prompt를 실제 추론으로 바꾸고 로컬 모델 파일을 관리하는 서버입니다." }
     ];
 
     const state = new Map(services.map((service) => [service.title, "checking"]));
 
     function renderCard(service) {
       const tags = service.tags.map((tag) => `<span class="tag">${tag}</span>`).join("");
-      return `
-        <article class="card" data-service="${service.title}">
-          <div class="card-top">
-            <div>
-              <h3>${service.title}</h3>
-              <div class="tags">
-                <span class="tag port">:${service.port}</span>
-                ${tags}
-              </div>
-            </div>
-            <span class="status checking" data-status-for="${service.title}">확인 중</span>
-          </div>
-          <p class="desc">${service.desc}</p>
-          <p class="url">${service.href}</p>
-          <div class="actions">
-            <a class="button" href="${service.href}" target="_blank" rel="noreferrer">열기</a>
-            <a class="button secondary" href="${service.check}" target="_blank" rel="noreferrer">${service.checkLabel}</a>
-          </div>
-        </article>
-      `;
+      return `<article class="card" data-service="${service.title}" style="--card-accent:${service.color}">
+        <div class="card-top"><div><div class="route">${service.route}</div><h3>${service.title}</h3></div><span class="status checking" data-status-for="${service.title}">확인 중</span></div>
+        <div class="tags"><span class="tag port">PORT ${service.port}</span>${tags}</div>
+        <p class="desc">${service.desc}</p><p class="url">${service.href}</p>
+        <div class="actions"><a class="button" href="${service.href}" target="_blank" rel="noreferrer">앱 열기</a><a class="button secondary" href="${service.check}" target="_blank" rel="noreferrer">${service.checkLabel}</a></div>
+      </article>`;
     }
 
     function updateMetrics() {
@@ -551,12 +387,7 @@
       setStatus(service, "checking");
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), 4500);
-      return fetch(service.check, {
-        method: "GET",
-        mode: "no-cors",
-        cache: "no-store",
-        signal: controller.signal
-      })
+      return fetch(service.check, { method: "GET", mode: "no-cors", cache: "no-store", signal: controller.signal })
         .then(() => setStatus(service, "online"))
         .catch(() => setStatus(service, "offline"))
         .finally(() => window.clearTimeout(timer));
@@ -566,26 +397,18 @@
       const button = document.getElementById("refresh");
       button.disabled = true;
       button.textContent = "확인 중";
-      document.getElementById("last-check").textContent = "서비스 상태를 확인하는 중입니다.";
+      document.getElementById("last-check").textContent = "서비스 상태 확인 중";
       for (const service of services) setStatus(service, "checking");
       Promise.allSettled(services.map(probe)).finally(() => {
-        const now = new Date();
-        document.getElementById("last-check").textContent = `마지막 확인: ${now.toLocaleString()}`;
+        document.getElementById("last-check").textContent = `마지막 확인 ${new Date().toLocaleTimeString()}`;
         button.disabled = false;
         button.textContent = "상태 다시 확인";
       });
     }
 
-    document.getElementById("day-grid").innerHTML = services
-      .filter((service) => service.group === "day")
-      .map(renderCard)
-      .join("");
-    document.getElementById("tool-grid").innerHTML = services
-      .filter((service) => service.group === "tool")
-      .map(renderCard)
-      .join("");
+    document.getElementById("app-grid").innerHTML = services.filter((service) => service.group === "app").map(renderCard).join("");
+    document.getElementById("infra-grid").innerHTML = services.filter((service) => service.group === "infra").map(renderCard).join("");
     document.getElementById("refresh").addEventListener("click", runChecks);
-
     updateMetrics();
     runChecks();
   </script>
