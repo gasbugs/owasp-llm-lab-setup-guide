@@ -78,7 +78,7 @@ class Handler(BaseHTTPRequestHandler):
                     },
                     ensure_ascii=False,
                 )
-            elif "g-003" in user and "삭제" in user:
+            elif "g-003" in user and ("삭제" in user or '"tool":"delete_animal"' in user):
                 content = json.dumps(
                     {"tool": "delete_animal", "args": {"animal_id": "g-003"}},
                     ensure_ascii=False,
