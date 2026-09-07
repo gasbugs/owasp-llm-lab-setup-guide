@@ -32,6 +32,7 @@ llm = LLMClient()
 # 의도된 취약점: 사용자 ID를 URL/세션 검증 없이 받음
 DEFAULT_USER = "farmer1"
 
+# 모델의 자연어 규칙은 안내일 뿐이며 실제 인증·인가는 실행기가 다시 검사해야 한다.
 SYSTEM_PROMPT = """너는 'Goat Farm Helper' 에이전트야. 농장주를 도와 일을 처리한다.
 
 사용 가능한 tool 목록(이름 / 설명 / 인자):
