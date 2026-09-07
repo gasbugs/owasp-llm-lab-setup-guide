@@ -3,109 +3,109 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>vuln-agent — Goat Farm Helper</title>
+  <title>Cloud Security · LLM Lab — Agent Workbench</title>
   <style>
-    body { font-family: ui-monospace, monospace; max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { color: #b00; }
-    .top-nav { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
-    .home-button { display: inline-flex; align-items: center; min-height: 38px; padding: 0 0.8rem; border: 1px solid #94a3b8; border-radius: 7px; color: #0f172a; background: #fff; font: 700 0.9rem system-ui, sans-serif; text-decoration: none; }
-    .home-button:hover, .home-button:focus-visible { border-color: #0369a1; color: #0369a1; }
-    .warning { background: #fee; border-left: 4px solid #b00; padding: 0.5rem 1rem; }
-    .grid {
-      --left-pane-width: 50%;
-      display: grid;
-      grid-template-columns: minmax(0, var(--left-pane-width)) 12px minmax(0, 1fr);
-      gap: 0.5rem;
-      align-items: stretch;
-    }
+    :root { color-scheme:dark; --canvas:#071018; --surface:#0d1924; --surface-raised:#132333; --line:#294052; --line-soft:#1b3040; --ink:#eaf5f7; --muted:#8eabb5; --signal:#55c2d8; --signal-soft:#123d4a; --incident:#ff6978; --warning:#f6c453; --success:#65d6a4; --shadow:0 18px 45px rgba(0,0,0,.28); }
+    :root[data-theme="light"] { color-scheme:light; --canvas:#eaf1f3; --surface:#f8fbfc; --surface-raised:#fff; --line:#b8cbd1; --line-soft:#d8e4e7; --ink:#12252d; --muted:#58717a; --signal:#087f98; --signal-soft:#d9f1f5; --incident:#c92f43; --warning:#9a6500; --success:#167a55; --shadow:0 18px 45px rgba(28,61,72,.12); }
+    * { box-sizing:border-box; }
+    body { margin:0; min-width:320px; min-height:100vh; overflow-x:hidden; background:var(--canvas); color:var(--ink); font-family:Inter,"Noto Sans KR",system-ui,sans-serif; }
+    button,textarea { font:inherit; }
+    button,a,textarea,summary { outline:none; }
+    button:focus-visible,a:focus-visible,textarea:focus-visible,summary:focus-visible,.splitter:focus-visible { box-shadow:0 0 0 3px color-mix(in srgb,var(--signal) 35%,transparent); }
+    .shell { width:min(1480px,100%); margin:0 auto; padding:18px; }
+    .masthead { display:grid; grid-template-columns:auto 1fr auto; gap:22px; align-items:center; padding:18px 20px; border:1px solid var(--line); background:color-mix(in srgb,var(--surface) 94%,transparent); box-shadow:var(--shadow); }
+    .brand { display:flex; gap:13px; align-items:center; min-width:0; }
+    .brand-mark { display:grid; place-items:center; width:42px; height:42px; border:1px solid var(--signal); color:var(--signal); font:800 15px ui-monospace,SFMono-Regular,monospace; letter-spacing:-.08em; transform:rotate(-4deg); }
+    .eyebrow { margin:0 0 3px; color:var(--signal); font:700 10px ui-monospace,SFMono-Regular,monospace; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { margin:0; font-size:clamp(18px,2.4vw,28px); line-height:1.05; letter-spacing:-.035em; }
+    .mission { margin:0; max-width:660px; color:var(--muted); font-size:13px; line-height:1.55; }
+    .top-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+    .vuln-beacon { color:var(--incident); font:750 10px ui-monospace,SFMono-Regular,monospace; letter-spacing:.09em; white-space:nowrap; }
+    .home-button,.icon-button { display:inline-flex; min-height:42px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); font-weight:750; text-decoration:none; }
+    .home-button { padding:0 13px; }.icon-button { width:42px; padding:0; cursor:pointer; }
+    .home-button:hover,.icon-button:hover { border-color:var(--signal); color:var(--signal); }
+    .identity-bar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px; align-items:center; margin-top:14px; padding:14px 18px; border:1px solid var(--line); background:var(--surface); }
+    .identity-copy { margin:0; color:var(--muted); font-size:13px; line-height:1.55; }.identity-copy code { color:var(--signal); }
+    .access-badge { display:flex; gap:8px; align-items:center; color:var(--warning); font:700 11px ui-monospace,SFMono-Regular,monospace; white-space:nowrap; }
+    .access-badge::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--warning); box-shadow:0 0 0 4px color-mix(in srgb,var(--warning) 16%,transparent); }
+    .tool-drawer { margin-top:12px; border:1px solid var(--line); background:var(--surface); }
+    .tool-drawer summary { padding:12px 16px; cursor:pointer; color:var(--signal); font:700 12px ui-monospace,SFMono-Regular,monospace; }
+    .tools { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:0; padding:0 16px 16px; list-style:none; }
+    .tools li { min-width:0; padding:10px 12px; border-left:2px solid var(--line); background:var(--surface-raised); color:var(--muted); font-size:12px; line-height:1.45; overflow-wrap:anywhere; }.tools code { display:block; margin-bottom:3px; color:var(--ink); font:700 11px ui-monospace,SFMono-Regular,monospace; }
+    .grid { --left-pane-width:50%; display:grid; grid-template-columns: minmax(0, var(--left-pane-width)) 12px minmax(0, 1fr); gap:0; align-items:stretch; margin-top:14px; }
     .pane { min-width: 0; }
-    .splitter {
-      position: relative;
-      cursor: col-resize;
-      touch-action: none;
-      border-radius: 999px;
-      background: #e5e7eb;
-      outline: none;
-    }
-    .splitter::after {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 4px;
-      height: 48px;
-      border-radius: 999px;
-      background: #64748b;
-      transform: translate(-50%, -50%);
-    }
-    .splitter:hover, .splitter:focus-visible { background: #bfdbfe; }
-    .splitter:hover::after, .splitter:focus-visible::after { background: #0369a1; }
-    body.resizing { cursor: col-resize; user-select: none; }
-    .chat, .trace {
-      box-sizing: border-box;
-      width: 100%;
-      max-width: 100%;
-      border: 1px solid #ccc;
-      padding: 1rem;
-      height: 60vh;
-      overflow: auto;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-      background: #fafafa;
-    }
+    .pane { border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:57px; padding:13px 16px; border-bottom:1px solid var(--line); }
+    .panel-head h2 { margin:0; font-size:14px; letter-spacing:-.01em; }.panel-kicker { color:var(--muted); font:650 10px ui-monospace,SFMono-Regular,monospace; text-transform:uppercase; letter-spacing:.08em; }
+    .chat,.trace { overflow-wrap: anywhere; word-break: break-word; }
+    .chat,.trace { width:100%; max-width:100%; height:52vh; min-height:390px; overflow:auto; }
+    .chat { padding:18px; background:linear-gradient(135deg,color-mix(in srgb,var(--signal) 3%,transparent),transparent 42%); }
+    .chat-empty { display:grid; place-items:center; height:100%; padding:28px; color:var(--muted); text-align:center; font-size:13px; line-height:1.7; }
+    .msg { width:fit-content; max-width:min(82%,720px); margin:0 0 12px; padding:11px 13px; border:1px solid var(--line); border-radius:3px 13px 13px 13px; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; font-size:13px; line-height:1.55; }
+    .msg.user { margin-left:auto; border-color:color-mix(in srgb,var(--signal) 55%,var(--line)); border-radius:13px 3px 13px 13px; background:var(--signal-soft); color:var(--ink); }.msg.bot { background:var(--surface-raised); color:var(--ink); }.msg.tool { color:var(--warning); font-size:12px; }
+    .role { display:block; margin-bottom:4px; color:var(--muted); font:750 9px ui-monospace,SFMono-Regular,monospace; letter-spacing:.12em; text-transform:uppercase; }
+    .composer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:14px; border-top:1px solid var(--line); background:var(--surface-raised); }
+    textarea { width:100%; min-height:54px; max-height:180px; resize:vertical; padding:12px 13px; border:1px solid var(--line); border-radius:9px; background:var(--canvas); color:var(--ink); line-height:1.45; } textarea::placeholder { color:var(--muted); }
+    .send-button { min-width:92px; border:0; border-radius:9px; background:var(--signal); color:#061319; font-weight:850; cursor:pointer; }.send-button:hover { filter:brightness(1.08); }.send-button:disabled { opacity:.55; cursor:wait; }
     .trace { white-space: pre-wrap; }
-    .msg { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
-    .msg.user { color: #036; }
-    .msg.bot { color: #060; }
-    .msg.tool { color: #960; font-size: 0.9em; }
-    .tools li { font-family: monospace; }
-    textarea { box-sizing: border-box; width: 100%; height: 4rem; }
-    @media (max-width: 720px) {
-      .grid { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-      .splitter { display: none; }
-    }
+    .trace { margin:0; padding:18px; background:var(--canvas); color:#9edbe5; font:12px/1.58 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    :root[data-theme="light"] .trace { color:#155e70; }
+    .trace-empty { color:var(--muted); }
+    .splitter { position:relative; cursor:col-resize; touch-action:none; background:var(--canvas); outline:none; }
+    .splitter::after { content:""; position:absolute; top:50%; left:50%; width:3px; height:64px; border-radius:999px; background:var(--line); transform:translate(-50%,-50%); transition:background .18s,height .18s; }.splitter:hover::after,.splitter:focus-visible::after { height:90px; background:var(--signal); } body.resizing { cursor:col-resize; user-select:none; }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; } }
+    @media (max-width:900px) { .masthead { grid-template-columns:1fr auto; }.mission { grid-column:1/-1; grid-row:2; }.tools { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 720px) { .shell { padding:10px; }.masthead { padding:14px; }.vuln-beacon { display:none; }.identity-bar { grid-template-columns:1fr; }.tools { grid-template-columns:1fr; }.grid { grid-template-columns:minmax(0,1fr); gap:12px; }.splitter { display: none; }.chat,.trace { height:auto; min-height:340px; }.composer { grid-template-columns:1fr; }.send-button { min-height:46px; } }
   </style>
 </head>
 <body>
-  <nav class="top-nav" aria-label="실습 이동"><a id="portal-home" class="home-button" href="#">← 홈</a></nav>
-  <h1>[VULN] Goat Farm Helper</h1>
-  <div class="warning">⚠️ 의도적 취약 — LLM06 Excessive Agency 실습용. tool들은 권한 검증을 하지 않음.</div>
+  <main class="shell">
+    <header class="masthead">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">CSL</div><div><p class="eyebrow">Cloud Security · LLM Lab</p><h1>Agent execution workbench</h1></div></div>
+      <p class="mission">모델의 제안이 실제 Tool 호출로 바뀌는 순간을 대화와 실행 Trace에서 나란히 관찰합니다.</p>
+      <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
+    </header>
 
-  <details><summary>사용 가능한 tool 목록 (의도된 노출)</summary>
-    <ul class="tools">
-      {% for name, fn in tools.items() %}
-        <li><code>{{ name }}</code> — {{ fn.__doc__ }}</li>
-      {% endfor %}
-    </ul>
-  </details>
+    <section class="identity-bar" aria-label="현재 실습 경계">
+      <p class="identity-copy">현재 사용자는 <code>farmer1</code>, 권한은 <code>L1</code>입니다. 다른 사용자의 정보 조회나 관리자 Tool 실행을 요청해 권한 경계를 확인하세요.</p>
+      <div class="access-badge">SERVER AUTHORIZATION DISABLED</div>
+    </section>
 
-  <p>당신은 현재 <code>farmer1</code> (L1 권한)로 인증되어 있다. 다른 사용자의 정보·관리자 tool 호출을 유도해봐.</p>
+    <details class="tool-drawer"><summary>사용 가능한 Tool 목록 · 의도된 노출</summary><ul class="tools">
+      {% for name, fn in tools.items() %}<li><code>{{ name }}</code>{{ fn.__doc__ }}</li>{% endfor %}
+    </ul></details>
 
-  <div id="split-grid" class="grid">
-    <div class="pane">
-      <h3>대화</h3>
-      <div id="chat" class="chat"></div>
-      <form id="form">
-        <textarea id="message" placeholder="자연어 또는 인젝션 페이로드..." required></textarea>
-        <button type="submit">Send</button>
-      </form>
-    </div>
-    <div id="splitter" class="splitter" role="separator" aria-label="대화와 trace 패널 너비 조절" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="50" tabindex="0" title="드래그하거나 방향키로 패널 너비 조절"></div>
-    <div class="pane">
-      <h3>실행 trace (LLM ↔ tool)</h3>
-      <pre id="trace" class="trace"></pre>
-    </div>
-  </div>
+    <section id="split-grid" class="grid" aria-label="Agent 실행 관찰 영역">
+      <div class="pane">
+        <div class="panel-head"><h2>대화</h2><span class="panel-kicker">Natural language input</span></div>
+        <div id="chat" class="chat"><div id="chat-empty" class="chat-empty">자연어 요청이나 Prompt Injection을 입력하면<br>모델 응답이 이곳에 표시됩니다.</div></div>
+        <form id="form" class="composer"><textarea id="message" aria-label="Agent 요청" placeholder="자연어 또는 Prompt Injection을 입력하세요." required></textarea><button id="send" class="send-button" type="submit">요청 보내기</button></form>
+      </div>
+      <div id="splitter" class="splitter" role="separator" aria-label="대화와 trace 패널 너비 조절" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="50" tabindex="0" title="드래그하거나 방향키로 패널 너비 조절"></div>
+      <div class="pane">
+        <div class="panel-head"><h2>실행 Trace</h2><span class="panel-kicker">LLM ↔ tool boundary</span></div>
+        <pre id="trace" class="trace"><span class="trace-empty">아직 실행된 단계가 없습니다.</span></pre>
+      </div>
+    </section>
+  </main>
 
 <script>
+const root = document.documentElement;
+const savedTheme = localStorage.getItem('llm-lab-theme');
+if (savedTheme === 'light') root.dataset.theme = 'light';
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  root.dataset.theme = root.dataset.theme === 'light' ? '' : 'light';
+  localStorage.setItem('llm-lab-theme', root.dataset.theme || 'dark');
+});
+
 const chat = document.getElementById('chat');
 document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
 const trace = document.getElementById('trace');
 const form = document.getElementById('form');
 const msg = document.getElementById('message');
+const send = document.getElementById('send');
 const splitGrid = document.getElementById('split-grid');
 const splitter = document.getElementById('splitter');
-
 const MIN_SPLIT = 25;
 const MAX_SPLIT = 75;
 let activePointerId = null;
@@ -115,29 +115,24 @@ function setSplit(percent) {
   splitGrid.style.setProperty('--left-pane-width', safePercent + '%');
   splitter.setAttribute('aria-valuenow', String(Math.round(safePercent)));
 }
-
 function setSplitFromPointer(clientX) {
   const bounds = splitGrid.getBoundingClientRect();
   setSplit(((clientX - bounds.left) / bounds.width) * 100);
 }
-
 splitter.addEventListener('pointerdown', (event) => {
   activePointerId = event.pointerId;
   splitter.setPointerCapture(event.pointerId);
   document.body.classList.add('resizing');
   setSplitFromPointer(event.clientX);
 });
-
 splitter.addEventListener('pointermove', (event) => {
   if (event.pointerId === activePointerId) setSplitFromPointer(event.clientX);
 });
-
 function finishResize(event) {
   if (event.pointerId !== activePointerId) return;
   activePointerId = null;
   document.body.classList.remove('resizing');
 }
-
 splitter.addEventListener('pointerup', finishResize);
 splitter.addEventListener('pointercancel', finishResize);
 splitter.addEventListener('dblclick', () => setSplit(50));
@@ -152,30 +147,44 @@ splitter.addEventListener('keydown', (event) => {
 });
 
 function add(role, text) {
-  const d = document.createElement('div');
-  d.className = 'msg ' + role;
-  d.textContent = role + ': ' + text;
-  chat.appendChild(d);
+  document.getElementById('chat-empty')?.remove();
+  const bubble = document.createElement('div');
+  bubble.className = 'msg ' + role;
+  const label = document.createElement('span');
+  label.className = 'role';
+  label.textContent = role === 'user' ? 'You · farmer1' : 'Agent response';
+  bubble.append(label, document.createTextNode(text));
+  chat.appendChild(bubble);
   chat.scrollTop = chat.scrollHeight;
 }
-
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
   const text = msg.value.trim();
   if (!text) return;
   add('user', text);
   msg.value = '';
-  const r = await fetch('/api/chat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer llm06-farmer1-demo-token',
-    },
-    body: JSON.stringify({ message: text }),
-  });
-  const data = await r.json();
-  add('bot', data.reply);
-  trace.textContent = JSON.stringify(data.trace, null, 2);
+  send.disabled = true;
+  send.textContent = '실행 중…';
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer llm06-farmer1-demo-token',
+      },
+      body: JSON.stringify({message:text}),
+    });
+    const data = await response.json();
+    add('bot', data.reply || `HTTP ${response.status}`);
+    trace.textContent = JSON.stringify(data.trace, null, 2);
+  } catch (error) {
+    add('bot', '요청에 실패했습니다. 컨테이너 상태를 확인하세요.');
+    trace.textContent = String(error);
+  } finally {
+    send.disabled = false;
+    send.textContent = '요청 보내기';
+    msg.focus();
+  }
 });
 </script>
 </body>

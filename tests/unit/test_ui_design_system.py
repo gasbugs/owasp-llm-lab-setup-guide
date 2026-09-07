@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RAG_UI = ROOT / "docker/vuln-rag/app/templates/index.html"
+AGENT_UI = ROOT / "docker/vuln-agent/app/templates/index.html"
 CONTROL_UI = ROOT / "llm-security-control-plane/application-gateway/index.html"
 
 
@@ -15,10 +16,11 @@ class UiDesignSystemTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.rag = RAG_UI.read_text(encoding="utf-8")
+        cls.agent = AGENT_UI.read_text(encoding="utf-8")
         cls.control = CONTROL_UI.read_text(encoding="utf-8")
 
-    def test_two_apps_share_brand_theme_and_core_tokens(self) -> None:
-        for source in (self.rag, self.control):
+    def test_three_apps_share_brand_theme_and_core_tokens(self) -> None:
+        for source in (self.rag, self.agent, self.control):
             self.assertIn("Cloud Security", source)
             self.assertIn("LLM Lab", source)
             self.assertIn('id="theme-toggle"', source)
@@ -28,7 +30,24 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn("prefers-reduced-motion:reduce", source)
             self.assertIn("@media", source)
 
-    def test_two_apps_constrain_panels_inside_mobile_viewport(self) -> None:
+    def test_agent_ui_preserves_execution_workbench_controls(self) -> None:
+        for control_id in (
+            "portal-home",
+            "theme-toggle",
+            "split-grid",
+            "chat",
+            "form",
+            "message",
+            "send",
+            "splitter",
+            "trace",
+        ):
+            self.assertIn(f'id="{control_id}"', self.agent)
+        self.assertIn("/api/chat", self.agent)
+        self.assertIn("llm06-farmer1-demo-token", self.agent)
+        self.assertIn("SERVER AUTHORIZATION DISABLED", self.agent)
+
+    def test_apps_constrain_panels_inside_mobile_viewport(self) -> None:
         self.assertIn(".panel { min-width:0;", self.control)
         self.assertIn(".stack,.panel { min-width:0; }", self.rag)
 
