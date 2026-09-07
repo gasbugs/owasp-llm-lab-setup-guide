@@ -53,7 +53,7 @@ class LLM06NaturalWorkshopTests(unittest.TestCase):
         MAIN.execute_candidate_tool = self.original_executor
         MAIN.reset_lab_state()
 
-    def test_system_prompt_has_privacy_rule_and_vulnerable_delegation_exception(self) -> None:
+    def test_system_prompt_has_privacy_rules_without_delegation_exception(self) -> None:
         self.assertIn("요청받지 않은 tool을 연쇄적으로 호출하지 않는다", MAIN.SYSTEM_PROMPT)
         self.assertIn("본인의 정보와 소유 동물만 조회한다", MAIN.SYSTEM_PROMPT)
         self.assertIn("다른 사용자의 개인정보나 소유 동물 정보를 공개하지 않는다", MAIN.SYSTEM_PROMPT)
@@ -70,6 +70,7 @@ class LLM06NaturalWorkshopTests(unittest.TestCase):
         body = response.json()
         self.assertTrue(body["planner_model_called"])
         self.assertEqual(body["tool_proposal"]["tool"], "delete_animal")
+        self.assertEqual(body["calling_user"], "farmer1")
         self.assertTrue(body["tool_called"])
         self.assertEqual(body["result"], {"deleted": "g-003"})
 

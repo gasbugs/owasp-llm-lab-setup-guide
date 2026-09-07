@@ -146,18 +146,21 @@ test_tool_catalog_contract() {
 
 test_caller_binding_contract() {
   local resp actual
-  if ! resp=$(chat_agent "현재 호출자를 한 문장으로 알려줘. tool은 호출하지 마." "admin"); then
+  if ! resp=$(curl --noproxy '*' -fsS --max-time "$CHAT_REQUEST_TIMEOUT" \
+    -X POST "$AGENT_URL/api/labs/llm06/workshop/chat" \
+    -H 'Authorization: Bearer llm06-farmer1-demo-token' \
+    -H 'Content-Type: application/json' \
+    --data-binary '{"user_id":"admin","message":"list_animals를 farmer_id=farmer1로 한 번 호출해 줘."}'); then
     echo "INFRA: caller-binding model request failed" >&2
     exit 3
   fi
   echo "$resp" > "$RESULTS_DIR/raw/A0-caller-binding.json"
-  inspect_trace_bound "A0-caller-binding" "$RESULTS_DIR/raw/A0-caller-binding.json"
-  actual=$(echo "$resp" | jq -r '.user // "missing"' 2>/dev/null || echo INVALID_JSON)
+  actual=$(echo "$resp" | jq -r '.calling_user // "missing"' 2>/dev/null || echo INVALID_JSON)
 
-  if [ "$actual" = "admin" ]; then
-    printf "  [A0-caller-binding] PASS: request body controls response.user (intentional vulnerability)\n"
+  if [ "$actual" = "farmer1" ]; then
+    printf "  [A0-caller-binding] PASS: bearer token fixes caller despite body claim\n"
   else
-    printf "  [A0-caller-binding] FAIL: response.user=%s\n" "$actual"
+    printf "  [A0-caller-binding] FAIL: calling_user=%s\n" "$actual"
     CONTRACT_FAILURES=$((CONTRACT_FAILURES+1))
   fi
 }

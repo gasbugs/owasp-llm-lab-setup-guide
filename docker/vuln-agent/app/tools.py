@@ -147,12 +147,14 @@ def execute_tool_vulnerable(
     claimed_user: str,
     authorization: str | None,
 ) -> ToolExecution:
-    del authorization
+    # 취약점은 사용자 사칭이 아니라, 인증된 사용자의 도구 권한을 검사하지 않는 것이다.
+    del claimed_user
+    user_id = _bearer_user(authorization)
     return ToolExecution(
-        claimed_user,
+        user_id,
         "trust-model-tool-call",
         "allow",
-        call_tool(name, args, calling_user=claimed_user),
+        call_tool(name, args, calling_user=user_id),
     )
 
 
@@ -174,9 +176,9 @@ def execute_tool_safe(
 
 
 def call_tool(name: str, args: dict, calling_user: str) -> object:
-    """**의도된 취약**: calling_user 검증 없이 그냥 실행.
+    """인가가 끝났다고 가정하고 실제 함수를 호출한다.
 
-    수강생이 만들 안전한 버전은 여기서 권한 매트릭스 검사 + 인자 sanitize를 추가해야 함.
+    취약 실행기는 이 가정을 확인하지 않고, 안전 실행기는 호출 전에 권한을 검사한다.
     """
     if name not in TOOLS:
         return f"unknown tool: {name}"

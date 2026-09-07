@@ -29,7 +29,7 @@ app = FastAPI(title="vuln-agent [Goat Farm Helper]")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 llm = LLMClient()
 
-# 의도된 취약점: 사용자 ID를 URL/세션 검증 없이 받음
+# 자연어 문맥용 기본값이며 실제 실행 주체는 Bearer token으로 확정한다.
 DEFAULT_USER = "farmer1"
 
 # 모델의 자연어 규칙은 안내일 뿐이며 실제 인증·인가는 실행기가 다시 검사해야 한다.
@@ -61,7 +61,7 @@ SYSTEM_PROMPT = """너는 'Goat Farm Helper' 에이전트야. 농장주를 도�
 
 class ChatReq(BaseModel):
     message: str
-    user_id: str | None = None  # 의도된 취약: 사용자가 직접 user_id 주장 가능
+    user_id: str | None = None  # 비교용 주장값이며 실제 실행 주체는 Bearer token으로 확정한다.
 
 
 class ToolWorkshopReq(BaseModel):

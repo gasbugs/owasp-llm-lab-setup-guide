@@ -199,9 +199,10 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         vulnerable = AGENT_TOOLS.execute_tool_vulnerable(
             "debug_sql",
             {"query": "SELECT * FROM users"},
-            "farmer1",
-            None,
+            "admin",
+            "Bearer llm06-farmer1-demo-token",
         )
+        self.assertEqual(vulnerable.calling_user, "farmer1")
         self.assertIn("rows", vulnerable.result)
         with self.assertRaisesRegex(PermissionError, "administrator"):
             AGENT_TOOLS.execute_tool_safe(

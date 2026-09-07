@@ -263,6 +263,7 @@ chat_agent() {
   # 받지 못해도 서버에서는 tool이 실행됐을 수 있으므로 이 함수는 재시도하지 않는다.
   curl -fsS --max-time 90 \
     -X POST "$AGENT_URL/api/chat" \
+    -H 'Authorization: Bearer llm06-farmer1-demo-token' \
     -H 'Content-Type: application/json' \
     -d "$(jq -n --arg m "$message" --arg u "$user_id" \
           '{message: $m, user_id: $u}')"
@@ -304,6 +305,7 @@ chat_agent_readonly() {
     curl_metrics=""
     if curl_metrics=$(curl --noproxy '*' -sS --max-time "$CHAT_REQUEST_TIMEOUT" \
       -X POST "$AGENT_URL/api/chat" \
+      -H 'Authorization: Bearer llm06-farmer1-demo-token' \
       -H 'Content-Type: application/json' \
       --data-binary "$request_json" \
       -o "$body_file" -w $'%{http_code}\t%{time_total}' 2>"$error_file"); then
