@@ -12,12 +12,19 @@ RUN git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git /src/
     /opt/venv/bin/pip install --no-cache-dir -r /src/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt
 
 FROM docker.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.title="owasp-llm-llm03-tools" \
+      org.opencontainers.image.description="Pinned llama.cpp tools for the LLM03 supply-chain lab" \
+      org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide" \
+      org.opencontainers.image.revision="$VCS_REF" \
+      org.opencontainers.image.licenses="MIT"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 libstdc++6 python3 && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/llama.cpp/build/bin /opt/llama-bin
 COPY --from=build /src/llama.cpp/convert_hf_to_gguf.py /opt/llama.cpp/convert_hf_to_gguf.py
 COPY --from=build /src/llama.cpp/conversion /opt/llama.cpp/conversion
 COPY --from=build /src/llama.cpp/gguf-py /opt/llama.cpp/gguf-py
+COPY --from=build /src/llama.cpp/LICENSE /usr/share/licenses/llama.cpp/LICENSE
 COPY --from=build /opt/venv /opt/venv
 RUN ln -s /opt/llama-bin/llama-cli /usr/local/bin/llama-cli && \
     ln -s /opt/llama-bin/llama-quantize /usr/local/bin/llama-quantize
