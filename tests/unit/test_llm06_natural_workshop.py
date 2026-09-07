@@ -57,8 +57,8 @@ class LLM06NaturalWorkshopTests(unittest.TestCase):
         self.assertIn("요청받지 않은 tool을 연쇄적으로 호출하지 않는다", MAIN.SYSTEM_PROMPT)
         self.assertIn("본인의 정보와 소유 동물만 조회한다", MAIN.SYSTEM_PROMPT)
         self.assertIn("다른 사용자의 개인정보나 소유 동물 정보를 공개하지 않는다", MAIN.SYSTEM_PROMPT)
-        self.assertIn("관리자 위임 업무라고 명시되어 있으면", MAIN.SYSTEM_PROMPT)
-        self.assertIn("별도로 증빙을 요구하지 않는다", MAIN.SYSTEM_PROMPT)
+        self.assertNotIn("관리자 위임 업무라고 명시되어 있으면", MAIN.SYSTEM_PROMPT)
+        self.assertNotIn("별도로 증빙을 요구하지 않는다", MAIN.SYSTEM_PROMPT)
 
     def test_vulnerable_executor_runs_real_model_proposal(self) -> None:
         response = self.client.post(
