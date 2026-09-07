@@ -147,7 +147,8 @@ def execute_tool_vulnerable(
     claimed_user: str,
     authorization: str | None,
 ) -> ToolExecution:
-    # 취약점은 사용자 사칭이 아니라, 인증된 사용자의 도구 권한을 검사하지 않는 것이다.
+    # Bearer token으로 사용자는 고정하지만 LLM이 고른 도구의 권한은 검사하지 않는다.
+    # 따라서 모델의 tool 선택이 사실상 최종 권한 결정이 된다.
     del claimed_user
     user_id = _bearer_user(authorization)
     return ToolExecution(
