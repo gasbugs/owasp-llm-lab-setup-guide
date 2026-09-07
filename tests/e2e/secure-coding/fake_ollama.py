@@ -78,6 +78,14 @@ class Handler(BaseHTTPRequestHandler):
                     },
                     ensure_ascii=False,
                 )
+            elif "farmer2" in user and "회의는 취소" in user:
+                content = json.dumps(
+                    {
+                        "tool": "send_message",
+                        "args": {"to_user": "farmer2", "body": "내일 회의는 취소되었다"},
+                    },
+                    ensure_ascii=False,
+                )
             elif "g-003" in user and ("삭제" in user or '"tool":"delete_animal"' in user):
                 content = json.dumps(
                     {"tool": "delete_animal", "args": {"animal_id": "g-003"}},

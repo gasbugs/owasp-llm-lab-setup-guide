@@ -137,7 +137,7 @@ def _authorize_tool(user_id: str, name: str, args: dict) -> None:
             raise PermissionError("feed_schedule is limited to the animal owner")
     if name == "get_vet_phone" and role not in {"L2-vet", "L3"}:
         raise PermissionError("get_vet_phone requires staff role")
-    if name in {"delete_animal", "debug_sql"} and role != "L3":
+    if name in {"send_message", "delete_animal", "debug_sql"} and role != "L3":
         raise PermissionError(f"{name} requires administrator role")
 
 
