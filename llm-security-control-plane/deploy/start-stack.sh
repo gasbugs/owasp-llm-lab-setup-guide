@@ -99,14 +99,25 @@ BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}"
 AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
 AWS_PROFILE="${AWS_PROFILE:-default}"
 AWS_CONFIG_DIR="${AWS_CONFIG_DIR:-$HOME/.aws}"
+USE_EC2_INSTANCE_ROLE="${USE_EC2_INSTANCE_ROLE:-false}"
 MODULE08_STATE_FILE="${MODULE08_STATE_FILE:-$ROOT/.state/module08-aws.env}"
 if [ -f "$MODULE08_STATE_FILE" ]; then
   # shellcheck disable=SC1090
   source "$MODULE08_STATE_FILE"
 fi
-if [ "$START_BEDROCK_GATEWAY" = true ] && [ ! -d "$AWS_CONFIG_DIR" ]; then
-  echo "AWS config directory does not exist: $AWS_CONFIG_DIR" >&2
-  exit 1
+AWS_CREDENTIAL_ARGS=()
+if [ "$START_BEDROCK_GATEWAY" = true ]; then
+  if [ -d "$AWS_CONFIG_DIR" ]; then
+    AWS_CREDENTIAL_ARGS=(
+      -e AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials
+      -e AWS_CONFIG_FILE=/tmp/.aws/config
+      -v "$AWS_CONFIG_DIR:/tmp/.aws:ro"
+    )
+  elif [ "$USE_EC2_INSTANCE_ROLE" != true ]; then
+    echo "AWS config directory does not exist: $AWS_CONFIG_DIR" >&2
+    echo "On EC2, set USE_EC2_INSTANCE_ROLE=true to use IMDS credentials." >&2
+    exit 1
+  fi
 fi
 if docker container inspect llm-sec-alloy >/dev/null 2>&1 && \
   docker container inspect llm-sec-gateway >/dev/null 2>&1; then
@@ -126,8 +137,7 @@ if [ "$START_BEDROCK_GATEWAY" = true ]; then
     --user "$(id -u):$(id -g)" \
     -e "AWS_REGION=$AWS_REGION" \
     -e "AWS_PROFILE=$AWS_PROFILE" \
-    -e AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials \
-    -e AWS_CONFIG_FILE=/tmp/.aws/config \
+    "${AWS_CREDENTIAL_ARGS[@]}" \
     -e "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" \
     -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_GATEWAY_TOKEN" \
     -e "BEDROCK_KNOWLEDGE_BASE_ID=${MODULE08_KNOWLEDGE_BASE_ID:-}" \
@@ -136,7 +146,6 @@ if [ "$START_BEDROCK_GATEWAY" = true ]; then
     -e "BEDROCK_PRICING_REFERENCE_DATE=${BEDROCK_PRICING_REFERENCE_DATE:-2026-08-24}" \
     -e "RELEASE_VERSION=$IMAGE_VERSION" \
     "${OTEL_ARGS[@]}" \
-    -v "$AWS_CONFIG_DIR:/tmp/.aws:ro" \
     "localhost/llm-security-bedrock-gateway:$IMAGE_VERSION" >/dev/null
 fi
 
