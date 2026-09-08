@@ -16,7 +16,7 @@ PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
 GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
 SKIP_BUILD="${SKIP_BUILD:-false}"
 
-for command in aws docker curl jq; do
+for command in aws docker jq; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "ERR: required command missing: $command" >&2
     exit 1
@@ -147,14 +147,14 @@ jq '{dashboard:(. + {
     }),overwrite:true}' \
   "$OBSERVABILITY_ROOT/grafana/dashboards/llm-security.json" \
   >"$dashboard_request"
-curl -fsS -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD" \
+curl -fsS --max-time 30 -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD" \
   -H 'Content-Type: application/json' \
   -X POST "$GRAFANA_URL/api/dashboards/db" \
   --data-binary "@$dashboard_request" \
   | jq -e '.status == "success" and .uid == "module10-security-fast-track"' >/dev/null
 rm -f "$dashboard_request"
 
-dashboard=$(curl -fsS -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD" \
+dashboard=$(curl -fsS --max-time 30 -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD" \
   "$GRAFANA_URL/api/dashboards/uid/module10-security-fast-track")
 jq -e '
   .dashboard.uid == "module10-security-fast-track"
