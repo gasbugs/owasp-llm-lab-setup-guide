@@ -8,7 +8,7 @@
       "title": "Presidio and NeMo guardrail decisions",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [
-        {"expr": "sum by (engine, direction, decision) (rate(llm_guardrail_decisions_total[5m]))", "legendFormat": "{{engine}} / {{direction}} / {{decision}}", "refId": "A"}
+        {"expr": "sum by (engine, direction, decision) (rate(llm_guardrail_decisions_total[1h]))", "legendFormat": "{{engine}} / {{direction}} / {{decision}}", "refId": "A"}
       ],
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 49}
     },
@@ -17,31 +17,31 @@
       "title": "Guardrail p95 latency and model calls",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [
-        {"expr": "histogram_quantile(0.95, sum by (le, engine, direction) (rate(llm_guardrail_duration_seconds_bucket[5m])))", "legendFormat": "p95 {{engine}} / {{direction}}", "refId": "A"},
-        {"expr": "sum by (engine) (rate(llm_guardrail_model_calls_total[5m]))", "legendFormat": "model calls {{engine}}", "refId": "B"}
+        {"expr": "histogram_quantile(0.95, sum by (le, engine, direction) (rate(llm_guardrail_duration_seconds_bucket[1h])))", "legendFormat": "p95 {{engine}} / {{direction}}", "refId": "A"},
+        {"expr": "sum by (engine) (rate(llm_guardrail_model_calls_total[1h]))", "legendFormat": "model calls {{engine}}", "refId": "B"}
       ],
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 49}
     },
     {
       "type": "stat",
-      "title": "Chat request rate",
+      "title": "Chat request rate over 1h",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(rate(llm_guardrail_decisions_total{engine=\"nemo\",direction=\"chat\"}[5m]))", "legendFormat": "requests/s", "refId": "A"}],
+      "targets": [{"expr": "sum(rate(llm_guardrail_decisions_total{engine=\"nemo\",direction=\"chat\"}[1h])) or vector(0)", "legendFormat": "requests/s", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
       "gridPos": {"h": 5, "w": 4, "x": 0, "y": 0}
     },
     {
       "type": "stat",
-      "title": "Blocked in the last 5m",
+      "title": "Blocked in the last 1h",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(increase(llm_guardrail_decisions_total{engine=\"nemo\",direction=\"chat\",decision=\"block\"}[5m]))", "refId": "A"}],
+      "targets": [{"expr": "sum(increase(llm_guardrail_decisions_total{engine=\"nemo\",direction=\"chat\",decision=\"block\"}[1h])) or vector(0)", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 4, "y": 0}
     },
     {
       "type": "stat",
       "title": "Chat p95 latency",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(bedrock_request_duration_seconds_bucket{task=\"converse\"}[5m])))", "refId": "A"}],
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(bedrock_request_duration_seconds_bucket{task=\"main\"}[1h]))) or vector(0)", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
       "gridPos": {"h": 5, "w": 4, "x": 8, "y": 0}
     },
@@ -49,7 +49,7 @@
       "type": "stat",
       "title": "Generated tokens",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(increase(bedrock_tokens_total{direction=\"output\",task=\"converse\"}[30m]))", "refId": "A"}],
+      "targets": [{"expr": "sum(increase(bedrock_tokens_total{direction=\"output\",task=\"main\"}[1h])) or vector(0)", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 12, "y": 0}
     },
     {
@@ -57,14 +57,14 @@
       "title": "Estimated Bedrock cost",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "fieldConfig": {"defaults": {"min": 0, "unit": "currencyUSD"}, "overrides": []},
-      "targets": [{"expr": "sum(bedrock_estimated_cost_usd_total)", "refId": "A"}],
+      "targets": [{"expr": "sum(bedrock_estimated_cost_usd_total) or vector(0)", "refId": "A"}],
       "gridPos": {"h": 5, "w": 4, "x": 16, "y": 0}
     },
     {
       "type": "stat",
       "title": "Telemetry and alert services up",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum(up{job=~\"alloy|loki|tempo|alertmanager|alert-webhook\"})", "refId": "A"}],
+      "targets": [{"expr": "sum(up{job=~\"alloy|loki|tempo|alertmanager|alert-webhook\"}) or vector(0)", "refId": "A"}],
       "fieldConfig": {"defaults": {"min": 0, "max": 5}, "overrides": []},
       "gridPos": {"h": 5, "w": 4, "x": 20, "y": 0}
     },
@@ -72,7 +72,7 @@
       "type": "timeseries",
       "title": "Application guardrail outcomes",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "sum by (engine, direction, decision) (rate(llm_guardrail_decisions_total[5m]))", "legendFormat": "{{engine}} / {{direction}} / {{decision}}", "refId": "A"}],
+      "targets": [{"expr": "sum by (engine, direction, decision) (rate(llm_guardrail_decisions_total[1h]))", "legendFormat": "{{engine}} / {{direction}} / {{decision}}", "refId": "A"}],
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
     },
     {
@@ -80,7 +80,7 @@
       "title": "Trace-derived RED metrics",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [
-        {"expr": "sum by (span_name, status_code) (rate(traces_spanmetrics_calls_total[5m]))", "legendFormat": "{{span_name}} / {{status_code}}", "refId": "A"}
+        {"expr": "sum by (span_name, status_code) (rate(traces_spanmetrics_calls_total[1h]))", "legendFormat": "{{span_name}} / {{status_code}}", "refId": "A"}
       ],
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}
     },
@@ -88,7 +88,7 @@
       "type": "table",
       "title": "Active Prometheus alerts",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
-      "targets": [{"expr": "ALERTS{alertstate=\"firing\"}", "format": "table", "instant": true, "refId": "A"}],
+      "targets": [{"expr": "ALERTS{alertstate=\"firing\"} or on() vector(0)", "format": "table", "instant": true, "refId": "A"}],
       "gridPos": {"h": 7, "w": 24, "x": 0, "y": 13}
     },
     {
@@ -96,9 +96,9 @@
       "title": "Telemetry loss and exporter queue pressure",
       "datasource": {"type": "prometheus", "uid": "llm-security-prometheus"},
       "targets": [
-        {"expr": "sum(increase(otelcol_receiver_failed_log_records_total[5m])) + sum(increase(otelcol_receiver_failed_spans_total[5m]))", "legendFormat": "OTLP receiver failures", "refId": "A"},
-        {"expr": "sum(increase(loki_write_dropped_entries_total[5m]))", "legendFormat": "Loki entries dropped", "refId": "B"},
-        {"expr": "max(otelcol_exporter_queue_size / otelcol_exporter_queue_capacity)", "legendFormat": "largest exporter queue ratio", "refId": "C"}
+        {"expr": "(sum(increase(otelcol_receiver_failed_log_records_total[1h])) + sum(increase(otelcol_receiver_failed_spans_total[1h]))) or vector(0)", "legendFormat": "OTLP receiver failures", "refId": "A"},
+        {"expr": "sum(increase(loki_write_dropped_entries_total[1h])) or vector(0)", "legendFormat": "Loki entries dropped", "refId": "B"},
+        {"expr": "max(otelcol_exporter_queue_size / otelcol_exporter_queue_capacity) or vector(0)", "legendFormat": "largest exporter queue ratio", "refId": "C"}
       ],
       "gridPos": {"h": 7, "w": 24, "x": 0, "y": 20}
     },
@@ -114,7 +114,7 @@
       "type": "traces",
       "title": "End-to-end request traces",
       "datasource": {"type": "tempo", "uid": "llm-security-tempo"},
-      "targets": [{"queryType": "traceql", "query": "{ resource.service.name = \"llm-security-gateway\" }", "refId": "A"}],
+      "targets": [{"queryType": "traceql", "query": "{ resource.service.name =~ \"llm-security-(application-gateway|nemo-hub|presidio-spoke|bedrock-gateway)\" } with (most_recent=true)", "limit": 20, "tableType": "traces", "refId": "A"}],
       "gridPos": {"h": 11, "w": 24, "x": 0, "y": 38}
     }
   ],
@@ -132,7 +132,7 @@
       }
     ]
   },
-  "time": {"from": "now-30m", "to": "now"},
+  "time": {"from": "now-6h", "to": "now"},
   "timezone": "browser",
   "title": "LLM Security Observability Center",
   "uid": "llm-security-monitoring",
