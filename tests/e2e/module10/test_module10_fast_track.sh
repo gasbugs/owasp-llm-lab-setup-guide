@@ -24,7 +24,7 @@ for command in aws docker jq openssl; do
   }
 done
 
-install -d -m 0700 "$CONTROL_ROOT/.state/application-auth"
+install -d -m 0700 "$CONTROL_ROOT/.state/application-auth" "$HOME/.aws"
 umask 077
 printf 'AWS_PROFILE=%s\nAWS_REGION=%s\nUSE_EC2_INSTANCE_ROLE=%s\nLOCAL_UID=%s\nLOCAL_GID=%s\nBEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0\nPRESIDIO_INTERNAL_TOKEN=%s\nAPPLICATION_INTERNAL_TOKEN=%s\nBEDROCK_GATEWAY_TOKEN=%s\nTELEMETRY_INGEST_TOKEN=%s\nTELEMETRY_HMAC_KEY=%s\nLLM_MONITOR_TOKEN=%s\nLLM_MONITOR_ADMIN_TOKEN=%s\nRETRIEVAL_SERVICE_TOKEN=%s\nGRAFANA_ADMIN_USER=admin\nGRAFANA_ADMIN_PASSWORD=%s\nAUTH_ADMIN_TOKEN=%s\nGUARD_MODE=enforce\nASSURANCE_PROFILE=high-assurance\nENABLE_LAB_ENDPOINTS=true\nIMAGE_VERSION=1.0.0\nCONTROL_PLANE_NETWORK_NAME=llm-security-observability\nOBSERVABILITY_NETWORK_NAME=llm-security-observability\nOTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318\nSECURITY_MONITOR_URL=http://llm-sec-gateway:8080\nAUTH_EVENT_SINK=stdout,monitor\n' \
   "${AWS_PROFILE:-default}" "${AWS_REGION:-us-east-1}" "${USE_EC2_INSTANCE_ROLE:-false}" "$(id -u)" "$(id -g)" \

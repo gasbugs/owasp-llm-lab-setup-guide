@@ -31,6 +31,8 @@ services:
 
   retrieval:
     image: localhost/llm-security-gateway:3.0
+    # gateway service가 같은 Compose 실행에서 Build한 local image만 재사용한다.
+    pull_policy: never
     container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-retrieval
     command: ["uvicorn", "retrieval_service:app", "--host", "0.0.0.0", "--port", "8081", "--no-access-log"]
     environment:
@@ -95,6 +97,8 @@ services:
 
   alert-webhook:
     image: localhost/llm-security-gateway:3.0
+    # localhost registry를 조회하지 않고 gateway의 local Build 결과를 재사용한다.
+    pull_policy: never
     container_name: ${CONTAINER_NAME_PREFIX:-llm-sec}-alert-webhook
     command: ["uvicorn", "alert_receiver:app", "--host", "0.0.0.0", "--port", "8099", "--no-access-log"]
     ports:

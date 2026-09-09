@@ -170,6 +170,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertGreaterEqual(control.count("OTEL_EXPORTER_OTLP_ENDPOINT"), 4)
         self.assertIn("SECURITY_MONITOR_URL", control)
         self.assertIn("TELEMETRY_INGEST_TOKEN", control)
+        monitoring = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
+        self.assertEqual(2, monitoring.count("pull_policy: never"))
 
     def test_grafana_does_not_download_plugins_at_startup(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
