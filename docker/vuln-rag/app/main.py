@@ -133,7 +133,7 @@ class LLM02ToolProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     customer_id: str | None
-    fields: list[str] = Field(min_length=1, max_length=9)
+    fields: list[str] = Field(min_length=1, max_length=13)
     reason: str = Field(min_length=1, max_length=500)
 
 
@@ -600,6 +600,53 @@ async def scenarios():
             }
             for scenario in SCENARIOS.values()
         ],
+    }
+
+
+@app.get("/api/system-prompt")
+async def system_prompt(scenario: str | None = None, lab: str | None = None):
+    """Expose the active lab prompt for learner inspection, without live data."""
+    selected = get_scenario(scenario)
+    context_marker = ["[실행 시 검색·업무 Context가 여기에 삽입됩니다]"]
+
+    if selected.id == "day2" and lab != "llm08-rag-poisoning":
+        prompts = [
+            {
+                "stage": "planner",
+                "title": "LLM02 Tool Planner",
+                "content": day2_scenario.build_llm02_planner_prompt(),
+            },
+            {
+                "stage": "answer",
+                "title": "LLM02 Answer Model",
+                "content": day2_scenario.build_llm02_answer_prompt(
+                    {"runtime_record": "[인가된 조회 결과]"}
+                ),
+            },
+        ]
+        llm_ids = ["LLM02"]
+    else:
+        prompts = [
+            {
+                "stage": "generation",
+                "title": selected.title,
+                "content": selected.build_system_prompt(context=context_marker),
+            }
+        ]
+        llm_ids = {
+            "day1": ["LLM01"],
+            "day2": ["LLM08"],
+            "day3": ["LLM05"],
+            "day4": ["LLM07", "LLM08", "LLM09"],
+            "day5": ["LLM10"],
+        }[selected.id]
+
+    return {
+        "lab_only": True,
+        "scenario": selected.id,
+        "llm_ids": llm_ids,
+        "dynamic_values": "placeholder",
+        "prompts": prompts,
     }
 
 

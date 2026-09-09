@@ -152,6 +152,13 @@ class LLM06NaturalWorkshopTests(unittest.TestCase):
         self.assertIn("valid LLM06 bearer token required", body["reply"])
         self.assertEqual(MAIN.llm.calls, 1)
 
+    def test_system_prompt_viewer_returns_the_actual_agent_prompt(self) -> None:
+        response = self.client.get("/api/system-prompt")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["llm_ids"], ["LLM06"])
+        self.assertEqual(body["prompts"][0]["content"], MAIN.SYSTEM_PROMPT)
+
 
 if __name__ == "__main__":
     unittest.main()

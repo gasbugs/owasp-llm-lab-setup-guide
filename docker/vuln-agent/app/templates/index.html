@@ -24,6 +24,16 @@
     .home-button,.icon-button { display:inline-flex; min-height:42px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); font-weight:750; text-decoration:none; }
     .home-button { padding:0 13px; }.icon-button { width:42px; padding:0; cursor:pointer; }
     .home-button:hover,.icon-button:hover { border-color:var(--signal); color:var(--signal); }
+    .prompt-button { min-height:42px; padding:0 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); font-size:12px; font-weight:750; cursor:pointer; }
+    .prompt-button:hover,.prompt-button:focus-visible { border-color:var(--warning); color:var(--warning); }
+    .prompt-dialog { box-sizing:border-box; width:min(820px,calc(100% - 2rem)); max-height:82vh; padding:0; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+    .prompt-dialog::backdrop { background:rgba(2,9,14,.78); backdrop-filter:blur(3px); }
+    .prompt-head { position:sticky; top:0; display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.9rem 1rem; border-bottom:1px solid var(--line); background:var(--surface); }
+    .prompt-head h2 { margin:0; font-size:1rem; }
+    .prompt-head button { min-height:36px; padding:0 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface-raised); color:var(--ink); cursor:pointer; }
+    .prompt-body { padding:1rem; }
+    .prompt-body p { color:var(--muted); font-size:.82rem; line-height:1.5; }
+    .prompt-body pre { max-height:56vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; border-left:4px solid var(--warning); background:var(--canvas); color:var(--ink); padding:1rem; }
     .identity-bar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px; align-items:center; margin-top:14px; padding:14px 18px; border:1px solid var(--line); background:var(--surface); }
     .identity-copy { margin:0; color:var(--muted); font-size:13px; line-height:1.55; }.identity-copy code { color:var(--signal); }
     .access-badge { display:flex; gap:8px; align-items:center; color:var(--warning); font:700 11px ui-monospace,SFMono-Regular,monospace; white-space:nowrap; }
@@ -63,7 +73,7 @@
     <header class="masthead">
       <div class="brand"><div class="brand-mark" aria-hidden="true">CSL</div><div><p class="eyebrow">Cloud Security · LLM Lab</p><h1>Agent execution workbench</h1></div></div>
       <p class="mission">모델의 제안이 실제 Tool 호출로 바뀌는 순간을 대화와 실행 Trace에서 나란히 관찰합니다.</p>
-      <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
+      <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><button id="prompt-open" class="prompt-button" type="button">시스템 프롬프트</button><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
     </header>
 
     <section class="identity-bar" aria-label="현재 실습 경계">
@@ -89,6 +99,11 @@
     </section>
   </main>
 
+  <dialog id="prompt-dialog" class="prompt-dialog" aria-labelledby="prompt-title">
+    <header class="prompt-head"><h2 id="prompt-title">LLM06 시스템 프롬프트</h2><button id="prompt-close" type="button">닫기</button></header>
+    <div class="prompt-body"><p>현재 Agent에 전달되는 실제 지시입니다. 권한 검사는 이 문장이 아니라 서버 Tool Executor가 담당해야 합니다.</p><pre id="prompt-content">프롬프트를 불러오는 중...</pre></div>
+  </dialog>
+
 <script>
 const root = document.documentElement;
 const savedTheme = localStorage.getItem('llm-lab-theme');
@@ -99,6 +114,10 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 });
 
 const chat = document.getElementById('chat');
+const promptOpen = document.getElementById('prompt-open');
+const promptClose = document.getElementById('prompt-close');
+const promptDialog = document.getElementById('prompt-dialog');
+const promptContent = document.getElementById('prompt-content');
 document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
 const trace = document.getElementById('trace');
 const form = document.getElementById('form');
@@ -109,6 +128,23 @@ const splitter = document.getElementById('splitter');
 const MIN_SPLIT = 25;
 const MAX_SPLIT = 75;
 let activePointerId = null;
+
+promptOpen.addEventListener('click', async () => {
+  promptDialog.showModal();
+  promptContent.textContent = '프롬프트를 불러오는 중...';
+  try {
+    const response = await fetch('/api/system-prompt');
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
+    promptContent.textContent = data.prompts.map((prompt) => prompt.content).join('\n\n');
+  } catch {
+    promptContent.textContent = '시스템 프롬프트를 불러오지 못했습니다.';
+  }
+});
+promptClose.addEventListener('click', () => promptDialog.close());
+promptDialog.addEventListener('click', (event) => {
+  if (event.target === promptDialog) promptDialog.close();
+});
 
 function setSplit(percent) {
   const safePercent = Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, percent));
