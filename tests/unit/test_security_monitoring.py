@@ -172,6 +172,10 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("TELEMETRY_INGEST_TOKEN", control)
         monitoring = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
         self.assertEqual(2, monitoring.count("pull_policy: never"))
+        publisher = (
+            ROOT / "tests/e2e/module10/test_module10_fast_track.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("down --volumes --remove-orphans", publisher)
 
     def test_grafana_does_not_download_plugins_at_startup(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")

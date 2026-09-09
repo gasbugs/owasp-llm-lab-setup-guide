@@ -45,6 +45,10 @@ COMPOSE_BUILD_ARGS=()
 if [ "$SKIP_BUILD" != true ]; then
   COMPOSE_BUILD_ARGS=(--build)
 fi
+# Publisher runs must not inherit SQLite or telemetry state from an earlier attempt.
+docker compose \
+  --env-file "$COMPOSE_ENV_FILE" \
+  --file "$COMPOSE_FILE" down --volumes --remove-orphans
 if ! docker compose \
     --env-file "$COMPOSE_ENV_FILE" \
     --file "$COMPOSE_FILE" up --detach \
