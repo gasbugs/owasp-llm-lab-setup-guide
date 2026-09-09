@@ -353,7 +353,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             "BEDROCK_GATEWAY_TOKEN",
             "AUTH_ADMIN_TOKEN",
         ):
-            self.assertIn(f"{secret}:?Run prepare-module08-runtime.sh", compose)
+            self.assertIn(f"{secret}:?Set {secret} in the selected Compose env file", compose)
         self.assertNotIn(":-module08-bedrock-gateway-token", compose)
         self.assertNotIn(":-llm-monitor-acme-token", monitor_compose)
 

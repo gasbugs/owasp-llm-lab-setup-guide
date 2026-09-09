@@ -73,6 +73,19 @@ docker compose --project-name llm-security-observability \
   --env-file "$COMPOSE_ENV_FILE" --file compose.yaml up --detach --build
 ```
 
+## Module 10 standalone entrypoint
+
+Module 10 creates `llm-security-control-plane/.state/module10-compose.env` directly. It then uses
+`compose.module10.yaml` to include the control plane and this observability stack, build every
+project-owned image, and start the complete stack with one Compose command. It does not require a
+Module 08 state file or preparation helper.
+
+```bash
+docker compose \
+  --env-file ../../llm-security-control-plane/.state/module10-compose.env \
+  --file compose.module10.yaml up --detach --build
+```
+
 ## Publisher regression
 
 The default E2E uses a deterministic Bedrock contract double. The real validation path uses the local credential-isolating Gateway and Amazon Nova Lite.

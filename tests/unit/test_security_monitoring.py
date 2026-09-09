@@ -158,6 +158,19 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertNotIn("name: llm-security-application", compose)
         self.assertGreaterEqual(compose.count("networks: [observability]"), 9)
 
+    def test_module10_compose_includes_and_builds_the_complete_stack(self) -> None:
+        module10 = (EXAMPLE / "compose.module10.yaml").read_text(encoding="utf-8")
+        control = (ROOT / "llm-security-control-plane" / "compose.yaml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("../../llm-security-control-plane/compose.yaml", module10)
+        self.assertIn("./compose.yaml", module10)
+        self.assertEqual(2, module10.count("module10-compose.env"))
+        self.assertIn("${CONTROL_PLANE_NETWORK_NAME:-llm-security-control-plane}", control)
+        self.assertGreaterEqual(control.count("OTEL_EXPORTER_OTLP_ENDPOINT"), 4)
+        self.assertIn("SECURITY_MONITOR_URL", control)
+        self.assertIn("TELEMETRY_INGEST_TOKEN", control)
+
     def test_grafana_does_not_download_plugins_at_startup(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
         self.assertIn('GF_ANALYTICS_CHECK_FOR_UPDATES: "false"', compose)

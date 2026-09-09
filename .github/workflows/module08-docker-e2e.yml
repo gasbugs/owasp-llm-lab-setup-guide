@@ -6,7 +6,9 @@ on:
     branches: [main]
     paths:
       - "llm-security-control-plane/**"
+      - "examples/security-monitoring/**"
       - "tests/browser/**"
+      - "tests/e2e/module10/**"
       - ".github/workflows/module08-docker-e2e.yml"
 
 permissions:
@@ -37,6 +39,39 @@ jobs:
           docker build -f examples/day6/presidio/Containerfile \
             -t localhost/day6-presidio:2.2.362 \
             examples/day6/presidio
+
+      - name: Validate the standalone Module 10 Compose model
+        run: |
+          install -d -m 0700 llm-security-control-plane/.state/application-auth
+          cat > llm-security-control-plane/.state/module10-compose.env <<'EOF'
+          AWS_PROFILE=default
+          AWS_REGION=us-east-1
+          LOCAL_UID=1001
+          LOCAL_GID=1001
+          BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
+          PRESIDIO_INTERNAL_TOKEN=ci-presidio-token
+          APPLICATION_INTERNAL_TOKEN=ci-application-token
+          BEDROCK_GATEWAY_TOKEN=ci-bedrock-token
+          TELEMETRY_INGEST_TOKEN=ci-telemetry-token
+          TELEMETRY_HMAC_KEY=ci-telemetry-hmac-key
+          LLM_MONITOR_TOKEN=ci-monitor-token
+          LLM_MONITOR_ADMIN_TOKEN=ci-monitor-admin-token
+          RETRIEVAL_SERVICE_TOKEN=ci-retrieval-token
+          GRAFANA_ADMIN_USER=admin
+          GRAFANA_ADMIN_PASSWORD=ci-grafana-password
+          AUTH_ADMIN_TOKEN=ci-auth-admin-token
+          CONTROL_PLANE_NETWORK_NAME=llm-security-observability
+          OBSERVABILITY_NETWORK_NAME=llm-security-observability
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318
+          SECURITY_MONITOR_URL=http://llm-sec-gateway:8080
+          AUTH_EVENT_SINK=stdout,monitor
+          EOF
+          docker compose \
+            --env-file llm-security-control-plane/.state/module10-compose.env \
+            --file examples/security-monitoring/compose.module10.yaml \
+            config --services | tee /tmp/module10-services.txt
+          grep -Fx application /tmp/module10-services.txt
+          grep -Fx grafana /tmp/module10-services.txt
 
       - name: Run the progressive learner sequence
         run: bash llm-security-control-plane/tests/e2e-learning-sequence.sh

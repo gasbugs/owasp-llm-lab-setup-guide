@@ -8,7 +8,8 @@ set -euo pipefail
 SETUP_ROOT="${SETUP_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 CONTROL_ROOT="$SETUP_ROOT/llm-security-control-plane"
 OBSERVABILITY_ROOT="$SETUP_ROOT/examples/security-monitoring"
-COMPOSE_ENV_FILE="$CONTROL_ROOT/.state/module08-compose.env"
+COMPOSE_ENV_FILE="$CONTROL_ROOT/.state/module10-compose.env"
+COMPOSE_FILE="$OBSERVABILITY_ROOT/compose.module10.yaml"
 APP_URL="${APP_URL:-http://127.0.0.1:18095}"
 LOKI_URL="${LOKI_URL:-http://127.0.0.1:3100}"
 TEMPO_URL="${TEMPO_URL:-http://127.0.0.1:3200}"
@@ -16,47 +17,54 @@ PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
 GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
 SKIP_BUILD="${SKIP_BUILD:-false}"
 
-for command in aws docker jq curl; do
+for command in aws docker jq openssl; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "ERR: required command missing: $command" >&2
     exit 1
   }
 done
 
-AWS_PROFILE="${AWS_PROFILE:-default}" AWS_REGION="${AWS_REGION:-us-east-1}" \
-  bash "$CONTROL_ROOT/deploy/prepare-module08-runtime.sh"
+install -d -m 0700 "$CONTROL_ROOT/.state/application-auth"
+umask 077
+printf 'AWS_PROFILE=%s\nAWS_REGION=%s\nLOCAL_UID=%s\nLOCAL_GID=%s\nBEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0\nPRESIDIO_INTERNAL_TOKEN=%s\nAPPLICATION_INTERNAL_TOKEN=%s\nBEDROCK_GATEWAY_TOKEN=%s\nTELEMETRY_INGEST_TOKEN=%s\nTELEMETRY_HMAC_KEY=%s\nLLM_MONITOR_TOKEN=%s\nLLM_MONITOR_ADMIN_TOKEN=%s\nRETRIEVAL_SERVICE_TOKEN=%s\nGRAFANA_ADMIN_USER=admin\nGRAFANA_ADMIN_PASSWORD=%s\nAUTH_ADMIN_TOKEN=%s\nGUARD_MODE=enforce\nASSURANCE_PROFILE=high-assurance\nENABLE_LAB_ENDPOINTS=true\nIMAGE_VERSION=1.0.0\nCONTROL_PLANE_NETWORK_NAME=llm-security-observability\nOBSERVABILITY_NETWORK_NAME=llm-security-observability\nOTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318\nSECURITY_MONITOR_URL=http://llm-sec-gateway:8080\nAUTH_EVENT_SINK=stdout,monitor\n' \
+  "${AWS_PROFILE:-default}" "${AWS_REGION:-us-east-1}" "$(id -u)" "$(id -g)" \
+  "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" \
+  "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" \
+  "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" \
+  "$(openssl rand -hex 18)" "$(openssl rand -hex 24)" \
+  >"$COMPOSE_ENV_FILE"
+chmod 0600 "$COMPOSE_ENV_FILE"
 
 set -a
 # shellcheck disable=SC1090
 source "$COMPOSE_ENV_FILE"
 set +a
 
+COMPOSE_BUILD_ARGS=()
 if [ "$SKIP_BUILD" != true ]; then
-  docker compose --project-directory "$CONTROL_ROOT" \
-    --env-file "$COMPOSE_ENV_FILE" \
-    build bedrock-gateway presidio nemo-hub application
+  COMPOSE_BUILD_ARGS=(--build)
 fi
-
-OBSERVABILITY_BUILD_ARGS=()
-if [ "$SKIP_BUILD" != true ]; then
-  OBSERVABILITY_BUILD_ARGS=(--build)
-fi
-if ! docker compose --project-name llm-security-observability \
+if ! docker compose \
     --env-file "$COMPOSE_ENV_FILE" \
-    --file "$OBSERVABILITY_ROOT/compose.yaml" up --detach \
-    "${OBSERVABILITY_BUILD_ARGS[@]}" \
-    >/tmp/module10-observability-e2e.log 2>&1; then
-  cat /tmp/module10-observability-e2e.log >&2
+    --file "$COMPOSE_FILE" up --detach \
+    "${COMPOSE_BUILD_ARGS[@]}" \
+    >/tmp/module10-compose-e2e.log 2>&1; then
+  cat /tmp/module10-compose-e2e.log >&2
   exit 1
 fi
 
-if ! USE_EC2_INSTANCE_ROLE="${USE_EC2_INSTANCE_ROLE:-false}" \
-    bash "$SETUP_ROOT/infrastructure/scripts/student/prepare-module08.sh" \
-    >/tmp/module10-prepare-e2e.log 2>&1; then
-  cat /tmp/module10-prepare-e2e.log >&2
-  exit 1
-fi
-grep -E '^\[(PASS|READY|TRACE)\]' /tmp/module10-prepare-e2e.log
+for url in \
+  http://127.0.0.1:18093/healthz \
+  http://127.0.0.1:18094/healthz \
+  http://127.0.0.1:18095/healthz \
+  http://127.0.0.1:3001/api/health; do
+  for _ in $(seq 1 90); do
+    curl -fsS --max-time 3 "$url" >/dev/null 2>&1 && break
+    sleep 2
+  done
+  curl -fsS --max-time 3 "$url" >/dev/null
+done
 
 access_token=$(curl -fsS --max-time 30 -X POST "$APP_URL/.well-known/login" \
   -H 'Content-Type: application/json' \
