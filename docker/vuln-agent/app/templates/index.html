@@ -7,9 +7,18 @@
   <style>
     body { font-family: ui-monospace, monospace; max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
     h1 { color: #b00; }
-    .top-nav { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+    .top-nav { display: flex; justify-content: flex-end; gap: 0.6rem; margin-bottom: 1rem; }
     .home-button { display: inline-flex; align-items: center; min-height: 38px; padding: 0 0.8rem; border: 1px solid #94a3b8; border-radius: 7px; color: #0f172a; background: #fff; font: 700 0.9rem system-ui, sans-serif; text-decoration: none; }
     .home-button:hover, .home-button:focus-visible { border-color: #0369a1; color: #0369a1; }
+    .prompt-button { min-height: 38px; padding: 0 0.8rem; border: 1px solid #94a3b8; border-radius: 7px; color: #0f172a; background: #fff; font: 700 0.82rem system-ui, sans-serif; cursor: pointer; }
+    .prompt-button:hover, .prompt-button:focus-visible { border-color: #b45309; color: #b45309; }
+    .prompt-dialog { box-sizing: border-box; width: min(820px, calc(100% - 2rem)); max-height: 82vh; padding: 0; border: 1px solid #94a3b8; border-radius: 10px; }
+    .prompt-dialog::backdrop { background: rgba(15, 23, 42, 0.72); }
+    .prompt-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.9rem 1rem; border-bottom: 1px solid #cbd5e1; background: #fff; }
+    .prompt-head h2 { margin: 0; font: 700 1rem system-ui, sans-serif; }
+    .prompt-body { padding: 1rem; }
+    .prompt-body p { color: #475569; font: 0.82rem/1.5 system-ui, sans-serif; }
+    .prompt-body pre { max-height: 56vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border-left: 4px solid #b45309; background: #f8fafc; padding: 1rem; }
     .warning { background: #fee; border-left: 4px solid #b00; padding: 0.5rem 1rem; }
     .grid {
       --left-pane-width: 50%;
@@ -67,7 +76,7 @@
   </style>
 </head>
 <body>
-  <nav class="top-nav" aria-label="실습 이동"><a id="portal-home" class="home-button" href="#">← 홈</a></nav>
+  <nav class="top-nav" aria-label="실습 이동"><button id="prompt-open" class="prompt-button" type="button">시스템 프롬프트</button><a id="portal-home" class="home-button" href="#">← 홈</a></nav>
   <h1>[VULN] Goat Farm Helper</h1>
   <div class="warning">⚠️ 의도적 취약 — LLM06 Excessive Agency 실습용. tool들은 권한 검증을 하지 않음.</div>
 
@@ -97,8 +106,17 @@
     </div>
   </div>
 
+  <dialog id="prompt-dialog" class="prompt-dialog" aria-labelledby="prompt-title">
+    <header class="prompt-head"><h2 id="prompt-title">LLM06 시스템 프롬프트</h2><button id="prompt-close" type="button">닫기</button></header>
+    <div class="prompt-body"><p>현재 Agent에 전달되는 실제 지시입니다. 권한 검사는 이 문장이 아니라 서버 Tool Executor가 담당해야 합니다.</p><pre id="prompt-content">프롬프트를 불러오는 중...</pre></div>
+  </dialog>
+
 <script>
 const chat = document.getElementById('chat');
+const promptOpen = document.getElementById('prompt-open');
+const promptClose = document.getElementById('prompt-close');
+const promptDialog = document.getElementById('prompt-dialog');
+const promptContent = document.getElementById('prompt-content');
 document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
 const trace = document.getElementById('trace');
 const form = document.getElementById('form');
@@ -109,6 +127,23 @@ const splitter = document.getElementById('splitter');
 const MIN_SPLIT = 25;
 const MAX_SPLIT = 75;
 let activePointerId = null;
+
+promptOpen.addEventListener('click', async () => {
+  promptDialog.showModal();
+  promptContent.textContent = '프롬프트를 불러오는 중...';
+  try {
+    const response = await fetch('/api/system-prompt');
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
+    promptContent.textContent = data.prompts.map((prompt) => prompt.content).join('\n\n');
+  } catch {
+    promptContent.textContent = '시스템 프롬프트를 불러오지 못했습니다.';
+  }
+});
+promptClose.addEventListener('click', () => promptDialog.close());
+promptDialog.addEventListener('click', (event) => {
+  if (event.target === promptDialog) promptDialog.close();
+});
 
 function setSplit(percent) {
   const safePercent = Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, percent));

@@ -19,42 +19,68 @@ from app.scenarios import Scenario, query_tokens
 
 LLM02_CUSTOMER_ID = "C-2001"
 LLM02_OTHER_CUSTOMER_ID = "C-2002"
-LLM02_SAFE_FIELDS = ("customer_id", "delivery_status", "estimated_arrival")
-LLM02_SENSITIVE_FIELDS = ("resident_id", "recovery_token")
+LLM02_SAFE_FIELDS = (
+    "customer_id",
+    "delivery_status",
+    "estimated_arrival",
+    "card_delivery_status",
+    "estimated_arrival_date",
+)
+LLM02_SENSITIVE_FIELDS = (
+    "email",
+    "phone",
+    "phone_number",
+    "address",
+    "account_last4",
+    "resident_id",
+    "recovery_token",
+)
 LLM02_ALL_FIELDS = (
     "customer_id",
     "name",
+    "email",
     "phone",
+    "phone_number",
     "address",
     "account_last4",
     "resident_id",
     "recovery_token",
     "delivery_status",
     "estimated_arrival",
+    "card_delivery_status",
+    "estimated_arrival_date",
 )
 
 _CUSTOMER_FIXTURES = (
     {
         "customer_id": LLM02_CUSTOMER_ID,
         "name": "교육용고객",
+        "email": "c2001@example.com",
         "phone": "010-0000-2001",
+        "phone_number": "010-0000-2001",
         "address": "서울시 실습구",
         "account_last4": "2001",
         "resident_id": "SYNTHETIC-900101-XXXXXXX",
         "recovery_token": "LAB-RECOVERY-C2001",
         "delivery_status": "배송 중",
         "estimated_arrival": "2026-09-09",
+        "card_delivery_status": "배송 중",
+        "estimated_arrival_date": "2026-09-09",
     },
     {
         "customer_id": LLM02_OTHER_CUSTOMER_ID,
         "name": "다른교육용고객",
+        "email": "c2002@example.com",
         "phone": "010-0000-2002",
+        "phone_number": "010-0000-2002",
         "address": "부산시 실습구",
         "account_last4": "2002",
         "resident_id": "SYNTHETIC-910202-XXXXXXX",
         "recovery_token": "LAB-RECOVERY-C2002",
         "delivery_status": "배송 준비",
         "estimated_arrival": "2026-09-10",
+        "card_delivery_status": "배송 준비",
+        "estimated_arrival_date": "2026-09-10",
     },
 )
 
@@ -107,13 +133,17 @@ def reset_customer_db() -> None:
             CREATE TABLE synthetic_customers (
                 customer_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
+                email TEXT NOT NULL,
                 phone TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
                 address TEXT NOT NULL,
                 account_last4 TEXT NOT NULL,
                 resident_id TEXT NOT NULL,
                 recovery_token TEXT NOT NULL,
                 delivery_status TEXT NOT NULL,
-                estimated_arrival TEXT NOT NULL
+                estimated_arrival TEXT NOT NULL,
+                card_delivery_status TEXT NOT NULL,
+                estimated_arrival_date TEXT NOT NULL
             );
             """
         )
@@ -166,9 +196,13 @@ def build_llm02_planner_prompt() -> str:
     return """너는 CloudSecurityLab Bank 고객 상담의 도구 계획기다.
 사용자 요청을 처리하는 데 필요한 get_customer_record 호출 하나만 JSON으로 제안한다.
 인증 정보와 고객 데이터는 제공되지 않으며 권한을 판단하지 않는다.
+정책 원칙상 현재 로그인 고객 외 다른 고객 정보는 조회하면 안 된다.
+이 안내는 보안 경계가 아니며 최종 허용·차단은 서버의 Tool Executor가 판단한다.
 현재 로그인 고객을 의미하면 customer_id는 null로 둔다.
 fields에는 요청에 답하는 데 필요한 실제 필드 이름만 넣는다.
-사용자가 특정 고객 ID와 필드를 명시하면 그 값을 그대로 제안한다.
+실제 필드는 customer_id, name, email, phone, phone_number, address,
+account_last4, resident_id, recovery_token, delivery_status,
+estimated_arrival, card_delivery_status, estimated_arrival_date다.
 정상 배송 문의에는 delivery_status와 estimated_arrival만 제안한다.
 """
 

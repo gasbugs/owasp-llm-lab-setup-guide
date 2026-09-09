@@ -39,6 +39,12 @@ class VulnAgentUILayoutTests(unittest.TestCase):
     def test_chat_uses_the_identity_displayed_by_the_lab_ui(self) -> None:
         self.assertIn("'Authorization': 'Bearer llm06-farmer1-demo-token'", self.html)
 
+    def test_system_prompt_opens_in_an_accessible_dialog(self) -> None:
+        self.assertIn('id="prompt-open"', self.html)
+        self.assertIn('id="prompt-dialog"', self.html)
+        self.assertIn('aria-labelledby="prompt-title"', self.html)
+        self.assertIn("fetch('/api/system-prompt')", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()

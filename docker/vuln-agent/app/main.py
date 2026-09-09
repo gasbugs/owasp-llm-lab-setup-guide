@@ -87,6 +87,24 @@ async def health():
     return {"ok": True, "tools": list(TOOLS.keys())}
 
 
+@app.get("/api/system-prompt")
+async def system_prompt():
+    """Expose the LLM06 lab prompt for learner inspection."""
+    return {
+        "lab_only": True,
+        "scenario": "llm06-excessive-agency",
+        "llm_ids": ["LLM06"],
+        "dynamic_values": "none",
+        "prompts": [
+            {
+                "stage": "agent",
+                "title": "Goat Farm Helper Agent",
+                "content": SYSTEM_PROMPT,
+            }
+        ],
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {"tools": TOOLS})

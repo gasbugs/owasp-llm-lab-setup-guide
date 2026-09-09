@@ -29,10 +29,21 @@
     .brand-kicker,.eyebrow,.micro-label { color:var(--signal); font:700 11px/1.2 ui-monospace,"SFMono-Regular",Consolas,monospace; letter-spacing:.15em; text-transform:uppercase; }
     .brand h1 { margin:4px 0 0; font:800 clamp(21px,2.3vw,34px)/.95 "Arial Narrow","Roboto Condensed","Segoe UI",sans-serif; letter-spacing:.025em; text-transform:uppercase; }
     .brand h1 span { color:var(--signal); }.mission { max-width:650px; color:var(--muted); font-size:13px; }
-    .top-actions { display:flex; gap:10px; align-items:center; }.vuln-beacon { color:var(--incident); font:700 11px ui-monospace,monospace; letter-spacing:.08em; }
+    .top-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end; }.vuln-beacon { color:var(--incident); font:700 11px ui-monospace,monospace; letter-spacing:.08em; }
     .icon-button { width:42px; height:42px; padding:0; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); cursor:pointer; }
     .home-button { display:inline-flex; min-height:42px; align-items:center; padding:0 13px; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); font-weight:750; text-decoration:none; }
     .home-button:hover,.home-button:focus-visible { border-color:var(--signal); color:var(--signal); }
+    .prompt-button { min-height:42px; padding:0 12px; border-color:var(--line); background:var(--surface-raised); color:var(--ink); font-size:12px; }
+    .prompt-button:hover,.prompt-button:focus-visible { border-color:var(--warning); color:var(--warning); }
+    .prompt-dialog { width:min(860px,calc(100% - 28px)); max-height:82vh; padding:0; border:1px solid var(--line); border-radius:14px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+    .prompt-dialog::backdrop { background:rgba(2,9,14,.78); backdrop-filter:blur(3px); }
+    .prompt-dialog-head { position:sticky; top:0; display:flex; justify-content:space-between; gap:16px; align-items:center; padding:15px 18px; border-bottom:1px solid var(--line); background:var(--surface); }
+    .prompt-dialog h2 { margin:3px 0 0; font:750 18px "Arial Narrow","Segoe UI",sans-serif; }
+    .prompt-dialog-body { display:grid; gap:12px; padding:16px 18px 20px; }
+    .prompt-note { margin:0; color:var(--muted); font-size:12px; }
+    .prompt-card { border-left:3px solid var(--warning); background:var(--surface-raised); padding:12px; }
+    .prompt-card strong { display:block; margin-bottom:8px; color:var(--warning); font:700 11px ui-monospace,monospace; letter-spacing:.06em; text-transform:uppercase; }
+    .prompt-card pre { max-height:44vh; margin:0; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--ink); font:12px/1.55 ui-monospace,"SFMono-Regular",Consolas,monospace; }
     .scenario-bar { display:grid; grid-template-columns:1fr minmax(240px,440px); gap:18px; align-items:end; margin-top:16px; padding:18px 20px; border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
     .scenario-title { margin:4px 0 3px; font:750 20px/1.15 "Arial Narrow","Segoe UI",sans-serif; }.scenario-copy { margin:0; color:var(--muted); font-size:13px; }
     label { color:var(--muted); font-size:12px; font-weight:700; }
@@ -65,7 +76,7 @@
   <header class="masthead">
     <div class="brand"><div class="brand-kicker">Cloud Security</div><h1>LLM Lab <span>// Experiment Center</span></h1></div>
     <div class="mission">취약한 LLM 애플리케이션의 입력·검색·도구·출력 경계를 직접 관찰하고 방어 전환 전후를 비교합니다.</div>
-    <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
+    <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><button id="prompt-open" class="prompt-button" type="button">시스템 프롬프트</button><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
   </header>
 
   <section class="scenario-bar">
@@ -118,8 +129,24 @@
   </div>
 </main>
 
+<dialog id="prompt-dialog" class="prompt-dialog" aria-labelledby="prompt-title">
+  <header class="prompt-dialog-head">
+    <div><div id="prompt-llm-ids" class="eyebrow">Active system prompt</div><h2 id="prompt-title">시스템 프롬프트</h2></div>
+    <button id="prompt-close" class="secondary" type="button" aria-label="시스템 프롬프트 닫기">닫기</button>
+  </header>
+  <div class="prompt-dialog-body">
+    <p class="prompt-note">실행 시 추가되는 검색 결과와 업무 데이터는 자리표시자로 표시합니다. 시스템 프롬프트는 비밀 저장소나 인가 경계가 아닙니다.</p>
+    <div id="prompt-content" aria-live="polite">프롬프트를 불러오는 중...</div>
+  </div>
+</dialog>
+
 <script>
 const themeButton = document.getElementById('theme-toggle');
+const promptOpen = document.getElementById('prompt-open');
+const promptClose = document.getElementById('prompt-close');
+const promptDialog = document.getElementById('prompt-dialog');
+const promptLlmIds = document.getElementById('prompt-llm-ids');
+const promptContent = document.getElementById('prompt-content');
 document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -153,6 +180,40 @@ const guardDuration = document.getElementById('guard-duration');
 const guardReason = document.getElementById('guard-reason');
 const guardChecks = document.getElementById('guard-checks');
 let lastBotReply = null;
+
+async function loadSystemPrompt() {
+  promptContent.textContent = '프롬프트를 불러오는 중...';
+  try {
+    const params = new URLSearchParams({scenario: scenarioSelect.value});
+    if (labSelect) params.set('lab', labSelect.value);
+    const response = await fetch(`/api/system-prompt?${params}`);
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
+    promptLlmIds.textContent = `${data.llm_ids.join(' · ')} / ${data.scenario}`;
+    promptContent.replaceChildren();
+    for (const prompt of data.prompts) {
+      const card = document.createElement('section');
+      card.className = 'prompt-card';
+      const title = document.createElement('strong');
+      title.textContent = `${prompt.stage} / ${prompt.title}`;
+      const pre = document.createElement('pre');
+      pre.textContent = prompt.content;
+      card.append(title, pre);
+      promptContent.appendChild(card);
+    }
+  } catch {
+    promptContent.textContent = '시스템 프롬프트를 불러오지 못했습니다.';
+  }
+}
+
+promptOpen.addEventListener('click', async () => {
+  promptDialog.showModal();
+  await loadSystemPrompt();
+});
+promptClose.addEventListener('click', () => promptDialog.close());
+promptDialog.addEventListener('click', (event) => {
+  if (event.target === promptDialog) promptDialog.close();
+});
 
 function add(role, text, html=false) {
   const d = document.createElement('div');

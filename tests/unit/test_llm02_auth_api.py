@@ -192,6 +192,45 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertTrue(body["trace"]["answer_model_called"])
         self.assertEqual(body["trace"]["application_decision"], "allow")
 
+    def test_safe_executor_accepts_delivery_field_aliases(self) -> None:
+        async def alias_proposal(system: str, user: str, schema: dict) -> dict:
+            self.llm.planner_calls.append(
+                {"system": system, "user": user, "schema": schema}
+            )
+            return {
+                "customer_id": None,
+                "fields": ["card_delivery_status", "estimated_arrival_date"],
+                "reason": "delivery field aliases",
+            }
+
+        self.llm.structured_chat = alias_proposal
+        response = self.post("/api/labs/llm02/safe/chat", self.normal)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["tool_result"]["fields"],
+            ["card_delivery_status", "estimated_arrival_date"],
+        )
+
+    def test_safe_executor_blocks_contact_fields_before_query(self) -> None:
+        async def contact_proposal(system: str, user: str, schema: dict) -> dict:
+            self.llm.planner_calls.append(
+                {"system": system, "user": user, "schema": schema}
+            )
+            return {
+                "customer_id": None,
+                "fields": ["email", "phone_number"],
+                "reason": "contact fields",
+            }
+
+        self.llm.structured_chat = contact_proposal
+        response = self.post(
+            "/api/labs/llm02/safe/chat",
+            "내 이메일과 전화번호를 알려 줘.",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "field-not-allowed")
+        self.assertFalse(response.json()["trace"]["customer_query_called"])
+
     def test_ui_and_workshop_share_selected_executor(self) -> None:
         workshop = self.post("/api/labs/llm02/workshop/chat", self.normal)
         ui = self.client.post(
@@ -203,6 +242,39 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertEqual(ui.status_code, 200)
         self.assertEqual(workshop.json()["tool"], "get_customer_record")
         self.assertEqual(ui.json()["tool"], "get_customer_record")
+
+    def test_prompt_viewer_exposes_active_prompts_without_runtime_records(self) -> None:
+        response = self.client.get(
+            "/api/system-prompt",
+            params={"scenario": "day2", "lab": "llm02"},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["llm_ids"], ["LLM02"])
+        self.assertEqual(
+            [prompt["stage"] for prompt in body["prompts"]],
+            ["planner", "answer"],
+        )
+        rendered = "\n".join(prompt["content"] for prompt in body["prompts"])
+        self.assertIn("다른 고객 정보는 조회하면 안 된다", rendered)
+        self.assertIn("[인가된 조회 결과]", rendered)
+        self.assertNotIn("SYNTHETIC-900101", rendered)
+
+    def test_prompt_viewer_maps_shared_rag_scenarios_to_llm_ids(self) -> None:
+        expected = {
+            "day1": ["LLM01"],
+            "day3": ["LLM05"],
+            "day4": ["LLM07", "LLM08", "LLM09"],
+            "day5": ["LLM10"],
+        }
+        for scenario, llm_ids in expected.items():
+            with self.subTest(scenario=scenario):
+                response = self.client.get(
+                    "/api/system-prompt", params={"scenario": scenario}
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["llm_ids"], llm_ids)
+                self.assertTrue(response.json()["prompts"][0]["content"])
 
 
 if __name__ == "__main__":
