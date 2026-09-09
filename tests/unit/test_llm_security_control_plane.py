@@ -198,6 +198,8 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("FAILED|DELETE_UNSUCCESSFUL", source)
         self.assertIn("DELETING", source)
         self.assertIn("wait_for_data_source_available", source)
+        self.assertIn("export AWS_REGION AWS_PROFILE", source)
+        self.assertIn("AWS authentication failed for profile", source)
         self.assertIn("knowledge_base=DEFERRED", runtime)
         self.assertNotIn("create-knowledge-base", runtime)
         self.assertIn("write_module08_compose_env", runtime)
