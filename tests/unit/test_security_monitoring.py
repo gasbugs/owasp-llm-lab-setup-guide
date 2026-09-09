@@ -236,7 +236,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             )
         )
         panel_types = {panel["type"] for panel in dashboard["panels"]}
-        self.assertTrue({"stat", "timeseries", "logs", "traces"}.issubset(panel_types))
+        self.assertTrue({"stat", "timeseries", "logs", "table"}.issubset(panel_types))
         serialized = json.dumps(dashboard)
         self.assertIn("bedrock_estimated_cost_usd_total", serialized)
         self.assertIn("llm-security-prometheus", serialized)
@@ -253,6 +253,14 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn('task=\\"main\\"', serialized)
         self.assertNotIn('task=\\"converse\\"', serialized)
         self.assertIn("most_recent=true", serialized)
+        trace_panel = next(
+            panel for panel in dashboard["panels"]
+            if panel["title"] == "End-to-end request traces"
+        )
+        self.assertEqual(trace_panel["type"], "table")
+        self.assertEqual(trace_panel["targets"][0]["queryType"], "traceql")
+        self.assertEqual(trace_panel["targets"][0]["tableType"], "traces")
+        self.assertIn('rootName = "POST /api/chat"', trace_panel["targets"][0]["query"])
         self.assertEqual(dashboard["time"]["from"], "now-6h")
         self.assertNotIn("llm_chat_requests_total", serialized)
         self.assertIn("otelcol_exporter_queue_size", serialized)

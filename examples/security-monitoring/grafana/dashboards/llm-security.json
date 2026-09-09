@@ -111,10 +111,11 @@
       "gridPos": {"h": 11, "w": 24, "x": 0, "y": 27}
     },
     {
-      "type": "traces",
+      "type": "table",
       "title": "End-to-end request traces",
       "datasource": {"type": "tempo", "uid": "llm-security-tempo"},
-      "targets": [{"queryType": "traceql", "query": "{ resource.service.name =~ \"llm-security-(application-gateway|nemo-hub|presidio-spoke|bedrock-gateway)\" } with (most_recent=true)", "limit": 20, "tableType": "traces", "refId": "A"}],
+      "targets": [{"queryType": "traceql", "query": "{ rootName = \"POST /api/chat\" } with (most_recent=true)", "limit": 20, "tableType": "traces", "refId": "A"}],
+      "options": {"showHeader": true},
       "gridPos": {"h": 11, "w": 24, "x": 0, "y": 38}
     }
   ],
