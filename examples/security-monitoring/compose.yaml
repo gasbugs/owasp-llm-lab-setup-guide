@@ -26,7 +26,7 @@ services:
     volumes:
       - ${MONITOR_POLICY_PATH:-./policy.json}:/app/policy.json:ro
       - gateway-events:/data
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
   retrieval:
@@ -40,7 +40,7 @@ services:
       RETRIEVAL_SERVICE_TOKEN: ${RETRIEVAL_SERVICE_TOKEN:?Set RETRIEVAL_SERVICE_TOKEN in the selected Compose env file}
     ports:
       - 127.0.0.1:${RETRIEVAL_HOST_PORT:-8015}:8081
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
   alloy:
@@ -57,7 +57,7 @@ services:
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
       - alloy-data:/var/lib/alloy/data
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
   prometheus:
@@ -77,7 +77,7 @@ services:
       - ${PROMETHEUS_CONFIG_SOURCE:-./prometheus.yml}:/etc/prometheus/prometheus.yml:ro
       - ${PROMETHEUS_RULES_SOURCE:-./alert-rules.yml}:/etc/prometheus/alert-rules.yml:ro
       - prometheus-data:/prometheus
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
   alertmanager:
@@ -92,7 +92,7 @@ services:
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager-data:/alertmanager
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
   alert-webhook:
@@ -103,7 +103,7 @@ services:
     command: ["uvicorn", "alert_receiver:app", "--host", "0.0.0.0", "--port", "8099", "--no-access-log"]
     ports:
       - 127.0.0.1:${WEBHOOK_HOST_PORT:-8099}:8099
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
   loki:
@@ -115,7 +115,7 @@ services:
     volumes:
       - ./loki-config.yaml:/etc/loki/config.yaml:ro
       - loki-data:/loki
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
   tempo:
@@ -127,7 +127,7 @@ services:
     volumes:
       - ./tempo.yaml:/etc/tempo/config.yaml:ro
       - tempo-data:/var/tempo
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
   grafana:
@@ -152,11 +152,11 @@ services:
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]
 
 networks:
-  observability:
+  default:
     name: ${OBSERVABILITY_NETWORK_NAME:-llm-security-observability}
 
 volumes:

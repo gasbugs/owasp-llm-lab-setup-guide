@@ -156,7 +156,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("name: ${COMPOSE_PROJECT_NAME:-llm-security-observability}", compose)
         self.assertNotIn("name: llm-security-telemetry", compose)
         self.assertNotIn("name: llm-security-application", compose)
-        self.assertGreaterEqual(compose.count("networks: [observability]"), 9)
+        self.assertGreaterEqual(compose.count("networks: [default]"), 9)
 
     def test_module10_compose_includes_and_builds_the_complete_stack(self) -> None:
         module10 = (EXAMPLE / "compose.module10.yaml").read_text(encoding="utf-8")
