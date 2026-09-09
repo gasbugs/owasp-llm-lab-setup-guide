@@ -46,6 +46,7 @@ jobs:
           cat > llm-security-control-plane/.state/module10-compose.env <<'EOF'
           AWS_PROFILE=default
           AWS_REGION=us-east-1
+          USE_EC2_INSTANCE_ROLE=false
           LOCAL_UID=1001
           LOCAL_GID=1001
           BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0

@@ -15,6 +15,7 @@ services:
     environment:
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_PROFILE: ${AWS_PROFILE:-default}
+      USE_EC2_INSTANCE_ROLE: ${USE_EC2_INSTANCE_ROLE:-false}
       AWS_SHARED_CREDENTIALS_FILE: /tmp/.aws/credentials
       AWS_CONFIG_FILE: /tmp/.aws/config
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}

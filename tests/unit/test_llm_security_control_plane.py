@@ -334,10 +334,14 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
 
     def test_start_stack_supports_explicit_ec2_instance_role_credentials(self) -> None:
         start = (CONTROL / "deploy/start-stack.sh").read_text()
+        compose = (CONTROL / "compose.yaml").read_text()
+        gateway = (CONTROL / "bedrock-gateway/server.py").read_text()
         self.assertIn('USE_EC2_INSTANCE_ROLE="${USE_EC2_INSTANCE_ROLE:-false}"', start)
         self.assertIn('elif [ "$USE_EC2_INSTANCE_ROLE" != true ]; then', start)
         self.assertIn('AWS_CREDENTIAL_ARGS=(', start)
         self.assertIn('"${AWS_CREDENTIAL_ARGS[@]}"', start)
+        self.assertIn("USE_EC2_INSTANCE_ROLE", compose)
+        self.assertIn('os.environ.pop("AWS_PROFILE", None)', gateway)
 
     def test_compose_secrets_are_generated_and_have_no_runtime_defaults(self) -> None:
         runtime = (CONTROL / "deploy/prepare-module08-runtime.sh").read_text()
