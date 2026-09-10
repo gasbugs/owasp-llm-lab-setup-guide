@@ -311,6 +311,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("for engine in GUARDRAIL_ENGINE_LABELS", source)
         self.assertIn("for direction in GUARDRAIL_DIRECTION_LABELS", source)
         self.assertIn("for decision in GUARDRAIL_DECISION_LABELS", source)
+        self.assertIn('"application"', source)
+        self.assertIn('"authorization"', source)
 
     def test_alertmanager_delivers_to_lab_webhook(self) -> None:
         config = (EXAMPLE / "alertmanager.yml").read_text(encoding="utf-8")

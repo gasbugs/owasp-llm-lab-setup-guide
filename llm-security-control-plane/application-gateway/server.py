@@ -187,6 +187,33 @@ async def observe_guardrail(result: dict) -> None:
         emit_metadata({"event": "telemetry_delivery_failed", "request_id": result.get("request_id")})
 
 
+async def observe_application_decision(result: dict, direction: str) -> None:
+    if not SECURITY_MONITOR_URL or not TELEMETRY_INGEST_TOKEN:
+        return
+    payload = {
+        "event": "application_decision",
+        "engine": "application",
+        "direction": direction,
+        "request_id": result.get("request_id"),
+        "trace_id": result.get("trace_id"),
+        "decision": result.get("application_decision"),
+        "blocking_reason": result.get("blocking_reason"),
+        "upstream_called": result.get("upstream_called"),
+        "guard_model_calls": 0,
+        "duration_ms": result.get("duration_ms", 0),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.post(
+                f"{SECURITY_MONITOR_URL}/api/events/guardrail",
+                headers={"X-Telemetry-Token": TELEMETRY_INGEST_TOKEN},
+                json=payload,
+            )
+            response.raise_for_status()
+    except httpx.HTTPError:
+        emit_metadata({"event": "telemetry_delivery_failed", "request_id": result.get("request_id")})
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index() -> str:
     return Path("/app/index.html").read_text(encoding="utf-8")
@@ -205,17 +232,23 @@ async def jwks() -> dict:
 @app.post("/.well-known/login")
 async def login(credentials: LoginRequest, request: Request) -> Response:
     request_id = str(uuid.uuid4())
+    trace_id = current_trace_id()
     try:
         pair = auth_service.authenticate_password(credentials.username, credentials.password)
     except InvalidCredentials as exc:
         await emit_auth_event({
             "request_id": request_id,
+            "trace_id": trace_id,
             "decision": "block",
             "blocking_reason": str(exc),
             "subject": credentials.username,
             "client_ip": request.client.host if request.client else None,
         })
-        raise HTTPException(status_code=401, detail="invalid username or password") from exc
+        raise HTTPException(
+            status_code=401,
+            detail="invalid username or password",
+            headers={"X-Request-ID": request_id, "X-Trace-ID": trace_id},
+        ) from exc
     await emit_auth_event({
         "request_id": request_id,
         "decision": "allow",
@@ -431,13 +464,16 @@ async def chat(
         )
         result = {
             "request_id": request_id,
+            "trace_id": current_trace_id(),
             "reply": "애플리케이션 권한 정책이 해당 RAG 접근을 차단했습니다.",
             "application_decision": "block",
             "blocking_reason": str(exc),
             "upstream_called": False,
             "application_stages": application_stages,
+            "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         }
         emit_metadata({"event": "application_chat", **result, "reply": None})
+        await observe_application_decision(result, "authorization")
         return result
 
     # 3) 원본 Bearer Token 대신 검증된 Principal과 인가된 Retrieval만 Hub에 전달한다.

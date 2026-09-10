@@ -139,8 +139,8 @@ GUARDRAIL_MODEL_CALLS = Counter(
     "Guard model calls reported by the observed guardrail.",
     ["engine"],
 )
-GUARDRAIL_ENGINE_LABELS = {"presidio", "nemo", "application-auth"}
-GUARDRAIL_DIRECTION_LABELS = {"input", "output", "chat", "authentication"}
+GUARDRAIL_ENGINE_LABELS = {"presidio", "nemo", "application", "application-auth"}
+GUARDRAIL_DIRECTION_LABELS = {"input", "output", "chat", "authentication", "authorization"}
 GUARDRAIL_DECISION_LABELS = {"allow", "block", "redact", "infra", "observe"}
 
 

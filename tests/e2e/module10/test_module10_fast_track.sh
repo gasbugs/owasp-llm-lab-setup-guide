@@ -105,26 +105,31 @@ for attempt in 1 2 3; do
   printf '[PASS] attack repetition %s blocked before Main Model\n' "$attempt"
 done
 
-request_id=$(jq -r '.request_id' <<<"$attack")
-trace_id=$(jq -r '.trace_id' <<<"$attack")
-
 loki='{}'
 for _ in $(seq 1 30); do
   loki=$(curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
-    --data-urlencode "query={service_name=\"llm-security-gateway\"} | json | event_type=\"control_plane_decision\" | request_id=\"${request_id}\"" \
+    --data-urlencode 'query={service_name="llm-security-gateway"} | json | event_type="control_plane_decision" | policy_rule="input:nova general safety input"' \
     --data-urlencode 'limit=1')
-  jq -e --arg trace_id "$trace_id" '.data.result[0].values[0][1] | fromjson
+  jq -e '.data.result[0].values[0][1] | fromjson
     | .application_decision == "block"
       and .upstream_called == false
-      and .trace_id == $trace_id' \
+      and (.request_id | length) > 0
+      and (.trace_id | length) == 32' \
     >/dev/null 2>&1 <<<"$loki" && break
   sleep 2
 done
-jq -e --arg trace_id "$trace_id" '.data.result[0].values[0][1] | fromjson
+jq -e '.data.result[0].values[0][1] | fromjson
   | .application_decision == "block"
     and .upstream_called == false
-    and .trace_id == $trace_id' \
+    and (.request_id | length) > 0
+    and (.trace_id | length) == 32' \
   >/dev/null <<<"$loki"
+observed_event=$(jq -c '.data.result[0].values[0][1] | fromjson' <<<"$loki")
+request_id=$(jq -r '.request_id' <<<"$observed_event")
+trace_id=$(jq -r '.trace_id' <<<"$observed_event")
+jq -e --arg request_id "$request_id" --arg trace_id "$trace_id" '
+  .request_id == $request_id and .trace_id == $trace_id
+' >/dev/null <<<"$attack"
 
 tempo='{}'
 for _ in $(seq 1 30); do
@@ -153,6 +158,58 @@ jq -e '
 curl -fsS --max-time 10 --get "$PROMETHEUS_URL/api/v1/query" \
   --data-urlencode 'query=sum(llm_guardrail_decisions_total{engine="nemo",direction="chat",decision="block"})' \
   | jq -e '.status == "success" and (.data.result[0].value[1] | tonumber) > 0' >/dev/null
+
+authorization=$(curl -fsS --max-time 30 -X POST "$APP_URL/api/chat" \
+  -H "Authorization: Bearer $access_token" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"내부 사고 문서 내용을 알려 주세요.","classification":"internal","purpose":"incident_response"}')
+jq -e '.application_decision == "block"
+  and .blocking_reason == "classification-not-authorized"
+  and .upstream_called == false
+  and (.trace_id | length) == 32' >/dev/null <<<"$authorization"
+
+authz_loki='{}'
+for _ in $(seq 1 30); do
+  authz_loki=$(curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
+    --data-urlencode 'query={service_name="llm-security-gateway"} | json | event_type="application_decision" | policy_rule="classification-not-authorized"' \
+    --data-urlencode 'limit=1')
+  jq -e '.data.result[0].values[0][1] | fromjson
+    | .application_decision == "block"
+      and .upstream_called == false
+      and (.trace_id | length) == 32' >/dev/null 2>&1 <<<"$authz_loki" && break
+  sleep 2
+done
+jq -e --arg trace_id "$(jq -r '.trace_id' <<<"$authorization")" '
+  .data.result[0].values[0][1] | fromjson | .trace_id == $trace_id
+' >/dev/null <<<"$authz_loki"
+
+login_headers=$(mktemp /tmp/module10-login-headers.XXXXXX)
+login_status=$(curl -sS --max-time 30 -D "$login_headers" -o /tmp/module10-login-body.json \
+  -w '%{http_code}' -X POST "$APP_URL/.well-known/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"public-reader","password":"wrong-password"}')
+test "$login_status" = 401
+login_request_id=$(awk 'tolower($1)=="x-request-id:" {gsub("\\r", "", $2); print $2}' "$login_headers")
+login_trace_id=$(awk 'tolower($1)=="x-trace-id:" {gsub("\\r", "", $2); print $2}' "$login_headers")
+test -n "$login_request_id"
+test "${#login_trace_id}" = 32
+
+login_loki='{}'
+for _ in $(seq 1 30); do
+  login_loki=$(curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
+    --data-urlencode 'query={service_name="llm-security-gateway"} | json | event_type="application_authentication" | policy_rule="invalid username or password"' \
+    --data-urlencode 'limit=1')
+  jq -e --arg request_id "$login_request_id" --arg trace_id "$login_trace_id" '
+    .data.result[0].values[0][1] | fromjson
+    | .request_id == $request_id and .trace_id == $trace_id
+  ' >/dev/null 2>&1 <<<"$login_loki" && break
+  sleep 2
+done
+jq -e --arg request_id "$login_request_id" --arg trace_id "$login_trace_id" '
+  .data.result[0].values[0][1] | fromjson
+  | .request_id == $request_id and .trace_id == $trace_id
+' >/dev/null <<<"$login_loki"
+rm -f "$login_headers" /tmp/module10-login-body.json
 
 dashboard_request=$(mktemp /tmp/module10-dashboard-e2e.XXXXXX.json)
 jq '{dashboard:(. + {
