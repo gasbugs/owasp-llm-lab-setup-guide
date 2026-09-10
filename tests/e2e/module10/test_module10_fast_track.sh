@@ -35,6 +35,7 @@ printf 'AWS_PROFILE=%s\nAWS_REGION=%s\nUSE_EC2_INSTANCE_ROLE=%s\nLOCAL_UID=%s\nL
   "$(openssl rand -hex 18)" "$(openssl rand -hex 24)" \
   >"$COMPOSE_ENV_FILE"
 chmod 0600 "$COMPOSE_ENV_FILE"
+umask 022
 
 set -a
 # shellcheck disable=SC1090
@@ -112,13 +113,17 @@ for _ in $(seq 1 30); do
   loki=$(curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
     --data-urlencode "query={service_name=\"llm-security-gateway\"} | json | event_type=\"control_plane_decision\" | request_id=\"${request_id}\"" \
     --data-urlencode 'limit=1')
-  jq -e '.data.result[0].values[0][1] | fromjson
-    | .application_decision == "block" and .upstream_called == false' \
+  jq -e --arg trace_id "$trace_id" '.data.result[0].values[0][1] | fromjson
+    | .application_decision == "block"
+      and .upstream_called == false
+      and .trace_id == $trace_id' \
     >/dev/null 2>&1 <<<"$loki" && break
   sleep 2
 done
-jq -e '.data.result[0].values[0][1] | fromjson
-  | .application_decision == "block" and .upstream_called == false' \
+jq -e --arg trace_id "$trace_id" '.data.result[0].values[0][1] | fromjson
+  | .application_decision == "block"
+    and .upstream_called == false
+    and .trace_id == $trace_id' \
   >/dev/null <<<"$loki"
 
 tempo='{}'

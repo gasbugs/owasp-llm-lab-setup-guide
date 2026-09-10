@@ -146,6 +146,7 @@ async def observe_guardrail(result: dict) -> None:
     guardrail = result.get("guardrail") or {}
     common = {
         "request_id": result.get("request_id"),
+        "trace_id": result.get("trace_id"),
         "guard_mode": guardrail.get("mode"),
         "upstream_called": guardrail.get("upstream_called"),
         "guard_model_calls": guardrail.get("guard_model_calls", 0),

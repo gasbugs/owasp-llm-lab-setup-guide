@@ -140,7 +140,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         for binding in (
             "127.0.0.1:${MONITOR_HOST_PORT:-8014}:8080",
             "127.0.0.1:${RETRIEVAL_HOST_PORT:-8015}:8081",
-            "127.0.0.1:${GRAFANA_HOST_PORT:-3001}:3000",
+            "${GRAFANA_BIND_ADDRESS:-127.0.0.1}:${GRAFANA_HOST_PORT:-3001}:3000",
             "127.0.0.1:${PROMETHEUS_HOST_PORT:-9090}:9090",
             "127.0.0.1:${ALERTMANAGER_HOST_PORT:-9093}:9093",
             "127.0.0.1:${ALLOY_HOST_PORT:-12345}:12345",
