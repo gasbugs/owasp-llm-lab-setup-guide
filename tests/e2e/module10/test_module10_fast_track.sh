@@ -197,7 +197,7 @@ test "${#login_trace_id}" = 32
 login_loki='{}'
 for _ in $(seq 1 30); do
   login_loki=$(curl -fsS --max-time 10 --get "$LOKI_URL/loki/api/v1/query_range" \
-    --data-urlencode 'query={service_name="llm-security-gateway"} | json | event_type="application_authentication" | policy_rule="invalid username or password"' \
+    --data-urlencode 'query={service_name="llm-security-gateway"} | json | event_type="application_authentication" | policy_rule="invalid-username-or-password"' \
     --data-urlencode 'limit=1')
   jq -e --arg request_id "$login_request_id" --arg trace_id "$login_trace_id" '
     .data.result[0].values[0][1] | fromjson
