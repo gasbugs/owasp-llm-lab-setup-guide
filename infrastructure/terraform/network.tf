@@ -100,7 +100,7 @@ resource "aws_security_group" "student" {
   # 포트별 규칙을 늘리지 않고 실습자의 현재 공인 IPv4 /32 하나만 신뢰한다.
   # 이 주소에서 들어오는 모든 IP 프로토콜과 포트를 하나의 규칙으로 허용한다.
   ingress {
-    description = "All traffic from the student's public IPv4 /32"
+    description = "All traffic from student public IPv4 /32"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
