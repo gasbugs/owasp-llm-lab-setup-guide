@@ -127,7 +127,7 @@ enable_user_data_bootstrap = true
 - 강의 종료 후에는 보존할 작업물을 개인 GitHub repo에 push한 뒤 `terraform destroy`를 실행하세요.
 - 이 Terraform은 Budget 알람을 만들지 않으므로 실행 시간을 직접 관리합니다.
 
-일시적인 강사 디버깅처럼 실습 서비스를 로컬에서만 확인해야 할 때는 다음 SSM 포트포워딩 helper를 사용할 수 있습니다. 수강생 정본은 보안 그룹이 본인 공인 IPv4 `/32`의 전체 인바운드 트래픽을 허용하고, EC2 public IP로 직접 접속하는 방식입니다.
+기본 `127.0.0.1/32`는 외부 인바운드를 허용하지 않습니다. 이 상태에서는 다음 SSM 포트포워딩 helper로 실습 서비스를 확인합니다. EC2 공인 IP에 직접 접속하려면 `allowed_ingress_cidr`를 본인의 현재 공인 IPv4 `/32`로 바꿉니다.
 
 ```bash
 AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
@@ -136,9 +136,9 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 
 ## 보안 원칙
 
-- `allowed_ingress_cidr`는 필수값이며 본인 공인 IPv4 `/32`만 입력합니다.
-- 보안 그룹은 이 `/32`에서 오는 모든 프로토콜과 포트를 단일 ingress 규칙으로 허용합니다.
-- 브라우저와 API client는 이 `/32`에서 EC2 public IP로 직접 접속합니다.
+- 기본 `allowed_ingress_cidr = "127.0.0.1/32"`는 외부 접속을 열지 않습니다.
+- 직접 접속할 때만 본인 공인 IPv4 `/32`를 입력합니다.
+- 보안 그룹은 선택한 `/32`에서 오는 모든 프로토콜과 포트를 단일 ingress 규칙으로 허용합니다.
 - `0.0.0.0/0` 또는 `::/0` 공개는 Terraform validation에서 차단됩니다.
 - Access Key, Secret, `terraform.tfvars`, `.tfstate` 파일은 절대 commit하지 마세요.
 

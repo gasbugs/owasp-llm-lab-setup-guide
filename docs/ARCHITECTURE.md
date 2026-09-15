@@ -55,13 +55,13 @@ ami_name_pattern = "owasp-llm-lab-*"
 
 ## Security group
 
-실습 앱은 의도적으로 취약합니다. 그래서 수강생이 현재 사용하는 공인 IPv4 한 주소만 허용합니다.
+실습 앱은 의도적으로 취약합니다. 기본값은 외부 인바운드를 닫고, 직접 접속이 필요할 때만 수강생의 공인 IPv4 한 주소를 허용합니다.
 
 ```hcl
-allowed_ingress_cidr = "203.0.113.10/32"
+allowed_ingress_cidr = "127.0.0.1/32"
 ```
 
-예시 주소를 그대로 사용하지 말고 `curl -sS https://checkip.amazonaws.com`으로 확인한 본인 공인 IPv4 뒤에 `/32`를 붙입니다. `127.0.0.1/32`와 `0.0.0.0/0`은 입력 검증에서 거부합니다.
+기본 `127.0.0.1/32`는 외부 인바운드를 열지 않습니다. EC2 공인 주소로 직접 접속할 때만 `curl -sS https://checkip.amazonaws.com`으로 확인한 본인 공인 IPv4 뒤에 `/32`를 붙입니다. `0.0.0.0/0`은 입력 검증에서 거부합니다.
 
 ## 설치 방식
 
@@ -151,7 +151,7 @@ flowchart LR
   A["server-side token map"] -->|"tenant=acme"| D
 ```
 
-`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고, EC2 내부 검사는 `127.0.0.1:18080`, 학습자 PC의 브라우저와 API 호출은 `EC2_PUBLIC_IP:18080`을 사용합니다. Terraform Security Group은 수강생의 공인 IPv4 `/32`에서 오는 전체 인바운드 트래픽을 허용합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback `127.0.0.1:8012`로 제한됩니다.
+`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고 EC2 내부 검사는 `127.0.0.1:18080`을 사용합니다. 기본 Terraform 값에서는 SSM 포트포워딩으로 확인하며, 본인 공인 IPv4 `/32`를 적용한 경우에만 학습자 PC에서 `EC2_PUBLIC_IP:18080`으로 직접 접속합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback `127.0.0.1:8012`로 제한됩니다.
 
 `vulnerable`과 `safe`는 같은 embedding model과 cosine 함수를 사용합니다. 차이는 ranking 이후 결과를 가리는 것이 아니라, **embedding/ranking 후보를 만들기 전에 인증 tenant metadata filter를 적용하는가**입니다. 미니 앱은 운영 vector DB가 아닌 교육용 인메모리 검색기입니다.
 
@@ -161,9 +161,9 @@ flowchart LR
 | Day 4 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
 | Day 4 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
 | Day 4 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
-| 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; Terraform은 수강생 공인 IPv4 `/32`의 전체 인바운드를 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
+| 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; 기본은 SSM, 선택적으로 수강생 공인 IPv4 `/32` 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
 
-LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. Terraform ingress는 `allowed_ingress_cidr` IPv4 `/32`에서 오는 모든 프로토콜과 포트를 허용합니다. 따라서 그 주소에서는 18080뿐 아니라 host에 publish된 8012와 11434에도 도달할 수 있습니다. 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
+LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. 기본 `127.0.0.1/32`는 외부 접속을 열지 않습니다. 공인 IPv4 `/32`로 바꾸면 그 주소에서는 18080뿐 아니라 host에 publish된 8012와 11434에도 도달할 수 있으므로 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
 
 ## 이미지 빌드
 

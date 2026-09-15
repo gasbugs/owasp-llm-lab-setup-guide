@@ -5,7 +5,7 @@
 #   - 검증 단계엔 외부 인터넷 허용 (Ubuntu repo, GHCR, Ollama 등 pull)
 #   - 강의 정식 운영 시 골든 AMI(Packer)로 변경하면 인터넷 차단으로 회귀 가능
 #   - VPC endpoint는 사용하지 않는다. SSM과 이미지 pull은 public egress 사용.
-#   - 수강생별 보안 그룹은 지정한 공인 IPv4 /32 한 곳의 전체 트래픽만 허용
+#   - 기본 loopback /32는 외부 인바운드를 닫고, 필요할 때만 공인 IPv4 /32를 사용
 ################################################################################
 
 resource "aws_vpc" "main" {
@@ -89,18 +89,18 @@ resource "aws_route_table_association" "lab" {
 }
 
 ################################################################################
-# Security Group — 계정당 1개, 지정한 공인 IPv4 /32만 허용
+# Security Group — 계정당 1개, 지정한 IPv4 /32만 허용
 ################################################################################
 
 resource "aws_security_group" "student" {
   name        = "${local.name_prefix}-sg"
-  description = "Lab ingress restricted to one public IPv4 /32"
+  description = "Lab ingress restricted to one IPv4 /32"
   vpc_id      = aws_vpc.main.id
 
-  # 포트별 규칙을 늘리지 않고 실습자의 현재 공인 IPv4 /32 하나만 신뢰한다.
-  # 이 주소에서 들어오는 모든 IP 프로토콜과 포트를 하나의 규칙으로 허용한다.
+  # 기본 loopback 값은 외부 접속을 열지 않는다.
+  # 공인 IPv4 /32로 바꾸면 그 주소의 모든 IP 프로토콜과 포트를 허용한다.
   ingress {
-    description = "All traffic from student public IPv4 /32"
+    description = "All traffic from selected IPv4 /32"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

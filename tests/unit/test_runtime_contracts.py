@@ -249,7 +249,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertTrue((ROOT / "infrastructure" / "compose" / "compose.yaml").exists())
         self.assertFalse((ROOT / "docker" / "docker-compose.yaml").exists())
 
-    def test_security_group_allows_all_traffic_from_student_ipv4_only(self) -> None:
+    def test_security_group_defaults_to_loopback_only(self) -> None:
         terraform = read("infrastructure/terraform/main.tf")
         self.assertNotIn("lab_app_ports", terraform)
         self.assertNotIn("module08_observability_ports", terraform)
@@ -260,8 +260,8 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertEqual(network.count("  ingress {"), 1)
         variables = read("infrastructure/terraform/variables.tf")
         self.assertIn("[0-9]{1,3}/32", variables)
-        self.assertNotIn('default     = "127.0.0.1/32"', variables)
-        self.assertIn('var.allowed_ingress_cidr != "127.0.0.1/32"', variables)
+        self.assertIn('default     = "127.0.0.1/32"', variables)
+        self.assertNotIn('var.allowed_ingress_cidr != "127.0.0.1/32"', variables)
 
     def test_provider_default_tags_are_plan_time_known(self) -> None:
         terraform = read("infrastructure/terraform/main.tf")

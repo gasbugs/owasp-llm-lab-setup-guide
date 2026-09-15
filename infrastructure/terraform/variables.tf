@@ -104,16 +104,17 @@ variable "root_volume_size" {
 }
 
 variable "allowed_ingress_cidr" {
-  description = "모든 인바운드 트래픽을 허용할 실습자 본인의 공인 IPv4 /32 CIDR"
+  description = "모든 인바운드 트래픽을 허용할 IPv4 /32 CIDR. 기본 loopback 값은 외부 접속을 허용하지 않음."
   type        = string
+  default     = "127.0.0.1/32"
+
   validation {
     condition = (
       can(cidrhost(var.allowed_ingress_cidr, 0)) &&
       can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/32$", var.allowed_ingress_cidr)) &&
-      var.allowed_ingress_cidr != "127.0.0.1/32" &&
       var.allowed_ingress_cidr != "0.0.0.0/32"
     )
-    error_message = "allowed_ingress_cidr에는 loopback이나 전체 공개 주소가 아닌 본인 공인 IPv4/32를 지정해야 합니다."
+    error_message = "allowed_ingress_cidr에는 127.0.0.1/32 또는 본인 공인 IPv4/32를 지정해야 합니다."
   }
 }
 

@@ -194,7 +194,7 @@ python3 learner_vector_app.py --serve --host 0.0.0.0 --port 18080
 
 두 번째 EC2/SSM 터미널에서 `ss -ltnp | grep ':18080'`과 `curl -fsS http://127.0.0.1:18080/healthz` 두 가지를 확인합니다. `0.0.0.0`은 bind sentinel이지 접속 URL이 아닙니다.
 
-브라우저가 안 열리면 현재 공인 IPv4가 Terraform의 `allowed_ingress_cidr` `/32`와 같은지 먼저 확인합니다. Terraform은 그 한 주소의 전체 인바운드 트래픽을 허용하므로 별도 TCP/18080 규칙은 필요하지 않습니다. 브라우저는 `EC2_PUBLIC_IP:18080`으로 접속하며 `127.0.0.1/32`와 `0.0.0.0/0`은 사용하지 않습니다.
+기본 `allowed_ingress_cidr = "127.0.0.1/32"`에서는 외부 브라우저가 EC2 공인 IP에 직접 접속할 수 없습니다. SSM 포트포워딩을 사용하거나, 직접 접속이 필요하면 현재 공인 IPv4 `/32`로 바꿉니다. `0.0.0.0/0`은 사용하지 않습니다.
 
 ```bash
 # [로컬 노트북]

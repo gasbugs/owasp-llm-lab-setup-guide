@@ -11,7 +11,7 @@ course_id = "owasp-llm-2026"
 # false는 SSM 접속 후 수동 설치, true는 최초 부팅 때 자동 설치.
 enable_user_data_bootstrap = false
 
-# 본인 공인 IPv4 뒤에 /32를 붙인다. 0.0.0.0/0은 허용하지 않는다.
-allowed_ingress_cidr = "203.0.113.10/32"
+# 기본값은 외부 접속을 허용하지 않는다. 직접 접속할 때만 본인 공인 IPv4 /32로 바꾼다.
+allowed_ingress_cidr = "127.0.0.1/32"
 
 # 기본값: g6.xlarge, 100GB. AMI·commit 고정은 ../../docs/TERRAFORM-ADVANCED-OPTIONS.md 참고.

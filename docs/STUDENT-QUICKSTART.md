@@ -74,12 +74,12 @@ course_id   = "owasp-llm-2026"
 # false는 SSM 접속 후 수동 설치, true는 EC2 최초 부팅 때 자동 설치입니다.
 enable_user_data_bootstrap = false
 
-# 본인 노트북의 현재 공인 IPv4 하나만 허용합니다.
-allowed_ingress_cidr = "203.0.113.10/32"
+# 기본값은 외부 접속을 열지 않습니다.
+allowed_ingress_cidr = "127.0.0.1/32"
 
 ```
 
-AMI ID는 직접 입력하지 않습니다. Terraform이 검증된 계열의 최신 DLAMI를 조회하고 `g6.xlarge`, 100GB를 기본값으로 적용합니다. `enable_user_data_bootstrap = false`는 수강생이 SSM으로 접속해 설치 과정을 직접 확인하는 정본이며, 강사용 자동 설치에서는 이 값을 `true`로 바꿉니다. AMI·commit 고정이 필요한 강사용 환경만 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 참고합니다.
+AMI ID는 직접 입력하지 않습니다. Terraform이 검증된 계열의 최신 DLAMI를 조회하고 `g6.xlarge`, 100GB를 기본값으로 적용합니다. `enable_user_data_bootstrap = false`는 수강생이 SSM으로 접속해 설치 과정을 직접 확인하는 정본이며, 강사용 자동 설치에서는 이 값을 `true`로 바꿉니다. EC2 공인 IP에 직접 접속하려면 `allowed_ingress_cidr`를 본인의 현재 공인 IPv4 `/32`로 바꿉니다. AMI·commit 고정이 필요한 강사용 환경만 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 참고합니다.
 
 ## 5. VM 생성
 
@@ -134,7 +134,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 ### 본인 공인 IPv4에서 실습 서비스에 접속
 
-Terraform은 포트별 Security Group 규칙을 만들지 않습니다. 대신 `allowed_ingress_cidr`에 적은 본인 공인 IPv4 `/32`에서 오는 모든 프로토콜과 포트를 ingress 규칙 하나로 허용합니다. `public_ip_lookup_command`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. 예를 들어 Portal은 `http://EC2_PUBLIC_IP:8080`입니다. `0.0.0.0/0`으로 넓히지 않으며, 노트북의 공인 IP가 바뀌면 현재 값으로 `terraform apply`를 다시 실행합니다.
+Terraform은 포트별 Security Group 규칙을 만들지 않습니다. 기본 `127.0.0.1/32`는 외부 인바운드를 열지 않으므로 SSM 포트포워딩을 사용합니다. 직접 접속이 필요하면 `allowed_ingress_cidr`에 본인 공인 IPv4 `/32`를 입력합니다. 이 경우 그 주소의 모든 프로토콜과 포트를 ingress 규칙 하나로 허용하며, `public_ip_lookup_command`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. `0.0.0.0/0`으로 넓히지 않습니다.
 
 ### LLM08 추가 셋업
 

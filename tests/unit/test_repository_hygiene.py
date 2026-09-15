@@ -61,9 +61,9 @@ class RepositoryHygieneTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.files = repository_text_files()
 
-    def test_terraform_example_uses_a_documentation_cidr(self) -> None:
+    def test_terraform_example_uses_loopback_cidr(self) -> None:
         text = TFVARS_EXAMPLE.read_text(encoding="utf-8")
-        self.assertRegex(text, r'allowed_ingress_cidr\s*=\s*"203\.0\.113\.10/32"')
+        self.assertRegex(text, r'allowed_ingress_cidr\s*=\s*"127\.0\.0\.1/32"')
 
     def test_no_likely_secrets_in_public_text_files(self) -> None:
         findings: list[str] = []
