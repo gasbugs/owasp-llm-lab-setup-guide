@@ -66,6 +66,10 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
+            'ollama show "$OLLAMA_COMPAT_MODEL" >/dev/null 2>&1',
+            installer,
+        )
+        self.assertIn(
             'compatibility alias is absent after create: $OLLAMA_COMPAT_MODEL',
             installer,
         )

@@ -339,7 +339,7 @@ else
   docker exec lab-ollama ollama pull "$OLLAMA_MODEL"
 fi
 if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" ]; then
-  if docker exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$OLLAMA_COMPAT_MODEL"; then
+  if docker exec lab-ollama ollama show "$OLLAMA_COMPAT_MODEL" >/dev/null 2>&1; then
     echo "[install-lab] $OLLAMA_COMPAT_MODEL compatibility alias already available"
   else
     printf 'FROM %s\n' "$OLLAMA_MODEL" | docker exec -i lab-ollama sh -c 'cat > /tmp/Modelfile.compat'
@@ -347,9 +347,7 @@ if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" 
     # CLI 종료 코드 대신 실제 모델 목록을 아래에서 다시 확인해 완료 여부를 판정한다.
     docker exec lab-ollama ollama create "$OLLAMA_COMPAT_MODEL" -f /tmp/Modelfile.compat || true
     docker exec lab-ollama rm -f /tmp/Modelfile.compat
-    docker exec lab-ollama ollama list \
-      | awk 'NR > 1 { print \$1 }' \
-      | grep -qx "$OLLAMA_COMPAT_MODEL" || {
+    docker exec lab-ollama ollama show "$OLLAMA_COMPAT_MODEL" >/dev/null 2>&1 || {
         echo "ERROR: compatibility alias is absent after create: $OLLAMA_COMPAT_MODEL" >&2
         exit 1
       }
