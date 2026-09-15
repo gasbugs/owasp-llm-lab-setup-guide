@@ -10,6 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 RAG_UI = ROOT / "docker/vuln-rag/app/templates/index.html"
 AGENT_UI = ROOT / "docker/vuln-agent/app/templates/index.html"
 CONTROL_UI = ROOT / "llm-security-control-plane/application-gateway/index.html"
+PRESIDIO_API = ROOT / "examples/day6/presidio/server.py"
+NEMO_API = ROOT / "examples/day6/nemo-guardrails/server.py"
+RAG_SCENARIOS = ROOT / "docker/vuln-rag/app/scenarios"
 
 
 class UiDesignSystemTests(unittest.TestCase):
@@ -80,6 +83,42 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn(endpoint, self.rag)
         self.assertIn("renderModelOutputVulnerable", self.rag)
         self.assertIn("renderModelOutputSafe", self.rag)
+
+    def test_vulnerable_rag_ui_hides_internal_day_identifiers(self) -> None:
+        for visible_fragment in (
+            "LLM Lab {{ scenario_id }}",
+            "Active exercise / {{ scenario_id }}",
+            "{{ s.id }} — {{ s.title }}",
+            "LIVE / {{ scenario_id }}",
+            "Day 2 routing",
+            "${data.llm_ids.join(' · ')} / ${data.scenario}",
+        ):
+            with self.subTest(visible_fragment=visible_fragment):
+                self.assertNotIn(visible_fragment, self.rag)
+
+        self.assertIn('id="scenario" type="hidden" value="{{ scenario_id }}"', self.rag)
+        self.assertNotIn('<select id="scenario"', self.rag)
+
+    def test_api_documentation_titles_use_component_names(self) -> None:
+        self.assertIn(
+            'FastAPI(title="Microsoft Presidio integration API")',
+            PRESIDIO_API.read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            'FastAPI(title="NeMo Guardrails integration API")',
+            NEMO_API.read_text(encoding="utf-8"),
+        )
+
+    def test_scenario_titles_use_llm_names_instead_of_day_labels(self) -> None:
+        for path in sorted(RAG_SCENARIOS.glob("day[1-5].py")):
+            title_lines = [
+                line.strip()
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip().startswith("title=")
+            ]
+            with self.subTest(path=path.name):
+                self.assertTrue(title_lines)
+                self.assertTrue(all("Day " not in line for line in title_lines))
 
     def test_control_center_preserves_auth_chat_and_evidence(self) -> None:
         for control_id in (

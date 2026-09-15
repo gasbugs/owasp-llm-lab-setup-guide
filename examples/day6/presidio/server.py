@@ -35,7 +35,7 @@ POLICY_VERSION = os.getenv("GUARD_POLICY_VERSION", "day7-guardrails-v1")
 TEST_CORPUS_VERSION = os.getenv("GUARD_TEST_CORPUS_VERSION", "day7-regression-v1")
 CORE = PresidioCore()
 
-app = FastAPI(title="Day 6 Microsoft Presidio integration API")
+app = FastAPI(title="Microsoft Presidio integration API")
 
 
 class ScanRequest(BaseModel):

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Cloud Security · LLM Lab {{ scenario_id }}</title>
+  <title>Cloud Security · LLM Lab · {{ scenario_title }}</title>
   <style>
     :root {
       color-scheme:dark;
@@ -44,7 +44,7 @@
     .prompt-card { border-left:3px solid var(--warning); background:var(--surface-raised); padding:12px; }
     .prompt-card strong { display:block; margin-bottom:8px; color:var(--warning); font:700 11px ui-monospace,monospace; letter-spacing:.06em; text-transform:uppercase; }
     .prompt-card pre { max-height:44vh; margin:0; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--ink); font:12px/1.55 ui-monospace,"SFMono-Regular",Consolas,monospace; }
-    .scenario-bar { display:grid; grid-template-columns:1fr minmax(240px,440px); gap:18px; align-items:end; margin-top:16px; padding:18px 20px; border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
+    .scenario-bar { margin-top:16px; padding:18px 20px; border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); }
     .scenario-title { margin:4px 0 3px; font:750 20px/1.15 "Arial Narrow","Segoe UI",sans-serif; }.scenario-copy { margin:0; color:var(--muted); font-size:13px; }
     label { color:var(--muted); font-size:12px; font-weight:700; }
     select,input[type="text"],input[type="password"],textarea { width:100%; border:1px solid var(--line); border-radius:9px; background:var(--surface-raised); color:var(--ink); padding:10px 12px; }
@@ -80,15 +80,15 @@
   </header>
 
   <section class="scenario-bar">
-    <div><div class="eyebrow">Active exercise / {{ scenario_id }}</div><h2 class="scenario-title">{{ scenario_title }}</h2><p class="scenario-copy">{{ scenario_intro }}</p></div>
-    <form method="get" class="row"><label for="scenario">실습 시나리오</label><select id="scenario" name="scenario" onchange="this.form.submit()">{% for s in scenarios %}<option value="{{ s.id }}" {% if s.id == scenario_id %}selected{% endif %}>{{ s.id }} — {{ s.title }}</option>{% endfor %}</select><noscript><button type="submit">시나리오 변경</button></noscript></form>
+    <div><div class="eyebrow">Active exercise</div><h2 class="scenario-title">{{ scenario_title }}</h2><p class="scenario-copy">{{ scenario_intro }}</p></div>
+    <input id="scenario" type="hidden" value="{{ scenario_id }}">
   </section>
   <div class="warning"><strong>LAB WARNING /</strong> {{ warning }}</div>
 
   <div class="lab-grid">
     <div class="stack">
       <section class="panel" aria-labelledby="message-title">
-        <header class="panel-head"><div><div class="eyebrow">Message traffic</div><h2 id="message-title">프롬프트와 모델 응답</h2></div><span class="panel-code">LIVE / {{ scenario_id }}</span></header>
+        <header class="panel-head"><div><div class="eyebrow">Message traffic</div><h2 id="message-title">프롬프트와 모델 응답</h2></div><span class="panel-code">LIVE</span></header>
         <div id="chat" class="chat" aria-live="polite"></div>
         <div class="panel-body">
           <form id="form" class="composer">
@@ -116,7 +116,7 @@
     <aside class="stack">
       {% if scenario_id == "day2" %}
       <section class="panel">
-        <header class="panel-head"><div><div class="eyebrow">Day 2 routing</div><h2>실습 선택과 인증</h2></div><span class="panel-code">8010</span></header>
+        <header class="panel-head"><div><div class="eyebrow">Feature routing</div><h2>실습 선택과 인증</h2></div><span class="panel-code">8010</span></header>
         <div class="panel-body"><p>LLM02와 LLM08 RAG corpus 오염은 같은 서비스의 서로 다른 기능입니다. 선택값은 기능 라우팅에만 사용됩니다.</p><div class="row"><label for="lab">실습</label><select id="lab"><option value="llm02">LLM02 — 민감정보 노출</option><option value="llm08-rag-poisoning">LLM08 — RAG Corpus 오염</option></select></div><div id="llm02-auth" class="row"><label for="llm02-token">LLM02 Bearer token</label><input id="llm02-token" type="password" autocomplete="off" placeholder="토큰을 직접 입력합니다"></div></div>
       </section>
       {% endif %}
@@ -189,7 +189,7 @@ async function loadSystemPrompt() {
     const response = await fetch(`/api/system-prompt?${params}`);
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
-    promptLlmIds.textContent = `${data.llm_ids.join(' · ')} / ${data.scenario}`;
+    promptLlmIds.textContent = data.llm_ids.join(' · ');
     promptContent.replaceChildren();
     for (const prompt of data.prompts) {
       const card = document.createElement('section');

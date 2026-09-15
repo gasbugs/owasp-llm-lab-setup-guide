@@ -266,7 +266,7 @@ def delete_doc(index: int) -> str | None:
 
 scenario = Scenario(
     id="day4",
-    title="PrivateGPT-Lite (Day 2 LLM08 · Day 4 LLM07/LLM09)",
+    title="PrivateGPT-Lite (LLM07 · LLM08 · LLM09)",
     intro="Multi-tenant 사내 문서 챗봇. 시스템 프롬프트 leak + tenant 경계 우회.",
     warning="의도적 취약 — tenant 검증 누락.",
     build_system_prompt=build_system_prompt,
