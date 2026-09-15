@@ -378,7 +378,6 @@ else
   set +e
   EVIDENCE_DIR="$RUN_ROOT/day5-live-evidence" \
     RUN_REAL_MODEL_NORMAL=1 \
-    RUN_LLAMA_GUARD_PROBE=1 \
     UPSTREAM_OLLAMA_URL=http://127.0.0.1:11434 \
     BASE_IMAGE_OVERRIDE="$BASE_GPU_REF" \
     bash "$day5_harness" 2>&1 | tee "$RUN_ROOT/day5-live.log"

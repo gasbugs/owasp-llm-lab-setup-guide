@@ -205,7 +205,6 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("docker image inspect --format '{{.Id}}'", installer)
         self.assertIn("WARMUP_RESPONSE=", installer)
         self.assertIn(".done == true", installer)
-        self.assertIn("required Day 5 model is absent after pull", installer)
         self.assertIn(
             '"$RAW_URL/infrastructure/scripts/student/reset-lab"', installer
         )
@@ -227,10 +226,8 @@ class RuntimeContractTest(unittest.TestCase):
         )
         self.assertLess(internal_health, publish_refresh)
         self.assertLess(publish_refresh, external_health)
-        guard_pull = installer.split(
-            'docker exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL"', 1
-        )[1].split("fi", 1)[0]
-        self.assertNotIn("|| true", guard_pull)
+        self.assertNotIn("LLAMA_GUARD_MODEL", installer)
+        self.assertNotIn("llama-guard3:8b", installer)
 
     def test_installer_waits_for_fresh_ami_package_manager_lock(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")

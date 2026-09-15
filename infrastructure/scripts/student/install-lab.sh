@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.8"
+SCRIPT_VERSION="0.2.9"
 DOCKER_ENGINE_RELEASE="${DOCKER_ENGINE_RELEASE:-29.7.2}"
 DOCKER_COMPOSE_RELEASE="${DOCKER_COMPOSE_RELEASE:-5.5.0}"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
@@ -29,7 +29,6 @@ APT_LOCK_TIMEOUT_SECONDS="${APT_LOCK_TIMEOUT_SECONDS:-600}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
 OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-bge-m3:latest}"
 OLLAMA_COMPAT_MODEL="${OLLAMA_COMPAT_MODEL:-llama3}"
-LLAMA_GUARD_MODEL="${LLAMA_GUARD_MODEL:-llama-guard3:8b}"
 LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
 INSTALL_START_EPOCH=$(date +%s)
 
@@ -354,19 +353,6 @@ if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" 
     echo "[install-lab] created $OLLAMA_COMPAT_MODEL compatibility alias for DVLA"
   fi
 fi
-if docker exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$LLAMA_GUARD_MODEL"; then
-  echo "[install-lab] $LLAMA_GUARD_MODEL already pulled"
-else
-  docker exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL" 2>&1 | tail -3
-  echo "[install-lab] $LLAMA_GUARD_MODEL pulled (Day 5 Defense demo)"
-fi
-docker exec lab-ollama ollama list \
-  | awk 'NR > 1 { print \$1 }' \
-  | grep -qx "$LLAMA_GUARD_MODEL" || {
-    echo "ERROR: required Day 5 model is absent after pull: $LLAMA_GUARD_MODEL" >&2
-    exit 1
-  }
-
 WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost:11434/api/generate \
   -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}")
 printf '%s' "\$WARMUP_RESPONSE" \
