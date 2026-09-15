@@ -51,10 +51,9 @@ INSTANCE_ID=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/instance
 IDENTITY_DOCUMENT=$(curl -fsSH "$HDR" http://169.254.169.254/latest/dynamic/instance-identity/document)
 REGION=$(printf '%s' "$IDENTITY_DOCUMENT" | python3 -c 'import json,sys; print(json.load(sys.stdin)["region"])')
 PUBLIC_IPV4=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
-STUDENT=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/tags/instance/Student 2>/dev/null || echo "student")
 COURSE_ID=$(curl -fsSH "$HDR" http://169.254.169.254/latest/meta-data/tags/instance/Course 2>/dev/null || echo "owasp-llm")
 
-echo "INSTANCE_ID=$INSTANCE_ID REGION=$REGION PUBLIC_IPV4=${PUBLIC_IPV4:-none} STUDENT=$STUDENT COURSE_ID=$COURSE_ID"
+echo "INSTANCE_ID=$INSTANCE_ID REGION=$REGION PUBLIC_IPV4=${PUBLIC_IPV4:-none} COURSE_ID=$COURSE_ID"
 
 # 2) /etc/lab/env 후보
 # 설치가 끝나기 전에 새 태그를 확정 기록하면 실패한 재설치가 새 런타임처럼 보일 수 있다.
@@ -64,7 +63,6 @@ install -d -m 0755 /etc/lab
 LAB_ENV_CANDIDATE=/etc/lab/env.pending
 cat > "$LAB_ENV_CANDIDATE" <<EOF
 SCRIPT_VERSION=$SCRIPT_VERSION
-STUDENT=$STUDENT
 COURSE_ID=$COURSE_ID
 AWS_DEFAULT_REGION=$REGION
 EC2_DOMAIN=$PUBLIC_IPV4

@@ -31,12 +31,11 @@ flowchart TD
 - VPC `10.42.0.0/16`
 - Public subnet `10.42.10.0/24`
 - Internet Gateway와 route table
-- 수강생별 security group
-- 수강생별 IAM role과 instance profile
-- 수강생별 EC2 GPU 인스턴스. 기본값은 `g6.xlarge`
-- AWS 일일 Budget 알람
+- 계정당 security group 1개
+- 계정당 IAM role과 instance profile 1개
+- 계정당 EC2 GPU 인스턴스 1대. 기본값은 `g6.xlarge`
 
-1인 1계정 운영이므로 `student_id` 한 명에 대한 EC2 한 대만 생성합니다. 내부 리소스는 기존 state 주소를 유지하기 위해 이 값을 한 원소 set으로 바꿔 `for_each`에 사용합니다.
+1인 1계정 운영이므로 수강생 식별자를 별도로 입력하지 않습니다. `course_id`로 자원 이름을 구분하고 단일 ASG가 EC2를 최대 한 대만 유지합니다. 기존의 `student_id` 기반 state에 이 구성을 적용하면 indexed 자원이 단일 자원으로 바뀌므로 plan에서 교체 대상을 반드시 확인합니다.
 
 기본 AMI 조회 기준은 우리가 기존 실습에서 사용한 계열과 같습니다.
 
@@ -152,7 +151,7 @@ flowchart LR
   A["server-side token map"] -->|"tenant=acme"| D
 ```
 
-`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고, EC2 내부 검사는 `127.0.0.1:18080`, 학습자 PC의 브라우저와 API 호출은 `EC2_PUBLIC_IP:18080`을 사용합니다. Terraform Security Group은 TCP/18080을 수강생의 공인 IPv4 `/32`에만 허용합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback `127.0.0.1:8012`로 제한됩니다.
+`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고, EC2 내부 검사는 `127.0.0.1:18080`, 학습자 PC의 브라우저와 API 호출은 `EC2_PUBLIC_IP:18080`을 사용합니다. Terraform Security Group은 수강생의 공인 IPv4 `/32`에서 오는 전체 인바운드 트래픽을 허용합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback `127.0.0.1:8012`로 제한됩니다.
 
 `vulnerable`과 `safe`는 같은 embedding model과 cosine 함수를 사용합니다. 차이는 ranking 이후 결과를 가리는 것이 아니라, **embedding/ranking 후보를 만들기 전에 인증 tenant metadata filter를 적용하는가**입니다. 미니 앱은 운영 vector DB가 아닌 교육용 인메모리 검색기입니다.
 
@@ -162,9 +161,9 @@ flowchart LR
 | Day 4 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
 | Day 4 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
 | Day 4 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
-| 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; Terraform TCP/18080은 수강생 공인 IPv4 `/32`만 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
+| 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; Terraform은 수강생 공인 IPv4 `/32`의 전체 인바운드를 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
 
-LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. Terraform이 만드는 TCP/18080 ingress는 `allowed_ingress_cidr` IPv4 `/32`만 받습니다. 직접 접속을 위해 자신의 공인 IPv4 `/32`를 사용하거나, 이미 승인된 수동 all-protocol 규칙이 그 `/32`에 한정된 경우에만 18080이 도달 가능합니다. 권장하는 최소 규칙은 TCP/18080 단일 포트이며 `0.0.0.0/0`은 사용하지 않습니다. 8012와 11434도 public internet에 공개하지 않습니다.
+LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. Terraform ingress는 `allowed_ingress_cidr` IPv4 `/32`에서 오는 모든 프로토콜과 포트를 허용합니다. 따라서 그 주소에서는 18080뿐 아니라 host에 publish된 8012와 11434에도 도달할 수 있습니다. 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
 
 ## 이미지 빌드
 

@@ -2,7 +2,7 @@
 # Upload the student Capstone starter from the local student package to EC2.
 #
 # Usage:
-#   AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+#   AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 #     bash infrastructure/scripts/student/upload-capstone.sh
 #
 # Existing destinations fail closed. To keep a timestamped backup and install
@@ -12,8 +12,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${AWS_PROFILE:=owasp-llm}"
 : "${AWS_REGION:?AWS_REGION is required, e.g. us-east-1}"
-: "${STUDENT:?STUDENT is required, e.g. alice}"
-: "${TF_DIR:=infrastructure/terraform}"
 : "${DEST_DIR:=/home/ubuntu/work/my-capstone}"
 : "${CAPSTONE_UPLOAD_MODE:=create}"
 
@@ -40,7 +38,7 @@ if [ ! -f "$CAPSTONE_INSTALLER" ]; then
   exit 1
 fi
 
-for cmd in aws terraform jq ssh scp ssh-keygen tar; do
+for cmd in aws jq ssh scp ssh-keygen tar; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "ERROR: required command not found: $cmd" >&2
     echo "Install the missing tool, then rerun this script from the student package root." >&2
@@ -48,9 +46,9 @@ for cmd in aws terraform jq ssh scp ssh-keygen tar; do
   fi
 done
 
-INSTANCE_ID=$(AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" STUDENT="$STUDENT" bash "$SCRIPT_DIR/instance-id.sh")
+INSTANCE_ID=$(AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" bash "$SCRIPT_DIR/instance-id.sh")
 if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "null" ]; then
-  echo "ERROR: cannot find instance id for STUDENT=$STUDENT from $TF_DIR output." >&2
+  echo "ERROR: cannot find the account's single lab instance." >&2
   exit 1
 fi
 
@@ -63,7 +61,7 @@ STATE=$(aws ec2 describe-instances \
 if [ "$STATE" != "running" ]; then
   echo "ERROR: instance $INSTANCE_ID is $STATE, not running." >&2
   echo "Run start-lab first:" >&2
-  echo "  AWS_PROFILE=$AWS_PROFILE AWS_REGION=$AWS_REGION STUDENT=$STUDENT bash infrastructure/scripts/student/start-lab.sh" >&2
+  echo "  AWS_PROFILE=$AWS_PROFILE AWS_REGION=$AWS_REGION bash infrastructure/scripts/student/start-lab.sh" >&2
   exit 1
 fi
 

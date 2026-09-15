@@ -61,14 +61,11 @@ python -m pip install -r tests/browser/requirements.txt
 python -m playwright install --with-deps chromium
 ```
 
-Resolve only the instance carrying the current course `Student` tag, then keep
-this single SSM forward open in a separate terminal.  Replace `yourname` with
-the same `student_id` used by Terraform:
+Resolve the account's single Terraform-managed lab instance, then keep this
+single SSM forward open in a separate terminal:
 
 ```bash
-export STUDENT=yourname
 export INSTANCE_ID="$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
-  STUDENT="$STUDENT" \
   bash infrastructure/scripts/student/instance-id.sh)"
 
 aws --profile owasp-llm --region us-east-1 \

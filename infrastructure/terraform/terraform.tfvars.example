@@ -6,15 +6,12 @@
 aws_profile = "owasp-llm"
 region      = "us-east-1"
 
-course_id  = "owasp-llm-2026"
-student_id = "student01"
+course_id = "owasp-llm-2026"
+
+# false는 SSM 접속 후 수동 설치, true는 최초 부팅 때 자동 설치.
+enable_user_data_bootstrap = false
 
 # 본인 공인 IPv4 뒤에 /32를 붙인다. 0.0.0.0/0은 허용하지 않는다.
 allowed_ingress_cidr = "203.0.113.10/32"
-alert_email          = "student@example.com"
 
-# 비용 알람이다. 실제 강의 시간과 리전 단가에 맞춰 확인한다.
-daily_budget_usd = 20
-
-# 기본값: g6.xlarge, 100GB, 수동 설치.
-# AMI·자동 bootstrap·commit 고정은 ../../docs/TERRAFORM-ADVANCED-OPTIONS.md를 참고한다.
+# 기본값: g6.xlarge, 100GB. AMI·commit 고정은 ../../docs/TERRAFORM-ADVANCED-OPTIONS.md 참고.

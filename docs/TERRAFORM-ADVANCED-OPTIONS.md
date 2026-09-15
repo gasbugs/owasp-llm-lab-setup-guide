@@ -4,20 +4,24 @@
 
 ## 기존 tfvars 이름 변경
 
-이전 예제를 복사한 `terraform.tfvars`가 있다면 `terraform plan` 전에 수강생 목록을 ID 하나로 바꾸고, 더 이상 선언되지 않는 날짜·월간 Budget·자동 중지 변수는 삭제한다.
+이전 예제를 복사한 `terraform.tfvars`가 있다면 `terraform plan` 전에 더 이상 선언되지 않는 다음 변수를 삭제한다.
 
-```hcl
-# 변경 전: student_ids = ["student01"]
-student_id = "student01"
-```
+- `student_ids`, `student_id`
+- `course_dates`, `course_start_date`
+- `course_budget_usd`, `monthly_budget_usd`, `daily_budget_usd`, `alert_email`
+- `enable_auto_stop`, `auto_stop_schedule_mode`, `auto_stop_custom_crons_utc`, `auto_stop_description`
 
-삭제할 수 있는 이전 변수 이름은 `course_dates`, `course_start_date`, `course_budget_usd`, `monthly_budget_usd`, `enable_auto_stop`, `auto_stop_schedule_mode`, `auto_stop_custom_crons_utc`, `auto_stop_description`이다.
-
-`student01` 같은 기존 ID를 유지하면 EC2·ASG·IAM의 Terraform resource 주소는 바뀌지 않는다. 반면 이전 Terraform state에 자동 중지 Lambda·EventBridge와 월간 Budget이 있으면 새 plan에는 해당 자원 삭제가 표시된다. 이는 현재 운영 정책에 맞는 변경이므로 정확한 대상인지 확인한 뒤 적용한다.
+기존 `student_id` 기반 state에서는 IAM·Security Group·Launch Template·ASG의 indexed 주소가 단일 주소로 바뀌고, Budget·SNS·Lambda·EventBridge가 있으면 삭제 대상으로 표시된다. 실행 중인 EC2가 교체될 수 있으므로 작업물을 먼저 보존하고 plan의 삭제·교체 대상을 확인한 뒤 적용한다.
 
 ## 자동 설치
 
-기본값은 EC2 생성 후 수강생이 SSM으로 접속해 설치 과정을 직접 실행하는 방식이다. 첫 부팅에 자동 설치하려면 다음 값을 추가한다.
+기본 예제는 다음 값을 명시해 EC2 생성 후 수강생이 SSM으로 접속하고 설치 과정을 직접 실행하게 한다.
+
+```hcl
+enable_user_data_bootstrap = false
+```
+
+강사용 환경에서 첫 부팅에 자동 설치하려면 이 값을 바꾼다.
 
 ```hcl
 enable_user_data_bootstrap = true

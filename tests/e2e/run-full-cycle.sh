@@ -236,7 +236,7 @@ run_llmgoat() {
 # === 실행 ===
 log "============================================"
 log "  OWASP Top 10 for LLM — Full Cycle e2e"
-log "  STUDENT=${STUDENT:-?} TRIALS=$TRIALS"
+log "  TRIALS=$TRIALS"
 log "============================================"
 
 if ! reset_mutable_state; then

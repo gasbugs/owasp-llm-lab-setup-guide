@@ -10,7 +10,6 @@
 - Terraform 1.x
 - Git
 - 강사가 공지한 AWS 리전
-- 비용 알람을 받을 이메일
 
 Ubuntu PC에서 위 도구를 한 번에 준비하려면 다음 선택적 스크립트를 실행할 수
 있습니다. 이 스크립트의 Docker는 로컬 개발용이며, EC2 실습 앱은 7단계의
@@ -71,16 +70,16 @@ cp terraform.tfvars.example terraform.tfvars
 aws_profile = "owasp-llm"
 region      = "us-east-1"
 course_id   = "owasp-llm-2026"
-student_id        = "yourname"
+
+# false는 SSM 접속 후 수동 설치, true는 EC2 최초 부팅 때 자동 설치입니다.
+enable_user_data_bootstrap = false
 
 # 본인 노트북의 현재 공인 IPv4 하나만 허용합니다.
 allowed_ingress_cidr = "203.0.113.10/32"
 
-alert_email        = "student@example.com"
-daily_budget_usd = 20
 ```
 
-AMI ID는 직접 입력하지 않습니다. Terraform이 검증된 계열의 최신 DLAMI를 조회하고 `g6.xlarge`, 100GB, 수동 설치를 기본값으로 적용합니다. AMI·자동 bootstrap·commit 고정이 필요한 강사용 환경만 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 참고합니다.
+AMI ID는 직접 입력하지 않습니다. Terraform이 검증된 계열의 최신 DLAMI를 조회하고 `g6.xlarge`, 100GB를 기본값으로 적용합니다. `enable_user_data_bootstrap = false`는 수강생이 SSM으로 접속해 설치 과정을 직접 확인하는 정본이며, 강사용 자동 설치에서는 이 값을 `true`로 바꿉니다. AMI·commit 고정이 필요한 강사용 환경만 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 참고합니다.
 
 ## 5. VM 생성
 
@@ -90,7 +89,7 @@ terraform plan
 terraform apply -auto-approve
 ```
 
-성공하면 `ami_id`, `ami_name`, `availability_zones`, `autoscaling_group_names`, `instance_lookup_commands`, `public_ip_lookup_commands`, `start_commands`, `stop_commands`, `ssm_session_commands`가 출력됩니다.
+성공하면 `ami_id`, `ami_name`, `availability_zones`, `autoscaling_group_name`, `instance_lookup_command`, `public_ip_lookup_command`, `start_command`, `stop_command`, `ssm_session_command`가 출력됩니다.
 
 ## 6. SSM 접속
 
@@ -99,8 +98,7 @@ terraform apply -auto-approve
 저장소 루트에서 실행합니다.
 
 ```bash
-export STUDENT=yourname
-export INSTANCE_ID=$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT="$STUDENT" \
+export INSTANCE_ID=$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/instance-id.sh)
 
 aws ssm start-session --profile owasp-llm --region us-east-1 \
@@ -109,7 +107,7 @@ aws ssm start-session --profile owasp-llm --region us-east-1 \
 
 ## 7. 실습 앱 직접 설치
 
-SSM 세션 안에서 아래 명령을 실행합니다. Terraform output의 `manual_install_commands`에 같은 명령이 표시됩니다.
+SSM 세션 안에서 아래 명령을 실행합니다. Terraform output의 `manual_install_command`에 같은 명령이 표시됩니다.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/install-lab.sh | sudo bash
@@ -136,7 +134,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 ### 본인 공인 IPv4에서 실습 서비스에 접속
 
-Terraform은 `allowed_ingress_cidr`에 적은 본인 공인 IPv4 `/32`에서만 실습 포트를 받습니다. `public_ip_lookup_commands`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. 예를 들어 Portal은 `http://EC2_PUBLIC_IP:8080`입니다. `0.0.0.0/0`으로 넓히지 않으며, 노트북의 공인 IP가 바뀌면 현재 값으로 `terraform apply`를 다시 실행합니다.
+Terraform은 포트별 Security Group 규칙을 만들지 않습니다. 대신 `allowed_ingress_cidr`에 적은 본인 공인 IPv4 `/32`에서 오는 모든 프로토콜과 포트를 ingress 규칙 하나로 허용합니다. `public_ip_lookup_command`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. 예를 들어 Portal은 `http://EC2_PUBLIC_IP:8080`입니다. `0.0.0.0/0`으로 넓히지 않으며, 노트북의 공인 IP가 바뀌면 현재 값으로 `terraform apply`를 다시 실행합니다.
 
 ### LLM08 추가 셋업
 
@@ -250,18 +248,18 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 ## 11. 매일 시작
 
 ```bash
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/start-lab.sh
 ```
 
 ## 12. 매일 종료
 
 ```bash
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 
-이 명령을 실행하면 EC2 시간당 요금이 멈춥니다. EBS 비용은 남습니다.
+이 명령은 ASG를 0으로 낮춰 EC2와 root EBS를 삭제하므로 두 자원의 비용이 멈춥니다.
 
 ## 13. 강의 종료 후 삭제
 

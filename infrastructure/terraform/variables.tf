@@ -27,15 +27,6 @@ variable "course_id" {
   }
 }
 
-variable "student_id" {
-  description = "현재 AWS 계정을 사용하는 수강생 ID. 인스턴스 태그와 IAM 이름에 사용."
-  type        = string
-  validation {
-    condition     = can(regex("^[a-z0-9-]{2,30}$", var.student_id))
-    error_message = "student_id는 소문자/숫자/하이픈만, 2~30자로 입력하세요."
-  }
-}
-
 variable "enable_user_data_bootstrap" {
   description = "true이면 EC2 최초 부팅 시 install-lab.sh를 user-data로 자동 실행한다. 기본값 false는 수강생이 SSM 접속 후 직접 설치 절차를 수행하는 방식이다."
   type        = bool
@@ -113,7 +104,7 @@ variable "root_volume_size" {
 }
 
 variable "allowed_ingress_cidr" {
-  description = "실습 서비스에 직접 접근할 실습자 본인의 공인 IPv4 /32 CIDR"
+  description = "모든 인바운드 트래픽을 허용할 실습자 본인의 공인 IPv4 /32 CIDR"
   type        = string
   validation {
     condition = (
@@ -126,23 +117,5 @@ variable "allowed_ingress_cidr" {
   }
 }
 
-variable "daily_budget_usd" {
-  description = "일일 비용 알람 임계값(USD)"
-  type        = number
-  default     = 20
-  validation {
-    condition     = var.daily_budget_usd > 0 && var.daily_budget_usd <= 10000
-    error_message = "daily_budget_usd는 0보다 크고 10000 이하로 설정하세요."
-  }
-}
-
-variable "alert_email" {
-  description = "비용 알람·운영 알람을 받을 이메일"
-  type        = string
-  validation {
-    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
-    error_message = "alert_email은 알림을 받을 이메일 주소 형식이어야 합니다."
-  }
-}
 
 # backup_retention_days 변수 제거 — S3 백업 자체를 안 씀

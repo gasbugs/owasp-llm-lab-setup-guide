@@ -5,7 +5,7 @@
 #   - 검증 단계엔 외부 인터넷 허용 (Ubuntu repo, GHCR, Ollama 등 pull)
 #   - 강의 정식 운영 시 골든 AMI(Packer)로 변경하면 인터넷 차단으로 회귀 가능
 #   - VPC endpoint는 사용하지 않는다. SSM과 이미지 pull은 public egress 사용.
-#   - 수강생별 보안 그룹으로 실습 포트 접근 범위를 제한
+#   - 수강생별 보안 그룹은 지정한 공인 IPv4 /32 한 곳의 전체 트래픽만 허용
 ################################################################################
 
 resource "aws_vpc" "main" {
@@ -89,69 +89,21 @@ resource "aws_route_table_association" "lab" {
 }
 
 ################################################################################
-# Security Groups — 수강생별 1개, 옆 수강생 인스턴스 접근 불가
+# Security Group — 계정당 1개, 지정한 공인 IPv4 /32만 허용
 ################################################################################
 
 resource "aws_security_group" "student" {
-  for_each    = local.student_ids
-  name        = "${local.name_prefix}-sg-${each.key}"
-  description = "Student ${each.key} isolation"
+  name        = "${local.name_prefix}-sg"
+  description = "Lab ingress restricted to one public IPv4 /32"
   vpc_id      = aws_vpc.main.id
 
-  # 의도적으로 취약한 챗봇이므로 전체 인터넷에 열지 않는다.
-  # 홍보 캡처·검증 시 운영자 현재 IP/32만 허용한다.
+  # 포트별 규칙을 늘리지 않고 실습자의 현재 공인 IPv4 /32 하나만 신뢰한다.
+  # 이 주소에서 들어오는 모든 IP 프로토콜과 포트를 하나의 규칙으로 허용한다.
   ingress {
-    description = "lab-portal (8080)"
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ingress_cidr]
-  }
-
-  dynamic "ingress" {
-    for_each = local.lab_app_ports
-    content {
-      description = "lab app (${ingress.value})"
-      from_port   = ingress.value
-      to_port     = ingress.value
-      protocol    = "tcp"
-      cidr_blocks = [var.allowed_ingress_cidr]
-    }
-  }
-
-  dynamic "ingress" {
-    for_each = local.module08_observability_ports
-
-    content {
-      description = "Module 08 observability port ${ingress.value} from student IP"
-      from_port   = ingress.value
-      to_port     = ingress.value
-      protocol    = "tcp"
-      cidr_blocks = [var.allowed_ingress_cidr]
-    }
-  }
-
-  ingress {
-    description = "lab-llmgoat (5000)"
-    from_port   = 5000
-    to_port     = 5000
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ingress_cidr]
-  }
-
-  ingress {
-    description = "lab-dvla (8501)"
-    from_port   = 8501
-    to_port     = 8501
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ingress_cidr]
-  }
-
-  ingress {
-    description = "Ollama API (11434) - GPU abuse risk"
-    from_port   = 11434
-    to_port     = 11434
-    protocol    = "tcp"
+    description = "All traffic from the student's public IPv4 /32"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [var.allowed_ingress_cidr]
   }
 
@@ -164,8 +116,7 @@ resource "aws_security_group" "student" {
   }
 
   tags = {
-    Name    = "${local.name_prefix}-sg-${each.key}"
-    Student = each.key
+    Name = "${local.name_prefix}-sg"
   }
 }
 

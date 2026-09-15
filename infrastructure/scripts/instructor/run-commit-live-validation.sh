@@ -11,15 +11,13 @@ Usage:
   SETUP_COMMIT=<40-char-main-commit> \
   COURSE_COMMIT=<40-char-main-commit> \
   COURSE_REPO=/absolute/path/to/owasp-top-10-for-llm \
-  ALERT_EMAIL=instructor@example.com \
-  AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=validator \
+  AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
     bash infrastructure/scripts/instructor/run-commit-live-validation.sh
 
 Required inputs:
   SETUP_COMMIT      Published setup-repository main commit.
   COURSE_COMMIT     Published, clean course-repository main commit.
   COURSE_REPO      Local course checkout whose capstone harness is uploaded.
-  ALERT_EMAIL      Daily Budget alert endpoint required by the Terraform stack.
 
 Canonical public image source:
   IMAGE_REGISTRY=ghcr.io
@@ -28,7 +26,7 @@ Canonical public image source:
 Safety controls:
   * IMAGE_TAG is derived as sha-$SETUP_COMMIT; latest is never accepted.
   * Existing Terraform state aborts the run before apply.
-  * EC2 ingress remains 127.0.0.1/32 and SSM is used for transport.
+  * EC2 ingress uses a non-routable documentation /32 and SSM is used for transport.
   * No Lambda or EventBridge auto-stop resource is created.
   * Every wait and remote command is bounded by the controller deadline.
   * The EXIT trap downloads evidence when possible, always runs destroy, and
@@ -54,10 +52,8 @@ fi
 : "${SETUP_COMMIT:?SETUP_COMMIT is required; see --help}"
 : "${COURSE_COMMIT:?COURSE_COMMIT is required; see --help}"
 : "${COURSE_REPO:?COURSE_REPO is required}"
-: "${ALERT_EMAIL:?ALERT_EMAIL is required by the Terraform alert resources}"
 : "${AWS_PROFILE:=owasp-llm}"
 : "${AWS_REGION:=us-east-1}"
-: "${STUDENT:=validator}"
 : "${RUN_DEADLINE_MINUTES:=120}"
 : "${IMAGE_REGISTRY:=ghcr.io}"
 : "${IMAGE_NAMESPACE:=gasbugs}"
@@ -91,21 +87,12 @@ if [[ ! "$AWS_REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
   echo "ERROR: AWS_REGION is invalid" >&2
   exit 2
 fi
-if [[ ! "$STUDENT" =~ ^[a-z0-9-]{2,30}$ ]]; then
-  echo "ERROR: STUDENT must use lowercase letters, digits, or hyphens" >&2
-  exit 2
-fi
 if [[ ! "$RUN_DEADLINE_MINUTES" =~ ^[0-9]+$ ]] \
   || [ "$RUN_DEADLINE_MINUTES" -lt 30 ] \
   || [ "$RUN_DEADLINE_MINUTES" -gt 180 ]; then
   echo "ERROR: RUN_DEADLINE_MINUTES must be an integer from 30 through 180" >&2
   exit 2
 fi
-if [[ ! "$ALERT_EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; then
-  echo "ERROR: ALERT_EMAIL is not a valid email address" >&2
-  exit 2
-fi
-
 IMAGE_TAG="sha-$SETUP_COMMIT"
 RUN_ID="$(date -u +%Y%m%d-%H%M%S)-${SETUP_COMMIT:0:12}"
 COURSE_ID="live-$(date -u +%Y%m%d-%H%M)-$$"
@@ -650,16 +637,6 @@ direct_residual_audit() {
   aws_cli iam list-instance-profiles --output json \
     >"$audit_tmp/profiles.json" 2>>"$CONTROL_LOG" || failed=1
 
-  local account_id
-  account_id=$(aws_cli sts get-caller-identity --query Account --output text 2>>"$CONTROL_LOG") \
-    || failed=1
-  if [ -n "${account_id:-}" ]; then
-    aws_cli budgets describe-budgets --account-id "$account_id" --output json \
-      >"$audit_tmp/budgets.json" 2>>"$CONTROL_LOG" || failed=1
-  else
-    printf '{"Budgets":[]}' >"$audit_tmp/budgets.json"
-  fi
-
   if [ "$failed" -ne 0 ]; then
     jq -n --arg course_id "$COURSE_ID" \
       '{schema:"owasp-llm-residual-audit/v1",course_id:$course_id,
@@ -686,8 +663,7 @@ direct_residual_audit() {
     --slurpfile sns "$audit_tmp/sns.json" \
     --slurpfile logs "$audit_tmp/logs.json" \
     --slurpfile roles "$audit_tmp/roles.json" \
-    --slurpfile profiles "$audit_tmp/profiles.json" \
-    --slurpfile budgets "$audit_tmp/budgets.json" '
+    --slurpfile profiles "$audit_tmp/profiles.json" '
       def includes_course: contains($course_id);
       {
         schema:"owasp-llm-residual-audit/v1", course_id:$course_id,
@@ -717,9 +693,7 @@ direct_residual_audit() {
           iam_roles:([$roles[0].Roles[]?
             | select(.RoleName | includes_course)] | length),
           instance_profiles:([$profiles[0].InstanceProfiles[]?
-            | select(.InstanceProfileName | includes_course)] | length),
-          budgets:([$budgets[0].Budgets[]?
-            | select(.BudgetName | includes_course)] | length)
+            | select(.InstanceProfileName | includes_course)] | length)
         }
       }
       | .status = (if ([.counts[]] | add) == 0 then "PASS" else "FAIL" end)
@@ -1043,18 +1017,15 @@ PY
 COST_DEADLINE_EPOCH=$RUN_DEADLINE_EPOCH
 
 export TF_IN_AUTOMATION=1
-export TF_VAR_alert_email="$ALERT_EMAIL"
 TF_VARS=(
   "-var=region=$AWS_REGION"
   "-var=aws_profile=$AWS_PROFILE"
   "-var=course_id=$COURSE_ID"
-  "-var=student_id=$STUDENT"
   "-var=enable_user_data_bootstrap=true"
   "-var=lab_setup_repo_raw_url=https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/$SETUP_COMMIT"
   "-var=lab_image_namespace=$IMAGE_NAMESPACE"
   "-var=lab_image_tag=$IMAGE_TAG"
-  "-var=allowed_ingress_cidr=127.0.0.1/32"
-  "-var=daily_budget_usd=5"
+  "-var=allowed_ingress_cidr=203.0.113.10/32"
 )
 
 log "Terraform apply starts; controller deadline epoch is $RUN_DEADLINE_EPOCH"
@@ -1067,7 +1038,6 @@ INSTANCE_ID=""
 for _ in $(seq 1 120); do
   INSTANCE_ID=$(aws_cli ec2 describe-instances \
     --filters "Name=tag:Course,Values=$COURSE_ID" \
-      "Name=tag:Student,Values=$STUDENT" \
       "Name=instance-state-name,Values=pending,running" \
     --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || true)
   [[ "$INSTANCE_ID" =~ ^i-[0-9a-f]+$ ]] && break
@@ -1169,8 +1139,7 @@ REMOTE_SETUP
 log "Uploading Day 5 course capstone with the existing setup uploader"
 (
   cd "$PINNED_COURSE"
-  AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" STUDENT="$STUDENT" \
-    TF_DIR="$TF_DIR" \
+  AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" \
     bounded_by_cost_deadline 600 \
       bash "$PINNED_REPO/infrastructure/scripts/student/upload-capstone.sh"
 ) >>"$CONTROL_LOG" 2>&1

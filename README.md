@@ -18,7 +18,7 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 | `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 공개 GHCR에 push하는 절차 |
 | `docs/LIVE-VALIDATION.md` | commit 태그와 resolved digest로 EC2 런타임을 설치하고 증거를 회수하는 강사용 절차 |
 | `docs/TROUBLESHOOTING.md` | quota, SSM, Terraform, Docker, Ollama 문제 해결 |
-| `infrastructure/terraform/` | VPC, 보안 그룹, EC2 GPU 인스턴스, IAM, 일일 Budget 알람 |
+| `infrastructure/terraform/` | VPC, 보안 그룹, EC2 GPU 인스턴스, IAM |
 | `infrastructure/terraform/user-data.sh.tpl` | 선택적 자동 설치용 user-data 래퍼. 기본값에서는 비활성화 |
 | `infrastructure/scripts/student/` | 수강생용 preflight, 수동 설치/클린업, instance-id, start, stop, sync 헬퍼 |
 | `infrastructure/packer/` | 선택 사항: 강사용 Golden AMI 빌드 |
@@ -53,7 +53,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 
 cd infrastructure/terraform
 cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars에서 student_id, 접속 IP와 알림 이메일 수정
+# terraform.tfvars에서 자동 설치 여부와 접속 IP를 확인
 
 terraform init
 terraform plan
@@ -63,17 +63,17 @@ terraform apply -auto-approve
 매일 시작과 종료는 저장소 루트에서 실행합니다.
 
 ```bash
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/start-lab.sh
 
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 
 ## 기본 배포 방식
 
 1. Terraform이 기존 검증 계열인 `Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)`의 최신 AMI를 조회합니다.
-2. Terraform이 수강생별 EC2 `g6.xlarge` 1대를 만듭니다.
+2. Terraform이 현재 AWS 계정에 EC2 `g6.xlarge` 1대를 만듭니다.
 3. 기본값에서는 user-data 자동 설치가 실행되지 않습니다.
 4. 수강생이 SSM으로 EC2에 접속해 `install-lab.sh`를 직접 실행합니다.
 5. 설치 스크립트가 Docker을 설치하고 실습 컨테이너 이미지를 pull합니다.
@@ -107,7 +107,7 @@ loopback API로 실제 호출합니다. 각 응답은 `llmgoat/raw/requests.json
 
 전체 절차와 결과 경로는 [docs/LIVE-VALIDATION.md](docs/LIVE-VALIDATION.md)에 고정합니다.
 
-강사가 운영 편의상 자동 설치를 원하면 `terraform.tfvars`에 아래 값을 추가합니다.
+강사가 운영 편의상 자동 설치를 원하면 `terraform.tfvars`의 명시적인 값을 아래처럼 바꿉니다.
 
 ```hcl
 enable_user_data_bootstrap = true
@@ -125,9 +125,9 @@ enable_user_data_bootstrap = true
 - 매일 실습 종료 후 즉시 `stop-lab.sh`를 실행하세요.
 - Terraform은 자동 중지 Lambda·EventBridge를 만들지 않습니다. 실습 직후 `stop-lab.sh`로 ASG를 0으로 낮춰 EC2와 root EBS를 삭제합니다.
 - 강의 종료 후에는 보존할 작업물을 개인 GitHub repo에 push한 뒤 `terraform destroy`를 실행하세요.
-- 일일 Budget은 비용을 막아 주는 장치가 아니라 경보입니다. 알람이 오면 즉시 ASG가 0인지 확인하세요.
+- 이 Terraform은 Budget 알람을 만들지 않으므로 실행 시간을 직접 관리합니다.
 
-일시적인 강사 디버깅처럼 실습 포트를 로컬에서만 확인해야 할 때는 다음 SSM 포트포워딩 helper를 사용할 수 있습니다. 수강생 정본은 보안 그룹의 본인 공인 IPv4 `/32`와 EC2 public IP를 이용한 직접 접속이며, 자세한 포트 목록은 `docs/STUDENT-QUICKSTART.md`를 참고합니다.
+일시적인 강사 디버깅처럼 실습 서비스를 로컬에서만 확인해야 할 때는 다음 SSM 포트포워딩 helper를 사용할 수 있습니다. 수강생 정본은 보안 그룹이 본인 공인 IPv4 `/32`의 전체 인바운드 트래픽을 허용하고, EC2 public IP로 직접 접속하는 방식입니다.
 
 ```bash
 AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
@@ -137,7 +137,8 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 ## 보안 원칙
 
 - `allowed_ingress_cidr`는 필수값이며 본인 공인 IPv4 `/32`만 입력합니다.
-- 브라우저는 이 `/32`에서 EC2 public IP의 학습자 포트로 직접 접속합니다.
+- 보안 그룹은 이 `/32`에서 오는 모든 프로토콜과 포트를 단일 ingress 규칙으로 허용합니다.
+- 브라우저와 API client는 이 `/32`에서 EC2 public IP로 직접 접속합니다.
 - `0.0.0.0/0` 또는 `::/0` 공개는 Terraform validation에서 차단됩니다.
 - Access Key, Secret, `terraform.tfvars`, `.tfstate` 파일은 절대 commit하지 마세요.
 

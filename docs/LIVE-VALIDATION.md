@@ -17,10 +17,8 @@ COURSE_COMMIT=$(git -C /absolute/path/to/owasp-top-10-for-llm rev-parse origin/m
 SETUP_COMMIT="$SETUP_COMMIT" \
 COURSE_COMMIT="$COURSE_COMMIT" \
 COURSE_REPO=/absolute/path/to/owasp-top-10-for-llm \
-ALERT_EMAIL=instructor@example.com \
 AWS_PROFILE=owasp-llm \
 AWS_REGION=us-east-1 \
-STUDENT=validator \
 RUN_DEADLINE_MINUTES=120 \
   bash infrastructure/scripts/instructor/run-commit-live-validation.sh
 ```
@@ -29,7 +27,7 @@ controller는 setup과 course의 명시한 40자리 commit이 각각 공개 `ori
 
 EC2 생성 전에는 선택한 Playwright package/browser를 실제 headless launch/close하고 로컬 `18011`, `18501`, `15000` 포트가 비어 있는지도 확인합니다. 원격 strict core가 끝나면 controller가 SSM forward `8011→18011`, `8501→18501`, `5000→15000`을 bounded child process로 열고 Day 3 UI/DVLA와 LLMGoat A01 harness를 실행합니다. LLMGoat UI는 API `response`의 정확한 DOM 반영과 boolean `solved`에 따른 overlay/sidebar 일치를 검사하며, solved 자체는 관찰값으로만 남깁니다. 결과와 세 forward cleanup 증거를 원격 raw bundle에 원자적으로 전달한 뒤에만 archive를 닫습니다. `STRICT_ACCEPTANCE=true TRIALS=5` full-cycle의 종료 코드를 그대로 사용하며 LLM10 timeout 같은 결과를 controller가 임의로 성공으로 바꾸지 않습니다. raw evidence archive와 SHA-256은 기본적으로 `$HOME/owasp-llm-live-evidence/<run-id>/remote/`에 회수됩니다.
 
-테스트가 실패해도 원격 runner의 EXIT trap이 현재 증거를 먼저 archive합니다. 원격 timeout/crash면 controller가 기존 run root를 `partial=true`로 별도 archive해 회수합니다. 그 직후 captured instance ID와 고유 `Course` 태그로 EC2 terminate를 직접 요청하고 terminated 상태를 확인한 다음, `terraform destroy`로 나머지 자원을 정리합니다. 마지막에는 Terraform state뿐 아니라 EC2, EBS, 네트워크, SNS, IAM, Budget을 직접 조회하고 legacy Lambda·EventBridge도 남지 않았는지 확인합니다. 증거 회수·직접 terminate·destroy·잔여 자원 확인 중 하나라도 실패하면 전체 명령도 실패합니다. 이 controller에는 인스턴스를 남기는 옵션이 없습니다.
+테스트가 실패해도 원격 runner의 EXIT trap이 현재 증거를 먼저 archive합니다. 원격 timeout/crash면 controller가 기존 run root를 `partial=true`로 별도 archive해 회수합니다. 그 직후 captured instance ID와 고유 `Course` 태그로 EC2 terminate를 직접 요청하고 terminated 상태를 확인한 다음, `terraform destroy`로 나머지 자원을 정리합니다. 마지막에는 Terraform state뿐 아니라 EC2, EBS, 네트워크, SNS, IAM을 직접 조회하고 legacy Lambda·EventBridge도 남지 않았는지 확인합니다. 증거 회수·직접 terminate·destroy·잔여 자원 확인 중 하나라도 실패하면 전체 명령도 실패합니다. 이 controller에는 인스턴스를 남기는 옵션이 없습니다.
 
 ## 1. 검증 커밋과 이미지 세트 고정
 
@@ -265,7 +263,7 @@ raw 응답에는 실습용 비밀값과 공격 payload가 포함될 수 있습�
 SETUP_REPO=/absolute/path/to/owasp-llm-lab-setup-guide
 cd "$SETUP_REPO"
 
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 

@@ -43,20 +43,18 @@ data "aws_ami" "lab_base" {
 }
 
 resource "aws_launch_template" "student" {
-  for_each = local.student_ids
-
-  name_prefix   = "${local.name_prefix}-${each.key}-"
+  name_prefix   = "${local.name_prefix}-"
   image_id      = data.aws_ami.lab_base.id
   instance_type = var.instance_type
   user_data     = var.enable_user_data_bootstrap ? base64encode(local.user_data) : null
 
   iam_instance_profile {
-    name = aws_iam_instance_profile.student[each.key].name
+    name = aws_iam_instance_profile.student.name
   }
 
   network_interfaces {
     associate_public_ip_address = true
-    security_groups             = [aws_security_group.student[each.key].id]
+    security_groups             = [aws_security_group.student.id]
   }
 
   block_device_mappings {
@@ -84,18 +82,18 @@ resource "aws_launch_template" "student" {
   tag_specifications {
     resource_type = "instance"
     tags = {
-      Name    = "${local.name_prefix}-${each.key}"
-      Student = each.key
+      Name    = local.name_prefix
       Course  = var.course_id
+      Project = "owasp-top-10-for-llm"
     }
   }
 
   tag_specifications {
     resource_type = "volume"
     tags = {
-      Name    = "${local.name_prefix}-${each.key}-root"
-      Student = each.key
+      Name    = "${local.name_prefix}-root"
       Course  = var.course_id
+      Project = "owasp-top-10-for-llm"
     }
   }
 
@@ -114,9 +112,7 @@ resource "aws_launch_template" "student" {
 }
 
 resource "aws_autoscaling_group" "student" {
-  for_each = local.student_ids
-
-  name                             = "${local.name_prefix}-asg-${each.key}"
+  name                             = "${local.name_prefix}-asg"
   min_size                         = 0
   max_size                         = 1
   desired_capacity                 = 1
@@ -127,19 +123,19 @@ resource "aws_autoscaling_group" "student" {
   wait_for_capacity_timeout        = "20m"
 
   launch_template {
-    id      = aws_launch_template.student[each.key].id
+    id      = aws_launch_template.student.id
     version = "$Latest"
   }
 
   tag {
     key                 = "Name"
-    value               = "${local.name_prefix}-${each.key}"
+    value               = local.name_prefix
     propagate_at_launch = true
   }
 
   tag {
-    key                 = "Student"
-    value               = each.key
+    key                 = "Project"
+    value               = "owasp-top-10-for-llm"
     propagate_at_launch = true
   }
 

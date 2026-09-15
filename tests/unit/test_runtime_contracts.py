@@ -237,18 +237,15 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertTrue((ROOT / "infrastructure" / "compose" / "compose.yaml").exists())
         self.assertFalse((ROOT / "docker" / "docker-compose.yaml").exists())
 
-    def test_security_group_only_lists_deployed_app_ports(self) -> None:
+    def test_security_group_allows_all_traffic_from_student_ipv4_only(self) -> None:
         terraform = read("infrastructure/terraform/main.tf")
-        self.assertIn(
-            "toset([3000, 8000, 8001, 8002, 8010, 8011, 8012, 8013, 18080])",
-            terraform,
-        )
+        self.assertNotIn("lab_app_ports", terraform)
+        self.assertNotIn("module08_observability_ports", terraform)
         network = read("infrastructure/terraform/network.tf")
-        self.assertIn("for_each = local.lab_app_ports", network)
-        self.assertIn("for_each = local.module08_observability_ports", network)
         self.assertIn("cidr_blocks = [var.allowed_ingress_cidr]", network)
-        self.assertIn('protocol    = "tcp"', network)
-        self.assertNotIn("5050", read("infrastructure/terraform/network.tf"))
+        self.assertIn('protocol    = "-1"', network)
+        self.assertNotIn('dynamic "ingress"', network)
+        self.assertEqual(network.count("  ingress {"), 1)
         variables = read("infrastructure/terraform/variables.tf")
         self.assertIn("[0-9]{1,3}/32", variables)
         self.assertNotIn('default     = "127.0.0.1/32"', variables)
@@ -374,22 +371,28 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('trimprefix(var.lab_image_tag, "sha-")', instance)
         self.assertIn("commit-pinned bootstrap", instance)
 
-    def test_terraform_student_inputs_match_the_one_account_model(self) -> None:
+    def test_terraform_inputs_match_the_one_account_model(self) -> None:
         variables = read("infrastructure/terraform/variables.tf")
         terraform = read("infrastructure/terraform/main.tf")
         example = read("infrastructure/terraform/terraform.tfvars.example")
-        budgets = read("infrastructure/terraform/budgets.tf")
+        terraform_dir = ROOT / "infrastructure" / "terraform"
+        all_terraform = "\n".join(
+            path.read_text(encoding="utf-8") for path in terraform_dir.glob("*.tf")
+        )
 
-        self.assertIn('variable "student_id"', variables)
+        self.assertNotIn('variable "student_id"', variables)
         self.assertNotIn('variable "student_ids"', variables)
-        self.assertIn("student_ids = toset([var.student_id])", terraform)
+        self.assertNotIn("student_ids", terraform)
         self.assertNotIn('variable "course_start_date"', variables)
         self.assertNotIn('variable "course_dates"', variables)
         self.assertNotIn('variable "monthly_budget_usd"', variables)
         self.assertNotIn('variable "course_budget_usd"', variables)
-        self.assertIn('resource "aws_budgets_budget" "daily"', budgets)
-        self.assertNotIn('resource "aws_budgets_budget" "course_total"', budgets)
-        self.assertNotIn("time_period_start", budgets)
+        self.assertNotIn('variable "daily_budget_usd"', variables)
+        self.assertNotIn('variable "alert_email"', variables)
+        self.assertFalse((terraform_dir / "budgets.tf").exists())
+        self.assertNotIn("aws_budgets_budget", all_terraform)
+        self.assertNotIn("aws_sns_topic", all_terraform)
+        self.assertIn("enable_user_data_bootstrap = false", example)
         self.assertLessEqual(len(example.splitlines()), 20)
 
     def test_teardown_lists_and_verifies_the_complete_state(self) -> None:

@@ -29,11 +29,10 @@ rm tfplan
 echo
 echo "=========================================="
 echo "Apply 완료. 인스턴스는 *부팅 후 stopped 상태가 아닌, running 상태*입니다."
-echo "필요 시 아래 수강생별 명령으로 즉시 stop하세요:"
-terraform output -json stop_commands 2>/dev/null \
-  | jq -r 'to_entries[] | "  \(.key): \(.value)"' \
-  || echo "  terraform output stop_commands"
+echo "필요 시 아래 명령으로 즉시 stop하세요:"
+terraform output -raw stop_command 2>/dev/null \
+  || echo "  terraform output -raw stop_command"
 echo
 echo "SSM 접속 명령:"
-terraform output -json ssm_session_commands 2>/dev/null | jq . || echo "  (jq 없음 — terraform output ssm_session_commands)"
+terraform output -raw ssm_session_command 2>/dev/null || echo "  terraform output -raw ssm_session_command"
 echo "=========================================="
