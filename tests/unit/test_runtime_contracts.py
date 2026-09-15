@@ -59,6 +59,17 @@ class RuntimeContractTest(unittest.TestCase):
             self.assertIn(f'"--port", "{port}"', compose)
         self.assertIn('docker compose up -d --no-deps --force-recreate "$service"', runner)
 
+    def test_ollama_compat_alias_is_verified_after_transient_cli_eof(self) -> None:
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        self.assertIn(
+            'ollama create "$OLLAMA_COMPAT_MODEL" -f /tmp/Modelfile.compat || true',
+            installer,
+        )
+        self.assertIn(
+            'compatibility alias is absent after create: $OLLAMA_COMPAT_MODEL',
+            installer,
+        )
+
     def test_every_deployed_service_has_an_explicit_port_exposure_contract(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         compose = read("infrastructure/compose/compose.yaml")
