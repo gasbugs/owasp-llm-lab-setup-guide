@@ -71,36 +71,16 @@ cp terraform.tfvars.example terraform.tfvars
 aws_profile = "owasp-llm"
 region      = "us-east-1"
 course_id   = "owasp-llm-2026"
-
-# 기본값은 g6.xlarge를 제공하는 모든 AZ를 ASG에 전달합니다.
-# 장애 분석 목적 외에는 단일 AZ를 지정하지 않습니다.
-
-student_ids = ["yourname"]
-
-course_dates = [
-  "2026-09-07",
-  "2026-09-08",
-  "2026-09-09",
-  "2026-09-10",
-  "2026-09-11",
-]
-
-# AMI ID는 직접 입력하지 않습니다.
-# Terraform이 기존 검증 계열의 최신 DLAMI를 자동 조회합니다.
+student_id        = "yourname"
 
 # 본인 노트북의 현재 공인 IPv4 하나만 허용합니다.
 allowed_ingress_cidr = "203.0.113.10/32"
 
-# 기본값은 수동 설치입니다.
-enable_user_data_bootstrap = false
-
-daily_budget_usd  = 20
-course_budget_usd = 120
-alert_email       = "student@example.com"
-
-# 기본 인스턴스 타입은 g6.xlarge입니다.
-# instance_type = "g6.xlarge"
+alert_email        = "student@example.com"
+daily_budget_usd = 20
 ```
+
+AMI ID는 직접 입력하지 않습니다. Terraform이 검증된 계열의 최신 DLAMI를 조회하고 `g6.xlarge`, 100GB, 수동 설치를 기본값으로 적용합니다. AMI·자동 bootstrap·commit 고정이 필요한 강사용 환경만 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 참고합니다.
 
 ## 5. VM 생성
 
@@ -150,7 +130,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Day 4 LLM03 fake model registry 실행: `lab-fake-registry`, port `8002`
 - 단일 Docker Compose 파일로 모든 서비스 실행
 - EC2 재부팅 후 자동 복구를 위한 `restart: always`와 `Docker daemon` 설정
-- Terraform 기본 설정으로 매일 18:00 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 기존 17:30 모드, 야간 반복 모드 또는 custom cron 선택 가능
+- 자동 중지 Lambda·EventBridge는 설치하지 않음. 실습 직후 `stop-lab.sh`로 ASG를 0으로 낮춰 EC2와 root EBS 삭제
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
 
@@ -179,7 +159,7 @@ LLM08 설치가 끝나면 최소 다음 계약을 확인합니다.
 enable_user_data_bootstrap = true
 ```
 
-강사가 commit 고정값을 공지한 경우에는 `lab_setup_repo_raw_url`, `lab_image_namespace`, `lab_image_tag`도 공지값을 그대로 사용합니다. 이 값들은 최초 `terraform apply` 전에 설정해야 합니다. 기존 인스턴스에서 값을 바꿔도 `user_data_replace_on_change = false` 설정 때문에 자동 설치가 다시 실행되지는 않습니다.
+강사가 commit 고정값을 공지한 경우에는 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)의 `lab_setup_repo_raw_url`, `lab_image_namespace`, `lab_image_tag`를 공지값대로 추가합니다. 이 값들은 최초 `terraform apply` 전에 설정해야 합니다. 기존 인스턴스에서 값을 바꿔도 `user_data_replace_on_change = false` 설정 때문에 자동 설치가 다시 실행되지는 않습니다.
 
 ## 8. 컨테이너 상태 확인
 

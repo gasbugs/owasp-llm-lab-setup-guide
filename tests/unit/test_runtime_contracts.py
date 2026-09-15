@@ -153,10 +153,10 @@ class RuntimeContractTest(unittest.TestCase):
             workflow,
         )
 
-    def test_installer_reports_the_current_default_auto_stop_time(self) -> None:
+    def test_installer_requires_explicit_asg_cleanup_without_lambda(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
-        self.assertIn("Terraform 기본 설정은 매일 18:00 KST", installer)
-        self.assertNotIn("Terraform 기본 설정은 매일 17:30 KST", installer)
+        self.assertIn("자동 중지 Lambda·EventBridge를 만들지 않습니다", installer)
+        self.assertIn("stop-lab.sh로 ASG를 0으로 낮추면", installer)
 
     def test_user_data_bootstrap_reuses_pinned_runtime_installer(self) -> None:
         instance = read("infrastructure/terraform/instance.tf")
@@ -347,6 +347,7 @@ class RuntimeContractTest(unittest.TestCase):
         instance = read("infrastructure/terraform/instance.tf")
         user_data = read("infrastructure/terraform/user-data.sh.tpl")
         example = read("infrastructure/terraform/terraform.tfvars.example")
+        advanced = read("docs/TERRAFORM-ADVANCED-OPTIONS.md")
 
         namespace = variables.split('variable "lab_image_namespace"', 1)[1].split(
             'variable "lab_image_tag"', 1
@@ -364,12 +365,32 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('IMAGE_NAMESPACE="$IMAGE_NAMESPACE"', user_data)
         self.assertIn('IMAGE_TAG="$IMAGE_TAG"', user_data)
         self.assertIn("ghcr.io/$IMAGE_NAMESPACE/", user_data)
-        self.assertIn("lab_setup_repo_raw_url", example)
-        self.assertIn("lab_image_tag", example)
-        self.assertIn("user_data_replace_on_change=false", example)
+        self.assertNotIn("lab_setup_repo_raw_url", example)
+        self.assertNotIn("lab_image_tag", example)
+        self.assertIn("lab_setup_repo_raw_url", advanced)
+        self.assertIn("lab_image_tag", advanced)
+        self.assertIn("user-data를 다시 실행하지 않는다", advanced)
         self.assertIn("lab_setup_source_revision", instance)
         self.assertIn('trimprefix(var.lab_image_tag, "sha-")', instance)
         self.assertIn("commit-pinned bootstrap", instance)
+
+    def test_terraform_student_inputs_match_the_one_account_model(self) -> None:
+        variables = read("infrastructure/terraform/variables.tf")
+        terraform = read("infrastructure/terraform/main.tf")
+        example = read("infrastructure/terraform/terraform.tfvars.example")
+        budgets = read("infrastructure/terraform/budgets.tf")
+
+        self.assertIn('variable "student_id"', variables)
+        self.assertNotIn('variable "student_ids"', variables)
+        self.assertIn("student_ids = toset([var.student_id])", terraform)
+        self.assertNotIn('variable "course_start_date"', variables)
+        self.assertNotIn('variable "course_dates"', variables)
+        self.assertNotIn('variable "monthly_budget_usd"', variables)
+        self.assertNotIn('variable "course_budget_usd"', variables)
+        self.assertIn('resource "aws_budgets_budget" "daily"', budgets)
+        self.assertNotIn('resource "aws_budgets_budget" "course_total"', budgets)
+        self.assertNotIn("time_period_start", budgets)
+        self.assertLessEqual(len(example.splitlines()), 20)
 
     def test_teardown_lists_and_verifies_the_complete_state(self) -> None:
         teardown = read("infrastructure/scripts/instructor/teardown-day.sh")
@@ -384,23 +405,23 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("root EBS가 삭제됩니다", stop)
         self.assertIn("가용 용량이 있는 AZ에 새 인스턴스가 생성", stop)
 
-    def test_auto_stop_is_ready_before_gpu_instance_and_leaves_no_unmanaged_log(self) -> None:
-        auto_stop = read("infrastructure/terraform/auto_stop.tf")
+    def test_terraform_omits_lambda_and_eventbridge_auto_stop(self) -> None:
+        variables = read("infrastructure/terraform/variables.tf")
+        versions = read("infrastructure/terraform/versions.tf")
         instance = read("infrastructure/terraform/instance.tf")
-        self.assertIn('variable = "autoscaling:ResourceTag/Course"', auto_stop)
-        self.assertIn('"autoscaling:UpdateAutoScalingGroup"', auto_stop)
-        self.assertIn('values   = [var.course_id]', auto_stop)
-        self.assertIn('resources = ["*"]', auto_stop)
-        self.assertIn('resource "aws_cloudwatch_log_group" "auto_stop"', auto_stop)
-        self.assertIn('retention_in_days = 1', auto_stop)
-        self.assertIn('aws_cloudwatch_log_group.auto_stop', auto_stop)
-        self.assertIn('aws_cloudwatch_event_target.auto_stop', instance)
-        self.assertIn('aws_lambda_permission.allow_eventbridge_auto_stop', instance)
+        outputs = read("infrastructure/terraform/outputs.tf")
+
+        self.assertFalse((ROOT / "infrastructure/terraform/auto_stop.tf").exists())
+        self.assertFalse((ROOT / "infrastructure/terraform/lambda/auto_stop.py").exists())
+        self.assertNotIn('source  = "hashicorp/archive"', versions)
+        self.assertNotIn('variable "enable_auto_stop"', variables)
+        self.assertNotIn("aws_cloudwatch_event_target", instance)
+        self.assertNotIn('output "auto_stop_schedule"', outputs)
 
     def test_asg_uses_all_supported_gpu_zones_and_scales_to_zero(self) -> None:
         network = read("infrastructure/terraform/network.tf")
         instance = read("infrastructure/terraform/instance.tf")
-        auto_stop_lambda = read("infrastructure/terraform/lambda/auto_stop.py")
+        outputs = read("infrastructure/terraform/outputs.tf")
 
         self.assertIn('data "aws_ec2_instance_type_offerings" "gpu"', network)
         self.assertIn("selected_availability_zones", network)
@@ -412,8 +433,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertRegex(instance, r"desired_capacity\s+= 1")
         self.assertIn("ignore_failed_scaling_activities = true", instance)
         self.assertIn("ignore_changes = [desired_capacity]", instance)
-        self.assertIn("DesiredCapacity=0", auto_stop_lambda)
-        self.assertNotIn("stop_instances", auto_stop_lambda)
+        self.assertIn("--desired-capacity 0", outputs)
 
     def test_local_build_helper_rejects_implicit_moving_tags(self) -> None:
         script = ROOT / "docker" / "build-and-push.sh"

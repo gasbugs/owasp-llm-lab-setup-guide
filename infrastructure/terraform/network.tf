@@ -93,7 +93,7 @@ resource "aws_route_table_association" "lab" {
 ################################################################################
 
 resource "aws_security_group" "student" {
-  for_each    = toset(var.student_ids)
+  for_each    = local.student_ids
   name        = "${local.name_prefix}-sg-${each.key}"
   description = "Student ${each.key} isolation"
   vpc_id      = aws_vpc.main.id

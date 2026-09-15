@@ -43,7 +43,7 @@ data "aws_ami" "lab_base" {
 }
 
 resource "aws_launch_template" "student" {
-  for_each = toset(var.student_ids)
+  for_each = local.student_ids
 
   name_prefix   = "${local.name_prefix}-${each.key}-"
   image_id      = data.aws_ami.lab_base.id
@@ -114,7 +114,7 @@ resource "aws_launch_template" "student" {
 }
 
 resource "aws_autoscaling_group" "student" {
-  for_each = toset(var.student_ids)
+  for_each = local.student_ids
 
   name                             = "${local.name_prefix}-asg-${each.key}"
   min_size                         = 0
@@ -152,9 +152,4 @@ resource "aws_autoscaling_group" "student" {
   lifecycle {
     ignore_changes = [desired_capacity]
   }
-
-  depends_on = [
-    aws_cloudwatch_event_target.auto_stop,
-    aws_lambda_permission.allow_eventbridge_auto_stop,
-  ]
 }

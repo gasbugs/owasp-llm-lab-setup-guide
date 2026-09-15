@@ -21,7 +21,7 @@ data "aws_iam_policy_document" "student_assume" {
 }
 
 resource "aws_iam_role" "student" {
-  for_each           = toset(var.student_ids)
+  for_each           = local.student_ids
   name               = "${local.name_prefix}-role-${each.key}"
   assume_role_policy = data.aws_iam_policy_document.student_assume.json
 
@@ -32,14 +32,14 @@ resource "aws_iam_role" "student" {
 
 # SSM Session Manager 기본 (인바운드 SSH 없이 접근)
 resource "aws_iam_role_policy_attachment" "student_ssm" {
-  for_each   = toset(var.student_ids)
+  for_each   = local.student_ids
   role       = aws_iam_role.student[each.key].name
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 # CloudWatch Logs — SSM Agent와 선택적 bootstrap 로그용
 resource "aws_iam_role_policy" "student_logs" {
-  for_each = toset(var.student_ids)
+  for_each = local.student_ids
   name     = "cloudwatch-logs"
   role     = aws_iam_role.student[each.key].id
   policy = jsonencode({
@@ -53,7 +53,7 @@ resource "aws_iam_role_policy" "student_logs" {
 }
 
 resource "aws_iam_instance_profile" "student" {
-  for_each = toset(var.student_ids)
+  for_each = local.student_ids
   name     = "${local.name_prefix}-profile-${each.key}"
   role     = aws_iam_role.student[each.key].name
 }

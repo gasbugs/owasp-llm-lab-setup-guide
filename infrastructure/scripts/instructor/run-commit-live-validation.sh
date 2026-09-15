@@ -19,7 +19,7 @@ Required inputs:
   SETUP_COMMIT      Published setup-repository main commit.
   COURSE_COMMIT     Published, clean course-repository main commit.
   COURSE_REPO      Local course checkout whose capstone harness is uploaded.
-  ALERT_EMAIL      SNS/Budget alert endpoint required by the Terraform stack.
+  ALERT_EMAIL      Daily Budget alert endpoint required by the Terraform stack.
 
 Canonical public image source:
   IMAGE_REGISTRY=ghcr.io
@@ -29,13 +29,13 @@ Safety controls:
   * IMAGE_TAG is derived as sha-$SETUP_COMMIT; latest is never accepted.
   * Existing Terraform state aborts the run before apply.
   * EC2 ingress remains 127.0.0.1/32 and SSM is used for transport.
-  * A custom emergency auto-stop is applied with the EC2 stack.
-  * Every wait and remote command has a deadline.
+  * No Lambda or EventBridge auto-stop resource is created.
+  * Every wait and remote command is bounded by the controller deadline.
   * The EXIT trap downloads evidence when possible, always runs destroy, and
     performs direct AWS residual checks. There is no preserve-resources option.
 
 Optional controls:
-  EMERGENCY_STOP_MINUTES=120   (allowed: 30..180)
+  RUN_DEADLINE_MINUTES=120     (allowed: 30..180)
   LOCAL_EVIDENCE_ROOT=$HOME/owasp-llm-live-evidence
   BROWSER_PYTHON=python3
   PLAYWRIGHT_BROWSER_CHANNEL=chrome
@@ -58,7 +58,7 @@ fi
 : "${AWS_PROFILE:=owasp-llm}"
 : "${AWS_REGION:=us-east-1}"
 : "${STUDENT:=validator}"
-: "${EMERGENCY_STOP_MINUTES:=120}"
+: "${RUN_DEADLINE_MINUTES:=120}"
 : "${IMAGE_REGISTRY:=ghcr.io}"
 : "${IMAGE_NAMESPACE:=gasbugs}"
 SETUP_GIT_URL="https://github.com/gasbugs/owasp-llm-lab-setup-guide.git"
@@ -95,10 +95,10 @@ if [[ ! "$STUDENT" =~ ^[a-z0-9-]{2,30}$ ]]; then
   echo "ERROR: STUDENT must use lowercase letters, digits, or hyphens" >&2
   exit 2
 fi
-if [[ ! "$EMERGENCY_STOP_MINUTES" =~ ^[0-9]+$ ]] \
-  || [ "$EMERGENCY_STOP_MINUTES" -lt 30 ] \
-  || [ "$EMERGENCY_STOP_MINUTES" -gt 180 ]; then
-  echo "ERROR: EMERGENCY_STOP_MINUTES must be an integer from 30 through 180" >&2
+if [[ ! "$RUN_DEADLINE_MINUTES" =~ ^[0-9]+$ ]] \
+  || [ "$RUN_DEADLINE_MINUTES" -lt 30 ] \
+  || [ "$RUN_DEADLINE_MINUTES" -gt 180 ]; then
+  echo "ERROR: RUN_DEADLINE_MINUTES must be an integer from 30 through 180" >&2
   exit 2
 fi
 if [[ ! "$ALERT_EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; then
@@ -592,30 +592,6 @@ terminate_instances_direct() {
   return 1
 }
 
-delete_validation_log_groups() {
-  local prefix="/aws/lambda/owasp-llm-$COURSE_ID"
-  local listing="$WORK_DIR/validation-log-groups.json"
-  local group
-  if ! aws_cli logs describe-log-groups --log-group-name-prefix "$prefix" \
-    --output json >"$listing" 2>>"$CONTROL_LOG"; then
-    return 1
-  fi
-  while IFS= read -r group; do
-    [ -n "$group" ] || continue
-    case "$group" in
-      "$prefix"*)
-        aws_cli logs delete-log-group --log-group-name "$group" \
-          >>"$CONTROL_LOG" 2>&1 || return 1
-        ;;
-      *)
-        echo "ERROR: refusing to delete unexpected log group: $group" \
-          >>"$CONTROL_LOG"
-        return 1
-        ;;
-    esac
-  done < <(jq -r '.logGroups[]?.logGroupName' "$listing")
-}
-
 direct_residual_audit() {
   local audit_tmp="$WORK_DIR/residual"
   mkdir -p "$audit_tmp"
@@ -797,10 +773,6 @@ cleanup() {
     if ! terminate_instances_direct; then
       log "Direct EC2 termination retry did not reach terminated state"
     fi
-    if ! delete_validation_log_groups; then
-      log "Validation Lambda log-group cleanup did not complete"
-    fi
-
     if direct_residual_audit; then
       RESIDUAL_OK=1
       log "Direct AWS residual audit passed"
@@ -1059,24 +1031,16 @@ if [ -n "$existing_state" ]; then
   exit 1
 fi
 
-schedule_document=$(python3 - "$EMERGENCY_STOP_MINUTES" <<'PY'
+RUN_DEADLINE_EPOCH=$(python3 - "$RUN_DEADLINE_MINUTES" <<'PY'
 from datetime import datetime, timedelta, timezone
-import json
 import sys
 
 now = datetime.now(timezone.utc)
-stop = now + timedelta(minutes=int(sys.argv[1]))
-dates = [(now.date() + timedelta(days=offset)).isoformat() for offset in range(5)]
-print(json.dumps({
-    "deadline_epoch": int(stop.timestamp()),
-    "cron": f"cron({stop.minute} {stop.hour} {stop.day} {stop.month} ? {stop.year})",
-    "course_dates": dates,
-}, separators=(",", ":")))
+deadline = now + timedelta(minutes=int(sys.argv[1]))
+print(int(deadline.timestamp()))
 PY
 )
-COST_DEADLINE_EPOCH=$(jq -er '.deadline_epoch' <<<"$schedule_document")
-EMERGENCY_CRON=$(jq -er '.cron' <<<"$schedule_document")
-COURSE_DATES_JSON=$(jq -cer '.course_dates' <<<"$schedule_document")
+COST_DEADLINE_EPOCH=$RUN_DEADLINE_EPOCH
 
 export TF_IN_AUTOMATION=1
 export TF_VAR_alert_email="$ALERT_EMAIL"
@@ -1084,33 +1048,21 @@ TF_VARS=(
   "-var=region=$AWS_REGION"
   "-var=aws_profile=$AWS_PROFILE"
   "-var=course_id=$COURSE_ID"
-  "-var=student_ids=[\"$STUDENT\"]"
-  "-var=course_dates=$COURSE_DATES_JSON"
+  "-var=student_id=$STUDENT"
   "-var=enable_user_data_bootstrap=true"
   "-var=lab_setup_repo_raw_url=https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/$SETUP_COMMIT"
   "-var=lab_image_namespace=$IMAGE_NAMESPACE"
   "-var=lab_image_tag=$IMAGE_TAG"
   "-var=allowed_ingress_cidr=127.0.0.1/32"
-  "-var=enable_auto_stop=true"
-  "-var=auto_stop_schedule_mode=custom"
-  "-var=auto_stop_custom_crons_utc={\"validation-emergency\":\"$EMERGENCY_CRON\"}"
-  "-var=auto_stop_description=Instructor live validation emergency stop"
   "-var=daily_budget_usd=5"
-  "-var=course_budget_usd=10"
 )
 
-log "Terraform apply starts; emergency stop is $EMERGENCY_CRON"
+log "Terraform apply starts; controller deadline epoch is $RUN_DEADLINE_EPOCH"
 APPLY_STARTED=1
 bounded_by_cost_deadline 1200 terraform -chdir="$TF_DIR" apply \
   -auto-approve -input=false -no-color -lock-timeout=60s "${TF_VARS[@]}" \
   >>"$CONTROL_LOG" 2>&1
 
-if ! terraform -chdir="$TF_DIR" output -json auto_stop_schedule \
-  | jq -e --arg expected "$EMERGENCY_CRON" \
-      'length == 1 and .["validation-emergency"] == $expected' >/dev/null; then
-  echo "ERROR: Terraform output does not prove the emergency auto-stop schedule" >&2
-  exit 1
-fi
 INSTANCE_ID=""
 for _ in $(seq 1 120); do
   INSTANCE_ID=$(aws_cli ec2 describe-instances \

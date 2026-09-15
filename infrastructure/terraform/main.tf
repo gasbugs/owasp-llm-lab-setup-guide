@@ -17,6 +17,9 @@ locals {
 
   name_prefix = "owasp-llm-${var.course_id}"
 
+  # 1인 1계정 운영이지만 기존 for_each key를 유지해 state 주소 변경을 피한다.
+  student_ids = toset([var.student_id])
+
   # 실제로 설치되는 앱만 허용한다. 8003~8009 같은 미사용 포트는 열지 않는다.
   # 18080은 LLM08 학습자 미니 앱이며 allowed_ingress_cidr /32로만 접근한다.
   lab_app_ports = toset([3000, 8000, 8001, 8002, 8010, 8011, 8012, 8013, 18080])

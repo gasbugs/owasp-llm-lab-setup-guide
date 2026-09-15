@@ -27,21 +27,12 @@ variable "course_id" {
   }
 }
 
-variable "student_ids" {
-  description = "수강생 ID 목록. 영문/숫자/하이픈만 사용. 인스턴스 태그·IAM 이름에 그대로 들어감"
-  type        = list(string)
+variable "student_id" {
+  description = "현재 AWS 계정을 사용하는 수강생 ID. 인스턴스 태그와 IAM 이름에 사용."
+  type        = string
   validation {
-    condition     = length(var.student_ids) > 0 && alltrue([for id in var.student_ids : can(regex("^[a-z0-9-]{2,30}$", id))])
-    error_message = "student_ids는 소문자/숫자/하이픈만, 2~30자."
-  }
-}
-
-variable "course_dates" {
-  description = "강의 일자(연속 5일 가정). 예: [\"2026-06-10\", \"2026-06-11\", ...]. 비용 산정·태그용."
-  type        = list(string)
-  validation {
-    condition     = length(var.course_dates) == 5 && alltrue([for d in var.course_dates : can(regex("^20[0-9]{2}-[0-9]{2}-[0-9]{2}$", d))])
-    error_message = "course_dates는 YYYY-MM-DD 형식의 5개 날짜여야 합니다."
+    condition     = can(regex("^[a-z0-9-]{2,30}$", var.student_id))
+    error_message = "student_id는 소문자/숫자/하이픈만, 2~30자로 입력하세요."
   }
 }
 
@@ -135,55 +126,13 @@ variable "allowed_ingress_cidr" {
   }
 }
 
-variable "enable_auto_stop" {
-  description = "true이면 EventBridge가 Lambda를 호출해 Course 태그가 같은 ASG의 desired capacity를 0으로 낮춘다."
-  type        = bool
-  default     = true
-}
-
-variable "auto_stop_schedule_mode" {
-  description = "자동 중지 스케줄 모드. daily_1800은 매일 18:00 KST 1회, daily_1730은 기존 환경 호환용 17:30 KST 1회, night_1730_0830은 17:30 KST부터 다음날 08:30 KST까지 30분마다 실행, custom은 auto_stop_custom_crons_utc를 사용한다."
-  type        = string
-  default     = "daily_1800"
-  validation {
-    condition     = contains(["daily_1800", "daily_1730", "night_1730_0830", "custom"], var.auto_stop_schedule_mode)
-    error_message = "auto_stop_schedule_mode는 daily_1800, daily_1730, night_1730_0830, custom 중 하나여야 합니다."
-  }
-}
-
-variable "auto_stop_custom_crons_utc" {
-  description = "auto_stop_schedule_mode = custom 일 때 사용할 EventBridge cron map."
-  type        = map(string)
-  default     = {}
-  validation {
-    condition     = alltrue([for cron in values(var.auto_stop_custom_crons_utc) : can(regex("^cron\\(.+\\)$", cron))])
-    error_message = "auto_stop_custom_crons_utc의 모든 값은 EventBridge cron(...) 표현식이어야 합니다."
-  }
-}
-
-variable "auto_stop_description" {
-  description = "자동 중지 스케줄 설명."
-  type        = string
-  default     = "EC2 auto-stop schedule"
-}
-
 variable "daily_budget_usd" {
   description = "일일 비용 알람 임계값(USD)"
   type        = number
-  default     = 200
+  default     = 20
   validation {
     condition     = var.daily_budget_usd > 0 && var.daily_budget_usd <= 10000
     error_message = "daily_budget_usd는 0보다 크고 10000 이하로 설정하세요."
-  }
-}
-
-variable "course_budget_usd" {
-  description = "강의 전체 비용 알람 임계값(USD)"
-  type        = number
-  default     = 1500
-  validation {
-    condition     = var.course_budget_usd > 0 && var.course_budget_usd <= 100000
-    error_message = "course_budget_usd는 0보다 크고 100000 이하로 설정하세요."
   }
 }
 
