@@ -98,7 +98,7 @@
         </div>
       </section>
 
-      <section id="document-panel" class="panel">
+      <section id="document-panel" class="panel"{% if scenario_id != "day2" %} hidden{% endif %}>
         <header class="panel-head"><div><div class="eyebrow">Corpus injection</div><h2>RAG 문서 주입</h2></div><span class="panel-code">LLM08</span></header>
         <div class="panel-body"><p>LLM08 실습용 의도된 취약점입니다. 문서의 출처와 승인 상태를 포함해 같은 RAG corpus에 등록합니다.</p>
           <form id="inject-form">
@@ -121,7 +121,7 @@
       </section>
       {% endif %}
 
-      <section class="panel">
+      <section id="guard-panel" class="panel" hidden>
         <header class="panel-head"><div><div class="eyebrow">Security telemetry</div><h2>서버 측 가드레일</h2></div><span class="panel-code">READ ONLY</span></header>
         <div class="panel-body"><p>브라우저는 같은 FastAPI backend만 호출합니다. Engine과 mode는 컨테이너 설정이며 화면에서 변경할 수 없습니다.</p><div class="guard-grid"><div class="guard-field"><strong>Engine</strong><span id="guard-engine">off</span></div><div class="guard-field"><strong>Mode</strong><span id="guard-mode">off</span></div><div class="guard-field"><strong>Decision</strong><span id="guard-decision">-</span></div><div class="guard-field"><strong>Ollama main called</strong><span id="guard-upstream">-</span></div><div class="guard-field"><strong>Duration</strong><span id="guard-duration">-</span></div><div class="guard-field"><strong>Blocking reason</strong><span id="guard-reason">-</span></div></div><pre id="guard-checks">input/output checks: -</pre></div>
       </section>
@@ -135,7 +135,7 @@
     <button id="prompt-close" class="secondary" type="button" aria-label="시스템 프롬프트 닫기">닫기</button>
   </header>
   <div class="prompt-dialog-body">
-    <p class="prompt-note">실행 시 추가되는 검색 결과와 업무 데이터는 자리표시자로 표시합니다. 시스템 프롬프트는 비밀 저장소나 인가 경계가 아닙니다.</p>
+    <p id="prompt-note" class="prompt-note" hidden></p>
     <div id="prompt-content" aria-live="polite">프롬프트를 불러오는 중...</div>
   </div>
 </dialog>
@@ -147,6 +147,7 @@ const promptClose = document.getElementById('prompt-close');
 const promptDialog = document.getElementById('prompt-dialog');
 const promptLlmIds = document.getElementById('prompt-llm-ids');
 const promptContent = document.getElementById('prompt-content');
+const promptNote = document.getElementById('prompt-note');
 const appBasePath = window.location.pathname.endsWith('/')
   ? window.location.pathname
   : `${window.location.pathname}/`;
@@ -176,6 +177,7 @@ const docSource = document.getElementById('doc-source');
 const injectStatus = document.getElementById('inject-status');
 const refreshDocs = document.getElementById('refresh-docs');
 const docList = document.getElementById('doc-list');
+const guardPanel = document.getElementById('guard-panel');
 const guardEngine = document.getElementById('guard-engine');
 const guardMode = document.getElementById('guard-mode');
 const guardDecision = document.getElementById('guard-decision');
@@ -194,6 +196,11 @@ async function loadSystemPrompt() {
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
     promptLlmIds.textContent = data.llm_ids.join(' · ');
+    const dynamicValues = Array.isArray(data.dynamic_values) ? data.dynamic_values : [];
+    promptNote.hidden = dynamicValues.length === 0;
+    promptNote.textContent = dynamicValues.length === 0
+      ? ''
+      : `실행 시 추가되는 ${dynamicValues.join(', ')}는 자리표시자로 표시합니다. 시스템 프롬프트는 비밀 저장소나 인가 경계가 아닙니다.`;
     promptContent.replaceChildren();
     for (const prompt of data.prompts) {
       const card = document.createElement('section');
@@ -206,7 +213,28 @@ async function loadSystemPrompt() {
       promptContent.appendChild(card);
     }
   } catch {
+    promptNote.hidden = true;
     promptContent.textContent = '시스템 프롬프트를 불러오지 못했습니다.';
+  }
+}
+
+function showGuardrailPanel(engine, mode) {
+  if (!engine || engine === 'off' || !mode || mode === 'off') return false;
+  guardPanel.hidden = false;
+  guardEngine.textContent = engine;
+  guardMode.textContent = mode;
+  return true;
+}
+
+async function loadGuardrailPolicy() {
+  guardPanel.hidden = true;
+  try {
+    const response = await fetch(appUrl('/api/guardrails/policy'));
+    const data = await response.json();
+    if (!response.ok) return;
+    showGuardrailPanel(data.guard_engine, data.guard_mode);
+  } catch {
+    guardPanel.hidden = true;
   }
 }
 
@@ -292,7 +320,7 @@ form.addEventListener('submit', async (e) => {
       provenance: data.debug.model_provenance ?? null,
     }));
   }
-  if (data.guardrail) {
+  if (data.guardrail && showGuardrailPanel(data.guardrail.engine, data.guardrail.mode)) {
     const innerGuardrail = data.guardrail.inner_guardrail ?? null;
     const effectiveDecision = innerGuardrail?.decision === 'block'
       ? 'block'
@@ -323,6 +351,7 @@ replayLast.addEventListener('click', () => {
 });
 
 async function loadDocs() {
+  if (scenarioSelect.value !== 'day2') return;
   if (labSelect && labSelect.value !== 'llm08-rag-poisoning') {
     docList.innerHTML = '';
     injectStatus.textContent = '';
@@ -446,6 +475,7 @@ injectForm.addEventListener('submit', async (e) => {
 });
 
 loadDocs();
+loadGuardrailPolicy();
 </script>
 </body>
 </html>

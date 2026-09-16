@@ -15,7 +15,7 @@ and creates it again from the configured image.
 
 | Lab | Exact Compose command | Raw verification |
 |---|---|---|
-| LLM01 secure-coding source or LLM01-B | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
+| LLM01 secure-coding source | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
 | LLM02 secure-coding source or LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 delete | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |

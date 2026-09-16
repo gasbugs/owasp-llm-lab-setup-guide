@@ -204,7 +204,7 @@ raw `/healthz`를 확인합니다. 먼저 `cd ~/.config/owasp-llm-lab`로 이동
 
 | 실습 | 재시작 명령 | 원본 확인 명령 |
 |---|---|---|
-| LLM01 시큐어 코딩·LLM01-B | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
+| LLM01 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
 | LLM02 시큐어 코딩·LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 삭제 실습 | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |

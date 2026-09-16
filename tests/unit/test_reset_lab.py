@@ -82,10 +82,6 @@ class ResetLabTest(unittest.TestCase):
 
     def test_simple_allowlist_ids_restart_only_their_exact_units(self) -> None:
         cases = {
-            "llm01b": (
-                "recreate lab-prompt-rag",
-                "LLM01_READY_URL=http://127.0.0.1:8000/healthz",
-            ),
             "llm01": (
                 "recreate lab-prompt-rag",
                 "LLM01_READY_URL=http://127.0.0.1:8000/healthz",

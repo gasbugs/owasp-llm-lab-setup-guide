@@ -7,7 +7,7 @@
 | 이미지 | 역할 | 실행 위치 |
 |---|---|---|
 | `owasp-llm-base-gpu` | CUDA 12.8, Python 3.12, uv 부모 이미지 | 빌드 기반 |
-| `owasp-llm-vuln-rag` | Day 1~5 시나리오를 제공하는 취약 RAG 앱 | 8000, 8010~8013 |
+| `owasp-llm-vuln-rag` | LLM01 직접 입력 앱과 LLM02·05·07·08·09·10 실습 시나리오를 제공하는 공용 앱 | 8000, 8010~8013 |
 | `owasp-llm-vuln-agent` | LLM06 tool-calling 취약 Agent | 8001 |
 | `owasp-llm-llmgoat` | cross-platform 챌린지 UI | 5000 |
 | `owasp-llm-dvla` | 고정 upstream commit의 ReAct Agent 앱 | 8501 |
@@ -24,6 +24,8 @@
 | `lab-knowledge-rag` | day4 / LLM07·LLM09, Day 2 LLM08 공유 | 8012 |
 | `lab-resource-rag` | day5 / LLM10 | 8013 |
 
+`lab-prompt-rag`는 기존 Compose·URL 호환을 위해 서비스 이름만 유지한다. LLM01 실행 경로에는 corpus, 문서 주입, 검색 Context가 없으며 `debug.retrieved_chunks`도 반환하지 않는다. RAG 문서 등록·검색·출처 검증은 `lab-data-rag`의 LLM08 기능이 담당한다.
+
 `/healthz`는 `default_scenario`와 전체 `scenarios` 목록을 반환합니다. 이미지 HEALTHCHECK도 `PORT`를 사용하므로 실제 uvicorn 포트와 일치합니다.
 
 Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 Ollama Structured Output Planner와 read-only `get_customer_record` Tool Executor가 들어 있습니다. Planner는 사용자 문장과 tool schema만 받고 Bearer token·DB credential·고객 데이터는 받지 않습니다. 취약 실행기는 LLM이 제안한 `customer_id`와 `fields`를 그대로 조회하고, 안전 실행기는 인증 principal과 배송 field allowlist를 DB 조회 전에 검사합니다. 수강생은 이미지를 다시 build하지 않고 인접한 실행기 호출 두 줄을 바꿔 같은 요청의 `HIT`와 `PASS`를 비교합니다.
@@ -32,7 +34,7 @@ Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 Ollama Structured Outp
 
 ## 실습 전용 검색 디버그 계약
 
-`vuln-rag`의 일반 scenario `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM08 RAG를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 E2E가 같은 필드를 사용합니다.
+RAG를 사용하는 일반 scenario의 `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM01은 검색을 사용하지 않으므로 이 필드가 없습니다. LLM08 RAG를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 RAG 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 E2E가 같은 필드를 사용합니다.
 
 ```json
 {

@@ -631,8 +631,8 @@ OWASP LLM Lab 설치가 완료되었습니다.
   - Ollama API            11434
     로컬 LLM 모델 목록 확인과 generate API 호출에 사용합니다.
 
-  - Day 1 Vulnerable RAG  8000
-    LLM01 프롬프트 인젝션 실습 앱입니다.
+  - LLM01 Prompt Injection 8000
+    검색 없이 사용자 입력만 처리하는 번역기 실습 앱입니다.
 
   - Day 2 Vulnerable RAG  8010
     LLM02 민감정보 노출과 LLM08 RAG corpus 오염 실습 앱입니다.
@@ -684,7 +684,7 @@ LLM08 추가 준비:
   Ollama 모델 목록:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:11434/api/tags
 
-  Day 1 Vulnerable RAG health check:
+  LLM01 Prompt Injection health check:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8000/healthz
 
   Day 2 Vulnerable RAG health check:

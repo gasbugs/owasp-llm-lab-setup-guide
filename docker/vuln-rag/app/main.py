@@ -469,10 +469,8 @@ async def llm01_secure_coding_workshop(request_body: ChatRequest):
             **decision.__dict__,
             "upstream_called": False,
         }
-    selected = get_scenario("day1")
-    context = selected.retrieve(request_body.message)
     reply = await llm.chat(
-        system=selected.build_system_prompt(context=context),
+        system=day1_scenario.build_system_prompt(),
         user=request_body.message,
     )
     emit_security_event(decision, upstream_called=True)
@@ -671,9 +669,10 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
             },
         ]
         llm_ids = ["LLM02"]
+        dynamic_values = ["인가된 조회 결과"]
     else:
         prompt_content = (
-            day1_scenario.build_system_prompt_preview(context_marker)
+            day1_scenario.build_system_prompt_preview()
             if selected.id == "day1"
             else selected.build_system_prompt(context=context_marker)
         )
@@ -691,12 +690,13 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
             "day4": ["LLM07", "LLM08", "LLM09"],
             "day5": ["LLM10"],
         }[selected.id]
+        dynamic_values = [] if selected.id == "day1" else ["검색·업무 Context"]
 
     return {
         "lab_only": True,
         "scenario": selected.id,
         "llm_ids": llm_ids,
-        "dynamic_values": "placeholder",
+        "dynamic_values": dynamic_values,
         "prompts": prompts,
     }
 
@@ -1058,8 +1058,8 @@ async def index(request: Request, scenario: str | None = None):
 async def chat(req: ChatRequest, request: Request):
     """**일부러 취약한** 챗봇 엔드포인트.
 
-    시나리오마다 가드 강도가 다르고 RAG 컨텍스트가 다름.
-    OWASP LLM01/02/04/05/07/08 실습에 활용.
+    LLM01은 사용자 입력만, RAG가 필요한 다른 시나리오는 검색 context도 사용한다.
+    OWASP LLM01/02/05/07/08/09/10 실습에 활용.
     """
     selected = get_scenario(req.scenario)
     if selected.id == "day2":
@@ -1084,7 +1084,6 @@ async def chat(req: ChatRequest, request: Request):
                     **llm01_decision.__dict__,
                     "upstream_called": False,
                     "debug": {
-                        "retrieved_chunks": [],
                         "rendered_system_prompt": "(not-built)",
                         "runtime_model": llm.model,
                         "model_provenance": model_provenance(),
@@ -1123,26 +1122,31 @@ async def chat(req: ChatRequest, request: Request):
             )
         return JSONResponse(guarded)
 
-    context = selected.retrieve(req.message)
-    system_prompt = selected.build_system_prompt(context=context)
+    if selected.id == "day1":
+        context = None
+        system_prompt = day1_scenario.build_system_prompt()
+    else:
+        context = selected.retrieve(req.message)
+        system_prompt = selected.build_system_prompt(context=context)
 
     response = await llm.chat(
         system=system_prompt,
         user=req.message,
     )
 
+    debug = {
+        "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
+        "runtime_model": llm.model,
+        "model_provenance": model_provenance(),
+    }
+    if context is not None:
+        # RAG 시나리오만 검색 결과를 관찰 증거로 노출한다.
+        debug["retrieved_chunks"] = context
+
     content = {
         "reply": response,
         "scenario": selected.id,
-        # LAB-ONLY DEBUG CONTRACT:
-        # 검색 성공과 모델 생성 성공을 분리해 검증하려고 RAG 컨텍스트를 일부러 노출한다.
-        # UI와 e2e가 이 값을 관찰 증거로 사용하지만 실제 사용자용 API에서는 제거해야 한다.
-        "debug": {
-            "retrieved_chunks": context,
-            "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
-            "runtime_model": llm.model,
-            "model_provenance": model_provenance(),
-        },
+        "debug": debug,
     }
     if llm01_decision is not None:
         emit_security_event(llm01_decision, upstream_called=True)
@@ -1162,6 +1166,8 @@ async def inject_doc(req: dict):
     실제로는 인증·검토 필수.
     """
     selected = get_scenario(req.get("scenario"))
+    if selected.id == "day1":
+        raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     text = req.get("text", "")
     title = req.get("title", "untitled")
     selected.add_doc(title=title, text=text)
@@ -1171,6 +1177,8 @@ async def inject_doc(req: dict):
 @app.get("/api/admin/docs")
 async def list_docs(scenario: str | None = None):
     selected = get_scenario(scenario)
+    if selected.id == "day1":
+        raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     return {
         "ok": True,
         "scenario": selected.id,
@@ -1184,6 +1192,8 @@ async def list_docs(scenario: str | None = None):
 @app.delete("/api/admin/docs/{index}")
 async def delete_doc(index: int, scenario: str | None = None):
     selected = get_scenario(scenario)
+    if selected.id == "day1":
+        raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     deleted = selected.delete_doc(index)
     if deleted is None:
         raise HTTPException(status_code=404, detail="document not found")

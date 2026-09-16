@@ -132,14 +132,29 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertEqual(vulnerable.json()["scenario"], "day1")
         self.assertEqual(vulnerable.json()["policy"], "accept-untrusted-input")
         self.assertTrue(vulnerable.json()["upstream_called"])
+        self.assertNotIn("retrieved_chunks", vulnerable.json()["debug"])
+        self.assertNotIn("검색 결과", self.llm.calls[0]["system"])
 
         MAIN.select_llm01_input_policy = POLICY_GLOBALS["enforce_llm01_input_policy"]
         safe = self.client.post("/api/chat", json=body)
         self.assertEqual(safe.status_code, 200)
         self.assertEqual(safe.json()["application_decision"], "block")
         self.assertFalse(safe.json()["upstream_called"])
-        self.assertEqual(safe.json()["debug"]["retrieved_chunks"], [])
+        self.assertNotIn("retrieved_chunks", safe.json()["debug"])
         self.assertEqual(len(self.llm.calls), 1)
+
+    def test_llm01_rejects_legacy_document_endpoints(self) -> None:
+        MAIN.DEFAULT_SCENARIO = "day1"
+        injected = self.client.post(
+            "/api/admin/inject-doc",
+            json={"scenario": "day1", "title": "legacy", "text": "unused"},
+        )
+        listed = self.client.get("/api/admin/docs", params={"scenario": "day1"})
+
+        self.assertEqual(injected.status_code, 404)
+        self.assertEqual(listed.status_code, 404)
+        self.assertEqual(injected.json()["detail"], "RAG is not enabled for LLM01")
+        self.assertEqual(listed.json()["detail"], "RAG is not enabled for LLM01")
 
     def test_llm02_same_route_changes_tool_authorization_owner(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day2"

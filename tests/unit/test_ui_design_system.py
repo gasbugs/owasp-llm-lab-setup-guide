@@ -66,6 +66,7 @@ class UiDesignSystemTests(unittest.TestCase):
             "document-panel",
             "inject-form",
             "refresh-docs",
+            "guard-panel",
             "guard-engine",
             "guard-mode",
             "guard-decision",
@@ -83,6 +84,13 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn(endpoint, self.rag)
         self.assertIn("renderModelOutputVulnerable", self.rag)
         self.assertIn("renderModelOutputSafe", self.rag)
+
+    def test_optional_panels_only_activate_when_backing_data_exists(self) -> None:
+        self.assertIn('id="guard-panel" class="panel" hidden', self.rag)
+        self.assertIn("guardPanel.hidden = true", self.rag)
+        self.assertIn("showGuardrailPanel(data.guard_engine, data.guard_mode)", self.rag)
+        self.assertIn('scenarioSelect.value !== \'day2\'', self.rag)
+        self.assertIn('{% if scenario_id != "day2" %} hidden{% endif %}', self.rag)
 
     def test_vulnerable_rag_ui_hides_internal_day_identifiers(self) -> None:
         for visible_fragment in (

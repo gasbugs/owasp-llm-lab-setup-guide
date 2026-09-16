@@ -2,7 +2,6 @@
 # Restore allowlisted OWASP LLM lab runtime state without touching learner files.
 #
 # Usage:
-#   reset-lab llm01b
 #   reset-lab llm08-rag
 #   reset-lab llm05
 #   reset-lab llm06
@@ -17,7 +16,6 @@ Usage: reset-lab <lab-id>
 
 Allowlisted lab IDs:
   llm01    LLM01 editable source and in-memory RAG corpus
-  llm01b   Day 1 in-memory RAG corpus
   llm02    LLM02 editable source and Day 2 process memory
   llm08-rag Day 2 in-memory RAG corpus
   llm04    compatibility alias for llm08-rag
@@ -136,7 +134,7 @@ recreate_one() {
 
 lab_id="$1"
 case "$lab_id" in
-  llm01|llm01b)
+  llm01)
     recreate_one \
       lab-prompt-rag \
       LLM01 \
