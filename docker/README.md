@@ -7,24 +7,25 @@
 | 이미지 | 역할 | 실행 위치 |
 |---|---|---|
 | `owasp-llm-base-gpu` | CUDA 12.8, Python 3.12, uv 부모 이미지 | 빌드 기반 |
-| `owasp-llm-vuln-rag` | LLM01 직접 입력 앱과 LLM02·05·07·08·09·10 실습 시나리오를 제공하는 공용 앱 | 8000, 8010~8013 |
+| `owasp-llm-vuln-rag` | LLM01 직접 입력 앱, LLM04 전용 RAG 변형과 LLM02·05·07·08·09·10 실습 시나리오를 제공하는 공용 앱 | 8000, 8004, 8010~8013 |
 | `owasp-llm-vuln-agent` | LLM06 tool-calling 취약 Agent | 8001 |
 | `owasp-llm-llmgoat` | cross-platform 챌린지 UI | 5000 |
 | `owasp-llm-dvla` | 고정 upstream commit의 ReAct Agent 앱 | 8501 |
 | `ollama/ollama` | 공용 로컬 모델 API | 11434 |
 | `python:3.12-slim` | Portal과 fake registry의 경량 런타임 | 8080, 8002 |
 
-설치 스크립트는 같은 `vuln-rag` image를 다섯 Compose service로 동시에 실행하며 `DEFAULT_SCENARIO`, `PORT`, 실행 command를 함께 고정합니다.
+설치 스크립트는 같은 `vuln-rag` image를 여섯 Compose service로 동시에 실행하며 `DEFAULT_SCENARIO`, `PORT`, 실행 command를 함께 고정합니다.
 
 | 컨테이너 | scenario | 포트 |
 |---|---|---:|
 | `lab-prompt-rag` | day1 / LLM01 | 8000 |
+| `lab-llm04-rag` | llm04 / LLM01의 전용 RAG 변형 | 8004 |
 | `lab-data-rag` | day2 / LLM02·LLM08 RAG corpus | 8010 |
 | `lab-output-rag` | day3 / LLM05 | 8011 |
 | `lab-knowledge-rag` | day4 / LLM07·LLM09, Day 2 LLM08 공유 | 8012 |
 | `lab-resource-rag` | day5 / LLM10 | 8013 |
 
-`lab-prompt-rag`는 기존 Compose·URL 호환을 위해 서비스 이름만 유지한다. LLM01 실행 경로에는 corpus, 문서 주입, 검색 Context가 없으며 `debug.retrieved_chunks`도 반환하지 않는다. RAG 문서 등록·검색·출처 검증은 `lab-data-rag`의 LLM08 기능이 담당한다.
+`lab-prompt-rag`는 기존 Compose·URL 호환을 위해 서비스 이름만 유지한다. LLM01 실행 경로에는 corpus, 문서 주입, 검색 Context가 없으며 `debug.retrieved_chunks`도 반환하지 않는다. `lab-llm04-rag`는 LLM01 번역기에만 별도 in-memory corpus를 붙인 변형이며 LLM08의 provenance-bearing corpus와 공유하지 않는다. RAG 문서 출처 검증은 계속 `lab-data-rag`의 LLM08 기능이 담당한다.
 
 `/healthz`는 `default_scenario`와 전체 `scenarios` 목록을 반환합니다. 이미지 HEALTHCHECK도 `PORT`를 사용하므로 실제 uvicorn 포트와 일치합니다.
 
@@ -34,7 +35,7 @@ Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 Ollama Structured Outp
 
 ## 실습 전용 검색 디버그 계약
 
-RAG를 사용하는 일반 scenario의 `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM01은 검색을 사용하지 않으므로 이 필드가 없습니다. LLM08 RAG를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 RAG 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 E2E가 같은 필드를 사용합니다.
+RAG를 사용하는 일반 scenario의 `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM01은 검색을 사용하지 않으므로 이 필드가 없고, LLM04에는 전용 corpus에서 실제 선택된 청크가 표시됩니다. LLM08 RAG를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 RAG 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 E2E가 같은 필드를 사용합니다.
 
 ```json
 {

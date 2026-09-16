@@ -16,6 +16,7 @@ and creates it again from the configured image.
 | Lab | Exact Compose command | Raw verification |
 |---|---|---|
 | LLM01 secure-coding source | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
+| LLM04 RAG corpus or source | `docker compose up -d --no-deps --force-recreate llm04-rag` | `curl -sS http://localhost:8004/healthz` |
 | LLM02 secure-coding source or LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 delete | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |
@@ -32,7 +33,8 @@ These commands never write to or delete `/home/ubuntu/work`,
 | Compose service | Port | Mutable runtime state | Persistent mount | Minimum action |
 |---|---:|---|---|---|
 | `ollama` | 11434 | loaded model and request queue | `/home/ubuntu/ollama-models:/root/.ollama` | Do not restart for ordinary lessons. Restart it only in the LLM10 overload sequence. |
-| `prompt-rag` | 8000 | Python `day1._corpus` and editable layer | none | Force-recreate after an LLM01 source switch or corpus injection. |
+| `prompt-rag` | 8000 | editable layer; no RAG corpus | none | Force-recreate after an LLM01 source switch. |
+| `llm04-rag` | 8004 | Python `llm04._documents` and editable layer | none | Force-recreate after an LLM04 corpus injection or source change. |
 | `data-rag` | 8010 | Python `day2._corpus` and editable layer | none | Force-recreate after an LLM02 source switch or LLM08 corpus mutation. |
 | `output-rag` | 8011 | Python `day3._corpus` and editable layer | none | Force-recreate after a renderer source switch or stored payload. |
 | `knowledge-rag` | 8012 | Python `day4._tenants` and editable layer | none | Force-recreate after an LLM08 or LLM09 source switch. |
@@ -43,7 +45,7 @@ These commands never write to or delete `/home/ubuntu/work`,
 | `fake-registry` | 8002 | startup rewrites `/app/data/A.gguf` and `B.gguf` | `/home/ubuntu/work/fake-registry:/app` | Standard LLM03 is read-only. Restart does not restore modified host files. |
 | `portal` | 8080 | none | `/home/ubuntu/work/portal:/app` | No reset. Restart does not restore modified host content. |
 
-All five vulnerable RAG services use the same image but run as separate
+All six vulnerable app services use the same image but run as separate
 processes. Their Python globals are isolated and return to image defaults when
 the corresponding container is force-recreated.
 

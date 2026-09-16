@@ -64,7 +64,7 @@ class RuntimeContractTest(unittest.TestCase):
     def test_compose_sets_same_published_port_for_each_rag_process(self) -> None:
         compose = read("infrastructure/compose/compose.yaml")
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
-        for port in (8000, 8010, 8011, 8012, 8013):
+        for port in (8000, 8004, 8010, 8011, 8012, 8013):
             self.assertIn(f'"{port}:{port}"', compose)
             self.assertIn(f'"--port", "{port}"', compose)
         self.assertIn('docker compose up -d --no-deps --force-recreate "$service"', runner)
@@ -90,6 +90,7 @@ class RuntimeContractTest(unittest.TestCase):
         published_services = {
             "lab-reverse-proxy": 80,
             "lab-prompt-rag": 8000,
+            "lab-llm04-rag": 8004,
             "lab-data-rag": 8010,
             "lab-output-rag": 8011,
             "lab-knowledge-rag": 8012,
@@ -103,6 +104,7 @@ class RuntimeContractTest(unittest.TestCase):
         health_urls = {
             "lab-ollama": "http://localhost:11434/api/tags",
             "lab-prompt-rag": "http://localhost:8000/healthz",
+            "lab-llm04-rag": "http://localhost:8004/healthz",
             "lab-data-rag": "http://localhost:8010/healthz",
             "lab-output-rag": "http://localhost:8011/healthz",
             "lab-knowledge-rag": "http://localhost:8012/healthz",
@@ -137,6 +139,7 @@ class RuntimeContractTest(unittest.TestCase):
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
         for unit in (
             "lab-prompt-rag",
+            "lab-llm04-rag",
             "lab-data-rag",
             "lab-output-rag",
             "lab-knowledge-rag",

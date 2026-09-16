@@ -24,6 +24,7 @@ services:
     depends_on:
       - portal
       - prompt-rag
+      - llm04-rag
       - data-rag
       - output-rag
       - knowledge-rag
@@ -59,6 +60,18 @@ services:
       SCENARIO: day1
       PORT: "8000"
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  llm04-rag:
+    <<: *rag-common
+    container_name: lab-llm04-rag
+    ports:
+      - "8004:8004"
+    environment:
+      <<: *rag-environment
+      DEFAULT_SCENARIO: llm04
+      SCENARIO: llm04
+      PORT: "8004"
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004"]
 
   data-rag:
     <<: *rag-common

@@ -24,6 +24,7 @@ flowchart TD
   E --> N
   E --> P["lab-portal :8080 backend"]
   E --> G1["lab-prompt-rag :8000"]
+  E --> G04["lab-llm04-rag :8004"]
   E --> G2["lab-data-rag :8010"]
   E --> G3["lab-output-rag :8011"]
   E --> G4["lab-knowledge-rag :8012"]
@@ -117,6 +118,7 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 | `lab-ollama` | 11434 | 생성 모델과 LLM08 `bge-m3:latest` embedding을 함께 제공하는 로컬 Ollama API |
 | `lab-portal` | 8080 | Nginx `/`가 연결하는 포털 backend와 기존 직접 포트 |
 | `lab-prompt-rag` | 8000 | LLM01 직접 프롬프트 인젝션 번역기 |
+| `lab-llm04-rag` | 8004 | LLM01 번역기에 격리된 corpus를 연결한 LLM04 RAG 변형 |
 | `lab-data-rag` | 8010 | Day 2 LLM02·LLM08 RAG corpus 챗봇 |
 | `lab-output-rag` | 8011 | Day 3 LLM05 output handling RAG 챗봇 |
 | `lab-knowledge-rag` | 8012 | Day 2 LLM08의 `/api/embed`·paired vector search/chat과 Day 4 LLM07·LLM09가 공유하는 PrivateGPT-Lite |

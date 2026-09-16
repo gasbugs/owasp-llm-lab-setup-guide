@@ -18,6 +18,7 @@ class ReverseProxyTests(unittest.TestCase):
     def test_port_80_routes_module_00_to_05_browser_services(self) -> None:
         routes = {
             "/prompt-rag/": "http://prompt_rag_backend/",
+            "/llm04-rag/": "http://llm04_rag_backend/",
             "/data-rag/": "http://data_rag_backend/",
             "/output-rag/": "http://output_rag_backend/",
             "/knowledge-rag/": "http://knowledge_rag_backend/",
@@ -41,6 +42,7 @@ class ReverseProxyTests(unittest.TestCase):
         self.assertIn("resolver 127.0.0.11 valid=10s ipv6=off;", self.config)
         for service, port in (
             ("prompt-rag", 8000),
+            ("llm04-rag", 8004),
             ("data-rag", 8010),
             ("output-rag", 8011),
             ("vuln-agent", 8001),
@@ -55,7 +57,7 @@ class ReverseProxyTests(unittest.TestCase):
         self.assertIn("docker.io/library/nginx:1.31.5-alpine3.24", self.compose)
         self.assertIn('"80:80"', self.compose)
         self.assertIn('"8501:8501"', self.compose)
-        for port in (5000, 8000, 8001, 8002, 8010, 8011, 8012, 8013, 8080):
+        for port in (5000, 8000, 8001, 8002, 8004, 8010, 8011, 8012, 8013, 8080):
             with self.subTest(port=port):
                 self.assertIn(f'"{port}:{port}"', self.compose)
 

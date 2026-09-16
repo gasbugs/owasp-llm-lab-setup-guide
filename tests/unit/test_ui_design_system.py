@@ -92,8 +92,8 @@ class UiDesignSystemTests(unittest.TestCase):
         self.assertIn('id="guard-panel" class="panel" hidden', self.rag)
         self.assertIn("guardPanel.hidden = true", self.rag)
         self.assertIn("showGuardrailPanel(data.guard_engine, data.guard_mode)", self.rag)
-        self.assertIn('scenarioSelect.value !== \'day2\'', self.rag)
-        self.assertIn('{% if scenario_id != "day2" %} hidden{% endif %}', self.rag)
+        self.assertIn("scenarioSelect.value !== 'day2' && !isLlm04Rag", self.rag)
+        self.assertIn('{% if scenario_id not in ("day2", "llm04") %} hidden{% endif %}', self.rag)
 
     def test_first_party_apps_share_a_responsive_llm_navigation_rail(self) -> None:
         for source in (self.rag, self.agent):
@@ -101,10 +101,9 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn('aria-label="LLM 실습 이동"', source)
             self.assertIn(".app-layout", source)
             self.assertIn("@media(max-width:760px)", source.replace(" ", ""))
-            for llm_number in (1, 2, 5, 6, 7, 8, 9, 10):
+            for llm_number in (1, 2, 4, 5, 6, 7, 8, 9, 10):
                 self.assertIn(f">{llm_number:02d}<", source)
-            for llm_number in (3, 4):
-                self.assertNotIn(f">{llm_number:02d}<", source)
+            self.assertNotIn(">03<", source)
             self.assertIn("LLMGoat", source)
             self.assertIn("DVLA", source)
 

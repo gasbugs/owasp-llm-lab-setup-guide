@@ -21,11 +21,12 @@ LLM02 수강생 흐름은 C-2001 Bearer token으로 서버 principal을 만든 �
 
 LLM08 RAG 실습도 `run_llm08_rag_policy_chat()`이 출처 필터를 한 번 선택한 뒤 `run_llm08_rag_chat()`을 호출한다. 전용 workshop endpoint와 8010 UI의 `/api/chat`은 이 함수를 공유하므로 주석 전환이 두 경로에 동시에 적용된다. UI의 `lab` 값은 `llm02`와 `llm08-rag-poisoning`만 정본으로 사용하며 인증이나 문서 승인 상태를 결정하지 않는다. 문서 주입과 목록도 `/api/labs/llm08/rag-poisoning/documents`를 사용해 별도 UI corpus가 생기지 않는다.
 
-시큐어 코딩으로 바꾼 source는 같은 컨테이너를 재시작해도 유지된다. 배포 이미지의 취약 기준선으로 돌아갈 때는 LLM01에 `prompt-rag`, LLM02와 LLM08 RAG에 `data-rag`, LLM05에 `output-rag`, LLM06에 `vuln-agent`, LLM08 tenant와 LLM09에 `knowledge-rag`, LLM10에 `resource-rag` 서비스를 지정해 `docker compose up -d --no-deps --force-recreate <service>`를 실행한다. 이 명령은 수강생의 `~/work`를 지우지 않고 지정한 컨테이너만 재생성한다. LLM10 과부하 뒤에는 대기 중인 생성 작업을 끊기 위해 `docker compose restart ollama`도 정해진 순서에 넣는다.
+시큐어 코딩으로 바꾼 source는 같은 컨테이너를 재시작해도 유지된다. 배포 이미지의 취약 기준선으로 돌아갈 때는 LLM01에 `prompt-rag`, LLM04 RAG에 `llm04-rag`, LLM02와 LLM08 RAG에 `data-rag`, LLM05에 `output-rag`, LLM06에 `vuln-agent`, LLM08 tenant와 LLM09에 `knowledge-rag`, LLM10에 `resource-rag` 서비스를 지정해 `docker compose up -d --no-deps --force-recreate <service>`를 실행한다. 이 명령은 수강생의 `~/work`를 지우지 않고 지정한 컨테이너만 재생성한다. LLM10 과부하 뒤에는 대기 중인 생성 작업을 끊기 위해 `docker compose restart ollama`도 정해진 순서에 넣는다.
 
 | 실습 경계 | 취약 기준선 재생성 명령 |
 |---|---|
 | LLM01 | `docker compose up -d --no-deps --force-recreate prompt-rag` |
+| LLM04 RAG | `docker compose up -d --no-deps --force-recreate llm04-rag` |
 | LLM02·LLM08 RAG | `docker compose up -d --no-deps --force-recreate data-rag` |
 | LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` |
 | LLM06 | `docker compose up -d --no-deps --force-recreate vuln-agent` |

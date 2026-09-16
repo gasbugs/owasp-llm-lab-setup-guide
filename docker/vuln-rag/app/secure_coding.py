@@ -159,7 +159,6 @@ def select_llm08_rag_provenance_filter() -> Literal["vulnerable", "safe"]:
 
 
 # Compatibility alias for older course evidence and API clients.
-select_llm04_provenance_filter = select_llm08_rag_provenance_filter
 
 
 def search_all_tenants() -> Literal["vulnerable", "safe"]:

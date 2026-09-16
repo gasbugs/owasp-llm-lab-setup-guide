@@ -72,6 +72,7 @@ sudo tail -n 200 /var/log/owasp-llm-lab-install.log
 sudo -u ubuntu docker ps -a
 sudo -u ubuntu docker logs lab-ollama --tail 100
 sudo -u ubuntu docker logs lab-prompt-rag --tail 100
+sudo -u ubuntu docker logs lab-llm04-rag --tail 100
 sudo -u ubuntu docker logs lab-data-rag --tail 100
 ```
 

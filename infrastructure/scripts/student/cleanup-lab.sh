@@ -90,6 +90,7 @@ containers=(
   lab-reverse-proxy
   lab-ollama
   lab-prompt-rag
+  lab-llm04-rag
   lab-data-rag
   lab-output-rag
   lab-knowledge-rag

@@ -30,6 +30,7 @@ class PortalStatusServerTests(TestCase):
             SERVER.SERVICES,
             {
                 "prompt-rag": "http://prompt-rag:8000/healthz",
+                "llm04-rag": "http://llm04-rag:8004/healthz",
                 "data-rag": "http://data-rag:8010/healthz",
                 "output-rag": "http://output-rag:8011/healthz",
                 "knowledge-rag": "http://knowledge-rag:8012/healthz",

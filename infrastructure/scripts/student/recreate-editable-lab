@@ -9,6 +9,7 @@ Usage: recreate-editable-lab <container-name>
 
 Allowlisted container names:
   lab-prompt-rag
+  lab-llm04-rag
   lab-data-rag
   lab-output-rag
   lab-knowledge-rag
@@ -54,6 +55,10 @@ container="$1"
 case "$container" in
   lab-prompt-rag)
     service=prompt-rag
+    image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
+    ;;
+  lab-llm04-rag)
+    service=llm04-rag
     image="ghcr.io/$IMAGE_NAMESPACE/owasp-llm-vuln-rag:$IMAGE_TAG"
     ;;
   lab-data-rag)

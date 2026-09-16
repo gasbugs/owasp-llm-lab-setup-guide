@@ -15,10 +15,10 @@ usage() {
 Usage: reset-lab <lab-id>
 
 Allowlisted lab IDs:
-  llm01    LLM01 editable source and in-memory RAG corpus
+  llm01    LLM01 editable source and direct-input process memory
   llm02    LLM02 editable source and Day 2 process memory
+  llm04    LLM04 editable source and in-memory RAG corpus
   llm08-rag Day 2 in-memory RAG corpus
-  llm04    compatibility alias for llm08-rag
   llm05    Day 3 in-memory RAG corpus
   llm06    Agent ANIMALS and DELETED_LOG memory
   llm08    LLM08 editable source and Day 4 process memory
@@ -140,11 +140,17 @@ case "$lab_id" in
       LLM01 \
       http://127.0.0.1:8000/healthz
     ;;
-  llm02|llm04|llm08-rag)
+  llm02|llm08-rag)
     recreate_one \
       lab-data-rag \
       LLM02_LLM08_RAG \
       http://127.0.0.1:8010/healthz
+    ;;
+  llm04)
+    recreate_one \
+      lab-llm04-rag \
+      LLM04 \
+      http://127.0.0.1:8004/healthz
     ;;
   llm05)
     recreate_one \

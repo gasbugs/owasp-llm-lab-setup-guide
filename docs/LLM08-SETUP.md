@@ -274,7 +274,7 @@ test "$(awk -F= '$1 == "OLLAMA_EMBED_MODEL" {print $2}' /etc/lab/env)" \
   = 'bge-m3:latest'
 
 for container in \
-  lab-prompt-rag lab-data-rag lab-output-rag \
+  lab-prompt-rag lab-llm04-rag lab-data-rag lab-output-rag \
   lab-knowledge-rag lab-resource-rag; do
   test "$(docker inspect --format '{{.Config.Image}}' "$container")" \
     = "ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG"

@@ -122,7 +122,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - LLM08 서버 vector 분석용 `~/work/llm08-analysis-venv` 준비(NumPy만 설치)
 - URI reverse proxy 실행: `lab-reverse-proxy`, port `80`
 - 실습 포털 backend 실행: `lab-portal`, 기존 port `8080`
-- 역할별 취약 RAG 앱 실행: `lab-prompt-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, ports `8000`, `8010`, `8011`, `8012`, `8013`
+- 역할별 취약 앱 실행: `lab-prompt-rag`, `lab-llm04-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, ports `8000`, `8004`, `8010`, `8011`, `8012`, `8013`
 - 취약 Agent 앱 실행: `lab-vuln-agent`, port `8001`
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
 - DVLA 실행: `lab-dvla`, 내부 port `8501` (`lab-reverse-proxy`가 `/dvla/`와 기존 host `8501`로 전달)
@@ -135,7 +135,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 
 ### 본인 공인 IPv4에서 실습 서비스에 접속
 
-Terraform은 포트별 Security Group 규칙을 만들지 않습니다. 기본 `127.0.0.1/32`는 외부 인바운드를 열지 않으므로 SSM 포트포워딩을 사용합니다. 직접 접속이 필요하면 `allowed_ingress_cidr`에 본인 공인 IPv4 `/32`를 입력합니다. 이 경우 그 주소의 모든 프로토콜과 포트를 ingress 규칙 하나로 허용하며, `public_ip_lookup_command`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. Portal은 `http://EC2_PUBLIC_IP/`이고 UI는 `/prompt-rag/`, `/data-rag/`, `/output-rag/`, `/knowledge-rag/`, `/resource-rag/`, `/vuln-agent/`, `/llmgoat/`, `/dvla/`에서 엽니다. `0.0.0.0/0`으로 넓히지 않습니다.
+Terraform은 포트별 Security Group 규칙을 만들지 않습니다. 기본 `127.0.0.1/32`는 외부 인바운드를 열지 않으므로 SSM 포트포워딩을 사용합니다. 직접 접속이 필요하면 `allowed_ingress_cidr`에 본인 공인 IPv4 `/32`를 입력합니다. 이 경우 그 주소의 모든 프로토콜과 포트를 ingress 규칙 하나로 허용하며, `public_ip_lookup_command`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. Portal은 `http://EC2_PUBLIC_IP/`이고 UI는 `/prompt-rag/`, `/llm04-rag/`, `/data-rag/`, `/output-rag/`, `/knowledge-rag/`, `/resource-rag/`, `/vuln-agent/`, `/llmgoat/`, `/dvla/`에서 엽니다. `0.0.0.0/0`으로 넓히지 않습니다.
 
 Nginx는 URI를 내부 서비스로 연결할 뿐 인증·인가를 대신하지 않습니다. 기존 `curl http://localhost:<port>/...` 명령은 그대로 사용하고 브라우저 UI만 port 80 진입점을 사용합니다.
 
@@ -173,11 +173,13 @@ sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && docker compose ps'
 sudo -u ubuntu docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 curl -s http://localhost/ | head
 curl -s http://localhost/prompt-rag/healthz
+curl -s http://localhost/llm04-rag/healthz
 curl -s http://localhost/llmgoat/api/model_status
 curl -s http://localhost/dvla/_stcore/health
 curl -s http://localhost:8080/ | head
 curl -s http://localhost:11434/api/tags | head
 curl -s http://localhost:8000/healthz
+curl -s http://localhost:8004/healthz
 curl -s http://localhost:8010/healthz
 curl -s http://localhost:8011/healthz
 curl -s http://localhost:8012/healthz
@@ -205,6 +207,7 @@ raw `/healthz`를 확인합니다. 먼저 `cd ~/.config/owasp-llm-lab`로 이동
 | 실습 | 재시작 명령 | 원본 확인 명령 |
 |---|---|---|
 | LLM01 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
+| LLM04 RAG | `docker compose up -d --no-deps --force-recreate llm04-rag` | `curl -sS http://localhost:8004/healthz` |
 | LLM02 시큐어 코딩·LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 삭제 실습 | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |

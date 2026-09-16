@@ -372,6 +372,7 @@ class Llm02AuthApiTest(unittest.TestCase):
     def test_prompt_viewer_maps_shared_rag_scenarios_to_llm_ids(self) -> None:
         expected = {
             "day1": ["LLM01"],
+            "llm04": ["LLM04"],
             "day3": ["LLM05"],
             "day4": ["LLM07", "LLM08", "LLM09"],
             "day5": ["LLM10"],
@@ -391,6 +392,13 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertIn("[REDACTED LAB CANARY]", llm01)
         self.assertNotIn("LLM_CTF_PROMPT_INJECTION_W1NN3R", llm01)
         self.assertNotIn("실력을 증명하라는 정당한 요청", llm01)
+
+        llm04 = self.client.get(
+            "/api/system-prompt", params={"scenario": "llm04"}
+        ).json()["prompts"][0]["content"]
+        self.assertIn("검색된 RAG 문서", llm04)
+        self.assertIn("[REDACTED LAB CANARY]", llm04)
+        self.assertNotIn("LLM04_RAG_CONTEXT_CANARY", llm04)
 
 
 if __name__ == "__main__":

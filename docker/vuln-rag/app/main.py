@@ -45,6 +45,7 @@ from app.scenarios import SCENARIO_NAMES, list_scenarios
 from app.scenarios import day1 as day1_scenario
 from app.scenarios import day2 as day2_scenario
 from app.scenarios import day4 as day4_scenario
+from app.scenarios import llm04 as llm04_scenario
 
 DEFAULT_SCENARIO = os.environ.get("DEFAULT_SCENARIO", os.environ.get("SCENARIO", "day1"))
 if DEFAULT_SCENARIO not in SCENARIO_NAMES:
@@ -99,7 +100,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
     scenario: str | None = None
-    lab: Literal["llm02", "llm08-rag-poisoning", "llm04"] | None = None
+    lab: Literal["llm02", "llm08-rag-poisoning"] | None = None
     customer_id: str | None = None
 
 
@@ -501,7 +502,6 @@ async def llm02_secure_coding_workshop(
     return await run_llm02_policy_chat(request_body, request)
 
 
-@app.post("/api/labs/llm04/workshop/chat", deprecated=True)
 @app.post("/api/labs/llm08/rag-poisoning/workshop/chat")
 async def llm08_rag_secure_coding_workshop(request_body: LLM08RagPoisoningChatRequest):
     return await run_llm08_rag_policy_chat(request_body)
@@ -671,11 +671,12 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
         llm_ids = ["LLM02"]
         dynamic_values = ["인가된 조회 결과"]
     else:
-        prompt_content = (
-            day1_scenario.build_system_prompt_preview()
-            if selected.id == "day1"
-            else selected.build_system_prompt(context=context_marker)
-        )
+        if selected.id == "day1":
+            prompt_content = day1_scenario.build_system_prompt_preview()
+        elif selected.id == "llm04":
+            prompt_content = llm04_scenario.build_system_prompt_preview()
+        else:
+            prompt_content = selected.build_system_prompt(context=context_marker)
         prompts = [
             {
                 "stage": "generation",
@@ -686,11 +687,14 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
         llm_ids = {
             "day1": ["LLM01"],
             "day2": ["LLM08"],
+            "llm04": ["LLM04"],
             "day3": ["LLM05"],
             "day4": ["LLM07", "LLM08", "LLM09"],
             "day5": ["LLM10"],
         }[selected.id]
-        dynamic_values = [] if selected.id == "day1" else ["검색·업무 Context"]
+        dynamic_values = (
+            [] if selected.id == "day1" else ["검색·업무 Context"]
+        )
 
     return {
         "lab_only": True,
@@ -782,14 +786,12 @@ async def llm02_safe_chat(request_body: LLM02SafeChatRequest, request: Request):
     )
 
 
-@app.get("/api/labs/llm04/documents", deprecated=True)
 @app.get("/api/labs/llm08/rag-poisoning/documents")
 async def llm08_rag_documents():
     require_day2_lab()
     return {"lab_only": True, "documents": day2_scenario.document_records()}
 
 
-@app.post("/api/labs/llm04/documents", deprecated=True)
 @app.post("/api/labs/llm08/rag-poisoning/documents")
 async def llm08_rag_add_document(request_body: LLM08RagPoisoningDocumentRequest):
     require_day2_lab()
@@ -805,13 +807,11 @@ async def llm08_rag_add_document(request_body: LLM08RagPoisoningDocumentRequest)
     }
 
 
-@app.post("/api/labs/llm04/vulnerable/chat", deprecated=True)
 @app.post("/api/labs/llm08/rag-poisoning/vulnerable/chat")
 async def llm08_rag_vulnerable_chat(request_body: LLM08RagPoisoningChatRequest):
     return await run_llm08_rag_chat(request_body, mode="vulnerable")
 
 
-@app.post("/api/labs/llm04/safe/chat", deprecated=True)
 @app.post("/api/labs/llm08/rag-poisoning/safe/chat")
 async def llm08_rag_safe_chat(request_body: LLM08RagPoisoningChatRequest):
     return await run_llm08_rag_chat(request_body, mode="safe")
@@ -1059,7 +1059,7 @@ async def chat(req: ChatRequest, request: Request):
     """**일부러 취약한** 챗봇 엔드포인트.
 
     LLM01은 사용자 입력만, RAG가 필요한 다른 시나리오는 검색 context도 사용한다.
-    OWASP LLM01/02/05/07/08/09/10 실습에 활용.
+    OWASP LLM01/02/04/05/07/08/09/10 실습에 활용.
     """
     selected = get_scenario(req.scenario)
     if selected.id == "day2":

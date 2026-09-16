@@ -26,7 +26,8 @@ fi
 target_for_item() {
   case "$1" in
     llm01) echo "http://localhost:8000" ;;
-    llm02|llm04) echo "http://localhost:8010" ;;
+    llm02) echo "http://localhost:8010" ;;
+    llm04) echo "http://localhost:8004" ;;
     llm05) echo "http://localhost:8011" ;;
     llm07|llm08|llm09) echo "http://localhost:8012" ;;
     llm10) echo "http://localhost:8013" ;;

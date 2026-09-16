@@ -170,7 +170,7 @@ PULLSH
 # published image when a clean baseline is required.
 
 # 7) 시나리오 결정
-echo "[install-lab] enabled scenarios: day1 day2 day3 day4 day5"
+echo "[install-lab] enabled scenarios: day1 day2 llm04 day3 day4 day5"
 
 # 8) 모든 서비스 정의를 하나의 Compose 파일로 설치하고 실행
 step "9/10" "단일 Docker Compose 정의로 모든 실습 컨테이너를 준비합니다"
@@ -267,6 +267,7 @@ all_units=(
   lab-reverse-proxy
   lab-ollama
   lab-prompt-rag
+  lab-llm04-rag
   lab-data-rag
   lab-output-rag
   lab-knowledge-rag
@@ -297,6 +298,7 @@ units=(
   lab-reverse-proxy
   lab-ollama
   lab-prompt-rag
+  lab-llm04-rag
   lab-data-rag
   lab-output-rag
   lab-knowledge-rag
@@ -408,6 +410,7 @@ set -euo pipefail
 
 declare -A expected_images=(
   [lab-prompt-rag]="owasp-llm-vuln-rag"
+  [lab-llm04-rag]="owasp-llm-vuln-rag"
   [lab-data-rag]="owasp-llm-vuln-rag"
   [lab-output-rag]="owasp-llm-vuln-rag"
   [lab-knowledge-rag]="owasp-llm-vuln-rag"
@@ -440,6 +443,7 @@ done
 
 declare -A container_layer_source_files=(
   [lab-prompt-rag]="/app/app/secure_coding.py"
+  [lab-llm04-rag]="/app/app/scenarios/llm04.py"
   [lab-data-rag]="/app/app/secure_coding.py"
   [lab-output-rag]="/app/app/templates/index.html"
   [lab-knowledge-rag]="/app/app/secure_coding.py"
@@ -488,6 +492,7 @@ echo "[install-lab] LLMGoat model initialization completed; container restarted"
 health_urls=(
   http://localhost/
   http://localhost/prompt-rag/healthz
+  http://localhost/llm04-rag/healthz
   http://localhost/data-rag/healthz
   http://localhost/output-rag/healthz
   http://localhost/knowledge-rag/healthz
@@ -500,6 +505,7 @@ health_urls=(
   http://localhost/fake-registry/api/v1/models
   http://localhost:11434/api/tags
   http://localhost:8000/healthz
+  http://localhost:8004/healthz
   http://localhost:8010/healthz
   http://localhost:8011/healthz
   http://localhost:8012/healthz
@@ -532,6 +538,7 @@ declare -A published_ports=(
   [lab-reverse-proxy]=80
   [lab-ollama]=11434
   [lab-prompt-rag]=8000
+  [lab-llm04-rag]=8004
   [lab-data-rag]=8010
   [lab-output-rag]=8011
   [lab-knowledge-rag]=8012
@@ -636,6 +643,9 @@ OWASP LLM Lab 설치가 완료되었습니다.
   - LLM01 Prompt Injection 8000
     검색 없이 사용자 입력만 처리하는 번역기 실습 앱입니다.
 
+  - LLM04 RAG Prompt Injection 8004
+    LLM01 번역기에 별도 문서 corpus를 연결한 RAG 실습 앱입니다.
+
   - Day 2 Vulnerable RAG  8010
     LLM02 민감정보 노출과 LLM08 RAG corpus 오염 실습 앱입니다.
 
@@ -675,6 +685,7 @@ LLM08 추가 준비:
 
   URI별 실습 UI:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/prompt-rag/
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/llm04-rag/
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/data-rag/
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/output-rag/
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/knowledge-rag/
@@ -688,6 +699,9 @@ LLM08 추가 준비:
 
   LLM01 Prompt Injection health check:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8000/healthz
+
+  LLM04 RAG Prompt Injection health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8004/healthz
 
   Day 2 Vulnerable RAG health check:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8010/healthz
@@ -728,10 +742,12 @@ LLM08 추가 준비:
   # API 응답 확인
   curl -fsS http://\$EC2_DOMAIN/ >/dev/null
   curl -fsS http://\$EC2_DOMAIN/prompt-rag/healthz
+  curl -fsS http://\$EC2_DOMAIN/llm04-rag/healthz
   curl -fsS http://\$EC2_DOMAIN/llmgoat/api/model_status
   curl -fsS http://\$EC2_DOMAIN/dvla/_stcore/health
   curl -fsS http://\$EC2_DOMAIN:11434/api/tags | jq
   curl -fsS http://\$EC2_DOMAIN:8000/healthz
+  curl -fsS http://\$EC2_DOMAIN:8004/healthz
   curl -fsS http://\$EC2_DOMAIN:8010/healthz
   curl -fsS http://\$EC2_DOMAIN:8011/healthz
   curl -fsS http://\$EC2_DOMAIN:8012/healthz

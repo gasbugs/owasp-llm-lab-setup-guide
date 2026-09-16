@@ -136,6 +136,7 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 |---:|---|---|
 | 80 | `lab-reverse-proxy` | `/`와 UI별 URI를 Compose 서비스로 전달 |
 | 8000 | `lab-prompt-rag` | `default_scenario=day1` |
+| 8004 | `lab-llm04-rag` | `default_scenario=llm04` |
 | 8010 | `lab-data-rag` | `default_scenario=day2` |
 | 8011 | `lab-output-rag` | `default_scenario=day3` |
 | 8012 | `lab-knowledge-rag` | `default_scenario=day4` |
@@ -150,18 +151,18 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 RAG health의 canonical JSON shape은 다음과 같습니다.
 
 ```json
-{"ok":true,"default_scenario":"day3","scenarios":["day1","day2","day3","day4","day5"]}
+{"ok":true,"default_scenario":"day3","scenarios":["day1","day2","llm04","day3","day4","day5"]}
 ```
 
-다섯 포트의 scenario를 한 번에 확인합니다.
+여섯 포트의 scenario를 한 번에 확인합니다.
 
 ```bash
-for pair in day1:8000 day2:8010 day3:8011 day4:8012 day5:8013; do
+for pair in day1:8000 day2:8010 llm04:8004 day3:8011 day4:8012 day5:8013; do
   scenario=${pair%%:*}
   port=${pair##*:}
   curl -fsS "http://localhost:${port}/healthz" \
     | jq -e --arg scenario "$scenario" \
-        '.ok == true and .default_scenario == $scenario and (.scenarios | length == 5)'
+        '.ok == true and .default_scenario == $scenario and (.scenarios | length == 6)'
 done
 
 curl -fsS http://localhost:8001/healthz \
@@ -169,6 +170,7 @@ curl -fsS http://localhost:8001/healthz \
 curl -fsS http://localhost:8002/api/v1/models | jq -e '.models | length > 0'
 curl -fsS http://localhost/ >/dev/null
 curl -fsS http://localhost/prompt-rag/healthz
+curl -fsS http://localhost/llm04-rag/healthz
 curl -fsS http://localhost/llmgoat/api/model_status
 curl -fsS http://localhost/dvla/_stcore/health
 curl -fsS http://localhost:8080/ >/dev/null
@@ -201,7 +203,7 @@ TRIALS=5 \
 TRIALS=5 bash tests/e2e/run-full-cycle.sh
 ```
 
-full-cycle은 다섯 RAG 포트와 Agent를 순회한 뒤 LLMGoat
+full-cycle은 LLM01 직접 입력 서비스와 다섯 RAG 포트, Agent를 순회한 뒤 LLMGoat
 A01/A02/A04/A06/A08 API를 실제 호출하고, 마지막에 LLM10을 실행합니다. LLMGoat의
 각 HTTP request/response는 `llmgoat/raw/requests.jsonl`에 원문 JSON과 SHA-256으로
 남습니다. A04는 review 추가 전·후·reset 상태 hash, A08은 vector export·import·reset
