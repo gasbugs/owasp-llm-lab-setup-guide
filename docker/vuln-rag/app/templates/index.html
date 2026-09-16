@@ -29,12 +29,13 @@
     .lab-nav-brand { display:block; margin:0 8px 18px; color:var(--ink); text-decoration:none; }.lab-nav-brand strong { display:block; color:var(--signal); font:800 14px ui-monospace,monospace; letter-spacing:.08em; }.lab-nav-brand span { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
     .lab-nav-group { margin:17px 8px 7px; color:var(--muted); font:700 9px ui-monospace,monospace; letter-spacing:.14em; text-transform:uppercase; }
     .lab-nav-list { display:grid; gap:4px; }.lab-nav-link { display:grid; grid-template-columns:34px minmax(0,1fr); gap:8px; align-items:center; min-height:43px; padding:7px 9px; border:1px solid transparent; border-radius:9px; color:var(--muted); text-decoration:none; }.lab-nav-link:hover,.lab-nav-link:focus-visible { border-color:var(--line); background:var(--surface-raised); color:var(--ink); }.lab-nav-link[aria-current="page"] { border-color:var(--signal); background:color-mix(in srgb,var(--signal) 11%,var(--surface-raised)); color:var(--ink); }.lab-nav-code { color:var(--signal); font:800 11px ui-monospace,monospace; }.lab-nav-name { overflow:hidden; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
-    .shell { position:relative; width:min(1440px,100%); margin:auto; padding:22px; }
-    .masthead { display:grid; grid-template-columns:auto 1fr auto; gap:22px; align-items:center; border:1px solid var(--line); background:color-mix(in srgb,var(--surface) 94%,transparent); box-shadow:var(--shadow); padding:18px 20px; }
+    .shell { position:relative; align-self:start; width:min(1440px,100%); margin:0 auto; padding:22px; }
+    .masthead { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px 22px; align-items:start; border:1px solid var(--line); background:color-mix(in srgb,var(--surface) 94%,transparent); box-shadow:var(--shadow); padding:18px 20px; }
+    .brand { grid-column:1; grid-row:1; }
     .brand-kicker,.eyebrow,.micro-label { color:var(--signal); font:700 11px/1.2 ui-monospace,"SFMono-Regular",Consolas,monospace; letter-spacing:.15em; text-transform:uppercase; }
     .brand h1 { margin:4px 0 0; font:800 clamp(21px,2.3vw,34px)/.95 "Arial Narrow","Roboto Condensed","Segoe UI",sans-serif; letter-spacing:.025em; text-transform:uppercase; }
-    .brand h1 span { color:var(--signal); }.mission { max-width:650px; color:var(--muted); font-size:13px; }
-    .top-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end; }.vuln-beacon { color:var(--incident); font:700 11px ui-monospace,monospace; letter-spacing:.08em; }
+    .brand h1 span { color:var(--signal); }.mission { grid-column:1/-1; grid-row:2; max-width:920px; margin:0; color:var(--muted); font-size:13px; }
+    .top-actions { grid-column:2; grid-row:1; align-self:center; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end; }.vuln-beacon { color:var(--incident); font:700 11px ui-monospace,monospace; letter-spacing:.08em; }
     .icon-button { width:42px; height:42px; padding:0; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); cursor:pointer; }
     .home-button { display:inline-flex; min-height:42px; align-items:center; padding:0 13px; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); font-weight:750; text-decoration:none; }
     .home-button:hover,.home-button:focus-visible { border-color:var(--signal); color:var(--signal); }
@@ -71,9 +72,10 @@
     .guard-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }.guard-field { border-left:3px solid var(--line); padding:9px 10px; background:var(--surface-raised); }.guard-field strong { display:block; color:var(--muted); font:10px ui-monospace,monospace; text-transform:uppercase; letter-spacing:.07em; }.guard-field span { display:block; margin-top:4px; overflow-wrap:anywhere; }
     #guard-checks { max-height:210px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; padding:10px; background:var(--surface-raised); font:11px/1.5 ui-monospace,monospace; }
     .doc-list { list-style:none; padding:0; margin:12px 0 0; }.doc-item { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:start; border-top:1px solid var(--line-soft); padding:12px 0; }.doc-text { white-space:pre-wrap; overflow-wrap:anywhere; }.doc-meta { color:var(--signal); font:11px ui-monospace,monospace; margin-bottom:4px; }
-    @media(max-width:980px){.app-layout{grid-template-columns:190px minmax(0,1fr)}.masthead{grid-template-columns:1fr auto}.mission{grid-column:1/-1;grid-row:2}.scenario-bar,.lab-grid{grid-template-columns:1fr}.chat{min-height:360px}}
+    @media(max-width:980px){.app-layout{grid-template-columns:190px minmax(0,1fr)}.scenario-bar,.lab-grid{grid-template-columns:1fr}.chat{min-height:360px}}
     @media(max-width:760px){.app-layout{display:block}.lab-nav{position:sticky;height:auto;max-height:none;padding:9px 10px;border-right:0;border-bottom:1px solid var(--line);overflow:hidden}.lab-nav-brand,.lab-nav-group{display:none}.lab-nav-list{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}.lab-nav-link{flex:0 0 auto;grid-template-columns:auto;min-height:38px;padding:7px 10px}.lab-nav-name{display:none}}
     @media(max-width:620px){.shell{padding:10px}.masthead,.scenario-bar,.panel-head,.panel-body{padding:14px}.vuln-beacon{display:none}.guard-grid{grid-template-columns:1fr}.composer-actions button{width:100%}.render-toggle{width:100%}}
+    @media(max-width:560px){.masthead{grid-template-columns:1fr}.brand{grid-column:1;grid-row:1}.top-actions{grid-column:1;grid-row:2;justify-content:flex-start}.mission{grid-column:1;grid-row:3}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
   </style>
 </head>
@@ -85,8 +87,6 @@
   <div class="lab-nav-list">
     <a class="lab-nav-link" data-lab-nav="llm01" data-lab-route="/prompt-rag/" href="/prompt-rag/"><span class="lab-nav-code">01</span><span class="lab-nav-name">Prompt Injection</span></a>
     <a class="lab-nav-link" data-lab-nav="llm02" data-lab-route="/data-rag/?lab=llm02" href="/data-rag/?lab=llm02"><span class="lab-nav-code">02</span><span class="lab-nav-name">Sensitive Data</span></a>
-    <a class="lab-nav-link" data-lab-nav="llm03" data-lab-route="/fake-registry/" href="/fake-registry/"><span class="lab-nav-code">03</span><span class="lab-nav-name">Supply Chain</span></a>
-    <a class="lab-nav-link" data-lab-nav="llm04" data-lab-route="/#llm04" href="/#llm04"><span class="lab-nav-code">04</span><span class="lab-nav-name">Data Poisoning · CLI</span></a>
     <a class="lab-nav-link" data-lab-nav="llm05" data-lab-route="/output-rag/" href="/output-rag/"><span class="lab-nav-code">05</span><span class="lab-nav-name">Output Handling</span></a>
     <a class="lab-nav-link" data-lab-nav="llm06" data-lab-route="/vuln-agent/" href="/vuln-agent/"><span class="lab-nav-code">06</span><span class="lab-nav-name">Agency</span></a>
     <a class="lab-nav-link" data-lab-nav="llm07" data-lab-route="/knowledge-rag/?lab=llm07" href="/knowledge-rag/?lab=llm07"><span class="lab-nav-code">07</span><span class="lab-nav-name">Prompt Leakage</span></a>

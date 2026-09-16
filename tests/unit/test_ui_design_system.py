@@ -101,10 +101,21 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn('aria-label="LLM 실습 이동"', source)
             self.assertIn(".app-layout", source)
             self.assertIn("@media(max-width:760px)", source.replace(" ", ""))
-            for llm_number in range(1, 11):
+            for llm_number in (1, 2, 5, 6, 7, 8, 9, 10):
                 self.assertIn(f">{llm_number:02d}<", source)
+            for llm_number in (3, 4):
+                self.assertNotIn(f">{llm_number:02d}<", source)
             self.assertIn("LLMGoat", source)
             self.assertIn("DVLA", source)
+
+    def test_app_content_is_top_aligned_and_header_copy_sits_below_title(self) -> None:
+        for source in (self.rag, self.agent):
+            compact = source.replace(" ", "")
+            self.assertIn(".shell{", compact)
+            self.assertIn("align-self:start", compact)
+            self.assertIn("grid-template-columns:minmax(0,1fr)auto", compact)
+            self.assertIn(".mission{grid-column:1/-1;grid-row:2", compact)
+            self.assertIn(".top-actions{grid-column:2;grid-row:1", compact)
 
     def test_html_render_controls_are_server_rendered_only_for_llm05(self) -> None:
         self.assertIn(
