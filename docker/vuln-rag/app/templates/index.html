@@ -147,7 +147,11 @@ const promptClose = document.getElementById('prompt-close');
 const promptDialog = document.getElementById('prompt-dialog');
 const promptLlmIds = document.getElementById('prompt-llm-ids');
 const promptContent = document.getElementById('prompt-content');
-document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
+const appBasePath = window.location.pathname.endsWith('/')
+  ? window.location.pathname
+  : `${window.location.pathname}/`;
+const appUrl = (path) => new URL(path.replace(/^\/+/, ''), `${window.location.origin}${appBasePath}`).toString();
+document.getElementById('portal-home').href = `http://${window.location.hostname}/`;
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('llm-lab-theme', theme);
@@ -186,7 +190,7 @@ async function loadSystemPrompt() {
   try {
     const params = new URLSearchParams({scenario: scenarioSelect.value});
     if (labSelect) params.set('lab', labSelect.value);
-    const response = await fetch(`/api/system-prompt?${params}`);
+    const response = await fetch(appUrl(`/api/system-prompt?${params}`));
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
     promptLlmIds.textContent = data.llm_ids.join(' · ');
@@ -254,7 +258,7 @@ form.addEventListener('submit', async (e) => {
       headers.Authorization = `Bearer ${token}`;
     }
   }
-  const r = await fetch('/api/chat', {
+  const r = await fetch(appUrl('/api/chat'), {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -325,7 +329,7 @@ async function loadDocs() {
     return;
   }
   if (scenarioSelect.value === 'day2') {
-    const r = await fetch('/api/labs/llm08/rag-poisoning/documents');
+    const r = await fetch(appUrl('/api/labs/llm08/rag-poisoning/documents'));
     const data = await r.json();
     if (!r.ok || !Array.isArray(data.documents)) {
       injectStatus.textContent = '문서 목록 조회 실패';
@@ -351,7 +355,7 @@ async function loadDocs() {
     return;
   }
   const scenario = encodeURIComponent(scenarioSelect.value);
-  const r = await fetch(`/api/admin/docs?scenario=${scenario}`);
+  const r = await fetch(appUrl(`/api/admin/docs?scenario=${scenario}`));
   const data = await r.json();
   if (!r.ok || !data.ok) {
     injectStatus.textContent = '문서 목록 조회 실패';
@@ -377,7 +381,7 @@ async function loadDocs() {
     del.type = 'button';
     del.textContent = '삭제';
     del.addEventListener('click', async () => {
-      const res = await fetch(`/api/admin/docs/${doc.index}?scenario=${scenario}`, { method: 'DELETE' });
+      const res = await fetch(appUrl(`/api/admin/docs/${doc.index}?scenario=${scenario}`), { method: 'DELETE' });
       if (!res.ok) {
         injectStatus.textContent = `#${doc.index} 삭제 실패`;
         return;
@@ -420,7 +424,8 @@ injectForm.addEventListener('submit', async (e) => {
 
   injectStatus.textContent = '문서를 주입하는 중...';
   const llm04Mode = scenarioSelect.value === 'day2' && labSelect?.value === 'llm08-rag-poisoning';
-  const r = await fetch(llm04Mode ? '/api/labs/llm08/rag-poisoning/documents' : '/api/admin/inject-doc', {
+  const endpoint = llm04Mode ? '/api/labs/llm08/rag-poisoning/documents' : '/api/admin/inject-doc';
+  const r = await fetch(appUrl(endpoint), {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(llm04Mode

@@ -43,7 +43,7 @@ class VulnAgentUILayoutTests(unittest.TestCase):
         self.assertIn('id="prompt-open"', self.html)
         self.assertIn('id="prompt-dialog"', self.html)
         self.assertIn('aria-labelledby="prompt-title"', self.html)
-        self.assertIn("fetch('/api/system-prompt')", self.html)
+        self.assertIn("fetch(appUrl('/api/system-prompt'))", self.html)
 
 
 if __name__ == "__main__":

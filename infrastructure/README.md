@@ -11,13 +11,15 @@
 - 자동 중지 Lambda·EventBridge는 만들지 않는다. 실습 직후 `stop-lab.sh`로 ASG를 0으로 축소한다.
 - 마지막 날에는 `terraform destroy -auto-approve`로 EC2, EBS, VPC를 삭제한다.
 - 보안 그룹은 포트별 규칙 대신 `allowed_ingress_cidr`의 본인 공인 IPv4 `/32`에서 오는 전체 인바운드 트래픽을 허용한다. 학습자 웹/API는 EC2 public IP로 직접 접속하고 SSM은 셸 접속에 사용한다.
+- Bootstrap 또는 수동 설치가 끝나면 브라우저 UI는 Nginx의 TCP/80 하나에서 URI별로 연결된다.
 
 ## 구성 요소
 
 | 경로 | 용도 |
 |---|---|
 | `terraform/` | 다중 AZ VPC, ASG, Launch Template, 보안 그룹, IAM instance profile |
-| `compose/compose.yaml` | 11개 실습 컨테이너의 단일 Docker Compose 배포 정의 |
+| `compose/compose.yaml` | 12개 실습 컨테이너의 단일 Docker Compose 배포 정의 |
+| `reverse-proxy/default.conf` | port 80의 UI URI를 기존 Compose 서비스로 전달하는 Nginx 설정 |
 | `scripts/student/` | 수강생용 preflight, 수동 설치, instance-id, start/stop 및 작업물 보존 안내 헬퍼 |
 
 `scripts/student/upload-capstone.sh`는 런타임이나 e2e의 의존성이 아니라 선택적 SSM 전송 helper입니다. 별도 수강생 패키지 루트에서 실행하며 `TF_DIR`은 이 설정 저장소의 `infrastructure/terraform`을 가리켜야 합니다.

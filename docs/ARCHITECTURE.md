@@ -10,8 +10,19 @@ flowchart TD
   A -->|"SSM Session Manager"| D
   D -->|"manual install-lab.sh"| E["Docker runtime"]
   D -. "optional user-data bootstrap" .-> E
+  A -->|"HTTP :80 · student IPv4 /32"| N["lab-reverse-proxy"]
+  N -->|"/"| P
+  N -->|"URI prefix"| G1
+  N -->|"URI prefix"| G2
+  N -->|"URI prefix"| G3
+  N -->|"URI prefix"| G4
+  N -->|"URI prefix"| G5
+  N -->|"/vuln-agent/"| H
+  N -->|"/llmgoat/"| I
+  N -->|"/dvla/"| J
   E --> F["lab-ollama :11434"]
-  E --> P["lab-portal :8080"]
+  E --> N
+  E --> P["lab-portal :8080 backend"]
   E --> G1["lab-prompt-rag :8000"]
   E --> G2["lab-data-rag :8010"]
   E --> G3["lab-output-rag :8011"]
@@ -102,8 +113,9 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 
 | 컨테이너 | 포트 | 역할 |
 |---|---:|---|
+| `lab-reverse-proxy` | 80, 8501 호환 | 포털과 실습 UI를 URI별로 Compose DNS upstream에 전달 |
 | `lab-ollama` | 11434 | 생성 모델과 LLM08 `bge-m3:latest` embedding을 함께 제공하는 로컬 Ollama API |
-| `lab-portal` | 8080 | 실습 앱 링크와 health check 진입점 |
+| `lab-portal` | 8080 | Nginx `/`가 연결하는 포털 backend와 기존 직접 포트 |
 | `lab-prompt-rag` | 8000 | Day 1 LLM01 프롬프트 인젝션 RAG 챗봇 |
 | `lab-data-rag` | 8010 | Day 2 LLM02·LLM08 RAG corpus 챗봇 |
 | `lab-output-rag` | 8011 | Day 3 LLM05 output handling RAG 챗봇 |
@@ -111,8 +123,10 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 | `lab-resource-rag` | 8013 | Day 5 LLM10 resource consumption RAG 챗봇 |
 | `lab-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
 | `lab-llmgoat` | 5000 | LLMGoat cross-platform 실습 |
-| `lab-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
+| `lab-dvla` | 내부 8501 | `baseUrlPath=dvla`인 Damn Vulnerable LLM Agent. 기존 host 8501은 Nginx가 호환 전달 |
 | `lab-fake-registry` | 8002 | Day 4 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
+
+브라우저는 `http://EC2_PUBLIC_IP/`에서 포털을 열고 URI로 앱을 고릅니다. Nginx는 RAG·Agent·Registry prefix를 제거해 기존 endpoint로 전달하고, LLMGoat와 DVLA는 각 wrapper의 base path 처리를 사용합니다. 기존 `curl http://localhost:<port>/...` 계약은 유지하며 DVLA의 8501만 같은 Nginx의 호환 listener가 전달합니다. 프록시는 인증·인가를 대신하지 않고 외부 접근 제한은 Security Group의 본인 공인 IPv4 `/32`가 담당합니다.
 
 ## LLM02 Planner와 Tool Executor 인가 경계
 

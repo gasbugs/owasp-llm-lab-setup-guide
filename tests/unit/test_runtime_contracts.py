@@ -25,10 +25,11 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("FROM docker.io/alpine/git:latest AS clone", dockerfile)
         self.assertIn("FROM docker.io/library/python:3.11-slim", dockerfile)
 
-    def test_llmgoat_uses_upstream_entrypoint_and_status_api(self) -> None:
+    def test_llmgoat_mounts_upstream_routes_without_patching_source(self) -> None:
         dockerfile = read("docker/llmgoat/Dockerfile")
         self.assertNotIn("health_entrypoint.py", dockerfile)
-        self.assertNotIn("ENTRYPOINT", dockerfile)
+        self.assertIn("COPY proxy_entrypoint.py", dockerfile)
+        self.assertIn("ENTRYPOINT", dockerfile)
         self.assertNotIn("sed -i", dockerfile)
 
     def test_vuln_agent_exposes_read_only_state_for_publisher_verification(self) -> None:
@@ -78,6 +79,7 @@ class RuntimeContractTest(unittest.TestCase):
         installer = read("infrastructure/scripts/student/install-lab.sh")
         compose = read("infrastructure/compose/compose.yaml")
         published_services = {
+            "lab-reverse-proxy": 80,
             "lab-prompt-rag": 8000,
             "lab-data-rag": 8010,
             "lab-output-rag": 8011,
@@ -86,7 +88,6 @@ class RuntimeContractTest(unittest.TestCase):
             "lab-vuln-agent": 8001,
             "lab-ollama": 11434,
             "lab-llmgoat": 5000,
-            "lab-dvla": 8501,
             "lab-fake-registry": 8002,
             "lab-portal": 8080,
         }
@@ -109,6 +110,12 @@ class RuntimeContractTest(unittest.TestCase):
         for service, url in health_urls.items():
             with self.subTest(service=service):
                 self.assertIn(url, installer)
+        self.assertIn('docker port lab-reverse-proxy 8501/tcp', installer)
+        self.assertIn('"8501:8501"', compose)
+        dvla_service = compose.split("\n  dvla:", 1)[1].split(
+            "\n  fake-registry:", 1
+        )[0]
+        self.assertNotIn("\n    ports:", dvla_service)
         self.assertIn('network_mode=$(docker inspect', installer)
         self.assertIn('[ "$network_mode" = "host" ]', installer)
         self.assertIn('published=$(docker port', installer)

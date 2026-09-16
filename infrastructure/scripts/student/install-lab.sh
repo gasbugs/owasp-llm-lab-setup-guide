@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.9"
+SCRIPT_VERSION="0.2.10"
 DOCKER_ENGINE_RELEASE="${DOCKER_ENGINE_RELEASE:-29.7.2}"
 DOCKER_COMPOSE_RELEASE="${DOCKER_COMPOSE_RELEASE:-5.5.0}"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
@@ -205,6 +205,13 @@ curl -fsSL "$RAW_URL/infrastructure/portal/index.html" -o /home/ubuntu/work/port
 curl -fsSL "$RAW_URL/infrastructure/portal/server.py" -o /home/ubuntu/work/portal/server.py
 chown -R ubuntu:ubuntu /home/ubuntu/work/portal
 
+echo "[install-lab] preparing the port 80 URI reverse proxy"
+mkdir -p /home/ubuntu/work/reverse-proxy
+curl -fsSL \
+  "$RAW_URL/infrastructure/reverse-proxy/default.conf" \
+  -o /home/ubuntu/work/reverse-proxy/default.conf
+chown -R ubuntu:ubuntu /home/ubuntu/work/reverse-proxy
+
 echo "[install-lab] installing the allowlisted learner reset command"
 EDITABLE_LAB_RUNNER_DIR=/home/ubuntu/.local/bin
 install -d -m 0755 -o ubuntu -g ubuntu "$EDITABLE_LAB_RUNNER_DIR"
@@ -257,6 +264,7 @@ chown ubuntu:ubuntu "$COMPOSE_DIR/.env"
 
 echo "[install-lab] reconciling the Docker Compose services"
 all_units=(
+  lab-reverse-proxy
   lab-ollama
   lab-prompt-rag
   lab-data-rag
@@ -286,6 +294,7 @@ all_units=(
   bash <<'COMPOSESH'
 set -euo pipefail
 units=(
+  lab-reverse-proxy
   lab-ollama
   lab-prompt-rag
   lab-data-rag
@@ -477,6 +486,16 @@ docker restart lab-llmgoat >/dev/null
 echo "[install-lab] LLMGoat model initialization completed; container restarted"
 
 health_urls=(
+  http://localhost/
+  http://localhost/prompt-rag/healthz
+  http://localhost/data-rag/healthz
+  http://localhost/output-rag/healthz
+  http://localhost/knowledge-rag/healthz
+  http://localhost/resource-rag/healthz
+  http://localhost/vuln-agent/healthz
+  http://localhost/llmgoat/api/model_status
+  http://localhost/dvla/_stcore/health
+  http://localhost/fake-registry/api/v1/models
   http://localhost:11434/api/tags
   http://localhost:8000/healthz
   http://localhost:8010/healthz
@@ -505,10 +524,10 @@ for url in "${health_urls[@]}"; do
   fi
 done
 
-# 모든 학습 서비스는 격리된 container network를 사용하고 host의 같은
-# 번호에 명시적으로 publish한다. Network=host가 다시 들어오거나 publish가
-# 빠지면 설치 단계에서 즉시 실패한다.
+# 모든 학습 서비스는 격리된 container network를 사용한다. 기존 직접 포트와
+# Nginx 80 진입점의 publish가 빠지면 설치 단계에서 즉시 실패한다.
 declare -A published_ports=(
+  [lab-reverse-proxy]=80
   [lab-ollama]=11434
   [lab-prompt-rag]=8000
   [lab-data-rag]=8010
@@ -517,7 +536,6 @@ declare -A published_ports=(
   [lab-resource-rag]=8013
   [lab-vuln-agent]=8001
   [lab-llmgoat]=5000
-  [lab-dvla]=8501
   [lab-fake-registry]=8002
   [lab-portal]=8080
 )
@@ -535,6 +553,17 @@ for container in "${!published_ports[@]}"; do
   fi
   echo "[install-lab] port exposure ready: $container published=$published"
 done
+
+dvla_compat_port=$(docker port lab-reverse-proxy 8501/tcp)
+if [ -z "$dvla_compat_port" ]; then
+  echo "ERROR: lab-reverse-proxy has no published host port for 8501/tcp" >&2
+  exit 1
+fi
+if [ "$(docker inspect --format '{{.HostConfig.NetworkMode}}' lab-dvla)" = "host" ]; then
+  echo "ERROR: lab-dvla must use an isolated network, got Network=host" >&2
+  exit 1
+fi
+echo "[install-lab] DVLA compatibility port ready: $dvla_compat_port"
 
 # Older vuln-rag images also expose /healthz. Exercise the authenticated LLM08
 # capability so a source/image publication mismatch fails during installation
@@ -586,14 +615,18 @@ OWASP LLM Lab 설치가 완료되었습니다.
   sudo -u ubuntu docker ps
 
 포트 노출 방식:
-  - 모든 서비스는 격리된 container network를 사용하고 host의 같은 번호에
-    명시적으로 publish됩니다. docker ps의 PORTS 열에서 mapping을 확인합니다.
-  - RAG, Agent, DVLA는 host.docker.internal을 통해 host의 Ollama에 연결합니다.
-  - 설치 과정은 Network=host 부재, 각 publish mapping, localhost health를 검증했습니다.
+  - 브라우저 UI는 Nginx의 host port 80 하나에서 URI별로 분산됩니다.
+  - 기존 직접 포트와 localhost health/API 계약은 그대로 유지됩니다. DVLA의
+    기존 8501 포트는 같은 Nginx가 /dvla base path로 호환 전달합니다.
+  - 컨테이너 간 통신은 격리된 network와 Compose DNS를 사용합니다.
+  - 설치 과정은 Network=host 부재, publish mapping, 직접/프록시 health를 검증했습니다.
 
 주요 서비스:
+  - Lab Reverse Proxy     80
+    포털과 모든 브라우저 UI를 URI별로 연결하는 단일 진입점입니다.
+
   - Lab Portal            8080
-    모든 실습 앱으로 이동하는 단일 진입점입니다.
+    기존 직접 포트를 유지하는 포털 backend입니다.
 
   - Ollama API            11434
     로컬 LLM 모델 목록 확인과 generate API 호출에 사용합니다.
@@ -636,7 +669,17 @@ LLM08 추가 준비:
   export EC2_DOMAIN=${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}
 
   Lab Portal:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8080
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/
+
+  URI별 실습 UI:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/prompt-rag/
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/data-rag/
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/output-rag/
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/knowledge-rag/
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/resource-rag/
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/vuln-agent/
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/llmgoat/
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/dvla/
 
   Ollama 모델 목록:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:11434/api/tags
@@ -662,10 +705,10 @@ LLM08 추가 준비:
   Day 4 LLM03 Fake Model Registry model list:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8002/api/v1/models
 
-  LLMGoat web UI:
+  기존 LLMGoat 직접 포트 호환 확인:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:5000
 
-  Day 3 DVLA web UI:
+  기존 DVLA 직접 포트 호환 확인:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8501
 
 터미널 검증 명령:
@@ -681,7 +724,10 @@ LLM08 추가 준비:
     }' | jq
 
   # API 응답 확인
-  curl -fsS http://\$EC2_DOMAIN:8080/ >/dev/null
+  curl -fsS http://\$EC2_DOMAIN/ >/dev/null
+  curl -fsS http://\$EC2_DOMAIN/prompt-rag/healthz
+  curl -fsS http://\$EC2_DOMAIN/llmgoat/api/model_status
+  curl -fsS http://\$EC2_DOMAIN/dvla/_stcore/health
   curl -fsS http://\$EC2_DOMAIN:11434/api/tags | jq
   curl -fsS http://\$EC2_DOMAIN:8000/healthz
   curl -fsS http://\$EC2_DOMAIN:8010/healthz

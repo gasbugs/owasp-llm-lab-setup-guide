@@ -134,6 +134,7 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 
 | 포트 | 서비스 | 계약 |
 |---:|---|---|
+| 80 | `lab-reverse-proxy` | `/`와 UI별 URI를 Compose 서비스로 전달 |
 | 8000 | `lab-prompt-rag` | `default_scenario=day1` |
 | 8010 | `lab-data-rag` | `default_scenario=day2` |
 | 8011 | `lab-output-rag` | `default_scenario=day3` |
@@ -143,7 +144,7 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 | 8002 | `lab-fake-registry` | `/api/v1/models` JSON |
 | 8080 | `lab-portal` | HTTP 200 |
 | 5000 | `lab-llmgoat` | web/API |
-| 8501 | `lab-dvla` | Streamlit health |
+| 8501 | `lab-reverse-proxy` → `lab-dvla` | 기존 Streamlit URL·health 호환 전달 |
 | 11434 | `lab-ollama` | `/api/tags` JSON |
 
 RAG health의 canonical JSON shape은 다음과 같습니다.
@@ -166,6 +167,10 @@ done
 curl -fsS http://localhost:8001/healthz \
   | jq -e '.ok == true and (.tools | length == 7)'
 curl -fsS http://localhost:8002/api/v1/models | jq -e '.models | length > 0'
+curl -fsS http://localhost/ >/dev/null
+curl -fsS http://localhost/prompt-rag/healthz
+curl -fsS http://localhost/llmgoat/api/model_status
+curl -fsS http://localhost/dvla/_stcore/health
 curl -fsS http://localhost:8080/ >/dev/null
 curl -fsS http://localhost:5000/api/model_status \
   | jq -e '.model_busy == false'

@@ -146,7 +146,7 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertIn('id="prompt-open"', template)
         self.assertIn('id="prompt-dialog"', template)
         self.assertIn('aria-labelledby="prompt-title"', template)
-        self.assertIn("fetch(`/api/system-prompt", template)
+        self.assertIn("fetch(appUrl(`/api/system-prompt", template)
         self.assertNotIn("approval_status: approvalStatus", template)
         self.assertIn("승인 상태는 업로드 사용자가 선택할 수 없습니다", template)
         self.assertNotIn("llm02-c2001-demo-token", template)

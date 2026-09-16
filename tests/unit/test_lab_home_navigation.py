@@ -14,18 +14,24 @@ class LabHomeNavigationTests(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             with self.subTest(relative=relative):
                 self.assertIn('id="portal-home"', source)
-                self.assertIn("http://${window.location.hostname}:8080/", source)
+                self.assertIn("http://${window.location.hostname}/", source)
+                self.assertIn("const appUrl", source)
 
         agent = (ROOT / "docker/vuln-agent/app/templates/index.html").read_text(
             encoding="utf-8"
         )
         self.assertIn('name="viewport" content="width=device-width, initial-scale=1"', agent)
 
-    def test_llmgoat_keeps_upstream_entrypoint_and_html(self) -> None:
+    def test_llmgoat_mounts_the_upstream_app_below_its_proxy_path(self) -> None:
         dockerfile = (ROOT / "docker/llmgoat/Dockerfile").read_text(encoding="utf-8")
-        self.assertNotIn("health_entrypoint.py", dockerfile)
-        self.assertNotIn("ENTRYPOINT", dockerfile)
-        self.assertFalse((ROOT / "docker/llmgoat/health_entrypoint.py").exists())
+        wrapper = (ROOT / "docker/llmgoat/proxy_entrypoint.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("COPY proxy_entrypoint.py", dockerfile)
+        self.assertIn("ENTRYPOINT", dockerfile)
+        self.assertIn("UriPrefixMiddleware", wrapper)
+        self.assertIn('MOUNT_PATH = "/llmgoat"', wrapper)
+        self.assertIn('"text/css"', wrapper)
 
     def test_dvla_keeps_upstream_app_unmodified(self) -> None:
         dockerfile = (ROOT / "docker/dvla/Dockerfile").read_text(encoding="utf-8")
@@ -34,6 +40,7 @@ class LabHomeNavigationTests(unittest.TestCase):
         self.assertNotIn("render_portal_home", dockerfile)
         self.assertNotIn("sed -i '/st.set_page_config", dockerfile)
         self.assertFalse((ROOT / "docker/dvla/home_link.py").exists())
+        self.assertIn("--server.baseUrlPath=dvla", dockerfile)
 
 
 if __name__ == "__main__":

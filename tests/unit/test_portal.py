@@ -62,6 +62,22 @@ class PortalIdentityTests(unittest.TestCase):
         self.assertIn("${service.openLabel}</a>", self.source)
         self.assertNotIn(">앱 열기</a>", self.source)
 
+    def test_browser_actions_use_the_port_80_uri_router(self) -> None:
+        for path in (
+            "/prompt-rag/",
+            "/data-rag/",
+            "/output-rag/",
+            "/knowledge-rag/",
+            "/resource-rag/",
+            "/vuln-agent/",
+            "/llmgoat/",
+            "/dvla/",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(f'proxyUrl("{path}")', self.source)
+        self.assertIn("Launchpad · port 80", self.source)
+        self.assertIn('directUrl(11434, "/api/tags")', self.source)
+
     def test_portal_supports_light_and_dark_themes_without_promotional_copy(self) -> None:
         self.assertIn('id="theme-toggle"', self.source)
         self.assertIn('html[data-theme="light"]', self.source)

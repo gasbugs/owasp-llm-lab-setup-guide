@@ -233,7 +233,7 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
         self.assertIn("PRESIDIO_URL", proxy)
         self.assertIn("NEMO_GUARD_URL", proxy)
         self.assertIn("guardrail_proxy.chat(req.message)", backend)
-        self.assertIn("fetch('/api/chat'", template)
+        self.assertIn("fetch(appUrl('/api/chat')", template)
         self.assertNotIn("host.containers.internal", template)
         self.assertNotIn("11434", template)
         self.assertIn("innerGuardrail?.decision === 'block'", template)

@@ -118,7 +118,11 @@ const promptOpen = document.getElementById('prompt-open');
 const promptClose = document.getElementById('prompt-close');
 const promptDialog = document.getElementById('prompt-dialog');
 const promptContent = document.getElementById('prompt-content');
-document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
+const appBasePath = window.location.pathname.endsWith('/')
+  ? window.location.pathname
+  : `${window.location.pathname}/`;
+const appUrl = (path) => new URL(path.replace(/^\/+/, ''), `${window.location.origin}${appBasePath}`).toString();
+document.getElementById('portal-home').href = `http://${window.location.hostname}/`;
 const trace = document.getElementById('trace');
 const form = document.getElementById('form');
 const msg = document.getElementById('message');
@@ -133,7 +137,7 @@ promptOpen.addEventListener('click', async () => {
   promptDialog.showModal();
   promptContent.textContent = '프롬프트를 불러오는 중...';
   try {
-    const response = await fetch('/api/system-prompt');
+    const response = await fetch(appUrl('/api/system-prompt'));
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
     promptContent.textContent = data.prompts.map((prompt) => prompt.content).join('\n\n');
@@ -202,7 +206,7 @@ form.addEventListener('submit', async (event) => {
   send.disabled = true;
   send.textContent = '실행 중…';
   try {
-    const response = await fetch('/api/chat', {
+    const response = await fetch(appUrl('/api/chat'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

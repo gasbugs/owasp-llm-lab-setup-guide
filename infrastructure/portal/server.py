@@ -17,7 +17,7 @@ SERVICES = {
     "resource-rag": "http://resource-rag:8013/healthz",
     "vuln-agent": "http://vuln-agent:8001/healthz",
     "llmgoat": "http://llmgoat:5000/api/model_status",
-    "dvla": "http://dvla:8501/_stcore/health",
+    "dvla": "http://dvla:8501/dvla/_stcore/health",
     "fake-registry": "http://fake-registry:8002/api/v1/models",
     "ollama": "http://ollama:11434/api/tags",
 }
