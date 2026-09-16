@@ -132,7 +132,7 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertIn("renderModelOutputSafe", template)
         self.assertIn("element.innerHTML", template)
         self.assertIn("element.textContent", template)
-        replay = template.split("replayLast.addEventListener", 1)[1]
+        replay = template.split("replayLast?.addEventListener", 1)[1]
         self.assertNotIn("fetch(", replay.split("});", 1)[0])
 
     def test_day2_ui_selects_allowlisted_lab_and_uses_llm08_rag_provenance_api(self) -> None:

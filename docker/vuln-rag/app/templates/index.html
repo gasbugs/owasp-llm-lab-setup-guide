@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Cloud Security · LLM Lab · {{ scenario_title }}</title>
+  <title>클씨랩 AI Security Lab · {{ scenario_title }}</title>
   <style>
     :root {
       color-scheme:dark;
@@ -24,6 +24,11 @@
     body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.42; background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px); background-size:48px 48px; mask-image:linear-gradient(to bottom,#000,transparent 72%); }
     button,input,select,textarea { font:inherit; }
     button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:3px solid color-mix(in srgb,var(--signal) 38%,transparent); outline-offset:2px; }
+    .app-layout { position:relative; display:grid; grid-template-columns:224px minmax(0,1fr); min-height:100vh; }
+    .lab-nav { position:sticky; top:0; z-index:5; height:100vh; overflow:auto; padding:20px 14px; border-right:1px solid var(--line); background:color-mix(in srgb,var(--surface) 97%,transparent); box-shadow:12px 0 34px rgba(0,0,0,.16); }
+    .lab-nav-brand { display:block; margin:0 8px 18px; color:var(--ink); text-decoration:none; }.lab-nav-brand strong { display:block; color:var(--signal); font:800 14px ui-monospace,monospace; letter-spacing:.08em; }.lab-nav-brand span { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
+    .lab-nav-group { margin:17px 8px 7px; color:var(--muted); font:700 9px ui-monospace,monospace; letter-spacing:.14em; text-transform:uppercase; }
+    .lab-nav-list { display:grid; gap:4px; }.lab-nav-link { display:grid; grid-template-columns:34px minmax(0,1fr); gap:8px; align-items:center; min-height:43px; padding:7px 9px; border:1px solid transparent; border-radius:9px; color:var(--muted); text-decoration:none; }.lab-nav-link:hover,.lab-nav-link:focus-visible { border-color:var(--line); background:var(--surface-raised); color:var(--ink); }.lab-nav-link[aria-current="page"] { border-color:var(--signal); background:color-mix(in srgb,var(--signal) 11%,var(--surface-raised)); color:var(--ink); }.lab-nav-code { color:var(--signal); font:800 11px ui-monospace,monospace; }.lab-nav-name { overflow:hidden; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
     .shell { position:relative; width:min(1440px,100%); margin:auto; padding:22px; }
     .masthead { display:grid; grid-template-columns:auto 1fr auto; gap:22px; align-items:center; border:1px solid var(--line); background:color-mix(in srgb,var(--surface) 94%,transparent); box-shadow:var(--shadow); padding:18px 20px; }
     .brand-kicker,.eyebrow,.micro-label { color:var(--signal); font:700 11px/1.2 ui-monospace,"SFMono-Regular",Consolas,monospace; letter-spacing:.15em; text-transform:uppercase; }
@@ -66,15 +71,38 @@
     .guard-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }.guard-field { border-left:3px solid var(--line); padding:9px 10px; background:var(--surface-raised); }.guard-field strong { display:block; color:var(--muted); font:10px ui-monospace,monospace; text-transform:uppercase; letter-spacing:.07em; }.guard-field span { display:block; margin-top:4px; overflow-wrap:anywhere; }
     #guard-checks { max-height:210px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; padding:10px; background:var(--surface-raised); font:11px/1.5 ui-monospace,monospace; }
     .doc-list { list-style:none; padding:0; margin:12px 0 0; }.doc-item { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:start; border-top:1px solid var(--line-soft); padding:12px 0; }.doc-text { white-space:pre-wrap; overflow-wrap:anywhere; }.doc-meta { color:var(--signal); font:11px ui-monospace,monospace; margin-bottom:4px; }
-    @media(max-width:980px){.masthead{grid-template-columns:1fr auto}.mission{grid-column:1/-1;grid-row:2}.scenario-bar,.lab-grid{grid-template-columns:1fr}.chat{min-height:360px}}
+    @media(max-width:980px){.app-layout{grid-template-columns:190px minmax(0,1fr)}.masthead{grid-template-columns:1fr auto}.mission{grid-column:1/-1;grid-row:2}.scenario-bar,.lab-grid{grid-template-columns:1fr}.chat{min-height:360px}}
+    @media(max-width:760px){.app-layout{display:block}.lab-nav{position:sticky;height:auto;max-height:none;padding:9px 10px;border-right:0;border-bottom:1px solid var(--line);overflow:hidden}.lab-nav-brand,.lab-nav-group{display:none}.lab-nav-list{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}.lab-nav-link{flex:0 0 auto;grid-template-columns:auto;min-height:38px;padding:7px 10px}.lab-nav-name{display:none}}
     @media(max-width:620px){.shell{padding:10px}.masthead,.scenario-bar,.panel-head,.panel-body{padding:14px}.vuln-beacon{display:none}.guard-grid{grid-template-columns:1fr}.composer-actions button{width:100%}.render-toggle{width:100%}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
   </style>
 </head>
 <body>
+<div class="app-layout">
+<nav id="lab-navigation" class="lab-nav" aria-label="LLM 실습 이동">
+  <a class="lab-nav-brand" data-lab-route="/" href="/"><strong>클씨랩</strong><span>AI Security Lab</span></a>
+  <div class="lab-nav-group">Top 10 labs</div>
+  <div class="lab-nav-list">
+    <a class="lab-nav-link" data-lab-nav="llm01" data-lab-route="/prompt-rag/" href="/prompt-rag/"><span class="lab-nav-code">01</span><span class="lab-nav-name">Prompt Injection</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm02" data-lab-route="/data-rag/?lab=llm02" href="/data-rag/?lab=llm02"><span class="lab-nav-code">02</span><span class="lab-nav-name">Sensitive Data</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm03" data-lab-route="/fake-registry/" href="/fake-registry/"><span class="lab-nav-code">03</span><span class="lab-nav-name">Supply Chain</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm04" data-lab-route="/#llm04" href="/#llm04"><span class="lab-nav-code">04</span><span class="lab-nav-name">Data Poisoning · CLI</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm05" data-lab-route="/output-rag/" href="/output-rag/"><span class="lab-nav-code">05</span><span class="lab-nav-name">Output Handling</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm06" data-lab-route="/vuln-agent/" href="/vuln-agent/"><span class="lab-nav-code">06</span><span class="lab-nav-name">Agency</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm07" data-lab-route="/knowledge-rag/?lab=llm07" href="/knowledge-rag/?lab=llm07"><span class="lab-nav-code">07</span><span class="lab-nav-name">Prompt Leakage</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm08" data-lab-route="/data-rag/?lab=llm08-rag-poisoning" href="/data-rag/?lab=llm08-rag-poisoning"><span class="lab-nav-code">08</span><span class="lab-nav-name">Vector & RAG</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm09" data-lab-route="/knowledge-rag/?lab=llm09" href="/knowledge-rag/?lab=llm09"><span class="lab-nav-code">09</span><span class="lab-nav-name">Misinformation</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm10" data-lab-route="/resource-rag/" href="/resource-rag/"><span class="lab-nav-code">10</span><span class="lab-nav-name">Consumption</span></a>
+  </div>
+  <div class="lab-nav-group">Comparison apps</div>
+  <div class="lab-nav-list">
+    <a class="lab-nav-link" data-lab-route="/llmgoat/" href="/llmgoat/"><span class="lab-nav-code">GOAT</span><span class="lab-nav-name">LLMGoat</span></a>
+    <a class="lab-nav-link" data-lab-route="/dvla/" href="/dvla/"><span class="lab-nav-code">DVLA</span><span class="lab-nav-name">ReAct Agent</span></a>
+  </div>
+</nav>
 <main class="shell">
   <header class="masthead">
-    <div class="brand"><div class="brand-kicker">Cloud Security</div><h1>LLM Lab <span>// Experiment Center</span></h1></div>
+    <div class="brand"><div class="brand-kicker">클씨랩 · AI Security</div><h1>LLM Lab <span>// Experiment Center</span></h1></div>
     <div class="mission">취약한 LLM 애플리케이션의 입력·검색·도구·출력 경계를 직접 관찰하고 방어 전환 전후를 비교합니다.</div>
     <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><button id="prompt-open" class="prompt-button" type="button">시스템 프롬프트</button><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
   </header>
@@ -93,7 +121,7 @@
         <div class="panel-body">
           <form id="form" class="composer">
             <label for="message">프롬프트 입력</label><textarea id="message" placeholder="페이로드 또는 자연어 입력..." required></textarea>
-            <div class="composer-actions"><label class="render-toggle"><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 · LLM05 전용</label><button type="submit">요청 전송</button><button id="replay-last" type="button" disabled class="secondary">마지막 응답 다시 렌더링</button></div>
+            <div class="composer-actions">{% if scenario_id == "day3" %}<label class="render-toggle"><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 · LLM05 전용</label>{% endif %}<button type="submit">요청 전송</button>{% if scenario_id == "day3" %}<button id="replay-last" type="button" disabled class="secondary">마지막 응답 다시 렌더링</button>{% endif %}</div>
           </form>
         </div>
       </section>
@@ -128,6 +156,7 @@
     </aside>
   </div>
 </main>
+</div>
 
 <dialog id="prompt-dialog" class="prompt-dialog" aria-labelledby="prompt-title">
   <header class="prompt-dialog-head">
@@ -152,7 +181,11 @@ const appBasePath = window.location.pathname.endsWith('/')
   ? window.location.pathname
   : `${window.location.pathname}/`;
 const appUrl = (path) => new URL(path.replace(/^\/+/, ''), `${window.location.origin}${appBasePath}`).toString();
-document.getElementById('portal-home').href = `http://${window.location.hostname}/`;
+const labOrigin = `${window.location.protocol}//${window.location.hostname}`;
+document.getElementById('portal-home').href = `${labOrigin}/`;
+document.querySelectorAll('[data-lab-route]').forEach((link) => {
+  link.href = `${labOrigin}${link.dataset.labRoute}`;
+});
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('llm-lab-theme', theme);
@@ -167,6 +200,21 @@ const renderHTML = document.getElementById('render-html');
 const replayLast = document.getElementById('replay-last');
 const scenarioSelect = document.getElementById('scenario');
 const labSelect = document.getElementById('lab');
+const requestedLab = new URLSearchParams(window.location.search).get('lab');
+if (labSelect && [...labSelect.options].some((option) => option.value === requestedLab)) {
+  labSelect.value = requestedLab;
+}
+const activeLab = scenarioSelect.value === 'day1' ? 'llm01'
+  : scenarioSelect.value === 'day2' ? (labSelect?.value === 'llm08-rag-poisoning' ? 'llm08' : 'llm02')
+  : scenarioSelect.value === 'day3' ? 'llm05'
+  : scenarioSelect.value === 'day4' ? (requestedLab === 'llm09' ? 'llm09' : 'llm07')
+  : scenarioSelect.value === 'day5' ? 'llm10'
+  : null;
+function markActiveLab(lab) {
+  document.querySelectorAll('[data-lab-nav]').forEach((link) => link.removeAttribute('aria-current'));
+  document.querySelector(`[data-lab-nav="${lab}"]`)?.setAttribute('aria-current', 'page');
+}
+markActiveLab(activeLab);
 const llm02Auth = document.getElementById('llm02-auth');
 const llm02Token = document.getElementById('llm02-token');
 const documentPanel = document.getElementById('document-panel');
@@ -294,8 +342,8 @@ form.addEventListener('submit', async (e) => {
   const data = await r.json();
   const reply = data.reply ?? data.detail ?? `HTTP ${r.status}`;
   lastBotReply = reply;
-  replayLast.disabled = false;
-  add('bot', reply, renderHTML.checked);
+  if (replayLast) replayLast.disabled = false;
+  add('bot', reply, renderHTML?.checked === true);
   if (data.debug?.retrieved_chunks?.length) {
     add('debug', '[retrieved] ' + JSON.stringify(data.debug.retrieved_chunks));
   }
@@ -345,9 +393,9 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-replayLast.addEventListener('click', () => {
+replayLast?.addEventListener('click', () => {
   if (lastBotReply === null) return;
-  add('bot-replay', lastBotReply, renderHTML.checked);
+  add('bot-replay', lastBotReply, renderHTML?.checked === true);
 });
 
 async function loadDocs() {
@@ -434,6 +482,7 @@ scenarioSelect.addEventListener('change', () => {
 function updateDay2Panels() {
   if (!labSelect) return;
   const isLlm04 = labSelect.value === 'llm08-rag-poisoning';
+  markActiveLab(isLlm04 ? 'llm08' : 'llm02');
   llm02Auth.hidden = isLlm04;
   documentPanel.hidden = !isLlm04;
   if (isLlm04) loadDocs();

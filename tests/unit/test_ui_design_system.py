@@ -23,9 +23,12 @@ class UiDesignSystemTests(unittest.TestCase):
         cls.control = CONTROL_UI.read_text(encoding="utf-8")
 
     def test_three_apps_share_brand_theme_and_core_tokens(self) -> None:
+        for source in (self.rag, self.agent):
+            self.assertIn("클씨랩", source)
+            self.assertIn("AI Security Lab", source)
+        self.assertIn("Cloud Security", self.control)
+        self.assertIn("LLM Lab", self.control)
         for source in (self.rag, self.agent, self.control):
-            self.assertIn("Cloud Security", source)
-            self.assertIn("LLM Lab", source)
             self.assertIn('id="theme-toggle"', source)
             self.assertIn("llm-lab-theme", source)
             for token in ("--canvas:#071018", "--signal:#55c2d8", "--incident:#ff6978"):
@@ -91,6 +94,24 @@ class UiDesignSystemTests(unittest.TestCase):
         self.assertIn("showGuardrailPanel(data.guard_engine, data.guard_mode)", self.rag)
         self.assertIn('scenarioSelect.value !== \'day2\'', self.rag)
         self.assertIn('{% if scenario_id != "day2" %} hidden{% endif %}', self.rag)
+
+    def test_first_party_apps_share_a_responsive_llm_navigation_rail(self) -> None:
+        for source in (self.rag, self.agent):
+            self.assertIn('id="lab-navigation"', source)
+            self.assertIn('aria-label="LLM 실습 이동"', source)
+            self.assertIn(".app-layout", source)
+            self.assertIn("@media(max-width:760px)", source.replace(" ", ""))
+            for llm_number in range(1, 11):
+                self.assertIn(f">{llm_number:02d}<", source)
+            self.assertIn("LLMGoat", source)
+            self.assertIn("DVLA", source)
+
+    def test_html_render_controls_are_server_rendered_only_for_llm05(self) -> None:
+        self.assertIn(
+            '{% if scenario_id == "day3" %}<label class="render-toggle">',
+            self.rag,
+        )
+        self.assertIn("renderHTML?.checked === true", self.rag)
 
     def test_vulnerable_rag_ui_hides_internal_day_identifiers(self) -> None:
         for visible_fragment in (

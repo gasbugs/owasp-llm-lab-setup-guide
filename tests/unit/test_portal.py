@@ -12,6 +12,9 @@ class PortalIdentityTests(unittest.TestCase):
         cls.source = PORTAL.read_text(encoding="utf-8")
 
     def test_cards_use_application_names_instead_of_day_labels(self) -> None:
+        self.assertIn("클씨랩 AI Security Lab", self.source)
+        self.assertIn("보안 실습 선택", self.source)
+        self.assertNotIn("실습 애플리케이션<span>바로가기", self.source)
         for name in (
             "번역기 봇",
             "CloudSecurityLab Bank",
@@ -75,7 +78,7 @@ class PortalIdentityTests(unittest.TestCase):
         ):
             with self.subTest(path=path):
                 self.assertIn(f'proxyUrl("{path}")', self.source)
-        self.assertIn("Launchpad · port 80", self.source)
+        self.assertIn("Lab console · port 80", self.source)
         self.assertIn('directUrl(11434, "/api/tags")', self.source)
 
     def test_portal_supports_light_and_dark_themes_without_promotional_copy(self) -> None:

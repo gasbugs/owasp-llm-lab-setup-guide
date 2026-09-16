@@ -41,6 +41,9 @@ def preserve_absolute_upstream_urls(response):
     }:
         return response
 
+    # Flask serves static files in direct-passthrough mode. Disable that mode
+    # before reading the body so CSS and JavaScript do not fail with HTTP 500.
+    response.direct_passthrough = False
     body = response.get_data(as_text=True)
     for route in ("api", "challenges", "static"):
         for quote in ('"', "'", "`"):

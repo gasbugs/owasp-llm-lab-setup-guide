@@ -494,6 +494,8 @@ health_urls=(
   http://localhost/resource-rag/healthz
   http://localhost/vuln-agent/healthz
   http://localhost/llmgoat/api/model_status
+  http://localhost/llmgoat/static/style.css
+  http://localhost/llmgoat/static/js/main.js
   http://localhost/dvla/_stcore/health
   http://localhost/fake-registry/api/v1/models
   http://localhost:11434/api/tags

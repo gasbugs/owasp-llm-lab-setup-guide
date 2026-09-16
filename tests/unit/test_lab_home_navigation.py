@@ -14,8 +14,10 @@ class LabHomeNavigationTests(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             with self.subTest(relative=relative):
                 self.assertIn('id="portal-home"', source)
-                self.assertIn("http://${window.location.hostname}/", source)
+                self.assertIn("const labOrigin", source)
+                self.assertIn("`${labOrigin}/`", source)
                 self.assertIn("const appUrl", source)
+                self.assertIn('id="lab-navigation"', source)
 
         agent = (ROOT / "docker/vuln-agent/app/templates/index.html").read_text(
             encoding="utf-8"
@@ -27,11 +29,17 @@ class LabHomeNavigationTests(unittest.TestCase):
         wrapper = (ROOT / "docker/llmgoat/proxy_entrypoint.py").read_text(
             encoding="utf-8"
         )
+        installer = (
+            ROOT / "infrastructure/scripts/student/install-lab.sh"
+        ).read_text(encoding="utf-8")
         self.assertIn("COPY proxy_entrypoint.py", dockerfile)
         self.assertIn("ENTRYPOINT", dockerfile)
         self.assertIn("UriPrefixMiddleware", wrapper)
         self.assertIn('MOUNT_PATH = "/llmgoat"', wrapper)
         self.assertIn('"text/css"', wrapper)
+        self.assertIn("response.direct_passthrough = False", wrapper)
+        self.assertIn("http://localhost/llmgoat/static/style.css", installer)
+        self.assertIn("http://localhost/llmgoat/static/js/main.js", installer)
 
     def test_dvla_keeps_upstream_app_unmodified(self) -> None:
         dockerfile = (ROOT / "docker/dvla/Dockerfile").read_text(encoding="utf-8")
