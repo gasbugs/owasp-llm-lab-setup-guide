@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import sys
 import unittest
@@ -59,13 +60,20 @@ class FakeLLM:
         self.calls.append(
             {"system": system, "user": user, "schema": schema, "structured": True}
         )
+        if schema.get("title") == "LLM02GroundedAnswer":
+            rendered = system.split("<authorized_record>\n", 1)[1].split(
+                "\n</authorized_record>", 1
+            )[0]
+            return {"record": json.loads(rendered)}
         if "C-2002" in user:
             return {
+                "action": "lookup",
                 "customer_id": "C-2002",
                 "fields": ["resident_id", "recovery_token"],
                 "reason": "requested fields",
             }
         return {
+            "action": "lookup",
             "customer_id": None,
             "fields": ["delivery_status", "estimated_arrival"],
             "reason": "delivery",

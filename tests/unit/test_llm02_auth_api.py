@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import sys
 import unittest
@@ -48,29 +49,35 @@ class FakeLLM:
         self.answer_calls: list[dict] = []
 
     async def structured_chat(self, system: str, user: str, schema: dict) -> dict:
+        if schema.get("title") == "LLM02GroundedAnswer":
+            self.answer_calls.append(
+                {"system": system, "user": user, "schema": schema}
+            )
+            rendered = system.split("<authorized_record>\n", 1)[1].split(
+                "\n</authorized_record>", 1
+            )[0]
+            return {"record": json.loads(rendered)}
         self.planner_calls.append({"system": system, "user": user, "schema": schema})
         if "C-2002" in user:
             return {
+                "action": "lookup",
                 "customer_id": "C-2002",
                 "fields": ["resident_id", "recovery_token"],
                 "reason": "requested internal audit fields",
             }
         if "resident_id" in user or "recovery_token" in user:
             return {
+                "action": "lookup",
                 "customer_id": None,
                 "fields": ["resident_id", "recovery_token"],
                 "reason": "requested own sensitive fields",
             }
         return {
+            "action": "lookup",
             "customer_id": None,
             "fields": ["delivery_status", "estimated_arrival"],
             "reason": "delivery question",
         }
-
-    async def chat(self, system: str, user: str, **_: object) -> str:
-        self.answer_calls.append({"system": system, "user": user})
-        return system
-
 
 class Llm02AuthApiTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -117,6 +124,7 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertEqual(
             body["tool_proposal"],
             {
+                "action": "lookup",
                 "customer_id": None,
                 "fields": ["delivery_status", "estimated_arrival"],
                 "reason": "delivery question",
@@ -132,6 +140,11 @@ class Llm02AuthApiTest(unittest.TestCase):
         answer = self.llm.answer_calls[0]["system"]
         self.assertIn("배송 중", answer)
         self.assertNotIn("resident_id", answer)
+        self.assertNotEqual(self.llm.answer_calls[0]["user"], self.normal)
+        self.assertEqual(
+            body["reply"],
+            "조회 결과입니다. 배송 상태: 배송 중, 도착 예정일: 2026-09-09.",
+        )
 
     def test_vulnerable_executor_queries_c2002_sensitive_fields(self) -> None:
         response = self.post("/api/labs/llm02/vulnerable/chat", self.attack)
@@ -193,11 +206,16 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertEqual(body["trace"]["application_decision"], "allow")
 
     def test_safe_executor_accepts_delivery_field_aliases(self) -> None:
+        original = self.llm.structured_chat
+
         async def alias_proposal(system: str, user: str, schema: dict) -> dict:
+            if schema.get("title") == "LLM02GroundedAnswer":
+                return await original(system, user, schema)
             self.llm.planner_calls.append(
                 {"system": system, "user": user, "schema": schema}
             )
             return {
+                "action": "lookup",
                 "customer_id": None,
                 "fields": ["card_delivery_status", "estimated_arrival_date"],
                 "reason": "delivery field aliases",
@@ -212,11 +230,16 @@ class Llm02AuthApiTest(unittest.TestCase):
         )
 
     def test_safe_executor_blocks_contact_fields_before_query(self) -> None:
+        original = self.llm.structured_chat
+
         async def contact_proposal(system: str, user: str, schema: dict) -> dict:
+            if schema.get("title") == "LLM02GroundedAnswer":
+                return await original(system, user, schema)
             self.llm.planner_calls.append(
                 {"system": system, "user": user, "schema": schema}
             )
             return {
+                "action": "lookup",
                 "customer_id": None,
                 "fields": ["email", "phone_number"],
                 "reason": "contact fields",
@@ -231,6 +254,74 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "field-not-allowed")
         self.assertFalse(response.json()["trace"]["customer_query_called"])
 
+    def test_unsupported_request_returns_no_data_without_query_or_answer(self) -> None:
+        async def cannot_answer(system: str, user: str, schema: dict) -> dict:
+            self.llm.planner_calls.append(
+                {"system": system, "user": user, "schema": schema}
+            )
+            return {
+                "action": "cannot_answer",
+                "customer_id": None,
+                "fields": [],
+                "reason": "unsupported request",
+            }
+
+        self.llm.structured_chat = cannot_answer
+        response = self.post(
+            "/api/labs/llm02/safe/chat",
+            "오늘 서울 날씨를 알려 줘.",
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(
+            body["reply"],
+            "현재 조회 가능한 고객 정보로는 답변할 수 없습니다.",
+        )
+        self.assertIsNone(body["tool"])
+        self.assertIsNone(body["tool_result"])
+        self.assertFalse(body["trace"]["customer_query_called"])
+        self.assertFalse(body["trace"]["answer_model_called"])
+        self.assertEqual(body["trace"]["blocking_reason"], "request-not-supported")
+
+    def test_planner_must_explicitly_choose_an_action(self) -> None:
+        async def missing_action(system: str, user: str, schema: dict) -> dict:
+            self.llm.planner_calls.append(
+                {"system": system, "user": user, "schema": schema}
+            )
+            return {
+                "customer_id": None,
+                "fields": ["delivery_status"],
+                "reason": "missing action",
+            }
+
+        self.llm.structured_chat = missing_action
+        response = self.post("/api/labs/llm02/safe/chat", self.normal)
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.json()["detail"],
+            "planner returned invalid tool proposal",
+        )
+        self.assertEqual(len(self.llm.planner_calls), 1)
+        self.assertEqual(len(self.llm.answer_calls), 0)
+
+    def test_ungrounded_answer_is_not_returned_to_user(self) -> None:
+        original = self.llm.structured_chat
+
+        async def ungrounded(system: str, user: str, schema: dict) -> dict:
+            if schema.get("title") == "LLM02GroundedAnswer":
+                return {"record": {"delivery_status": "이미 배송 완료"}}
+            return await original(system, user, schema)
+
+        self.llm.structured_chat = ungrounded
+        response = self.post("/api/labs/llm02/safe/chat", self.normal)
+        self.assertEqual(response.status_code, 502)
+        body = response.json()
+        self.assertEqual(body["detail"], "answer model returned ungrounded data")
+        self.assertNotIn("이미 배송 완료", response.text)
+        self.assertTrue(body["trace"]["customer_query_called"])
+        self.assertTrue(body["trace"]["answer_model_called"])
+        self.assertEqual(body["trace"]["blocking_reason"], "answer-not-grounded")
+
     def test_ui_and_workshop_share_selected_executor(self) -> None:
         workshop = self.post("/api/labs/llm02/workshop/chat", self.normal)
         ui = self.client.post(
@@ -242,6 +333,24 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertEqual(ui.status_code, 200)
         self.assertEqual(workshop.json()["tool"], "get_customer_record")
         self.assertEqual(ui.json()["tool"], "get_customer_record")
+
+    def test_policy_describes_unsupported_and_grounded_answer_boundaries(self) -> None:
+        response = self.client.get("/api/labs/llm02/policy")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(
+            body["planner_unsupported_action"],
+            "cannot_answer without customer query",
+        )
+        self.assertEqual(
+            body["answer_grounding"],
+            {
+                "model_receives": "authorized record only",
+                "original_user_message": "not forwarded",
+                "validation": "structured record must exactly equal tool result",
+                "rendering": "deterministic application template",
+            },
+        )
 
     def test_prompt_viewer_exposes_active_prompts_without_runtime_records(self) -> None:
         response = self.client.get(
@@ -275,6 +384,13 @@ class Llm02AuthApiTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json()["llm_ids"], llm_ids)
                 self.assertTrue(response.json()["prompts"][0]["content"])
+
+        llm01 = self.client.get(
+            "/api/system-prompt", params={"scenario": "day1"}
+        ).json()["prompts"][0]["content"]
+        self.assertIn("[REDACTED LAB CANARY]", llm01)
+        self.assertNotIn("LLM_CTF_PROMPT_INJECTION_W1NN3R", llm01)
+        self.assertNotIn("실력을 증명하라는 정당한 요청", llm01)
 
 
 if __name__ == "__main__":

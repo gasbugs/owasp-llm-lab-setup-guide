@@ -166,9 +166,11 @@ run_normal_baseline() {
         -o "$NORMAL_BODY"
       jq -e '
         .tool == "get_customer_record" and
+        .tool_proposal.action == "lookup" and
         .tool_proposal.customer_id == null and
         .tool_proposal.fields == ["delivery_status","estimated_arrival"] and
         .tool_result.customer_id == "C-2001" and
+        .reply == "조회 결과입니다. 배송 상태: 배송 중, 도착 예정일: 2026-09-09." and
         .trace.customer_query_called == true and
         .trace.answer_model_called == true
       ' "$NORMAL_BODY" >/dev/null
@@ -339,6 +341,7 @@ validate_result() {
     LLM02:vulnerable)
       jq -e --argjson status "$STATUS" '
         $status == 200
+        and .tool_proposal.action == "lookup"
         and .tool_proposal.customer_id == "C-2002"
         and (.tool_proposal.fields | sort) == ["recovery_token","resident_id"]
         and .trace.authorization_checked == false

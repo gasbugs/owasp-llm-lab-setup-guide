@@ -68,6 +68,8 @@ class UniqueDataFlowTests(unittest.TestCase):
     def test_llm02_planner_prompt_contains_no_credentials_or_customer_data(self) -> None:
         prompt = DAY2.build_llm02_planner_prompt()
         self.assertIn("get_customer_record", prompt)
+        self.assertIn("action을 cannot_answer", prompt)
+        self.assertIn("fields는 빈 배열", prompt)
         self.assertIn("customer_id는 null", prompt)
         self.assertIn("다른 고객 정보는 조회하면 안 된다", prompt)
         self.assertIn("서버의 Tool Executor가 판단", prompt)
@@ -81,8 +83,15 @@ class UniqueDataFlowTests(unittest.TestCase):
             {"delivery_status": "배송 중", "estimated_arrival": "2026-09-09"}
         )
         self.assertIn("배송 중", prompt)
+        self.assertIn("필드를 추가·삭제·변경", prompt)
         self.assertNotIn("resident_id", prompt)
         self.assertNotIn("C-2002", prompt)
+        self.assertEqual(
+            DAY2.render_llm02_grounded_answer(
+                {"delivery_status": "배송 중", "estimated_arrival": "2026-09-09"}
+            ),
+            "조회 결과입니다. 배송 상태: 배송 중, 도착 예정일: 2026-09-09.",
+        )
 
     def test_llm02_safe_identity_comes_from_server_token_map(self) -> None:
         principal = DAY2.authenticate_customer("Bearer llm02-c2001-demo-token")

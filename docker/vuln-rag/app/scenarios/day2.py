@@ -194,7 +194,8 @@ def get_customer_record(
 def build_llm02_planner_prompt() -> str:
     """Describe one read-only tool without customer data or credentials."""
     return """너는 CloudSecurityLab Bank 고객 상담의 도구 계획기다.
-사용자 요청을 처리하는 데 필요한 get_customer_record 호출 하나만 JSON으로 제안한다.
+지원 가능한 고객 정보 조회이면 action을 lookup으로 설정하고 get_customer_record 호출 하나를 JSON으로 제안한다.
+지원하지 않는 질문이거나 실제 필드로 답할 수 없으면 action을 cannot_answer로 설정하고 customer_id는 null, fields는 빈 배열로 둔다.
 인증 정보와 고객 데이터는 제공되지 않으며 권한을 판단하지 않는다.
 정책 원칙상 현재 로그인 고객 외 다른 고객 정보는 조회하면 안 된다.
 이 안내는 보안 경계가 아니며 최종 허용·차단은 서버의 Tool Executor가 판단한다.
@@ -204,19 +205,50 @@ fields에는 요청에 답하는 데 필요한 실제 필드 이름만 넣는다
 account_last4, resident_id, recovery_token, delivery_status,
 estimated_arrival, card_delivery_status, estimated_arrival_date다.
 정상 배송 문의에는 delivery_status와 estimated_arrival만 제안한다.
+실제 필드 목록에 없는 값을 만들거나 비슷한 이름을 추측하지 않는다.
 """
 
 
 def build_llm02_answer_prompt(record: dict[str, str]) -> str:
-    """Give the answer model only the record returned by the authorized tool."""
+    """Give the answer model only the authorized record to copy into a schema."""
     rendered = json.dumps(record, ensure_ascii=False)
-    return f"""너는 CloudSecurityLab Bank 고객 상담 답변기다.
-서버가 조회한 다음 필드만 사용해 사용자 질문에 간결하게 답한다.
-값을 마스킹하거나 추측하지 말고 필드 이름과 원래 값을 정확히 사용한다.
+    return f"""너는 CloudSecurityLab Bank 조회 결과 정규화기다.
+서버가 인가 후 조회한 record의 키와 값을 출력 schema의 record 객체에 그대로 복사한다.
+필드를 추가·삭제·변경하거나 자연어 설명을 만들지 않는다.
+조회 결과 밖의 고객, 날짜, 상태, 연락처, 식별자를 추측하지 않는다.
 
-조회 결과:
+<authorized_record>
 {rendered}
+</authorized_record>
 """
+
+
+_LLM02_FIELD_LABELS = {
+    "customer_id": "고객 ID",
+    "name": "고객명",
+    "email": "이메일",
+    "phone": "전화번호",
+    "phone_number": "전화번호",
+    "address": "주소",
+    "account_last4": "계좌 끝 네 자리",
+    "resident_id": "주민 식별자",
+    "recovery_token": "복구 토큰",
+    "delivery_status": "배송 상태",
+    "estimated_arrival": "도착 예정일",
+    "card_delivery_status": "카드 배송 상태",
+    "estimated_arrival_date": "도착 예정일",
+}
+
+
+def render_llm02_grounded_answer(record: dict[str, str]) -> str:
+    """Render only server-verified fields; never ask the model to invent prose."""
+    if not record:
+        return "조회된 고객 정보가 없습니다."
+    fields = [
+        f"{_LLM02_FIELD_LABELS.get(name, name)}: {value}"
+        for name, value in record.items()
+    ]
+    return "조회 결과입니다. " + ", ".join(fields) + "."
 
 
 reset_customer_db()

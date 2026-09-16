@@ -42,6 +42,7 @@ from app.secure_coding import (
     select_llm10_resource_budget,
 )
 from app.scenarios import SCENARIO_NAMES, list_scenarios
+from app.scenarios import day1 as day1_scenario
 from app.scenarios import day2 as day2_scenario
 from app.scenarios import day4 as day4_scenario
 
@@ -132,9 +133,16 @@ class LLM02SafeChatRequest(BaseModel):
 class LLM02ToolProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    action: Literal["lookup", "cannot_answer"]
     customer_id: str | None
-    fields: list[str] = Field(min_length=1, max_length=13)
+    fields: list[str] = Field(min_length=0, max_length=13)
     reason: str = Field(min_length=1, max_length=500)
+
+
+class LLM02GroundedAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    record: dict[str, str]
 
 
 class LLM08RagPoisoningChatRequest(BaseModel):
@@ -310,6 +318,12 @@ async def run_llm02_tool_chat(
         )
         trace["planner_model_called"] = True
         proposal = LLM02ToolProposal.model_validate(raw_proposal)
+        if proposal.action == "lookup" and not proposal.fields:
+            raise ValueError("lookup requires at least one field")
+        if proposal.action == "cannot_answer" and (
+            proposal.customer_id is not None or proposal.fields
+        ):
+            raise ValueError("cannot_answer must not request customer data")
     except Exception as exc:
         trace["planner_model_called"] = True
         trace["blocking_reason"] = "planner-invalid-response"
@@ -318,6 +332,20 @@ async def run_llm02_tool_chat(
 
     trace["requested_customer_id"] = proposal.customer_id
     trace["requested_fields"] = proposal.fields
+
+    if proposal.action == "cannot_answer":
+        trace["blocking_reason"] = "request-not-supported"
+        emit_llm02_trace(trace)
+        return {
+            "reply": "현재 조회 가능한 고객 정보로는 답변할 수 없습니다.",
+            "scenario": "day2",
+            "lab": "llm02-sensitive-information-disclosure",
+            "mode": executor,
+            "tool": None,
+            "tool_proposal": proposal.model_dump(),
+            "tool_result": None,
+            "trace": trace,
+        }
 
     try:
         if executor == "vulnerable":
@@ -346,11 +374,29 @@ async def run_llm02_tool_chat(
         return JSONResponse(status_code=422, content={"detail": str(exc), "trace": trace})
 
     trace["customer_query_called"] = True
-    reply = await llm.chat(
-        system=day2_scenario.build_llm02_answer_prompt(result.record),
-        user=request_body.message,
-    )
-    trace["answer_model_called"] = True
+    try:
+        raw_answer = await llm.structured_chat(
+            system=day2_scenario.build_llm02_answer_prompt(result.record),
+            user="인가된 조회 결과를 출력 schema에 맞게 그대로 복사한다.",
+            schema=LLM02GroundedAnswer.model_json_schema(),
+        )
+        trace["answer_model_called"] = True
+        grounded = LLM02GroundedAnswer.model_validate(raw_answer)
+        if grounded.record != result.record:
+            raise ValueError("answer record differs from authorized tool result")
+    except Exception:
+        trace["answer_model_called"] = True
+        trace["blocking_reason"] = "answer-not-grounded"
+        emit_llm02_trace(trace)
+        return JSONResponse(
+            status_code=502,
+            content={
+                "detail": "answer model returned ungrounded data",
+                "trace": trace,
+            },
+        )
+
+    reply = day2_scenario.render_llm02_grounded_answer(grounded.record)
     trace["application_decision"] = "allow"
     emit_llm02_trace(trace)
     return {
@@ -626,11 +672,16 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
         ]
         llm_ids = ["LLM02"]
     else:
+        prompt_content = (
+            day1_scenario.build_system_prompt_preview(context_marker)
+            if selected.id == "day1"
+            else selected.build_system_prompt(context=context_marker)
+        )
         prompts = [
             {
                 "stage": "generation",
                 "title": selected.title,
-                "content": selected.build_system_prompt(context=context_marker),
+                "content": prompt_content,
             }
         ]
         llm_ids = {
@@ -695,11 +746,18 @@ async def llm02_policy():
             "policy_owner": "application",
         },
         "planner_receives": ["user message", "read-only tool schema"],
+        "planner_unsupported_action": "cannot_answer without customer query",
         "planner_never_receives": [
             "bearer token",
             "database credential",
             "customer records",
         ],
+        "answer_grounding": {
+            "model_receives": "authorized record only",
+            "original_user_message": "not forwarded",
+            "validation": "structured record must exactly equal tool result",
+            "rendering": "deterministic application template",
+        },
     }
 
 
