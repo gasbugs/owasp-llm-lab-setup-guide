@@ -129,8 +129,12 @@ RUN_AS_UBUNTU=(runuser -u ubuntu --)
 # CDI 모드 nvidia
 step "6/10" "NVIDIA GPU를 Docker 컨테이너에서 사용할 CDI 설정을 확인합니다"
 if command -v nvidia-ctk >/dev/null 2>&1; then
-  nvidia-ctk runtime configure --runtime=docker
-  systemctl restart docker
+  if docker info --format '{{json .Runtimes}}' | jq -e 'has("nvidia")' >/dev/null; then
+    echo "[install-lab] NVIDIA Docker runtime already active"
+  else
+    nvidia-ctk runtime configure --runtime=docker
+    systemctl restart docker
+  fi
 else
   echo "(nvidia-ctk 미설치 — NVIDIA Container Toolkit 설치 필요)"
 fi

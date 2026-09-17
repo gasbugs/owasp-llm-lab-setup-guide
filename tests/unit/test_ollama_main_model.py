@@ -1,6 +1,7 @@
 """Normal HTTP payload contracts for the non-thinking main model."""
 import importlib.util
 import json
+import subprocess
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -72,6 +73,28 @@ class MainModelTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("llama-guard", content)
         self.assertIn("OLLAMA_EMBED_MODEL", content)
         self.assertIn("--max-time 300 http://localhost:11434/api/generate", content)
+
+    def check_runtime_reconcile(self, configured):
+        source = (ROOT / "infrastructure/scripts/student/install-lab.sh").read_text()
+        block = source.split("if command -v nvidia-ctk", 1)[1].split("# 5) Ollama", 1)[0]
+        script = """
+set -eu
+nvidia-ctk() { printf 'configure-runtime\\n'; }
+docker() { printf '{}\\n'; }
+systemctl() { printf 'restart-daemon\\n'; }
+""" + f"jq() {{ cat >/dev/null; return {0 if configured else 1}; }}\n"
+        result = subprocess.run(
+            ["bash", "-c", script + "if command -v nvidia-ctk" + block],
+            check=True, capture_output=True, text=True,
+        )
+        self.assertEqual("restart-daemon" in result.stdout, not configured)
+        self.assertEqual("configure-runtime" in result.stdout, not configured)
+
+    def test_existing_gpu_runtime_is_not_restarted(self):
+        self.check_runtime_reconcile(True)
+
+    def test_missing_gpu_runtime_is_configured(self):
+        self.check_runtime_reconcile(False)
 
 
 if __name__ == "__main__":
