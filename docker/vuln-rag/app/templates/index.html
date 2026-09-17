@@ -402,6 +402,10 @@ form.addEventListener('submit', async (e) => {
   const searchToken = document.getElementById('search-token')?.value.trim();
   if (searchToken) headers.Authorization = `Bearer ${searchToken}`;
   const body = { message: text, session_id: 'default', scenario: scenarioSelect.value };
+  if (!document.getElementById('retrieval-panel').hidden) {
+    body.top_k = Number(document.getElementById('search-top-k').value);
+    body.min_score = Number(document.getElementById('search-min-score').value);
+  }
   if (labSelect) {
     body.lab = labSelect.value;
     const token = llm02Token.value.trim();

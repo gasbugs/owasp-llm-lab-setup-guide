@@ -334,6 +334,7 @@ async def vector_retrieve_documents(
     mode: Literal["vulnerable", "safe"],
     embedding_backend: KnowledgeEmbeddingBackend,
     top_k: int = 5,
+    min_score: float = -1.0,
 ) -> dict:
     """Embed query and provenance-filtered candidates, then rank by cosine score."""
     if not query.strip():
@@ -346,7 +347,7 @@ async def vector_retrieve_documents(
     candidates.sort(key=lambda document: document.document_id)
     dimensions, scores = await rank_texts(
         query, [document.rendered for document in candidates], embedding_backend,
-        top_k=top_k,
+        top_k=top_k, min_score=min_score,
     )
     ranked = [(score, candidates[index]) for score, index in scores]
     return {

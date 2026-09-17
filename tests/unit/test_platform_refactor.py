@@ -60,13 +60,24 @@ class PlatformRefactorTests(unittest.TestCase):
                 self.assertEqual(hit['score'], 1.)
                 self.assertIn('orchard care', hit['text'])
                 model.assert_not_awaited()
-                reply = client.post('/api/chat', json={'message': 'fruit trees'}).json()
-                self.assertEqual(reply['debug']['retrieved_chunks'][0], hit['text'])
+                reply = client.post('/api/chat', json={'message': 'fruit trees', 'top_k': 1, 'min_score': .5}).json()
+                self.assertEqual(reply['debug']['retrieved_chunks'], [hit['text']])
                 self.assertIn(hit['text'], model.call_args.kwargs['system'])
             finally:
                 client.delete(f'/api/admin/docs/{len(before)}')
             empty = client.post('/api/search', json={'query': 'fruit trees', 'min_score': .5}).json()
             self.assertEqual(empty['hits'], [])
+            reply = client.post('/api/chat', json={'message': 'fruit trees', 'min_score': .5}).json()
+            self.assertEqual(reply['debug']['retrieved_chunks'], [])
+
+    def test_provenance_chat_forwards_retrieval_controls(self):
+        search = AsyncMock(return_value={'documents': [], 'hits': []})
+        with patch.object(MAIN.day2_scenario, 'vector_retrieve_documents', search), \
+             patch.object(MAIN.llm, 'chat', AsyncMock(return_value='근거 없음')), TestClient(MAIN.app) as client:
+            response = client.post('/api/chat', json={'message': 'normal policy question',
+                'lab': 'llm08-rag-poisoning', 'top_k': 2, 'min_score': .75})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(search.call_args.kwargs, {'top_k': 2, 'min_score': .75})
 
     def test_invalid_embedding_blocks_generation(self):
         model = AsyncMock()

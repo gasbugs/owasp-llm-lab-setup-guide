@@ -107,6 +107,8 @@ class ChatRequest(BaseModel):
     scenario: str | None = None
     lab: Literal["llm02", "llm08-rag-poisoning"] | None = None
     customer_id: str | None = None
+    top_k: int = Field(default=5, ge=1, le=10)
+    min_score: float = Field(default=0.0, ge=-1.0, le=1.0)
 
 
 class LLM08SearchRequest(BaseModel):
@@ -141,6 +143,8 @@ class LLM08RagPoisoningChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1, max_length=4096)
+    top_k: int = Field(default=5, ge=1, le=10)
+    min_score: float = Field(default=0.0, ge=-1.0, le=1.0)
 
 
 class LLM08RagPoisoningDocumentRequest(BaseModel):
@@ -428,6 +432,7 @@ async def run_llm08_rag_chat(
             request_body.query,
             mode,
             embedding,
+            top_k=request_body.top_k, min_score=request_body.min_score,
         )
     except EmbeddingBackendError as exc:
         raise HTTPException(
@@ -1070,7 +1075,7 @@ async def chat(req: ChatRequest, request: Request):
             return result if isinstance(result, JSONResponse) else JSONResponse(result)
         return JSONResponse(
             await run_llm08_rag_policy_chat(
-                LLM08RagPoisoningChatRequest(query=req.message)
+                LLM08RagPoisoningChatRequest(query=req.message, top_k=req.top_k, min_score=req.min_score)
             )
         )
 
@@ -1130,7 +1135,7 @@ async def chat(req: ChatRequest, request: Request):
         system_prompt = day1_scenario.build_system_prompt()
     else:
         retrieval = await search_documents(
-            req.message, selected, request
+            req.message, selected, request, top_k=req.top_k, min_score=req.min_score
         )
         context = retrieval["retrieved_chunks"]
         system_prompt = selected.build_system_prompt(context=context)
@@ -1196,11 +1201,10 @@ async def knowledge_search(body: CorpusSearchRequest):
     require_day2_lab()
     mode = select_llm08_rag_provenance_filter()
     try:
-        result = await day2_scenario.vector_retrieve_documents(body.query, mode, embedding, top_k=body.top_k)
+        result = await day2_scenario.vector_retrieve_documents(body.query, mode, embedding, top_k=body.top_k, min_score=body.min_score)
     except (EmbeddingBackendError, ValueError) as exc:
         raise HTTPException(status_code=502, detail="embedding search unavailable") from exc
     result.pop("documents")
-    result["hits"] = [hit for hit in result["hits"] if hit["score"] >= body.min_score]
     return {**result, "min_score": body.min_score, "top_k": body.top_k,
             "provenance_filter_applied": mode == "safe"}
 
