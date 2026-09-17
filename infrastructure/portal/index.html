@@ -385,12 +385,14 @@
     const state = new Map(services.map((service) => [service.title, "checking"]));
 
     function renderCard(service) {
+      const externalIcon = ['llmgoat', 'dvla'].includes(service.id)
+        ? '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7"/></svg>' : '';
       const tags = service.tags.map((tag) => `<span class="tag">${tag}</span>`).join("");
       return `<article class="card" data-service="${service.title}" style="--card-accent:${service.color}">
         <div class="card-top"><div><div class="route">${service.route}</div><h3>${service.title}</h3></div><span class="status checking" data-status-for="${service.title}">확인 중</span></div>
         <div class="tags"><span class="tag port">PORT ${service.port}</span>${tags}</div>
         <p class="desc">${service.desc}</p><p class="url">${service.href}</p>
-        <div class="actions"><a class="button" href="${service.href}" target="_blank" rel="noreferrer" aria-label="${service.openLabel}: ${service.title}">${service.openLabel}</a><a class="button secondary" href="${service.check}" target="_blank" rel="noreferrer">${service.checkLabel}</a></div>
+        <div class="actions"><a class="button" href="${service.href}" target="_blank" rel="noopener noreferrer" aria-label="${service.openLabel}: ${service.title} (새 탭)">${service.openLabel} ${externalIcon}</a><a class="button secondary" href="${service.check}" target="_blank" rel="noopener noreferrer">${service.checkLabel}</a></div>
       </article>`;
     }
 

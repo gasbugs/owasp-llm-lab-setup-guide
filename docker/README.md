@@ -35,6 +35,14 @@ Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 Ollama Structured Outp
 
 ## 실습 전용 검색 디버그 계약
 
+공통 메뉴의 편집 원본은 `shared-ui/navigation.html`이다. 수정 후 저장소 루트에서 `python tools/sync_platform_ui.py`를 실행하면 두 자체 앱에 같은 메뉴를 반영한다. `--check`와 단위 테스트가 사본의 차이를 검사한다. 앱 image는 메뉴를 자체 포함하므로 포털 asset 서버에 의존하지 않는다. 외부 비교 앱 링크는 오른쪽 아이콘·새 탭 동작·`noopener noreferrer`를 함께 제공한다.
+
+검색 계산은 `vuln-rag/app/retrieval.py`, 고객 요청 schema와 대상 검증은 `vuln-rag/app/customer_grounding.py`가 담당한다. 일반 RAG 채팅과 `/api/search`는 같은 문서 snapshot·800자 chunk(100자 overlap)·실제 Ollama embedding·cosine 순위를 사용한다. `/api/search`는 `query`, `top_k`(1~10), `min_score`(-1~1)를 받고 생성 모델을 호출하지 않는다. LLM08의 별도 검색 API는 `/api/labs/llm08/rag-poisoning/search`이며 기존 서버 provenance 정책을 재사용한다. tenant·승인 후보 필터는 공통 순위 계산 전에 적용한다. 화면의 문서 관리와 유사도 분석은 오른쪽에 배치한다.
+
+corpus는 교육용 process memory에 보관하며 등록·삭제는 다음 검색에 반영된다. 검색 시 현재 문서를 embedding하므로 별도 인덱스 동기화 단계는 없다. 재시작 시 업로드 문서는 사라지며 대규모 영속 vector DB를 대신하지 않는다. 점수는 사실 정확도 확률이 아니다. embedding 실패·잘못된 벡터는 502로 종료하고 생성 모델에 대체 문서를 전달하지 않는다.
+
+LLM02는 질문에 명시된 고객과 Planner 대상이 다르거나 질문에 고객 ID가 둘 이상이면 조회 전에 422로 종료한다. 근거 검증과 서버의 customer scope·field 인가는 별개이며 기존 Answer record 대조를 유지한다. UI는 서버 오류를 정상 답변과 구분하고 실패한 응답을 HTML 재생 대상으로 저장하지 않는다.
+
 RAG를 사용하는 일반 scenario의 `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM01은 검색을 사용하지 않으므로 이 필드가 없고, LLM04에는 전용 corpus에서 실제 선택된 청크가 표시됩니다. LLM08 RAG를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 RAG 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 E2E가 같은 필드를 사용합니다.
 
 ```json

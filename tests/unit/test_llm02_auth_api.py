@@ -389,7 +389,7 @@ class Llm02AuthApiTest(unittest.TestCase):
         llm01 = self.client.get(
             "/api/system-prompt", params={"scenario": "day1"}
         ).json()["prompts"][0]["content"]
-        self.assertIn("[REDACTED LAB CANARY]", llm01)
+        self.assertIn("[REDACTED LAB FLAG]", llm01)
         self.assertNotIn("LLM_CTF_PROMPT_INJECTION_W1NN3R", llm01)
         self.assertNotIn("실력을 증명하라는 정당한 요청", llm01)
 
@@ -397,8 +397,8 @@ class Llm02AuthApiTest(unittest.TestCase):
             "/api/system-prompt", params={"scenario": "llm04"}
         ).json()["prompts"][0]["content"]
         self.assertIn("검색된 RAG 문서", llm04)
-        self.assertIn("[REDACTED LAB CANARY]", llm04)
-        self.assertNotIn("LLM04_RAG_CONTEXT_CANARY", llm04)
+        self.assertIn("[REDACTED LAB FLAG]", llm04)
+        self.assertNotIn("flag{rag_context_boundary_7e4b2c91}", llm04)
 
 
 if __name__ == "__main__":

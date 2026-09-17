@@ -79,25 +79,30 @@
 <body>
   <div class="app-layout">
   <nav id="lab-navigation" class="lab-nav" aria-label="LLM 실습 이동">
-    <a class="lab-nav-brand" data-lab-route="/" href="/"><strong>클씨랩</strong><span>AI Security Lab</span></a>
-    <div class="lab-nav-group">Top 10 labs</div>
-    <div class="lab-nav-list">
-      <a class="lab-nav-link" data-lab-route="/prompt-rag/" href="/prompt-rag/"><span class="lab-nav-code">01</span><span class="lab-nav-name">Prompt Injection</span></a>
-      <a class="lab-nav-link" data-lab-route="/data-rag/?lab=llm02" href="/data-rag/?lab=llm02"><span class="lab-nav-code">02</span><span class="lab-nav-name">Sensitive Data</span></a>
-      <a class="lab-nav-link" data-lab-route="/llm04-rag/" href="/llm04-rag/"><span class="lab-nav-code">04</span><span class="lab-nav-name">RAG Injection</span></a>
-      <a class="lab-nav-link" data-lab-route="/output-rag/" href="/output-rag/"><span class="lab-nav-code">05</span><span class="lab-nav-name">Output Handling</span></a>
-      <a class="lab-nav-link" aria-current="page" data-lab-route="/vuln-agent/" href="/vuln-agent/"><span class="lab-nav-code">06</span><span class="lab-nav-name">Agency</span></a>
-      <a class="lab-nav-link" data-lab-route="/knowledge-rag/?lab=llm07" href="/knowledge-rag/?lab=llm07"><span class="lab-nav-code">07</span><span class="lab-nav-name">Prompt Leakage</span></a>
-      <a class="lab-nav-link" data-lab-route="/data-rag/?lab=llm08-rag-poisoning" href="/data-rag/?lab=llm08-rag-poisoning"><span class="lab-nav-code">08</span><span class="lab-nav-name">Vector & RAG</span></a>
-      <a class="lab-nav-link" data-lab-route="/knowledge-rag/?lab=llm09" href="/knowledge-rag/?lab=llm09"><span class="lab-nav-code">09</span><span class="lab-nav-name">Misinformation</span></a>
-      <a class="lab-nav-link" data-lab-route="/resource-rag/" href="/resource-rag/"><span class="lab-nav-code">10</span><span class="lab-nav-name">Consumption</span></a>
-    </div>
-    <div class="lab-nav-group">Comparison apps</div>
-    <div class="lab-nav-list">
-      <a class="lab-nav-link" data-lab-route="/llmgoat/" href="/llmgoat/"><span class="lab-nav-code">GOAT</span><span class="lab-nav-name">LLMGoat</span></a>
-      <a class="lab-nav-link" data-lab-route="/dvla/" href="/dvla/"><span class="lab-nav-code">DVLA</span><span class="lab-nav-name">ReAct Agent</span></a>
-    </div>
-  </nav>
+  <style>
+    .lab-nav-link[target="_blank"] { grid-template-columns:34px minmax(0,1fr) 16px; }
+    .external-icon { justify-self:end; flex-shrink:0; }
+    @media(max-width:760px) { .lab-nav-link[target="_blank"] { grid-template-columns:auto 16px; } }
+  </style>
+  <a class="lab-nav-brand" data-lab-route="/" href="/"><strong>클씨랩</strong><span>AI Security Lab</span></a>
+  <div class="lab-nav-group">Top 10 labs</div>
+  <div class="lab-nav-list">
+    <a class="lab-nav-link" data-lab-nav="llm01" data-lab-route="/prompt-rag/" href="/prompt-rag/"><span class="lab-nav-code">01</span><span class="lab-nav-name">Prompt Injection</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm02" data-lab-route="/data-rag/?lab=llm02" href="/data-rag/?lab=llm02"><span class="lab-nav-code">02</span><span class="lab-nav-name">Sensitive Data</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm04" data-lab-route="/llm04-rag/" href="/llm04-rag/"><span class="lab-nav-code">04</span><span class="lab-nav-name">RAG Injection</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm05" data-lab-route="/output-rag/" href="/output-rag/"><span class="lab-nav-code">05</span><span class="lab-nav-name">Output Handling</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm06" data-lab-route="/vuln-agent/" href="/vuln-agent/"><span class="lab-nav-code">06</span><span class="lab-nav-name">Agency</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm07" data-lab-route="/knowledge-rag/?lab=llm07" href="/knowledge-rag/?lab=llm07"><span class="lab-nav-code">07</span><span class="lab-nav-name">Prompt Leakage</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm08" data-lab-route="/data-rag/?lab=llm08-rag-poisoning" href="/data-rag/?lab=llm08-rag-poisoning"><span class="lab-nav-code">08</span><span class="lab-nav-name">Vector & RAG</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm09" data-lab-route="/knowledge-rag/?lab=llm09" href="/knowledge-rag/?lab=llm09"><span class="lab-nav-code">09</span><span class="lab-nav-name">Misinformation</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm10" data-lab-route="/resource-rag/" href="/resource-rag/"><span class="lab-nav-code">10</span><span class="lab-nav-name">Consumption</span></a>
+  </div>
+  <div class="lab-nav-group">Comparison apps</div>
+  <div class="lab-nav-list">
+    <a class="lab-nav-link" data-lab-route="/llmgoat/" href="/llmgoat/" target="_blank" rel="noopener noreferrer" aria-label="LLMGoat (새 탭)"><span class="lab-nav-code">GOAT</span><span class="lab-nav-name">LLMGoat</span><svg class="external-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7"/></svg></a>
+    <a class="lab-nav-link" data-lab-route="/dvla/" href="/dvla/" target="_blank" rel="noopener noreferrer" aria-label="DVLA ReAct Agent (새 탭)"><span class="lab-nav-code">DVLA</span><span class="lab-nav-name">ReAct Agent</span><svg class="external-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7"/></svg></a>
+  </div>
+</nav>
   <main class="shell">
     <header class="masthead">
       <div class="brand"><div class="brand-mark" aria-hidden="true">CSL</div><div><p class="eyebrow">클씨랩 · AI Security Lab</p><h1>Agent execution workbench</h1></div></div>
@@ -153,6 +158,7 @@ const appBasePath = window.location.pathname.endsWith('/')
   : `${window.location.pathname}/`;
 const appUrl = (path) => new URL(path.replace(/^\/+/, ''), `${window.location.origin}${appBasePath}`).toString();
 const labOrigin = `${window.location.protocol}//${window.location.hostname}`;
+document.querySelector('[data-lab-nav="llm06"]').setAttribute('aria-current', 'page');
 document.getElementById('portal-home').href = `${labOrigin}/`;
 document.querySelectorAll('[data-lab-route]').forEach((link) => {
   link.href = `${labOrigin}${link.dataset.labRoute}`;

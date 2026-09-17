@@ -20,6 +20,9 @@
       --shadow:0 22px 60px rgba(23,49,61,.13);
     }
     * { box-sizing:border-box; }
+    [hidden] { display:none!important; }
+    input[type="number"] { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface-raised); color:var(--ink); }
+    #doc-list,#search-hits { max-height:280px; overflow:auto; }
     body { margin:0; min-width:320px; min-height:100vh; background:var(--canvas); color:var(--ink); font:15px/1.55 "Segoe UI","Noto Sans KR",sans-serif; }
     body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.42; background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px); background-size:48px 48px; mask-image:linear-gradient(to bottom,#000,transparent 72%); }
     button,input,select,textarea { font:inherit; }
@@ -82,6 +85,11 @@
 <body>
 <div class="app-layout">
 <nav id="lab-navigation" class="lab-nav" aria-label="LLM 실습 이동">
+  <style>
+    .lab-nav-link[target="_blank"] { grid-template-columns:34px minmax(0,1fr) 16px; }
+    .external-icon { justify-self:end; flex-shrink:0; }
+    @media(max-width:760px) { .lab-nav-link[target="_blank"] { grid-template-columns:auto 16px; } }
+  </style>
   <a class="lab-nav-brand" data-lab-route="/" href="/"><strong>클씨랩</strong><span>AI Security Lab</span></a>
   <div class="lab-nav-group">Top 10 labs</div>
   <div class="lab-nav-list">
@@ -97,8 +105,8 @@
   </div>
   <div class="lab-nav-group">Comparison apps</div>
   <div class="lab-nav-list">
-    <a class="lab-nav-link" data-lab-route="/llmgoat/" href="/llmgoat/"><span class="lab-nav-code">GOAT</span><span class="lab-nav-name">LLMGoat</span></a>
-    <a class="lab-nav-link" data-lab-route="/dvla/" href="/dvla/"><span class="lab-nav-code">DVLA</span><span class="lab-nav-name">ReAct Agent</span></a>
+    <a class="lab-nav-link" data-lab-route="/llmgoat/" href="/llmgoat/" target="_blank" rel="noopener noreferrer" aria-label="LLMGoat (새 탭)"><span class="lab-nav-code">GOAT</span><span class="lab-nav-name">LLMGoat</span><svg class="external-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7"/></svg></a>
+    <a class="lab-nav-link" data-lab-route="/dvla/" href="/dvla/" target="_blank" rel="noopener noreferrer" aria-label="DVLA ReAct Agent (새 탭)"><span class="lab-nav-code">DVLA</span><span class="lab-nav-name">ReAct Agent</span><svg class="external-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7"/></svg></a>
   </div>
 </nav>
 <main class="shell">
@@ -127,6 +135,9 @@
         </div>
       </section>
 
+    </div>
+
+    <aside class="stack">
       <section id="document-panel" class="panel"{% if scenario_id not in ("day2", "llm04") %} hidden{% endif %}>
         <header class="panel-head"><div><div class="eyebrow">Corpus injection</div><h2>RAG 문서 주입</h2></div><span class="panel-code">{% if scenario_id == "llm04" %}LLM04{% else %}LLM08{% endif %}</span></header>
         <div class="panel-body"><p>{% if scenario_id == "llm04" %}LLM01 번역기에 연결된 별도 corpus입니다. 주입한 문서가 검색되면 모델의 시스템 컨텍스트에 함께 전달됩니다.{% else %}LLM08 실습용 의도된 취약점입니다. 문서의 출처와 승인 상태를 포함해 같은 RAG corpus에 등록합니다.{% endif %}</p>
@@ -140,9 +151,24 @@
           </form>
         </div>
       </section>
-    </div>
-
-    <aside class="stack">
+      {% if scenario_id != "day1" %}
+      <section id="retrieval-panel" class="panel">
+        <header class="panel-head"><div><div class="eyebrow">Retrieval evidence</div><h2>문서 유사도 검색</h2></div></header>
+        <div class="panel-body">
+          <p>검색어와 문서를 임베딩으로 바꿔 cosine 유사도를 비교합니다. 점수가 클수록 의미가 가깝지만, 사실 여부나 접근 권한을 뜻하지는 않습니다. 검색만 실행하면 답변 모델은 호출하지 않습니다.</p>
+          <form id="search-form">
+            {% if scenario_id == "day4" %}
+            <div class="row"><label for="search-token">문서 접근용 Bearer token</label><input id="search-token" type="password" autocomplete="off" placeholder="본인 Tenant의 토큰을 입력합니다" required></div>
+            {% endif %}
+            <div class="row"><label for="search-query">검색어</label><input id="search-query" type="text" required maxlength="4096"></div>
+            <div class="row"><label for="search-top-k">최대 결과 수</label><input id="search-top-k" type="number" min="1" max="10" value="5" required></div>
+            <div class="row"><label for="search-min-score">최소 유사도 (-1~1)</label><input id="search-min-score" type="number" min="-1" max="1" step="0.05" value="0" required></div>
+            <button type="submit">유사도 분석</button>
+          </form>
+          <p id="search-status" role="status"></p><ol id="search-hits" class="doc-list"></ol>
+        </div>
+      </section>
+      {% endif %}
       {% if scenario_id == "day2" %}
       <section class="panel">
         <header class="panel-head"><div><div class="eyebrow">Feature routing</div><h2>실습 선택과 인증</h2></div><span class="panel-code">8010</span></header>
@@ -237,6 +263,51 @@ const guardReason = document.getElementById('guard-reason');
 const guardChecks = document.getElementById('guard-checks');
 let lastBotReply = null;
 
+function showRetrieval(result) {
+  const status = document.getElementById('search-status');
+  const list = document.getElementById('search-hits');
+  if (!status || !list) return;
+  list.replaceChildren();
+  status.textContent = `${result.model} · ${result.dimensions}차원 · 후보 ${result.candidate_count}개 · 결과 ${result.hits.length}개`;
+  for (const hit of result.hits) {
+    const item = document.createElement('li');
+    item.className = 'doc-text';
+    const heading = document.createElement('strong');
+    heading.textContent = `${hit.rank}. ${hit.title || hit.document_id} · 유사도 ${hit.score.toFixed(4)}`;
+    const body = document.createElement('p');
+    body.textContent = hit.text;
+    item.append(heading, body);
+    list.appendChild(item);
+  }
+  if (!result.hits.length) status.textContent += ' · 기준을 만족하는 문서가 없습니다.';
+}
+
+document.getElementById('search-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button');
+  const status = document.getElementById('search-status');
+  button.disabled = true;
+  document.getElementById('search-hits').replaceChildren();
+  status.textContent = '문서를 검색하는 중…';
+  try {
+    const endpoint = scenarioSelect.value === 'day2'
+      ? '/api/labs/llm08/rag-poisoning/search' : '/api/search';
+    const response = await fetch(appUrl(endpoint), {
+      method: 'POST', headers: {'Content-Type': 'application/json',
+        ...(document.getElementById('search-token')?.value.trim()
+          ? {Authorization: `Bearer ${document.getElementById('search-token').value.trim()}`} : {})},
+      body: JSON.stringify({query: document.getElementById('search-query').value,
+        top_k: Number(document.getElementById('search-top-k').value),
+        min_score: Number(document.getElementById('search-min-score').value)}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : '검색 요청을 확인해 주세요.');
+    showRetrieval(data);
+  } catch (error) {
+    status.textContent = `ERR · 검색을 완료하지 못했습니다. ${error.message}`;
+  } finally { button.disabled = false; }
+});
+
 async function loadSystemPrompt() {
   promptContent.textContent = '프롬프트를 불러오는 중...';
   try {
@@ -328,6 +399,8 @@ form.addEventListener('submit', async (e) => {
   add('user', text);
   msg.value = '';
   const headers = {'Content-Type': 'application/json'};
+  const searchToken = document.getElementById('search-token')?.value.trim();
+  if (searchToken) headers.Authorization = `Bearer ${searchToken}`;
   const body = { message: text, session_id: 'default', scenario: scenarioSelect.value };
   if (labSelect) {
     body.lab = labSelect.value;
@@ -342,6 +415,15 @@ form.addEventListener('submit', async (e) => {
     body: JSON.stringify(body),
   });
   const data = await r.json();
+  const retrieval = data.retrieval || data.debug?.retrieval || data.vector_search;
+  if (retrieval) showRetrieval(retrieval);
+  if (!r.ok) {
+    lastBotReply = null;
+    if (replayLast) replayLast.disabled = true;
+    add('debug', `HTTP ${r.status} · ${data.reply || data.detail || '요청 처리 실패'}`);
+    if (data.trace) add('debug', JSON.stringify(data.trace));
+    return;
+  }
   const reply = data.reply ?? data.detail ?? `HTTP ${r.status}`;
   lastBotReply = reply;
   if (replayLast) replayLast.disabled = false;
@@ -488,6 +570,7 @@ function updateDay2Panels() {
   markActiveLab(isLlm04 ? 'llm08' : 'llm02');
   llm02Auth.hidden = isLlm04;
   documentPanel.hidden = !isLlm04;
+  document.getElementById('retrieval-panel').hidden = !isLlm04;
   if (isLlm04) loadDocs();
 }
 

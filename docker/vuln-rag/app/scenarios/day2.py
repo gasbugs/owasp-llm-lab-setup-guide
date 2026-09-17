@@ -9,13 +9,13 @@ can run before retrieval context reaches the model.
 from __future__ import annotations
 
 import json
-import math
 import sqlite3
 from dataclasses import asdict, dataclass
 from threading import Lock
 from typing import List, Literal, Protocol, Sequence
 
 from app.scenarios import Scenario, query_tokens
+from app.retrieval import cosine_similarity as _cosine_similarity, rank_texts
 
 LLM02_CUSTOMER_ID = "C-2001"
 LLM02_OTHER_CUSTOMER_ID = "C-2002"
@@ -275,16 +275,6 @@ class KnowledgeEmbeddingBackend(Protocol):
     async def embed(self, inputs: Sequence[str]) -> list[list[float]]: ...
 
 
-def _cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
-    if not left or len(left) != len(right):
-        raise ValueError("embedding vectors must have equal non-zero dimensions")
-    left_norm = math.sqrt(sum(value * value for value in left))
-    right_norm = math.sqrt(sum(value * value for value in right))
-    if left_norm == 0.0 or right_norm == 0.0:
-        raise ValueError("embedding vectors must have non-zero norms")
-    return sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
-
-
 _BASELINE_DOCUMENTS = (
     KnowledgeDocument(
         document_id="bank/transfer-official-v3",
@@ -353,23 +343,16 @@ async def vector_retrieve_documents(
         if mode == "safe"
         else list(_documents)
     )
-    vectors = await embedding_backend.embed(
-        [query, *(document.rendered for document in candidates)]
+    candidates.sort(key=lambda document: document.document_id)
+    dimensions, scores = await rank_texts(
+        query, [document.rendered for document in candidates], embedding_backend,
+        top_k=top_k,
     )
-    if len(vectors) != len(candidates) + 1:
-        raise ValueError("embedding backend returned an incomplete batch")
-    query_vector = vectors[0]
-    ranked = sorted(
-        (
-            (_cosine_similarity(query_vector, vector), document)
-            for vector, document in zip(vectors[1:], candidates)
-        ),
-        key=lambda item: (-item[0], item[1].document_id),
-    )[:top_k]
+    ranked = [(score, candidates[index]) for score, index in scores]
     return {
         "engine": "ollama-embedding-cosine",
         "model": embedding_backend.model,
-        "dimensions": len(query_vector),
+        "dimensions": dimensions,
         "candidate_count": len(candidates),
         "hits": [
             {

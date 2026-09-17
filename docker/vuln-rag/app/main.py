@@ -19,6 +19,11 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.embedding import EmbeddingBackendError, EmbeddingClient
+from app.customer_grounding import (
+    CustomerChatRequest, LLM02ToolProposal, LLM02GroundedAnswer,
+    validate_customer_target,
+)
+from app.retrieval import search_corpus
 from app.classified_rag import (
     RagAuthenticationError,
     RagAuthorizationError,
@@ -111,39 +116,25 @@ class LLM08SearchRequest(BaseModel):
     top_k: int = Field(default=2, ge=1, le=4)
 
 
+class CorpusSearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(min_length=1, max_length=4096, pattern=r"\S")
+    top_k: int = Field(default=5, ge=1, le=10)
+    min_score: float = Field(default=0.0, ge=-1.0, le=1.0)
+
+
 class EmbedRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     input: str | list[str]
 
 
-class LLM02VulnerableChatRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    message: str = Field(min_length=1, max_length=4096)
-    customer_id: str | None = None
+class LLM02VulnerableChatRequest(CustomerChatRequest):
+    pass
 
 
-class LLM02SafeChatRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    message: str = Field(min_length=1, max_length=4096)
-    customer_id: str | None = None
-
-
-class LLM02ToolProposal(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    action: Literal["lookup", "cannot_answer"]
-    customer_id: str | None
-    fields: list[str] = Field(min_length=0, max_length=13)
-    reason: str = Field(min_length=1, max_length=500)
-
-
-class LLM02GroundedAnswer(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    record: dict[str, str]
+class LLM02SafeChatRequest(CustomerChatRequest):
+    pass
 
 
 class LLM08RagPoisoningChatRequest(BaseModel):
@@ -161,11 +152,8 @@ class LLM08RagPoisoningDocumentRequest(BaseModel):
     revision: str = Field(default="1", min_length=1, max_length=50)
 
 
-class LLM02WorkshopRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    message: str = Field(min_length=1, max_length=4096)
-    customer_id: str | None = None
+class LLM02WorkshopRequest(CustomerChatRequest):
+    pass
 
 
 class LLM05SqlLookupRequest(BaseModel):
@@ -325,14 +313,28 @@ async def run_llm02_tool_chat(
             proposal.customer_id is not None or proposal.fields
         ):
             raise ValueError("cannot_answer must not request customer data")
-    except Exception as exc:
+    except Exception:
         trace["planner_model_called"] = True
         trace["blocking_reason"] = "planner-invalid-response"
         emit_llm02_trace(trace)
-        raise HTTPException(status_code=502, detail="planner returned invalid tool proposal") from exc
+        return JSONResponse(status_code=502, content={
+            "detail": "planner returned invalid tool proposal", "trace": trace,
+        })
 
     trace["requested_customer_id"] = proposal.customer_id
     trace["requested_fields"] = proposal.fields
+
+    if proposal.action == "lookup":
+        try:
+            validate_customer_target(request_body.message, proposal.customer_id, principal.customer_id)
+        except ValueError as exc:
+            trace["blocking_reason"] = str(exc)
+            emit_llm02_trace(trace)
+            return JSONResponse(status_code=422, content={
+                "detail": str(exc),
+                "reply": "조회할 고객 ID 하나와 필요한 항목을 명확히 지정해 주세요. 고객 정보는 조회하지 않았습니다.",
+                "trace": trace,
+            })
 
     if proposal.action == "cannot_answer":
         trace["blocking_reason"] = "request-not-supported"
@@ -1122,11 +1124,15 @@ async def chat(req: ChatRequest, request: Request):
             )
         return JSONResponse(guarded)
 
+    retrieval = None
     if selected.id == "day1":
         context = None
         system_prompt = day1_scenario.build_system_prompt()
     else:
-        context = selected.retrieve(req.message)
+        retrieval = await search_documents(
+            req.message, selected, request
+        )
+        context = retrieval["retrieved_chunks"]
         system_prompt = selected.build_system_prompt(context=context)
 
     response = await llm.chat(
@@ -1142,6 +1148,7 @@ async def chat(req: ChatRequest, request: Request):
     if context is not None:
         # RAG 시나리오만 검색 결과를 관찰 증거로 노출한다.
         debug["retrieved_chunks"] = context
+        debug["retrieval"] = retrieval
 
     content = {
         "reply": response,
@@ -1157,6 +1164,45 @@ async def chat(req: ChatRequest, request: Request):
             }
         )
     return JSONResponse(content)
+
+
+async def search_documents(query: str, selected, request: Request, *, top_k=5, min_score=0.0) -> dict:
+    if selected.id in ("day1", "day2"):
+        raise HTTPException(status_code=404, detail="use the dedicated lab retrieval endpoint")
+    if selected.id == "day4":
+        result = await run_llm08_search(
+            LLM08SearchRequest(query=query, top_k=min(top_k, 4)), request,
+            mode="safe",
+        )
+        result["hits"] = [hit for hit in result["hits"] if hit["score"] >= min_score]
+        result["retrieved_chunks"] = [f'[{hit["document_id"]}] {hit["text"]}' for hit in result["hits"]]
+        result["min_score"] = min_score
+        return result
+    try:
+        return await search_corpus(query, selected.list_docs(), embedding,
+                                   top_k=top_k, min_score=min_score)
+    except (EmbeddingBackendError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="embedding search unavailable") from exc
+
+
+@app.post("/api/search")
+async def corpus_search(body: CorpusSearchRequest, request: Request):
+    return await search_documents(body.query, get_scenario(None), request,
+                                  top_k=body.top_k, min_score=body.min_score)
+
+
+@app.post("/api/labs/llm08/rag-poisoning/search")
+async def knowledge_search(body: CorpusSearchRequest):
+    require_day2_lab()
+    mode = select_llm08_rag_provenance_filter()
+    try:
+        result = await day2_scenario.vector_retrieve_documents(body.query, mode, embedding, top_k=body.top_k)
+    except (EmbeddingBackendError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="embedding search unavailable") from exc
+    result.pop("documents")
+    result["hits"] = [hit for hit in result["hits"] if hit["score"] >= body.min_score]
+    return {**result, "min_score": body.min_score, "top_k": body.top_k,
+            "provenance_filter_applied": mode == "safe"}
 
 
 @app.post("/api/admin/inject-doc")

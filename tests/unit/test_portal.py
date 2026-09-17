@@ -64,7 +64,7 @@ class PortalIdentityTests(unittest.TestCase):
                     self.source,
                     rf'id: "{service_id}".*port: {port}.*openLabel: "{label}"',
                 )
-        self.assertIn("${service.openLabel}</a>", self.source)
+        self.assertIn("${service.openLabel} ${externalIcon}</a>", self.source)
         self.assertNotIn(">앱 열기</a>", self.source)
 
     def test_browser_actions_use_the_port_80_uri_router(self) -> None:
