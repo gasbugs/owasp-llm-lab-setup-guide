@@ -1,67 +1,17 @@
 ################################################################################
-# 강의 실행 전 채워야 할 변수
+# 수강생이 확인하거나 변경할 값
 #   cp terraform.tfvars.example terraform.tfvars
 ################################################################################
 
-# AWS profile (aws configure --profile owasp-llm 또는 강사 안내 방식)
 aws_profile = "owasp-llm"
-region      = "us-east-1" # 강사가 공지한 리전으로 변경
-# 기본값은 g6.xlarge를 제공하는 모든 AZ를 ASG에 전달한다.
-# 장애 분석 목적 외에는 단일 AZ를 고정하지 않는다.
+region      = "us-east-1"
 
-# 강의 식별자 — 리소스 이름·태그·비용 알람에 사용
 course_id = "owasp-llm-2026"
 
-# 수강생 ID 목록 (소문자/숫자/하이픈만, 2~30자)
-# 수강생 개인 계정에서는 본인 ID 하나만 둔다.
-student_ids = [
-  "student01",
-]
+# false는 SSM 접속 후 수동 설치, true는 최초 부팅 때 자동 설치.
+enable_user_data_bootstrap = false
 
-# 강의 일자 (연속 5일 가정)
-course_dates = [
-  "2026-09-07",
-  "2026-09-08",
-  "2026-09-09",
-  "2026-09-10",
-  "2026-09-11",
-]
+# 기본값은 외부 접속을 허용하지 않는다. 직접 접속할 때만 본인 공인 IPv4 /32로 바꾼다.
+allowed_ingress_cidr = "127.0.0.1/32"
 
-# AMI는 기존 검증 계열의 최신 DLAMI를 자동 조회한다.
-# 기본값:
-#   ami_owner_id     = "898082745236"
-#   ami_name_pattern = "Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.11 (Ubuntu 24.04)*"
-# 강사가 Packer로 만든 골든 AMI를 쓰라고 안내한 경우에만 아래처럼 override한다.
-#   ami_owner_id     = "self"
-#   ami_name_pattern = "owasp-llm-lab-*"
-
-# `curl -sS https://checkip.amazonaws.com`으로 확인한 본인 공인 IPv4/32를 지정한다.
-# 실습 서비스는 이 주소에서만 직접 접근한다. 0.0.0.0/0 금지.
-allowed_ingress_cidr = "203.0.113.10/32"
-
-# 비용 알람. 금액은 강사가 공지한 최신 비용 기준으로 조정한다.
-daily_budget_usd  = 20
-course_budget_usd = 120
-alert_email       = "student@example.com"
-
-# 자동 bootstrap의 기본값은 main 설치 스크립트 + 공개 GHCR gasbugs 이미지의 latest 태그다.
-# 재현 가능한 강사용 실측은 같은 40자리 main commit으로 스크립트와 이미지 세트를 함께 고정한다.
-# 아래 두 줄의 0123... 값은 실제 `git rev-parse origin/main` 결과로 바꿔서 주석을 해제한다.
-# lab_setup_repo_raw_url = "https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/0123456789abcdef0123456789abcdef01234567"
-# lab_image_namespace    = "gasbugs"
-# lab_image_tag          = "sha-0123456789abcdef0123456789abcdef01234567"
-# enable_user_data_bootstrap = true
-# 중요: user_data_replace_on_change=false이므로 이 값은 최초 terraform apply 전에 확정해야 한다.
-# 기존 인스턴스에서 값을 바꿔도 bootstrap이 재실행되거나 인스턴스가 자동 교체되지 않는다.
-
-# 기본값 사용 가능 (필요시만 override)
-# instance_type    = "g6.xlarge"
-# root_volume_size = 100
-# enable_auto_stop = true
-# auto_stop_schedule_mode = "daily_1800"       # 매일 18:00 KST 1회(기본값)
-# auto_stop_schedule_mode = "daily_1730"       # 기존 환경 호환용 매일 17:30 KST 1회
-# auto_stop_schedule_mode = "night_1730_0830" # 17:30 KST부터 다음날 08:30 KST까지 30분마다
-# auto_stop_schedule_mode = "custom"
-# auto_stop_custom_crons_utc = {
-#   "custom-1730-kst" = "cron(30 8 * * ? *)"
-# }
+# 기본값: g6.xlarge, 100GB. AMI·commit 고정은 ../../docs/TERRAFORM-ADVANCED-OPTIONS.md 참고.

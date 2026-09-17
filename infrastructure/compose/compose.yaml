@@ -12,6 +12,30 @@ x-rag-common: &rag-common
       condition: service_started
 
 services:
+  reverse-proxy:
+    container_name: lab-reverse-proxy
+    image: docker.io/library/nginx:1.31.5-alpine3.24
+    restart: always
+    ports:
+      - "80:80"
+      - "8501:8501"
+    volumes:
+      - /home/ubuntu/work/reverse-proxy/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - portal
+      - prompt-rag
+      - llm04-rag
+      - data-rag
+      - output-rag
+      - knowledge-rag
+      - resource-rag
+      - vuln-agent
+      - llmgoat
+      - dvla
+      - fake-registry
+    security_opt:
+      - no-new-privileges:true
+
   ollama:
     container_name: lab-ollama
     image: docker.io/ollama/ollama:latest
@@ -36,6 +60,18 @@ services:
       SCENARIO: day1
       PORT: "8000"
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  llm04-rag:
+    <<: *rag-common
+    container_name: lab-llm04-rag
+    ports:
+      - "8004:8004"
+    environment:
+      <<: *rag-environment
+      DEFAULT_SCENARIO: llm04
+      SCENARIO: llm04
+      PORT: "8004"
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004"]
 
   data-rag:
     <<: *rag-common
@@ -120,8 +156,6 @@ services:
     container_name: lab-dvla
     image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-dvla:${IMAGE_TAG:-latest}
     restart: always
-    ports:
-      - "8501:8501"
     environment:
       OLLAMA_HOST: http://ollama:11434
       OLLAMA_API_BASE: http://ollama:11434

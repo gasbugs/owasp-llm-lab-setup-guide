@@ -10,7 +10,7 @@ LLM08 환경은 다음 구성요소를 함께 사용합니다.
 - `examples/llm08/mini_vector_search_app.py`: 학습자가 복사해 공격하고 수정하는 미니 앱
 - `0.0.0.0:18080`: 학습자 미니 앱의 명시적 IPv4 wildcard bind. EC2 내부 검사는 `127.0.0.1:18080` 사용
 
-이 실습은 허가된 개인 AWS 계정의 교육용 취약 환경에서만 실행합니다. `0.0.0.0`은 접속 URL이 아니라 bind sentinel입니다. Terraform Security Group은 TCP/18080을 수강생의 현재 공인 IPv4 `/32`에만 허용합니다. 관리 셸에는 SSM Session Manager를 사용하고, 학습자 웹/API에는 EC2 공인 주소를 사용합니다. `127.0.0.1/32`와 `0.0.0.0/0`은 입력 검증에서 거부합니다.
+이 실습은 허가된 개인 AWS 계정의 교육용 취약 환경에서만 실행합니다. `0.0.0.0`은 접속 URL이 아니라 bind sentinel입니다. Terraform Security Group의 기본 `127.0.0.1/32`는 외부 인바운드를 열지 않으므로 SSM Session Manager를 사용합니다. EC2 공인 주소로 직접 접속할 때만 수강생의 현재 공인 IPv4 `/32`로 바꿉니다. `0.0.0.0/0`은 입력 검증에서 거부합니다.
 
 > 비용 종료 계약: 검증이 성공했든 중간에 실패했든, 증거와 진단 자료를 보존한 다음 **이 문서 9절을 마지막 작업으로 실행해 EC2가 `stopped`인지 확인**합니다. 다음 날 진단을 이어갈 때도 실행 상태로 방치하지 않습니다.
 
@@ -98,7 +98,7 @@ IMAGE_TAG=sha-<same 40-character commit>
 
 ```hcl
 enable_user_data_bootstrap = false
-allowed_ingress_cidr       = "203.0.113.10/32"
+allowed_ingress_cidr       = "127.0.0.1/32"
 ```
 
 EC2를 만들고 단일 수강생 instance ID를 fail-closed로 조회합니다.
@@ -108,14 +108,12 @@ EC2를 만들고 단일 수강생 instance ID를 fail-closed로 조회합니다.
 set -euo pipefail
 export AWS_PROFILE=owasp-llm
 export AWS_REGION=us-east-1
-export STUDENT=yourname
 
 terraform -chdir=infrastructure/terraform init
 terraform -chdir=infrastructure/terraform plan
 terraform -chdir=infrastructure/terraform apply -auto-approve
 
 INSTANCE_ID=$(AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" \
-  STUDENT="$STUDENT" \
   bash infrastructure/scripts/student/instance-id.sh)
 test -n "$INSTANCE_ID"
 aws ec2 wait instance-running --profile "$AWS_PROFILE" \
@@ -155,19 +153,17 @@ test "$(id -un)" = ubuntu
 
 ## 1B. 기존 EC2 경로
 
-기존 EC2는 EBS 작업물과 현재 설치 기록을 먼저 보존한 뒤 시작합니다. `start-lab.sh`는 Student tag가 같은 인스턴스가 여러 개면 자동으로 중단합니다.
+기존 EC2는 EBS 작업물과 현재 설치 기록을 먼저 보존한 뒤 시작합니다. `start-lab.sh`는 프로젝트 태그가 같은 ASG가 여러 개면 자동으로 중단합니다.
 
 ```bash
 # [로컬 노트북] setup repo 루트
 set -euo pipefail
 export AWS_PROFILE=owasp-llm
 export AWS_REGION=us-east-1
-export STUDENT=yourname
 
-AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" STUDENT="$STUDENT" \
+AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" \
   bash infrastructure/scripts/student/start-lab.sh
 INSTANCE_ID=$(AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" \
-  STUDENT="$STUDENT" \
   bash infrastructure/scripts/student/instance-id.sh)
 test -n "$INSTANCE_ID"
 PING=""
@@ -278,7 +274,7 @@ test "$(awk -F= '$1 == "OLLAMA_EMBED_MODEL" {print $2}' /etc/lab/env)" \
   = 'bge-m3:latest'
 
 for container in \
-  lab-prompt-rag lab-data-rag lab-output-rag \
+  lab-prompt-rag lab-llm04-rag lab-data-rag lab-output-rag \
   lab-knowledge-rag lab-resource-rag; do
   test "$(docker inspect --format '{{.Config.Image}}' "$container")" \
     = "ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG"
@@ -467,7 +463,7 @@ export LLM08_TOKEN=llm08-acme-demo-token
 python3 "$LEARNER_APP" --serve --host 0.0.0.0 --port 18080
 ```
 
-`0.0.0.0`은 EC2의 모든 IPv4 인터페이스에서 연결을 받으라는 **bind sentinel**이며 브라우저에서 여는 주소가 아닙니다. Terraform Security Group은 TCP/18080을 본인 공인 IPv4 `/32`에만 허용하고, 브라우저에서는 `EC2_PUBLIC_IP:18080`으로 접속합니다. 미니 앱의 수신 bind와 upstream은 별개입니다. `TARGET_URL=http://127.0.0.1:8012`는 계속 loopback HTTP origin으로 제한됩니다.
+`0.0.0.0`은 EC2의 모든 IPv4 인터페이스에서 연결을 받으라는 **bind sentinel**이며 브라우저에서 여는 주소가 아닙니다. 기본 Terraform 값은 외부 인바운드를 열지 않습니다. `allowed_ingress_cidr`를 본인 공인 IPv4 `/32`로 바꾼 경우에만 브라우저에서 `EC2_PUBLIC_IP:18080`으로 직접 접속할 수 있습니다. 미니 앱의 수신 bind와 upstream은 별개입니다. `TARGET_URL=http://127.0.0.1:8012`는 계속 loopback HTTP origin으로 제한됩니다.
 
 서버 터미널을 열어 둔 채 두 번째 EC2/SSM 터미널을 엽니다. health와 API는 wildcard bind의 로컬 검사 주소인 `127.0.0.1:18080`으로 호출합니다. 3절에서 기록한 현재 evidence 경로를 읽은 뒤, request body의 `tenant`를 신뢰하지 않는지 HTTP 상태까지 확인합니다.
 
@@ -502,7 +498,7 @@ printf 'BODY_TENANT_SPOOF=REJECTED http=%s\n' "$SPOOF_STATUS"
 
 ## 6. 공인 주소와 브라우저 확인
 
-미니 앱은 `0.0.0.0:18080`에 bind하고 Terraform은 TCP/18080을 본인 공인 IPv4 `/32`에만 허용합니다. 로컬 터미널에서 EC2 공인 주소를 확인한 뒤 브라우저로 직접 접속합니다.
+이 절은 `allowed_ingress_cidr`를 본인 공인 IPv4 `/32`로 바꿔 적용한 경우에만 수행합니다. 기본 `127.0.0.1/32`를 유지했다면 앞 절의 SSM 경로로 확인합니다. 직접 접속을 선택했다면 로컬 터미널에서 EC2 공인 주소를 확인합니다.
 
 ```bash
 # [로컬 노트북]
@@ -523,7 +519,7 @@ curl -fsS --max-time 5 http://127.0.0.1:18080/healthz \
 printf 'Open http://127.0.0.1:18080/ in a browser.\n'
 ```
 
-Day 4 API를 로컬에서 직접 진단할 때는 첫 forwarding session과 다른 터미널에서 8012를 18012로 전달합니다. 8012를 외부 ingress로 열지 않습니다.
+Day 4 API를 public IP 대신 SSM 경로로 진단하려면 첫 forwarding session과 다른 터미널에서 8012를 18012로 전달합니다. 현재 Terraform ingress에서는 지정한 `/32`에서 EC2 public IP의 8012에도 직접 도달할 수 있습니다.
 
 ```bash
 # [로컬 노트북 / 새 터미널]
@@ -605,7 +601,7 @@ printf 'MINI_APP_CLEANUP=PASS\nEVIDENCE_ARCHIVE=%s\n' \
 ```bash
 # [로컬 노트북] setup repo 루트
 set -euo pipefail
-AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" STUDENT="$STUDENT" \
+AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" \
   bash infrastructure/scripts/student/stop-lab.sh
 
 STATE=$(aws ec2 describe-instances \

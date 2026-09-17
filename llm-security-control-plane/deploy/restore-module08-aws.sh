@@ -13,7 +13,13 @@ esac
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AWS_REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}
 AWS_PROFILE=${AWS_PROFILE:-default}
-ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+# 하위 aws 프로세스가 같은 ~/.aws 프로필과 리전을 선택하도록 전달한다.
+export AWS_REGION AWS_PROFILE
+if ! ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"; then
+  echo "AWS authentication failed for profile: $AWS_PROFILE" >&2
+  echo "Reauthenticate it with 'aws login --profile $AWS_PROFILE' or the login command used by that profile." >&2
+  exit 1
+fi
 PREFIX=owasp-llm-module08
 SOURCE_BUCKET="${PREFIX}-${ACCOUNT_ID}-source"
 VECTOR_BUCKET="${PREFIX}-${ACCOUNT_ID}-vectors"

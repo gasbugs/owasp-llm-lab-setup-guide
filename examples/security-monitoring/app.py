@@ -139,8 +139,8 @@ GUARDRAIL_MODEL_CALLS = Counter(
     "Guard model calls reported by the observed guardrail.",
     ["engine"],
 )
-GUARDRAIL_ENGINE_LABELS = {"presidio", "nemo", "application-auth"}
-GUARDRAIL_DIRECTION_LABELS = {"input", "output", "chat", "authentication"}
+GUARDRAIL_ENGINE_LABELS = {"presidio", "nemo", "application", "application-auth"}
+GUARDRAIL_DIRECTION_LABELS = {"input", "output", "chat", "authentication", "authorization"}
 GUARDRAIL_DECISION_LABELS = {"allow", "block", "redact", "infra", "observe"}
 
 
@@ -368,7 +368,11 @@ def persist(event: SecurityEvent, decision: Decision) -> dict[str, Any]:
             },
         )
         connection.commit()
-    log_record = {"event": "llm_security_event", **record}
+    log_record = {
+        "event": "llm_security_event",
+        **record,
+        "trace_id": record["attributes"].get("trace_id"),
+    }
     serialized = json.dumps(log_record, ensure_ascii=False, separators=(",", ":"))
     print(serialized, flush=True)
     if OTEL_ENDPOINT:
@@ -947,6 +951,7 @@ def collect_guardrail_event(
         application_decision=str(decision),
         policy_rule=str(reason or "guardrail-observation"),
         attributes={
+            "trace_id": payload.get("trace_id"),
             "guard_engine": engine,
             "guard_mode": payload.get("guard_mode") or payload.get("mode"),
             "direction": direction,

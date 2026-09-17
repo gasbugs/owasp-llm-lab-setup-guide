@@ -36,27 +36,30 @@ log() {
 }
 
 # 런타임 서비스별 고정 포트 + 실행할 e2e 항목.
+# LLM04는 LLM01의 RAG 변형이지만 별도 service와 corpus를 사용한다.
 # LLM08은 Day 2 차시지만 shared PrivateGPT-Lite 서비스(day4/8012)를 사용한다.
 # LLM03은 RAG scenario가 아니라 독립 registry(8002)이므로 아래 map 밖에서 실행한다.
 declare -A SCENARIO_ITEMS=(
   ["day1"]="llm01"
-  ["day2"]="llm02 llm04"
+  ["day2"]="llm02"
+  ["llm04"]="llm04"
   ["day3"]="llm05"
   ["day4"]="llm07 llm08 llm09"
   ["day5"]="llm10"
 )
 # 파괴적 Agent 검증 뒤, 자원 소비 LLM10을 전체 cycle의 마지막에 실행한다.
-SCENARIO_ORDER=(day1 day2 day3 day4)
+SCENARIO_ORDER=(day1 day2 llm04 day3 day4)
 declare -A SCENARIO_URLS=(
   ["day1"]="http://localhost:8000"
   ["day2"]="http://localhost:8010"
+  ["llm04"]="http://localhost:8004"
   ["day3"]="http://localhost:8011"
   ["day4"]="http://localhost:8012"
   ["day5"]="http://localhost:8013"
 )
 declare -A BASELINE_DOC_COUNTS=(
-  ["day1"]=2
   ["day2"]=2
+  ["llm04"]=2
   ["day3"]=2
   ["day4"]=4
   ["day5"]=3
@@ -82,6 +85,7 @@ reset_mutable_state() {
   local sentinel="E2E_RESET_SENTINEL_${TS}"
   local containers=(
     lab-prompt-rag
+    lab-llm04-rag
     lab-data-rag
     lab-output-rag
     lab-knowledge-rag
@@ -95,7 +99,7 @@ reset_mutable_state() {
 
   # restart가 실제로 메모리 내 오염 문서를 버리는지 sentinel로 검증한다.
   local scenario url
-  for scenario in day1 day2 day3 day4 day5; do
+  for scenario in day2 llm04 day3 day4 day5; do
     url="${SCENARIO_URLS[$scenario]}"
     if ! curl -fsS --max-time 10 -X POST "$url/api/admin/inject-doc" \
       -H 'Content-Type: application/json' \
@@ -115,7 +119,7 @@ reset_mutable_state() {
   done
 
   local clean baseline count expected
-  for scenario in day1 day2 day3 day4 day5; do
+  for scenario in day2 llm04 day3 day4 day5; do
     url="${SCENARIO_URLS[$scenario]}"
     expected="${BASELINE_DOC_COUNTS[$scenario]}"
     clean=false
@@ -161,7 +165,7 @@ reset_mutable_state() {
     log "  ✗ Agent container 재생성 기준선 확인 실패"
     return 1
   fi
-  log "  ✓ shared corpus 5개와 Agent 상태 기준선 확인"
+  log "  ✓ RAG corpus 5개와 Agent 상태 기준선 확인"
 }
 
 # === LLM03 — 독립 fake registry (port 8002) ===
@@ -236,7 +240,7 @@ run_llmgoat() {
 # === 실행 ===
 log "============================================"
 log "  OWASP Top 10 for LLM — Full Cycle e2e"
-log "  STUDENT=${STUDENT:-?} TRIALS=$TRIALS"
+log "  TRIALS=$TRIALS"
 log "============================================"
 
 if ! reset_mutable_state; then

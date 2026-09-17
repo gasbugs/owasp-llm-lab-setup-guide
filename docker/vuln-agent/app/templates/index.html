@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cloud Security · LLM Lab — Agent Workbench</title>
+  <title>클씨랩 AI Security Lab · Agent Workbench</title>
   <style>
     :root { color-scheme:dark; --canvas:#071018; --surface:#0d1924; --surface-raised:#132333; --line:#294052; --line-soft:#1b3040; --ink:#eaf5f7; --muted:#8eabb5; --signal:#55c2d8; --signal-soft:#123d4a; --incident:#ff6978; --warning:#f6c453; --success:#65d6a4; --shadow:0 18px 45px rgba(0,0,0,.28); }
     :root[data-theme="light"] { color-scheme:light; --canvas:#eaf1f3; --surface:#f8fbfc; --surface-raised:#fff; --line:#b8cbd1; --line-soft:#d8e4e7; --ink:#12252d; --muted:#58717a; --signal:#087f98; --signal-soft:#d9f1f5; --incident:#c92f43; --warning:#9a6500; --success:#167a55; --shadow:0 18px 45px rgba(28,61,72,.12); }
@@ -12,18 +12,33 @@
     button,textarea { font:inherit; }
     button,a,textarea,summary { outline:none; }
     button:focus-visible,a:focus-visible,textarea:focus-visible,summary:focus-visible,.splitter:focus-visible { box-shadow:0 0 0 3px color-mix(in srgb,var(--signal) 35%,transparent); }
-    .shell { width:min(1480px,100%); margin:0 auto; padding:18px; }
-    .masthead { display:grid; grid-template-columns:auto 1fr auto; gap:22px; align-items:center; padding:18px 20px; border:1px solid var(--line); background:color-mix(in srgb,var(--surface) 94%,transparent); box-shadow:var(--shadow); }
-    .brand { display:flex; gap:13px; align-items:center; min-width:0; }
+    .app-layout { display:grid; grid-template-columns:224px minmax(0,1fr); min-height:100vh; }
+    .lab-nav { position:sticky; top:0; z-index:5; height:100vh; overflow:auto; padding:20px 14px; border-right:1px solid var(--line); background:color-mix(in srgb,var(--surface) 97%,transparent); box-shadow:12px 0 34px rgba(0,0,0,.16); }
+    .lab-nav-brand { display:block; margin:0 8px 18px; color:var(--ink); text-decoration:none; }.lab-nav-brand strong { display:block; color:var(--signal); font:800 14px ui-monospace,monospace; letter-spacing:.08em; }.lab-nav-brand span { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
+    .lab-nav-group { margin:17px 8px 7px; color:var(--muted); font:700 9px ui-monospace,monospace; letter-spacing:.14em; text-transform:uppercase; }
+    .lab-nav-list { display:grid; gap:4px; }.lab-nav-link { display:grid; grid-template-columns:34px minmax(0,1fr); gap:8px; align-items:center; min-height:43px; padding:7px 9px; border:1px solid transparent; border-radius:9px; color:var(--muted); text-decoration:none; }.lab-nav-link:hover,.lab-nav-link:focus-visible { border-color:var(--line); background:var(--surface-raised); color:var(--ink); }.lab-nav-link[aria-current="page"] { border-color:var(--signal); background:color-mix(in srgb,var(--signal) 11%,var(--surface-raised)); color:var(--ink); }.lab-nav-code { color:var(--signal); font:800 11px ui-monospace,monospace; }.lab-nav-name { overflow:hidden; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .shell { align-self:start; width:min(1480px,100%); margin:0 auto; padding:18px; }
+    .masthead { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px 22px; align-items:start; padding:18px 20px; border:1px solid var(--line); background:color-mix(in srgb,var(--surface) 94%,transparent); box-shadow:var(--shadow); }
+    .brand { grid-column:1; grid-row:1; display:flex; gap:13px; align-items:center; min-width:0; }
     .brand-mark { display:grid; place-items:center; width:42px; height:42px; border:1px solid var(--signal); color:var(--signal); font:800 15px ui-monospace,SFMono-Regular,monospace; letter-spacing:-.08em; transform:rotate(-4deg); }
     .eyebrow { margin:0 0 3px; color:var(--signal); font:700 10px ui-monospace,SFMono-Regular,monospace; letter-spacing:.16em; text-transform:uppercase; }
     h1 { margin:0; font-size:clamp(18px,2.4vw,28px); line-height:1.05; letter-spacing:-.035em; }
-    .mission { margin:0; max-width:660px; color:var(--muted); font-size:13px; line-height:1.55; }
-    .top-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+    .mission { grid-column:1/-1; grid-row:2; margin:0; max-width:920px; color:var(--muted); font-size:13px; line-height:1.55; }
+    .top-actions { grid-column:2; grid-row:1; align-self:center; display:flex; gap:8px; align-items:center; justify-content:flex-end; }
     .vuln-beacon { color:var(--incident); font:750 10px ui-monospace,SFMono-Regular,monospace; letter-spacing:.09em; white-space:nowrap; }
     .home-button,.icon-button { display:inline-flex; min-height:42px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); font-weight:750; text-decoration:none; }
     .home-button { padding:0 13px; }.icon-button { width:42px; padding:0; cursor:pointer; }
     .home-button:hover,.icon-button:hover { border-color:var(--signal); color:var(--signal); }
+    .prompt-button { min-height:42px; padding:0 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-raised); color:var(--ink); font-size:12px; font-weight:750; cursor:pointer; }
+    .prompt-button:hover,.prompt-button:focus-visible { border-color:var(--warning); color:var(--warning); }
+    .prompt-dialog { box-sizing:border-box; width:min(820px,calc(100% - 2rem)); max-height:82vh; padding:0; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+    .prompt-dialog::backdrop { background:rgba(2,9,14,.78); backdrop-filter:blur(3px); }
+    .prompt-head { position:sticky; top:0; display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.9rem 1rem; border-bottom:1px solid var(--line); background:var(--surface); }
+    .prompt-head h2 { margin:0; font-size:1rem; }
+    .prompt-head button { min-height:36px; padding:0 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface-raised); color:var(--ink); cursor:pointer; }
+    .prompt-body { padding:1rem; }
+    .prompt-body p { color:var(--muted); font-size:.82rem; line-height:1.5; }
+    .prompt-body pre { max-height:56vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; border-left:4px solid var(--warning); background:var(--canvas); color:var(--ink); padding:1rem; }
     .identity-bar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px; align-items:center; margin-top:14px; padding:14px 18px; border:1px solid var(--line); background:var(--surface); }
     .identity-copy { margin:0; color:var(--muted); font-size:13px; line-height:1.55; }.identity-copy code { color:var(--signal); }
     .access-badge { display:flex; gap:8px; align-items:center; color:var(--warning); font:700 11px ui-monospace,SFMono-Regular,monospace; white-space:nowrap; }
@@ -54,16 +69,45 @@
     .splitter { position:relative; cursor:col-resize; touch-action:none; background:var(--canvas); outline:none; }
     .splitter::after { content:""; position:absolute; top:50%; left:50%; width:3px; height:64px; border-radius:999px; background:var(--line); transform:translate(-50%,-50%); transition:background .18s,height .18s; }.splitter:hover::after,.splitter:focus-visible::after { height:90px; background:var(--signal); } body.resizing { cursor:col-resize; user-select:none; }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; } }
-    @media (max-width:900px) { .masthead { grid-template-columns:1fr auto; }.mission { grid-column:1/-1; grid-row:2; }.tools { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:980px) { .app-layout { grid-template-columns:190px minmax(0,1fr); } }
+    @media (max-width:900px) { .tools { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:760px) { .app-layout { display:block; }.lab-nav { position:sticky; height:auto; max-height:none; padding:9px 10px; border-right:0; border-bottom:1px solid var(--line); overflow:hidden; }.lab-nav-brand,.lab-nav-group { display:none; }.lab-nav-list { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; }.lab-nav-link { flex:0 0 auto; grid-template-columns:auto; min-height:38px; padding:7px 10px; }.lab-nav-name { display:none; } }
     @media (max-width: 720px) { .shell { padding:10px; }.masthead { padding:14px; }.vuln-beacon { display:none; }.identity-bar { grid-template-columns:1fr; }.tools { grid-template-columns:1fr; }.grid { grid-template-columns:minmax(0,1fr); gap:12px; }.splitter { display: none; }.chat,.trace { height:auto; min-height:340px; }.composer { grid-template-columns:1fr; }.send-button { min-height:46px; } }
+    @media (max-width:560px) { .masthead { grid-template-columns:1fr; }.brand { grid-column:1; grid-row:1; }.top-actions { grid-column:1; grid-row:2; justify-content:flex-start; }.mission { grid-column:1; grid-row:3; } }
   </style>
 </head>
 <body>
+  <div class="app-layout">
+  <nav id="lab-navigation" class="lab-nav" aria-label="LLM 실습 이동">
+  <style>
+    .lab-nav-link[target="_blank"] { grid-template-columns:34px minmax(0,1fr) 16px; }
+    .external-icon { justify-self:end; flex-shrink:0; }
+    @media(max-width:760px) { .lab-nav-link[target="_blank"] { grid-template-columns:auto 16px; } }
+  </style>
+  <a class="lab-nav-brand" data-lab-route="/" href="/"><strong>클씨랩</strong><span>AI Security Lab</span></a>
+  <div class="lab-nav-group">Top 10 labs</div>
+  <div class="lab-nav-list">
+    <a class="lab-nav-link" data-lab-nav="llm01" data-lab-route="/prompt-rag/" href="/prompt-rag/"><span class="lab-nav-code">01</span><span class="lab-nav-name">Prompt Injection</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm02" data-lab-route="/data-rag/?lab=llm02" href="/data-rag/?lab=llm02"><span class="lab-nav-code">02</span><span class="lab-nav-name">Sensitive Data</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm04" data-lab-route="/llm04-rag/" href="/llm04-rag/"><span class="lab-nav-code">04</span><span class="lab-nav-name">RAG Injection</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm05" data-lab-route="/output-rag/" href="/output-rag/"><span class="lab-nav-code">05</span><span class="lab-nav-name">Output Handling</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm06" data-lab-route="/vuln-agent/" href="/vuln-agent/"><span class="lab-nav-code">06</span><span class="lab-nav-name">Agency</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm07" data-lab-route="/knowledge-rag/?lab=llm07" href="/knowledge-rag/?lab=llm07"><span class="lab-nav-code">07</span><span class="lab-nav-name">Prompt Leakage</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm08" data-lab-route="/data-rag/?lab=llm08-rag-poisoning" href="/data-rag/?lab=llm08-rag-poisoning"><span class="lab-nav-code">08</span><span class="lab-nav-name">Vector & RAG</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm09" data-lab-route="/knowledge-rag/?lab=llm09" href="/knowledge-rag/?lab=llm09"><span class="lab-nav-code">09</span><span class="lab-nav-name">Misinformation</span></a>
+    <a class="lab-nav-link" data-lab-nav="llm10" data-lab-route="/resource-rag/" href="/resource-rag/"><span class="lab-nav-code">10</span><span class="lab-nav-name">Consumption</span></a>
+  </div>
+  <div class="lab-nav-group">Comparison apps</div>
+  <div class="lab-nav-list">
+    <a class="lab-nav-link" data-lab-route="/llmgoat/" href="/llmgoat/" target="_blank" rel="noopener noreferrer" aria-label="LLMGoat (새 탭)"><span class="lab-nav-code">GOAT</span><span class="lab-nav-name">LLMGoat</span><svg class="external-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7"/></svg></a>
+    <a class="lab-nav-link" data-lab-route="/dvla/" href="/dvla/" target="_blank" rel="noopener noreferrer" aria-label="DVLA ReAct Agent (새 탭)"><span class="lab-nav-code">DVLA</span><span class="lab-nav-name">ReAct Agent</span><svg class="external-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7"/></svg></a>
+  </div>
+</nav>
   <main class="shell">
     <header class="masthead">
-      <div class="brand"><div class="brand-mark" aria-hidden="true">CSL</div><div><p class="eyebrow">Cloud Security · LLM Lab</p><h1>Agent execution workbench</h1></div></div>
+      <div class="brand"><div class="brand-mark" aria-hidden="true">CSL</div><div><p class="eyebrow">클씨랩 · AI Security Lab</p><h1>Agent execution workbench</h1></div></div>
       <p class="mission">모델의 제안이 실제 Tool 호출로 바뀌는 순간을 대화와 실행 Trace에서 나란히 관찰합니다.</p>
-      <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
+      <div class="top-actions"><div class="vuln-beacon">● INTENTIONALLY VULNERABLE</div><button id="prompt-open" class="prompt-button" type="button">시스템 프롬프트</button><a id="portal-home" class="home-button" href="#">← 홈</a><button id="theme-toggle" class="icon-button" type="button" aria-label="색상 테마 전환" title="색상 테마 전환">◐</button></div>
     </header>
 
     <section class="identity-bar" aria-label="현재 실습 경계">
@@ -88,6 +132,12 @@
       </div>
     </section>
   </main>
+  </div>
+
+  <dialog id="prompt-dialog" class="prompt-dialog" aria-labelledby="prompt-title">
+    <header class="prompt-head"><h2 id="prompt-title">LLM06 시스템 프롬프트</h2><button id="prompt-close" type="button">닫기</button></header>
+    <div class="prompt-body"><p>현재 Agent에 전달되는 실제 지시입니다. 권한 검사는 이 문장이 아니라 서버 Tool Executor가 담당해야 합니다.</p><pre id="prompt-content">프롬프트를 불러오는 중...</pre></div>
+  </dialog>
 
 <script>
 const root = document.documentElement;
@@ -99,7 +149,20 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 });
 
 const chat = document.getElementById('chat');
-document.getElementById('portal-home').href = `http://${window.location.hostname}:8080/`;
+const promptOpen = document.getElementById('prompt-open');
+const promptClose = document.getElementById('prompt-close');
+const promptDialog = document.getElementById('prompt-dialog');
+const promptContent = document.getElementById('prompt-content');
+const appBasePath = window.location.pathname.endsWith('/')
+  ? window.location.pathname
+  : `${window.location.pathname}/`;
+const appUrl = (path) => new URL(path.replace(/^\/+/, ''), `${window.location.origin}${appBasePath}`).toString();
+const labOrigin = `${window.location.protocol}//${window.location.hostname}`;
+document.querySelector('[data-lab-nav="llm06"]').setAttribute('aria-current', 'page');
+document.getElementById('portal-home').href = `${labOrigin}/`;
+document.querySelectorAll('[data-lab-route]').forEach((link) => {
+  link.href = `${labOrigin}${link.dataset.labRoute}`;
+});
 const trace = document.getElementById('trace');
 const form = document.getElementById('form');
 const msg = document.getElementById('message');
@@ -109,6 +172,23 @@ const splitter = document.getElementById('splitter');
 const MIN_SPLIT = 25;
 const MAX_SPLIT = 75;
 let activePointerId = null;
+
+promptOpen.addEventListener('click', async () => {
+  promptDialog.showModal();
+  promptContent.textContent = '프롬프트를 불러오는 중...';
+  try {
+    const response = await fetch(appUrl('/api/system-prompt'));
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
+    promptContent.textContent = data.prompts.map((prompt) => prompt.content).join('\n\n');
+  } catch {
+    promptContent.textContent = '시스템 프롬프트를 불러오지 못했습니다.';
+  }
+});
+promptClose.addEventListener('click', () => promptDialog.close());
+promptDialog.addEventListener('click', (event) => {
+  if (event.target === promptDialog) promptDialog.close();
+});
 
 function setSplit(percent) {
   const safePercent = Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, percent));
@@ -166,7 +246,7 @@ form.addEventListener('submit', async (event) => {
   send.disabled = true;
   send.textContent = '실행 중…';
   try {
-    const response = await fetch('/api/chat', {
+    const response = await fetch(appUrl('/api/chat'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

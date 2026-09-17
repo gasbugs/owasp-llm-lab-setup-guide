@@ -82,10 +82,6 @@ class ResetLabTest(unittest.TestCase):
 
     def test_simple_allowlist_ids_restart_only_their_exact_units(self) -> None:
         cases = {
-            "llm01b": (
-                "recreate lab-prompt-rag",
-                "LLM01_READY_URL=http://127.0.0.1:8000/healthz",
-            ),
             "llm01": (
                 "recreate lab-prompt-rag",
                 "LLM01_READY_URL=http://127.0.0.1:8000/healthz",
@@ -93,6 +89,10 @@ class ResetLabTest(unittest.TestCase):
             "llm02": (
                 "recreate lab-data-rag",
                 "LLM02_LLM08_RAG_READY_URL=http://127.0.0.1:8010/healthz",
+            ),
+            "llm04": (
+                "recreate lab-llm04-rag",
+                "LLM04_READY_URL=http://127.0.0.1:8004/healthz",
             ),
             "llm08-rag": (
                 "recreate lab-data-rag",
@@ -164,6 +164,7 @@ class ResetLabTest(unittest.TestCase):
         )
         service_commands = {
             "prompt-rag": "docker compose up -d --no-deps --force-recreate prompt-rag",
+            "llm04-rag": "docker compose up -d --no-deps --force-recreate llm04-rag",
             "data-rag": "docker compose up -d --no-deps --force-recreate data-rag",
             "output-rag": "docker compose up -d --no-deps --force-recreate output-rag",
             "vuln-agent": "docker compose up -d --no-deps --force-recreate vuln-agent",

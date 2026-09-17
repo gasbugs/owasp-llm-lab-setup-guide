@@ -2,9 +2,8 @@
 # 수강생용 — ASG desired capacity를 0으로 내려 실습 인스턴스와 root EBS 삭제
 set -euo pipefail
 
-: "${AWS_PROFILE:?usage: AWS_PROFILE=<profile> AWS_REGION=<region> STUDENT=<id> bash stop-lab.sh}"
+: "${AWS_PROFILE:?usage: AWS_PROFILE=<profile> AWS_REGION=<region> bash stop-lab.sh}"
 : "${AWS_REGION:=us-east-1}"
-: "${STUDENT:?STUDENT 환경변수 필요}"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ASG_NAME=$(bash "$SCRIPT_DIR/asg-name.sh")

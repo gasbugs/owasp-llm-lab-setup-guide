@@ -25,4 +25,9 @@ LABEL org.opencontainers.image.revision="$VCS_REF"
 # Docker은 /.dockerenv를 자동 생성하지 않으므로 이미지 레벨에서 마커 박음.
 RUN touch /.dockerenv
 
+# Preserve the pinned upstream routes while mounting its UI below /llmgoat.
+COPY proxy_entrypoint.py /opt/owasp-llm/proxy_entrypoint.py
+
 EXPOSE 5000
+
+ENTRYPOINT ["python3", "/opt/owasp-llm/proxy_entrypoint.py"]

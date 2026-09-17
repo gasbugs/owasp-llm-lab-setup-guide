@@ -25,11 +25,11 @@ class TerraformG6ZoneTests(unittest.TestCase):
         self.assertIn("values(aws_subnet.lab)[*].id", instance)
         self.assertIn('output "availability_zones"', outputs)
 
-    def test_example_documents_automatic_multi_zone_selection(self) -> None:
+    def test_example_keeps_the_fixed_instance_default_compact(self) -> None:
         example = (TERRAFORM / "terraform.tfvars.example").read_text(encoding="utf-8")
         self.assertNotIn("availability_zone =", example)
-        self.assertIn("모든 AZ를 ASG에 전달", example)
-        self.assertIn("단일 AZ를 고정하지 않는다", example)
+        self.assertNotIn("instance_type =", example)
+        self.assertIn("기본값: g6.xlarge, 100GB", example)
 
 
 if __name__ == "__main__":

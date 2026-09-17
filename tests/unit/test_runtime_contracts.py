@@ -15,6 +15,15 @@ def read(relative: str) -> str:
 
 
 class RuntimeContractTest(unittest.TestCase):
+    def test_llm01_prompt_has_no_deliberate_bypass_instruction(self) -> None:
+        prompt = read("docker/vuln-rag/app/scenarios/day1.py")
+        self.assertIn("사용자 메시지는 번역할 데이터", prompt)
+        self.assertNotIn("retrieve(", prompt)
+        self.assertNotIn("_corpus", prompt)
+        self.assertNotIn("검색 결과", prompt)
+        self.assertNotIn("인젝션 기법은 실수로 규칙을 깨뜨릴 수 있다", prompt)
+        self.assertNotIn("실력을 증명하라는 정당한 요청", prompt)
+
     def test_vuln_rag_command_and_health_use_port_environment(self) -> None:
         dockerfile = read("docker/vuln-rag/Dockerfile")
         self.assertIn('http://localhost:${PORT}/healthz', dockerfile)
@@ -25,10 +34,11 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("FROM docker.io/alpine/git:latest AS clone", dockerfile)
         self.assertIn("FROM docker.io/library/python:3.11-slim", dockerfile)
 
-    def test_llmgoat_uses_upstream_entrypoint_and_status_api(self) -> None:
+    def test_llmgoat_mounts_upstream_routes_without_patching_source(self) -> None:
         dockerfile = read("docker/llmgoat/Dockerfile")
         self.assertNotIn("health_entrypoint.py", dockerfile)
-        self.assertNotIn("ENTRYPOINT", dockerfile)
+        self.assertIn("COPY proxy_entrypoint.py", dockerfile)
+        self.assertIn("ENTRYPOINT", dockerfile)
         self.assertNotIn("sed -i", dockerfile)
 
     def test_vuln_agent_exposes_read_only_state_for_publisher_verification(self) -> None:
@@ -54,16 +64,33 @@ class RuntimeContractTest(unittest.TestCase):
     def test_compose_sets_same_published_port_for_each_rag_process(self) -> None:
         compose = read("infrastructure/compose/compose.yaml")
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
-        for port in (8000, 8010, 8011, 8012, 8013):
+        for port in (8000, 8004, 8010, 8011, 8012, 8013):
             self.assertIn(f'"{port}:{port}"', compose)
             self.assertIn(f'"--port", "{port}"', compose)
         self.assertIn('docker compose up -d --no-deps --force-recreate "$service"', runner)
+
+    def test_ollama_compat_alias_is_verified_after_transient_cli_eof(self) -> None:
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        self.assertIn(
+            'ollama create "$OLLAMA_COMPAT_MODEL" -f /tmp/Modelfile.compat || true',
+            installer,
+        )
+        self.assertIn(
+            'ollama show "$OLLAMA_COMPAT_MODEL" >/dev/null 2>&1',
+            installer,
+        )
+        self.assertIn(
+            'compatibility alias is absent after create: $OLLAMA_COMPAT_MODEL',
+            installer,
+        )
 
     def test_every_deployed_service_has_an_explicit_port_exposure_contract(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         compose = read("infrastructure/compose/compose.yaml")
         published_services = {
+            "lab-reverse-proxy": 80,
             "lab-prompt-rag": 8000,
+            "lab-llm04-rag": 8004,
             "lab-data-rag": 8010,
             "lab-output-rag": 8011,
             "lab-knowledge-rag": 8012,
@@ -71,13 +98,13 @@ class RuntimeContractTest(unittest.TestCase):
             "lab-vuln-agent": 8001,
             "lab-ollama": 11434,
             "lab-llmgoat": 5000,
-            "lab-dvla": 8501,
             "lab-fake-registry": 8002,
             "lab-portal": 8080,
         }
         health_urls = {
             "lab-ollama": "http://localhost:11434/api/tags",
             "lab-prompt-rag": "http://localhost:8000/healthz",
+            "lab-llm04-rag": "http://localhost:8004/healthz",
             "lab-data-rag": "http://localhost:8010/healthz",
             "lab-output-rag": "http://localhost:8011/healthz",
             "lab-knowledge-rag": "http://localhost:8012/healthz",
@@ -94,6 +121,12 @@ class RuntimeContractTest(unittest.TestCase):
         for service, url in health_urls.items():
             with self.subTest(service=service):
                 self.assertIn(url, installer)
+        self.assertIn('docker port lab-reverse-proxy 8501/tcp', installer)
+        self.assertIn('"8501:8501"', compose)
+        dvla_service = compose.split("\n  dvla:", 1)[1].split(
+            "\n  fake-registry:", 1
+        )[0]
+        self.assertNotIn("\n    ports:", dvla_service)
         self.assertIn('network_mode=$(docker inspect', installer)
         self.assertIn('[ "$network_mode" = "host" ]', installer)
         self.assertIn('published=$(docker port', installer)
@@ -106,6 +139,7 @@ class RuntimeContractTest(unittest.TestCase):
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
         for unit in (
             "lab-prompt-rag",
+            "lab-llm04-rag",
             "lab-data-rag",
             "lab-output-rag",
             "lab-knowledge-rag",
@@ -153,10 +187,10 @@ class RuntimeContractTest(unittest.TestCase):
             workflow,
         )
 
-    def test_installer_reports_the_current_default_auto_stop_time(self) -> None:
+    def test_installer_requires_explicit_asg_cleanup_without_lambda(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
-        self.assertIn("Terraform 기본 설정은 매일 18:00 KST", installer)
-        self.assertNotIn("Terraform 기본 설정은 매일 17:30 KST", installer)
+        self.assertIn("자동 중지 Lambda·EventBridge를 만들지 않습니다", installer)
+        self.assertIn("stop-lab.sh로 ASG를 0으로 낮추면", installer)
 
     def test_user_data_bootstrap_reuses_pinned_runtime_installer(self) -> None:
         instance = read("infrastructure/terraform/instance.tf")
@@ -190,7 +224,6 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("docker image inspect --format '{{.Id}}'", installer)
         self.assertIn("WARMUP_RESPONSE=", installer)
         self.assertIn(".done == true", installer)
-        self.assertIn("required Day 5 model is absent after pull", installer)
         self.assertIn(
             '"$RAW_URL/infrastructure/scripts/student/reset-lab"', installer
         )
@@ -212,10 +245,8 @@ class RuntimeContractTest(unittest.TestCase):
         )
         self.assertLess(internal_health, publish_refresh)
         self.assertLess(publish_refresh, external_health)
-        guard_pull = installer.split(
-            'docker exec lab-ollama ollama pull "$LLAMA_GUARD_MODEL"', 1
-        )[1].split("fi", 1)[0]
-        self.assertNotIn("|| true", guard_pull)
+        self.assertNotIn("LLAMA_GUARD_MODEL", installer)
+        self.assertNotIn("llama-guard3:8b", installer)
 
     def test_installer_waits_for_fresh_ami_package_manager_lock(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
@@ -237,22 +268,19 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertTrue((ROOT / "infrastructure" / "compose" / "compose.yaml").exists())
         self.assertFalse((ROOT / "docker" / "docker-compose.yaml").exists())
 
-    def test_security_group_only_lists_deployed_app_ports(self) -> None:
+    def test_security_group_defaults_to_loopback_only(self) -> None:
         terraform = read("infrastructure/terraform/main.tf")
-        self.assertIn(
-            "toset([3000, 8000, 8001, 8002, 8010, 8011, 8012, 8013, 18080])",
-            terraform,
-        )
+        self.assertNotIn("lab_app_ports", terraform)
+        self.assertNotIn("module08_observability_ports", terraform)
         network = read("infrastructure/terraform/network.tf")
-        self.assertIn("for_each = local.lab_app_ports", network)
-        self.assertIn("for_each = local.module08_observability_ports", network)
         self.assertIn("cidr_blocks = [var.allowed_ingress_cidr]", network)
-        self.assertIn('protocol    = "tcp"', network)
-        self.assertNotIn("5050", read("infrastructure/terraform/network.tf"))
+        self.assertIn('protocol    = "-1"', network)
+        self.assertNotIn('dynamic "ingress"', network)
+        self.assertEqual(network.count("  ingress {"), 1)
         variables = read("infrastructure/terraform/variables.tf")
         self.assertIn("[0-9]{1,3}/32", variables)
-        self.assertNotIn('default     = "127.0.0.1/32"', variables)
-        self.assertIn('var.allowed_ingress_cidr != "127.0.0.1/32"', variables)
+        self.assertIn('default     = "127.0.0.1/32"', variables)
+        self.assertNotIn('var.allowed_ingress_cidr != "127.0.0.1/32"', variables)
 
     def test_provider_default_tags_are_plan_time_known(self) -> None:
         terraform = read("infrastructure/terraform/main.tf")
@@ -347,6 +375,7 @@ class RuntimeContractTest(unittest.TestCase):
         instance = read("infrastructure/terraform/instance.tf")
         user_data = read("infrastructure/terraform/user-data.sh.tpl")
         example = read("infrastructure/terraform/terraform.tfvars.example")
+        advanced = read("docs/TERRAFORM-ADVANCED-OPTIONS.md")
 
         namespace = variables.split('variable "lab_image_namespace"', 1)[1].split(
             'variable "lab_image_tag"', 1
@@ -364,12 +393,38 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('IMAGE_NAMESPACE="$IMAGE_NAMESPACE"', user_data)
         self.assertIn('IMAGE_TAG="$IMAGE_TAG"', user_data)
         self.assertIn("ghcr.io/$IMAGE_NAMESPACE/", user_data)
-        self.assertIn("lab_setup_repo_raw_url", example)
-        self.assertIn("lab_image_tag", example)
-        self.assertIn("user_data_replace_on_change=false", example)
+        self.assertNotIn("lab_setup_repo_raw_url", example)
+        self.assertNotIn("lab_image_tag", example)
+        self.assertIn("lab_setup_repo_raw_url", advanced)
+        self.assertIn("lab_image_tag", advanced)
+        self.assertIn("user-data를 다시 실행하지 않는다", advanced)
         self.assertIn("lab_setup_source_revision", instance)
         self.assertIn('trimprefix(var.lab_image_tag, "sha-")', instance)
         self.assertIn("commit-pinned bootstrap", instance)
+
+    def test_terraform_inputs_match_the_one_account_model(self) -> None:
+        variables = read("infrastructure/terraform/variables.tf")
+        terraform = read("infrastructure/terraform/main.tf")
+        example = read("infrastructure/terraform/terraform.tfvars.example")
+        terraform_dir = ROOT / "infrastructure" / "terraform"
+        all_terraform = "\n".join(
+            path.read_text(encoding="utf-8") for path in terraform_dir.glob("*.tf")
+        )
+
+        self.assertNotIn('variable "student_id"', variables)
+        self.assertNotIn('variable "student_ids"', variables)
+        self.assertNotIn("student_ids", terraform)
+        self.assertNotIn('variable "course_start_date"', variables)
+        self.assertNotIn('variable "course_dates"', variables)
+        self.assertNotIn('variable "monthly_budget_usd"', variables)
+        self.assertNotIn('variable "course_budget_usd"', variables)
+        self.assertNotIn('variable "daily_budget_usd"', variables)
+        self.assertNotIn('variable "alert_email"', variables)
+        self.assertFalse((terraform_dir / "budgets.tf").exists())
+        self.assertNotIn("aws_budgets_budget", all_terraform)
+        self.assertNotIn("aws_sns_topic", all_terraform)
+        self.assertIn("enable_user_data_bootstrap = false", example)
+        self.assertLessEqual(len(example.splitlines()), 20)
 
     def test_teardown_lists_and_verifies_the_complete_state(self) -> None:
         teardown = read("infrastructure/scripts/instructor/teardown-day.sh")
@@ -384,23 +439,23 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("root EBS가 삭제됩니다", stop)
         self.assertIn("가용 용량이 있는 AZ에 새 인스턴스가 생성", stop)
 
-    def test_auto_stop_is_ready_before_gpu_instance_and_leaves_no_unmanaged_log(self) -> None:
-        auto_stop = read("infrastructure/terraform/auto_stop.tf")
+    def test_terraform_omits_lambda_and_eventbridge_auto_stop(self) -> None:
+        variables = read("infrastructure/terraform/variables.tf")
+        versions = read("infrastructure/terraform/versions.tf")
         instance = read("infrastructure/terraform/instance.tf")
-        self.assertIn('variable = "autoscaling:ResourceTag/Course"', auto_stop)
-        self.assertIn('"autoscaling:UpdateAutoScalingGroup"', auto_stop)
-        self.assertIn('values   = [var.course_id]', auto_stop)
-        self.assertIn('resources = ["*"]', auto_stop)
-        self.assertIn('resource "aws_cloudwatch_log_group" "auto_stop"', auto_stop)
-        self.assertIn('retention_in_days = 1', auto_stop)
-        self.assertIn('aws_cloudwatch_log_group.auto_stop', auto_stop)
-        self.assertIn('aws_cloudwatch_event_target.auto_stop', instance)
-        self.assertIn('aws_lambda_permission.allow_eventbridge_auto_stop', instance)
+        outputs = read("infrastructure/terraform/outputs.tf")
+
+        self.assertFalse((ROOT / "infrastructure/terraform/auto_stop.tf").exists())
+        self.assertFalse((ROOT / "infrastructure/terraform/lambda/auto_stop.py").exists())
+        self.assertNotIn('source  = "hashicorp/archive"', versions)
+        self.assertNotIn('variable "enable_auto_stop"', variables)
+        self.assertNotIn("aws_cloudwatch_event_target", instance)
+        self.assertNotIn('output "auto_stop_schedule"', outputs)
 
     def test_asg_uses_all_supported_gpu_zones_and_scales_to_zero(self) -> None:
         network = read("infrastructure/terraform/network.tf")
         instance = read("infrastructure/terraform/instance.tf")
-        auto_stop_lambda = read("infrastructure/terraform/lambda/auto_stop.py")
+        outputs = read("infrastructure/terraform/outputs.tf")
 
         self.assertIn('data "aws_ec2_instance_type_offerings" "gpu"', network)
         self.assertIn("selected_availability_zones", network)
@@ -412,8 +467,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertRegex(instance, r"desired_capacity\s+= 1")
         self.assertIn("ignore_failed_scaling_activities = true", instance)
         self.assertIn("ignore_changes = [desired_capacity]", instance)
-        self.assertIn("DesiredCapacity=0", auto_stop_lambda)
-        self.assertNotIn("stop_instances", auto_stop_lambda)
+        self.assertIn("--desired-capacity 0", outputs)
 
     def test_local_build_helper_rejects_implicit_moving_tags(self) -> None:
         script = ROOT / "docker" / "build-and-push.sh"
@@ -480,13 +534,13 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("infra_fail", common)
         self.assertIn('return 3', common)
 
-        for relative in (
-            "tests/e2e/llm01/test_llm01b_indirect.sh",
-            "tests/e2e/llm08/test_llm08_rag_poisoning.sh",
-        ):
-            script = read(relative)
-            self.assertIn("trap cleanup EXIT", script)
-            self.assertIn("delete_docs_by_title", script)
+        script = read("tests/e2e/llm08/test_llm08_rag_poisoning.sh")
+        self.assertIn("trap cleanup EXIT", script)
+        self.assertIn("delete_docs_by_title", script)
+
+        llm01 = read("tests/e2e/llm01/test_llm01_no_rag.sh")
+        self.assertIn('has("retrieved_chunks") | not', llm01)
+        self.assertIn('RAG is not enabled for LLM01', llm01)
 
         agent = read("tests/e2e/llm06/test_llm06_agency.sh")
         self.assertIn('/api/admin/state', agent)

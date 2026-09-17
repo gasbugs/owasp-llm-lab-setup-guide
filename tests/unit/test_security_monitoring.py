@@ -140,7 +140,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         for binding in (
             "127.0.0.1:${MONITOR_HOST_PORT:-8014}:8080",
             "127.0.0.1:${RETRIEVAL_HOST_PORT:-8015}:8081",
-            "127.0.0.1:${GRAFANA_HOST_PORT:-3001}:3000",
+            "${GRAFANA_BIND_ADDRESS:-127.0.0.1}:${GRAFANA_HOST_PORT:-3001}:3000",
             "127.0.0.1:${PROMETHEUS_HOST_PORT:-9090}:9090",
             "127.0.0.1:${ALERTMANAGER_HOST_PORT:-9093}:9093",
             "127.0.0.1:${ALLOY_HOST_PORT:-12345}:12345",
@@ -156,7 +156,26 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("name: ${COMPOSE_PROJECT_NAME:-llm-security-observability}", compose)
         self.assertNotIn("name: llm-security-telemetry", compose)
         self.assertNotIn("name: llm-security-application", compose)
-        self.assertGreaterEqual(compose.count("networks: [observability]"), 9)
+        self.assertGreaterEqual(compose.count("networks: [default]"), 9)
+
+    def test_module10_compose_includes_and_builds_the_complete_stack(self) -> None:
+        module10 = (EXAMPLE / "compose.module10.yaml").read_text(encoding="utf-8")
+        control = (ROOT / "llm-security-control-plane" / "compose.yaml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("../../llm-security-control-plane/compose.yaml", module10)
+        self.assertIn("./compose.yaml", module10)
+        self.assertEqual(2, module10.count("module10-compose.env"))
+        self.assertIn("${CONTROL_PLANE_NETWORK_NAME:-llm-security-control-plane}", control)
+        self.assertGreaterEqual(control.count("OTEL_EXPORTER_OTLP_ENDPOINT"), 4)
+        self.assertIn("SECURITY_MONITOR_URL", control)
+        self.assertIn("TELEMETRY_INGEST_TOKEN", control)
+        monitoring = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
+        self.assertEqual(2, monitoring.count("pull_policy: never"))
+        publisher = (
+            ROOT / "tests/e2e/module10/test_module10_fast_track.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("down --volumes --remove-orphans", publisher)
 
     def test_grafana_does_not_download_plugins_at_startup(self) -> None:
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
@@ -236,7 +255,7 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             )
         )
         panel_types = {panel["type"] for panel in dashboard["panels"]}
-        self.assertTrue({"stat", "timeseries", "logs", "traces"}.issubset(panel_types))
+        self.assertTrue({"stat", "timeseries", "logs", "table"}.issubset(panel_types))
         serialized = json.dumps(dashboard)
         self.assertIn("bedrock_estimated_cost_usd_total", serialized)
         self.assertIn("llm-security-prometheus", serialized)
@@ -250,6 +269,18 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("llm_guardrail_decisions_total", serialized)
         self.assertIn("bedrock_tokens_total", serialized)
         self.assertIn("bedrock_request_duration_seconds_bucket", serialized)
+        self.assertIn('task=\\"main\\"', serialized)
+        self.assertNotIn('task=\\"converse\\"', serialized)
+        self.assertIn("most_recent=true", serialized)
+        trace_panel = next(
+            panel for panel in dashboard["panels"]
+            if panel["title"] == "End-to-end request traces"
+        )
+        self.assertEqual(trace_panel["type"], "table")
+        self.assertEqual(trace_panel["targets"][0]["queryType"], "traceql")
+        self.assertEqual(trace_panel["targets"][0]["tableType"], "traces")
+        self.assertIn('rootName = "POST /api/chat"', trace_panel["targets"][0]["query"])
+        self.assertEqual(dashboard["time"]["from"], "now-6h")
         self.assertNotIn("llm_chat_requests_total", serialized)
         self.assertIn("otelcol_exporter_queue_size", serialized)
         self.assertEqual(dashboard["refresh"], "5s")
@@ -267,6 +298,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("LLMGatewayUnavailable", rules)
         self.assertIn("LLMObservabilityPipelineUnavailable", rules)
         self.assertIn("AlertDeliveryStalled", rules)
+        self.assertIn('task="main"', rules)
+        self.assertNotIn('task="converse"', rules)
         self.assertNotIn("MimirRemoteWriteFailure", rules)
         self.assertIn("TelemetryDataDropped", rules)
         self.assertIn("AlloyExporterQueuePressure", rules)
@@ -278,6 +311,8 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("for engine in GUARDRAIL_ENGINE_LABELS", source)
         self.assertIn("for direction in GUARDRAIL_DIRECTION_LABELS", source)
         self.assertIn("for decision in GUARDRAIL_DECISION_LABELS", source)
+        self.assertIn('"application"', source)
+        self.assertIn('"authorization"', source)
 
     def test_alertmanager_delivers_to_lab_webhook(self) -> None:
         config = (EXAMPLE / "alertmanager.yml").read_text(encoding="utf-8")

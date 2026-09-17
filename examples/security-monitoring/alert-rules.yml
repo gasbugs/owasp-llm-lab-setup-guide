@@ -91,7 +91,7 @@ groups:
           runbook: Follow the failed trace and inspect the local Bedrock Gateway and Converse error
 
       - alert: LLMHighP95Latency
-        expr: histogram_quantile(0.95, sum by (le) (rate(bedrock_request_duration_seconds_bucket{task="converse"}[5m]))) > 10
+        expr: histogram_quantile(0.95, sum by (le) (rate(bedrock_request_duration_seconds_bucket{task="main"}[5m]))) > 10
         for: 2m
         labels:
           severity: warning

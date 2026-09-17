@@ -44,17 +44,36 @@ class UniqueDataFlowTests(unittest.TestCase):
     def test_llm02_reads_only_executor_selected_sqlite_fields(self) -> None:
         record = DAY2.customer_record("C-2001")
         self.assertEqual(record["resident_id"], "SYNTHETIC-900101-XXXXXXX")
+        self.assertEqual(record["email"], "c2001@example.com")
+        self.assertEqual(record["phone_number"], "010-0000-2001")
         self.assertEqual(
             DAY2.get_customer_record(
                 "C-2001", ["delivery_status", "estimated_arrival"]
             ),
             {"delivery_status": "배송 중", "estimated_arrival": "2026-09-09"},
         )
+        self.assertEqual(
+            DAY2.get_customer_record(
+                "C-2002",
+                ["card_delivery_status", "estimated_arrival_date", "email", "phone_number"],
+            ),
+            {
+                "card_delivery_status": "배송 준비",
+                "estimated_arrival_date": "2026-09-10",
+                "email": "c2002@example.com",
+                "phone_number": "010-0000-2002",
+            },
+        )
 
     def test_llm02_planner_prompt_contains_no_credentials_or_customer_data(self) -> None:
         prompt = DAY2.build_llm02_planner_prompt()
         self.assertIn("get_customer_record", prompt)
+        self.assertIn("action을 cannot_answer", prompt)
+        self.assertIn("fields는 빈 배열", prompt)
         self.assertIn("customer_id는 null", prompt)
+        self.assertIn("다른 고객 정보는 조회하면 안 된다", prompt)
+        self.assertIn("서버의 Tool Executor가 판단", prompt)
+        self.assertNotIn("특정 고객 ID와 필드를 명시하면", prompt)
         self.assertNotIn("LAB-RECOVERY", prompt)
         self.assertNotIn("llm02-c2001-demo-token", prompt)
         self.assertNotIn("SYNTHETIC-", prompt)
@@ -64,8 +83,15 @@ class UniqueDataFlowTests(unittest.TestCase):
             {"delivery_status": "배송 중", "estimated_arrival": "2026-09-09"}
         )
         self.assertIn("배송 중", prompt)
+        self.assertIn("필드를 추가·삭제·변경", prompt)
         self.assertNotIn("resident_id", prompt)
         self.assertNotIn("C-2002", prompt)
+        self.assertEqual(
+            DAY2.render_llm02_grounded_answer(
+                {"delivery_status": "배송 중", "estimated_arrival": "2026-09-09"}
+            ),
+            "조회 결과입니다. 배송 상태: 배송 중, 도착 예정일: 2026-09-09.",
+        )
 
     def test_llm02_safe_identity_comes_from_server_token_map(self) -> None:
         principal = DAY2.authenticate_customer("Bearer llm02-c2001-demo-token")
@@ -106,7 +132,7 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertIn("renderModelOutputSafe", template)
         self.assertIn("element.innerHTML", template)
         self.assertIn("element.textContent", template)
-        replay = template.split("replayLast.addEventListener", 1)[1]
+        replay = template.split("replayLast?.addEventListener", 1)[1]
         self.assertNotIn("fetch(", replay.split("});", 1)[0])
 
     def test_day2_ui_selects_allowlisted_lab_and_uses_llm08_rag_provenance_api(self) -> None:
@@ -121,6 +147,15 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertIn("provenance_filter_applied", template)
         self.assertIn("approval_status", template)
         self.assertNotIn('id="doc-approval"', template)
+
+    def test_shared_ui_opens_the_active_system_prompt_in_a_dialog(self) -> None:
+        template = (
+            VULN_RAG_ROOT / "app" / "templates" / "index.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn('id="prompt-open"', template)
+        self.assertIn('id="prompt-dialog"', template)
+        self.assertIn('aria-labelledby="prompt-title"', template)
+        self.assertIn("fetch(appUrl(`/api/system-prompt", template)
         self.assertNotIn("approval_status: approvalStatus", template)
         self.assertIn("승인 상태는 업로드 사용자가 선택할 수 없습니다", template)
         self.assertNotIn("llm02-c2001-demo-token", template)

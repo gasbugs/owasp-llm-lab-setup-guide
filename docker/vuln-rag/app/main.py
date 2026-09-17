@@ -19,6 +19,11 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.embedding import EmbeddingBackendError, EmbeddingClient
+from app.customer_grounding import (
+    CustomerChatRequest, LLM02ToolProposal, LLM02GroundedAnswer,
+    validate_customer_target,
+)
+from app.retrieval import search_corpus
 from app.classified_rag import (
     RagAuthenticationError,
     RagAuthorizationError,
@@ -42,8 +47,10 @@ from app.secure_coding import (
     select_llm10_resource_budget,
 )
 from app.scenarios import SCENARIO_NAMES, list_scenarios
+from app.scenarios import day1 as day1_scenario
 from app.scenarios import day2 as day2_scenario
 from app.scenarios import day4 as day4_scenario
+from app.scenarios import llm04 as llm04_scenario
 
 DEFAULT_SCENARIO = os.environ.get("DEFAULT_SCENARIO", os.environ.get("SCENARIO", "day1"))
 if DEFAULT_SCENARIO not in SCENARIO_NAMES:
@@ -98,8 +105,10 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
     scenario: str | None = None
-    lab: Literal["llm02", "llm08-rag-poisoning", "llm04"] | None = None
+    lab: Literal["llm02", "llm08-rag-poisoning"] | None = None
     customer_id: str | None = None
+    top_k: int = Field(default=5, ge=1, le=10)
+    min_score: float = Field(default=0.0, ge=-1.0, le=1.0)
 
 
 class LLM08SearchRequest(BaseModel):
@@ -109,38 +118,33 @@ class LLM08SearchRequest(BaseModel):
     top_k: int = Field(default=2, ge=1, le=4)
 
 
+class CorpusSearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(min_length=1, max_length=4096, pattern=r"\S")
+    top_k: int = Field(default=5, ge=1, le=10)
+    min_score: float = Field(default=0.0, ge=-1.0, le=1.0)
+
+
 class EmbedRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     input: str | list[str]
 
 
-class LLM02VulnerableChatRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    message: str = Field(min_length=1, max_length=4096)
-    customer_id: str | None = None
+class LLM02VulnerableChatRequest(CustomerChatRequest):
+    pass
 
 
-class LLM02SafeChatRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    message: str = Field(min_length=1, max_length=4096)
-    customer_id: str | None = None
-
-
-class LLM02ToolProposal(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    customer_id: str | None
-    fields: list[str] = Field(min_length=1, max_length=9)
-    reason: str = Field(min_length=1, max_length=500)
+class LLM02SafeChatRequest(CustomerChatRequest):
+    pass
 
 
 class LLM08RagPoisoningChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1, max_length=4096)
+    top_k: int = Field(default=5, ge=1, le=10)
+    min_score: float = Field(default=0.0, ge=-1.0, le=1.0)
 
 
 class LLM08RagPoisoningDocumentRequest(BaseModel):
@@ -152,11 +156,8 @@ class LLM08RagPoisoningDocumentRequest(BaseModel):
     revision: str = Field(default="1", min_length=1, max_length=50)
 
 
-class LLM02WorkshopRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    message: str = Field(min_length=1, max_length=4096)
-    customer_id: str | None = None
+class LLM02WorkshopRequest(CustomerChatRequest):
+    pass
 
 
 class LLM05SqlLookupRequest(BaseModel):
@@ -310,14 +311,48 @@ async def run_llm02_tool_chat(
         )
         trace["planner_model_called"] = True
         proposal = LLM02ToolProposal.model_validate(raw_proposal)
-    except Exception as exc:
+        if proposal.action == "lookup" and not proposal.fields:
+            raise ValueError("lookup requires at least one field")
+        if proposal.action == "cannot_answer" and (
+            proposal.customer_id is not None or proposal.fields
+        ):
+            raise ValueError("cannot_answer must not request customer data")
+    except Exception:
         trace["planner_model_called"] = True
         trace["blocking_reason"] = "planner-invalid-response"
         emit_llm02_trace(trace)
-        raise HTTPException(status_code=502, detail="planner returned invalid tool proposal") from exc
+        return JSONResponse(status_code=502, content={
+            "detail": "planner returned invalid tool proposal", "trace": trace,
+        })
 
     trace["requested_customer_id"] = proposal.customer_id
     trace["requested_fields"] = proposal.fields
+
+    if proposal.action == "lookup":
+        try:
+            validate_customer_target(request_body.message, proposal.customer_id, principal.customer_id)
+        except ValueError as exc:
+            trace["blocking_reason"] = str(exc)
+            emit_llm02_trace(trace)
+            return JSONResponse(status_code=422, content={
+                "detail": str(exc),
+                "reply": "조회할 고객 ID 하나와 필요한 항목을 명확히 지정해 주세요. 고객 정보는 조회하지 않았습니다.",
+                "trace": trace,
+            })
+
+    if proposal.action == "cannot_answer":
+        trace["blocking_reason"] = "request-not-supported"
+        emit_llm02_trace(trace)
+        return {
+            "reply": "현재 조회 가능한 고객 정보로는 답변할 수 없습니다.",
+            "scenario": "day2",
+            "lab": "llm02-sensitive-information-disclosure",
+            "mode": executor,
+            "tool": None,
+            "tool_proposal": proposal.model_dump(),
+            "tool_result": None,
+            "trace": trace,
+        }
 
     try:
         if executor == "vulnerable":
@@ -346,11 +381,29 @@ async def run_llm02_tool_chat(
         return JSONResponse(status_code=422, content={"detail": str(exc), "trace": trace})
 
     trace["customer_query_called"] = True
-    reply = await llm.chat(
-        system=day2_scenario.build_llm02_answer_prompt(result.record),
-        user=request_body.message,
-    )
-    trace["answer_model_called"] = True
+    try:
+        raw_answer = await llm.structured_chat(
+            system=day2_scenario.build_llm02_answer_prompt(result.record),
+            user="인가된 조회 결과를 출력 schema에 맞게 그대로 복사한다.",
+            schema=LLM02GroundedAnswer.model_json_schema(),
+        )
+        trace["answer_model_called"] = True
+        grounded = LLM02GroundedAnswer.model_validate(raw_answer)
+        if grounded.record != result.record:
+            raise ValueError("answer record differs from authorized tool result")
+    except Exception:
+        trace["answer_model_called"] = True
+        trace["blocking_reason"] = "answer-not-grounded"
+        emit_llm02_trace(trace)
+        return JSONResponse(
+            status_code=502,
+            content={
+                "detail": "answer model returned ungrounded data",
+                "trace": trace,
+            },
+        )
+
+    reply = day2_scenario.render_llm02_grounded_answer(grounded.record)
     trace["application_decision"] = "allow"
     emit_llm02_trace(trace)
     return {
@@ -379,6 +432,7 @@ async def run_llm08_rag_chat(
             request_body.query,
             mode,
             embedding,
+            top_k=request_body.top_k, min_score=request_body.min_score,
         )
     except EmbeddingBackendError as exc:
         raise HTTPException(
@@ -423,10 +477,8 @@ async def llm01_secure_coding_workshop(request_body: ChatRequest):
             **decision.__dict__,
             "upstream_called": False,
         }
-    selected = get_scenario("day1")
-    context = selected.retrieve(request_body.message)
     reply = await llm.chat(
-        system=selected.build_system_prompt(context=context),
+        system=day1_scenario.build_system_prompt(),
         user=request_body.message,
     )
     emit_security_event(decision, upstream_called=True)
@@ -457,7 +509,6 @@ async def llm02_secure_coding_workshop(
     return await run_llm02_policy_chat(request_body, request)
 
 
-@app.post("/api/labs/llm04/workshop/chat", deprecated=True)
 @app.post("/api/labs/llm08/rag-poisoning/workshop/chat")
 async def llm08_rag_secure_coding_workshop(request_body: LLM08RagPoisoningChatRequest):
     return await run_llm08_rag_policy_chat(request_body)
@@ -603,6 +654,64 @@ async def scenarios():
     }
 
 
+@app.get("/api/system-prompt")
+async def system_prompt(scenario: str | None = None, lab: str | None = None):
+    """Expose the active lab prompt for learner inspection, without live data."""
+    selected = get_scenario(scenario)
+    context_marker = ["[실행 시 검색·업무 Context가 여기에 삽입됩니다]"]
+
+    if selected.id == "day2" and lab != "llm08-rag-poisoning":
+        prompts = [
+            {
+                "stage": "planner",
+                "title": "LLM02 Tool Planner",
+                "content": day2_scenario.build_llm02_planner_prompt(),
+            },
+            {
+                "stage": "answer",
+                "title": "LLM02 Answer Model",
+                "content": day2_scenario.build_llm02_answer_prompt(
+                    {"runtime_record": "[인가된 조회 결과]"}
+                ),
+            },
+        ]
+        llm_ids = ["LLM02"]
+        dynamic_values = ["인가된 조회 결과"]
+    else:
+        if selected.id == "day1":
+            prompt_content = day1_scenario.build_system_prompt_preview()
+        elif selected.id == "llm04":
+            prompt_content = llm04_scenario.build_system_prompt_preview()
+        else:
+            prompt_content = selected.build_system_prompt(context=context_marker)
+        prompts = [
+            {
+                "stage": "generation",
+                "title": selected.title,
+                "content": prompt_content,
+            }
+        ]
+        llm_ids = {
+            "day1": ["LLM01"],
+            "day2": ["LLM08"],
+            "llm04": ["LLM04"],
+            "day3": ["LLM05"],
+            "day4": ["LLM07", "LLM08", "LLM09"],
+            "day5": ["LLM10"],
+        }[selected.id]
+        dynamic_values = (
+            [] if selected.id == "day1" else ["검색·업무 Context"]
+        )
+
+    return {
+        "lab_only": True,
+        "scenario": selected.id,
+        "llm_ids": llm_ids,
+        "dynamic_values": dynamic_values,
+        "prompts": prompts,
+    }
+
+
 @app.get("/api/guardrails/policy")
 async def guardrails_policy():
     """Proxy policy metadata without exposing the guard API to browser code."""
@@ -648,11 +757,18 @@ async def llm02_policy():
             "policy_owner": "application",
         },
         "planner_receives": ["user message", "read-only tool schema"],
+        "planner_unsupported_action": "cannot_answer without customer query",
         "planner_never_receives": [
             "bearer token",
             "database credential",
             "customer records",
         ],
+        "answer_grounding": {
+            "model_receives": "authorized record only",
+            "original_user_message": "not forwarded",
+            "validation": "structured record must exactly equal tool result",
+            "rendering": "deterministic application template",
+        },
     }
 
 
@@ -677,14 +793,12 @@ async def llm02_safe_chat(request_body: LLM02SafeChatRequest, request: Request):
     )
 
 
-@app.get("/api/labs/llm04/documents", deprecated=True)
 @app.get("/api/labs/llm08/rag-poisoning/documents")
 async def llm08_rag_documents():
     require_day2_lab()
     return {"lab_only": True, "documents": day2_scenario.document_records()}
 
 
-@app.post("/api/labs/llm04/documents", deprecated=True)
 @app.post("/api/labs/llm08/rag-poisoning/documents")
 async def llm08_rag_add_document(request_body: LLM08RagPoisoningDocumentRequest):
     require_day2_lab()
@@ -700,13 +814,11 @@ async def llm08_rag_add_document(request_body: LLM08RagPoisoningDocumentRequest)
     }
 
 
-@app.post("/api/labs/llm04/vulnerable/chat", deprecated=True)
 @app.post("/api/labs/llm08/rag-poisoning/vulnerable/chat")
 async def llm08_rag_vulnerable_chat(request_body: LLM08RagPoisoningChatRequest):
     return await run_llm08_rag_chat(request_body, mode="vulnerable")
 
 
-@app.post("/api/labs/llm04/safe/chat", deprecated=True)
 @app.post("/api/labs/llm08/rag-poisoning/safe/chat")
 async def llm08_rag_safe_chat(request_body: LLM08RagPoisoningChatRequest):
     return await run_llm08_rag_chat(request_body, mode="safe")
@@ -953,8 +1065,8 @@ async def index(request: Request, scenario: str | None = None):
 async def chat(req: ChatRequest, request: Request):
     """**일부러 취약한** 챗봇 엔드포인트.
 
-    시나리오마다 가드 강도가 다르고 RAG 컨텍스트가 다름.
-    OWASP LLM01/02/04/05/07/08 실습에 활용.
+    LLM01은 사용자 입력만, RAG가 필요한 다른 시나리오는 검색 context도 사용한다.
+    OWASP LLM01/02/04/05/07/08/09/10 실습에 활용.
     """
     selected = get_scenario(req.scenario)
     if selected.id == "day2":
@@ -963,7 +1075,7 @@ async def chat(req: ChatRequest, request: Request):
             return result if isinstance(result, JSONResponse) else JSONResponse(result)
         return JSONResponse(
             await run_llm08_rag_policy_chat(
-                LLM08RagPoisoningChatRequest(query=req.message)
+                LLM08RagPoisoningChatRequest(query=req.message, top_k=req.top_k, min_score=req.min_score)
             )
         )
 
@@ -979,7 +1091,6 @@ async def chat(req: ChatRequest, request: Request):
                     **llm01_decision.__dict__,
                     "upstream_called": False,
                     "debug": {
-                        "retrieved_chunks": [],
                         "rendered_system_prompt": "(not-built)",
                         "runtime_model": llm.model,
                         "model_provenance": model_provenance(),
@@ -1018,26 +1129,36 @@ async def chat(req: ChatRequest, request: Request):
             )
         return JSONResponse(guarded)
 
-    context = selected.retrieve(req.message)
-    system_prompt = selected.build_system_prompt(context=context)
+    retrieval = None
+    if selected.id == "day1":
+        context = None
+        system_prompt = day1_scenario.build_system_prompt()
+    else:
+        retrieval = await search_documents(
+            req.message, selected, request, top_k=req.top_k, min_score=req.min_score
+        )
+        context = retrieval["retrieved_chunks"]
+        system_prompt = selected.build_system_prompt(context=context)
 
     response = await llm.chat(
         system=system_prompt,
         user=req.message,
     )
 
+    debug = {
+        "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
+        "runtime_model": llm.model,
+        "model_provenance": model_provenance(),
+    }
+    if context is not None:
+        # RAG 시나리오만 검색 결과를 관찰 증거로 노출한다.
+        debug["retrieved_chunks"] = context
+        debug["retrieval"] = retrieval
+
     content = {
         "reply": response,
         "scenario": selected.id,
-        # LAB-ONLY DEBUG CONTRACT:
-        # 검색 성공과 모델 생성 성공을 분리해 검증하려고 RAG 컨텍스트를 일부러 노출한다.
-        # UI와 e2e가 이 값을 관찰 증거로 사용하지만 실제 사용자용 API에서는 제거해야 한다.
-        "debug": {
-            "retrieved_chunks": context,
-            "rendered_system_prompt": system_prompt if selected.expose_system_prompt else "(hidden)",
-            "runtime_model": llm.model,
-            "model_provenance": model_provenance(),
-        },
+        "debug": debug,
     }
     if llm01_decision is not None:
         emit_security_event(llm01_decision, upstream_called=True)
@@ -1050,6 +1171,44 @@ async def chat(req: ChatRequest, request: Request):
     return JSONResponse(content)
 
 
+async def search_documents(query: str, selected, request: Request, *, top_k=5, min_score=0.0) -> dict:
+    if selected.id in ("day1", "day2"):
+        raise HTTPException(status_code=404, detail="use the dedicated lab retrieval endpoint")
+    if selected.id == "day4":
+        result = await run_llm08_search(
+            LLM08SearchRequest(query=query, top_k=min(top_k, 4)), request,
+            mode="safe",
+        )
+        result["hits"] = [hit for hit in result["hits"] if hit["score"] >= min_score]
+        result["retrieved_chunks"] = [f'[{hit["document_id"]}] {hit["text"]}' for hit in result["hits"]]
+        result["min_score"] = min_score
+        return result
+    try:
+        return await search_corpus(query, selected.list_docs(), embedding,
+                                   top_k=top_k, min_score=min_score)
+    except (EmbeddingBackendError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="embedding search unavailable") from exc
+
+
+@app.post("/api/search")
+async def corpus_search(body: CorpusSearchRequest, request: Request):
+    return await search_documents(body.query, get_scenario(None), request,
+                                  top_k=body.top_k, min_score=body.min_score)
+
+
+@app.post("/api/labs/llm08/rag-poisoning/search")
+async def knowledge_search(body: CorpusSearchRequest):
+    require_day2_lab()
+    mode = select_llm08_rag_provenance_filter()
+    try:
+        result = await day2_scenario.vector_retrieve_documents(body.query, mode, embedding, top_k=body.top_k, min_score=body.min_score)
+    except (EmbeddingBackendError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="embedding search unavailable") from exc
+    result.pop("documents")
+    return {**result, "min_score": body.min_score, "top_k": body.top_k,
+            "provenance_filter_applied": mode == "safe"}
+
+
 @app.post("/api/admin/inject-doc")
 async def inject_doc(req: dict):
     """LLM08 RAG corpus 실습용 — 누구나 문서를 주입할 수 있는 의도된 취약점.
@@ -1057,6 +1216,8 @@ async def inject_doc(req: dict):
     실제로는 인증·검토 필수.
     """
     selected = get_scenario(req.get("scenario"))
+    if selected.id == "day1":
+        raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     text = req.get("text", "")
     title = req.get("title", "untitled")
     selected.add_doc(title=title, text=text)
@@ -1066,6 +1227,8 @@ async def inject_doc(req: dict):
 @app.get("/api/admin/docs")
 async def list_docs(scenario: str | None = None):
     selected = get_scenario(scenario)
+    if selected.id == "day1":
+        raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     return {
         "ok": True,
         "scenario": selected.id,
@@ -1079,6 +1242,8 @@ async def list_docs(scenario: str | None = None):
 @app.delete("/api/admin/docs/{index}")
 async def delete_doc(index: int, scenario: str | None = None):
     selected = get_scenario(scenario)
+    if selected.id == "day1":
+        raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     deleted = selected.delete_doc(index)
     if deleted is None:
         raise HTTPException(status_code=404, detail="document not found")

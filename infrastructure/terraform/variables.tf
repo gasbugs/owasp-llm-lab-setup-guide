@@ -27,24 +27,6 @@ variable "course_id" {
   }
 }
 
-variable "student_ids" {
-  description = "수강생 ID 목록. 영문/숫자/하이픈만 사용. 인스턴스 태그·IAM 이름에 그대로 들어감"
-  type        = list(string)
-  validation {
-    condition     = length(var.student_ids) > 0 && alltrue([for id in var.student_ids : can(regex("^[a-z0-9-]{2,30}$", id))])
-    error_message = "student_ids는 소문자/숫자/하이픈만, 2~30자."
-  }
-}
-
-variable "course_dates" {
-  description = "강의 일자(연속 5일 가정). 예: [\"2026-06-10\", \"2026-06-11\", ...]. 비용 산정·태그용."
-  type        = list(string)
-  validation {
-    condition     = length(var.course_dates) == 5 && alltrue([for d in var.course_dates : can(regex("^20[0-9]{2}-[0-9]{2}-[0-9]{2}$", d))])
-    error_message = "course_dates는 YYYY-MM-DD 형식의 5개 날짜여야 합니다."
-  }
-}
-
 variable "enable_user_data_bootstrap" {
   description = "true이면 EC2 최초 부팅 시 install-lab.sh를 user-data로 자동 실행한다. 기본값 false는 수강생이 SSM 접속 후 직접 설치 절차를 수행하는 방식이다."
   type        = bool
@@ -122,78 +104,19 @@ variable "root_volume_size" {
 }
 
 variable "allowed_ingress_cidr" {
-  description = "실습 서비스에 직접 접근할 실습자 본인의 공인 IPv4 /32 CIDR"
+  description = "모든 인바운드 트래픽을 허용할 IPv4 /32 CIDR. 기본 loopback 값은 외부 접속을 허용하지 않음."
   type        = string
+  default     = "127.0.0.1/32"
+
   validation {
     condition = (
       can(cidrhost(var.allowed_ingress_cidr, 0)) &&
       can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/32$", var.allowed_ingress_cidr)) &&
-      var.allowed_ingress_cidr != "127.0.0.1/32" &&
       var.allowed_ingress_cidr != "0.0.0.0/32"
     )
-    error_message = "allowed_ingress_cidr에는 loopback이나 전체 공개 주소가 아닌 본인 공인 IPv4/32를 지정해야 합니다."
+    error_message = "allowed_ingress_cidr에는 127.0.0.1/32 또는 본인 공인 IPv4/32를 지정해야 합니다."
   }
 }
 
-variable "enable_auto_stop" {
-  description = "true이면 EventBridge가 Lambda를 호출해 Course 태그가 같은 ASG의 desired capacity를 0으로 낮춘다."
-  type        = bool
-  default     = true
-}
-
-variable "auto_stop_schedule_mode" {
-  description = "자동 중지 스케줄 모드. daily_1800은 매일 18:00 KST 1회, daily_1730은 기존 환경 호환용 17:30 KST 1회, night_1730_0830은 17:30 KST부터 다음날 08:30 KST까지 30분마다 실행, custom은 auto_stop_custom_crons_utc를 사용한다."
-  type        = string
-  default     = "daily_1800"
-  validation {
-    condition     = contains(["daily_1800", "daily_1730", "night_1730_0830", "custom"], var.auto_stop_schedule_mode)
-    error_message = "auto_stop_schedule_mode는 daily_1800, daily_1730, night_1730_0830, custom 중 하나여야 합니다."
-  }
-}
-
-variable "auto_stop_custom_crons_utc" {
-  description = "auto_stop_schedule_mode = custom 일 때 사용할 EventBridge cron map."
-  type        = map(string)
-  default     = {}
-  validation {
-    condition     = alltrue([for cron in values(var.auto_stop_custom_crons_utc) : can(regex("^cron\\(.+\\)$", cron))])
-    error_message = "auto_stop_custom_crons_utc의 모든 값은 EventBridge cron(...) 표현식이어야 합니다."
-  }
-}
-
-variable "auto_stop_description" {
-  description = "자동 중지 스케줄 설명."
-  type        = string
-  default     = "EC2 auto-stop schedule"
-}
-
-variable "daily_budget_usd" {
-  description = "일일 비용 알람 임계값(USD)"
-  type        = number
-  default     = 200
-  validation {
-    condition     = var.daily_budget_usd > 0 && var.daily_budget_usd <= 10000
-    error_message = "daily_budget_usd는 0보다 크고 10000 이하로 설정하세요."
-  }
-}
-
-variable "course_budget_usd" {
-  description = "강의 전체 비용 알람 임계값(USD)"
-  type        = number
-  default     = 1500
-  validation {
-    condition     = var.course_budget_usd > 0 && var.course_budget_usd <= 100000
-    error_message = "course_budget_usd는 0보다 크고 100000 이하로 설정하세요."
-  }
-}
-
-variable "alert_email" {
-  description = "비용 알람·운영 알람을 받을 이메일"
-  type        = string
-  validation {
-    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
-    error_message = "alert_email은 알림을 받을 이메일 주소 형식이어야 합니다."
-  }
-}
 
 # backup_retention_days 변수 제거 — S3 백업 자체를 안 씀

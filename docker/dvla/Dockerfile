@@ -5,12 +5,8 @@
 # 빌드:
 #   docker build -t ghcr.io/gasbugs/owasp-llm-dvla:sha-<commit> .
 #
-# 실행 (본 강의 인프라):
-#   docker run -d --name lab-dvla --network host \
-#     -e OLLAMA_HOST=http://localhost:11434 \
-#     -e OLLAMA_API_BASE=http://localhost:11434 \
-#     -e model_name=ollama-local-llama3 \
-#     ghcr.io/gasbugs/owasp-llm-dvla:sha-<commit>
+# 실행 (본 강의 인프라): Compose 격리 network에서 lab-ollama와 연결하고,
+# host의 80·8501 listener는 lab-reverse-proxy가 /dvla로 전달한다.
 #
 # 로컬 검증 (Mac native Ollama):
 #   docker run -d --name lab-dvla -p 8501:8501 \
@@ -61,8 +57,9 @@ ENV OLLAMA_HOST=http://localhost:11434 \
 EXPOSE 8501
 
 HEALTHCHECK --interval=20s --timeout=5s --retries=3 \
-    CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+    CMD curl --fail http://localhost:8501/dvla/_stcore/health || exit 1
 
 ENTRYPOINT ["streamlit", "run", "main.py", \
             "--server.port=8501", "--server.address=0.0.0.0", \
+            "--server.baseUrlPath=dvla", \
             "--server.headless=true"]

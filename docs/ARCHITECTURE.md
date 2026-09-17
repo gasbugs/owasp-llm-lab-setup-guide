@@ -10,9 +10,21 @@ flowchart TD
   A -->|"SSM Session Manager"| D
   D -->|"manual install-lab.sh"| E["Docker runtime"]
   D -. "optional user-data bootstrap" .-> E
+  A -->|"HTTP :80 · student IPv4 /32"| N["lab-reverse-proxy"]
+  N -->|"/"| P
+  N -->|"URI prefix"| G1
+  N -->|"URI prefix"| G2
+  N -->|"URI prefix"| G3
+  N -->|"URI prefix"| G4
+  N -->|"URI prefix"| G5
+  N -->|"/vuln-agent/"| H
+  N -->|"/llmgoat/"| I
+  N -->|"/dvla/"| J
   E --> F["lab-ollama :11434"]
-  E --> P["lab-portal :8080"]
+  E --> N
+  E --> P["lab-portal :8080 backend"]
   E --> G1["lab-prompt-rag :8000"]
+  E --> G04["lab-llm04-rag :8004"]
   E --> G2["lab-data-rag :8010"]
   E --> G3["lab-output-rag :8011"]
   E --> G4["lab-knowledge-rag :8012"]
@@ -31,12 +43,11 @@ flowchart TD
 - VPC `10.42.0.0/16`
 - Public subnet `10.42.10.0/24`
 - Internet Gateway와 route table
-- 수강생별 security group
-- 수강생별 IAM role과 instance profile
-- 수강생별 EC2 GPU 인스턴스. 기본값은 `g6.xlarge`
-- AWS Budget 알람
+- 계정당 security group 1개
+- 계정당 IAM role과 instance profile 1개
+- 계정당 EC2 GPU 인스턴스 1대. 기본값은 `g6.xlarge`
 
-수강생 수가 여러 명이면 `student_ids` 목록만큼 EC2가 생성됩니다.
+1인 1계정 운영이므로 수강생 식별자를 별도로 입력하지 않습니다. `course_id`로 자원 이름을 구분하고 단일 ASG가 EC2를 최대 한 대만 유지합니다. 기존의 `student_id` 기반 state에 이 구성을 적용하면 indexed 자원이 단일 자원으로 바뀌므로 plan에서 교체 대상을 반드시 확인합니다.
 
 기본 AMI 조회 기준은 우리가 기존 실습에서 사용한 계열과 같습니다.
 
@@ -56,13 +67,13 @@ ami_name_pattern = "owasp-llm-lab-*"
 
 ## Security group
 
-실습 앱은 의도적으로 취약합니다. 그래서 수강생이 현재 사용하는 공인 IPv4 한 주소만 허용합니다.
+실습 앱은 의도적으로 취약합니다. 기본값은 외부 인바운드를 닫고, 직접 접속이 필요할 때만 수강생의 공인 IPv4 한 주소를 허용합니다.
 
 ```hcl
-allowed_ingress_cidr = "203.0.113.10/32"
+allowed_ingress_cidr = "127.0.0.1/32"
 ```
 
-예시 주소를 그대로 사용하지 말고 `curl -sS https://checkip.amazonaws.com`으로 확인한 본인 공인 IPv4 뒤에 `/32`를 붙입니다. `127.0.0.1/32`와 `0.0.0.0/0`은 입력 검증에서 거부합니다.
+기본 `127.0.0.1/32`는 외부 인바운드를 열지 않습니다. EC2 공인 주소로 직접 접속할 때만 `curl -sS https://checkip.amazonaws.com`으로 확인한 본인 공인 IPv4 뒤에 `/32`를 붙입니다. `0.0.0.0/0`은 입력 검증에서 거부합니다.
 
 ## 설치 방식
 
@@ -86,7 +97,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Ollama와 실습 앱 컨테이너 실행
 - Ollama 모델 pull과 warm-up
 - 단일 Compose 정의 실행과 Docker 재시작 정책 등록
-- Terraform 기본 설정으로 매일 18:00 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 기존 17:30 모드, 야간 반복 모드 또는 custom cron 선택 가능
+- 자동 중지 Lambda·EventBridge는 만들지 않으며 `stop-lab.sh`가 ASG를 즉시 0으로 축소
 
 운영 편의상 자동 설치가 필요하면 `terraform.tfvars`에서 아래 값을 켭니다.
 
@@ -95,7 +106,7 @@ enable_user_data_bootstrap = true
 ```
 
 이때 `infrastructure/terraform/user-data.sh.tpl`은 최초 부팅 시 `install-lab.sh`를 내려받아 실행하는 얇은 래퍼로 동작합니다. 자동 설치와 수동 설치가 같은 스크립트를 공유하므로 설치 내용은 동일합니다.
-Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스크립트에 전달하며, 설치 로그와 `/etc/lab/env`에 실제 선택값이 남습니다. 강사용 검증은 설치 스크립트 URL과 이미지 태그를 같은 main commit에 고정합니다.
+Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스크립트에 전달하며, 설치 로그와 `/etc/lab/env`에 실제 선택값이 남습니다. 강사용 검증은 설치 스크립트 URL과 이미지 태그를 같은 main commit에 고정합니다. 상세 override는 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 사용합니다.
 
 인스턴스는 수강생 데이터를 보존하기 위해 `user_data_replace_on_change = false`를 사용합니다. 따라서 user-data 관련 변수를 바꿔도 이미 생성된 인스턴스에서 bootstrap이 재실행되거나 인스턴스가 자동 교체되지 않습니다. pin은 최초 apply 전에 설정하고, 기존 인스턴스는 수동 재설치 또는 명시적인 교체 절차를 사용합니다.
 
@@ -103,17 +114,21 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 
 | 컨테이너 | 포트 | 역할 |
 |---|---:|---|
+| `lab-reverse-proxy` | 80, 8501 호환 | 포털과 실습 UI를 URI별로 Compose DNS upstream에 전달 |
 | `lab-ollama` | 11434 | 생성 모델과 LLM08 `bge-m3:latest` embedding을 함께 제공하는 로컬 Ollama API |
-| `lab-portal` | 8080 | 실습 앱 링크와 health check 진입점 |
-| `lab-prompt-rag` | 8000 | Day 1 LLM01 프롬프트 인젝션 RAG 챗봇 |
+| `lab-portal` | 8080 | Nginx `/`가 연결하는 포털 backend와 기존 직접 포트 |
+| `lab-prompt-rag` | 8000 | LLM01 직접 프롬프트 인젝션 번역기 |
+| `lab-llm04-rag` | 8004 | LLM01 번역기에 격리된 corpus를 연결한 LLM04 RAG 변형 |
 | `lab-data-rag` | 8010 | Day 2 LLM02·LLM08 RAG corpus 챗봇 |
 | `lab-output-rag` | 8011 | Day 3 LLM05 output handling RAG 챗봇 |
 | `lab-knowledge-rag` | 8012 | Day 2 LLM08의 `/api/embed`·paired vector search/chat과 Day 4 LLM07·LLM09가 공유하는 PrivateGPT-Lite |
 | `lab-resource-rag` | 8013 | Day 5 LLM10 resource consumption RAG 챗봇 |
 | `lab-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
 | `lab-llmgoat` | 5000 | LLMGoat cross-platform 실습 |
-| `lab-dvla` | 8501 | Damn Vulnerable LLM Agent 실습 |
+| `lab-dvla` | 내부 8501 | `baseUrlPath=dvla`인 Damn Vulnerable LLM Agent. 기존 host 8501은 Nginx가 호환 전달 |
 | `lab-fake-registry` | 8002 | Day 4 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
+
+브라우저는 `http://EC2_PUBLIC_IP/`에서 포털을 열고 URI로 앱을 고릅니다. Nginx는 RAG·Agent·Registry prefix를 제거해 기존 endpoint로 전달하고, LLMGoat와 DVLA는 각 wrapper의 base path 처리를 사용합니다. 기존 `curl http://localhost:<port>/...` 계약은 유지하며 DVLA의 8501만 같은 Nginx의 호환 listener가 전달합니다. 프록시는 인증·인가를 대신하지 않고 외부 접근 제한은 Security Group의 본인 공인 IPv4 `/32`가 담당합니다.
 
 ## LLM02 Planner와 Tool Executor 인가 경계
 
@@ -152,7 +167,7 @@ flowchart LR
   A["server-side token map"] -->|"tenant=acme"| D
 ```
 
-`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고, EC2 내부 검사는 `127.0.0.1:18080`, 학습자 PC의 브라우저와 API 호출은 `EC2_PUBLIC_IP:18080`을 사용합니다. Terraform Security Group은 TCP/18080을 수강생의 공인 IPv4 `/32`에만 허용합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback `127.0.0.1:8012`로 제한됩니다.
+`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고 EC2 내부 검사는 `127.0.0.1:18080`을 사용합니다. 기본 Terraform 값에서는 SSM 포트포워딩으로 확인하며, 본인 공인 IPv4 `/32`를 적용한 경우에만 학습자 PC에서 `EC2_PUBLIC_IP:18080`으로 직접 접속합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback `127.0.0.1:8012`로 제한됩니다.
 
 `vulnerable`과 `safe`는 같은 embedding model과 cosine 함수를 사용합니다. 차이는 ranking 이후 결과를 가리는 것이 아니라, **embedding/ranking 후보를 만들기 전에 인증 tenant metadata filter를 적용하는가**입니다. 미니 앱은 운영 vector DB가 아닌 교육용 인메모리 검색기입니다.
 
@@ -162,9 +177,9 @@ flowchart LR
 | Day 4 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
 | Day 4 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
 | Day 4 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
-| 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; Terraform TCP/18080은 수강생 공인 IPv4 `/32`만 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
+| 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; 기본은 SSM, 선택적으로 수강생 공인 IPv4 `/32` 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
 
-LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. Terraform이 만드는 TCP/18080 ingress는 `allowed_ingress_cidr` IPv4 `/32`만 받습니다. 직접 접속을 위해 자신의 공인 IPv4 `/32`를 사용하거나, 이미 승인된 수동 all-protocol 규칙이 그 `/32`에 한정된 경우에만 18080이 도달 가능합니다. 권장하는 최소 규칙은 TCP/18080 단일 포트이며 `0.0.0.0/0`은 사용하지 않습니다. 8012와 11434도 public internet에 공개하지 않습니다.
+LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. 기본 `127.0.0.1/32`는 외부 접속을 열지 않습니다. 공인 IPv4 `/32`로 바꾸면 그 주소에서는 18080뿐 아니라 host에 publish된 8012와 11434에도 도달할 수 있으므로 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
 
 ## 이미지 빌드
 

@@ -72,6 +72,7 @@ sudo tail -n 200 /var/log/owasp-llm-lab-install.log
 sudo -u ubuntu docker ps -a
 sudo -u ubuntu docker logs lab-ollama --tail 100
 sudo -u ubuntu docker logs lab-prompt-rag --tail 100
+sudo -u ubuntu docker logs lab-llm04-rag --tail 100
 sudo -u ubuntu docker logs lab-data-rag --tail 100
 ```
 
@@ -194,7 +195,7 @@ python3 learner_vector_app.py --serve --host 0.0.0.0 --port 18080
 
 두 번째 EC2/SSM 터미널에서 `ss -ltnp | grep ':18080'`과 `curl -fsS http://127.0.0.1:18080/healthz` 두 가지를 확인합니다. `0.0.0.0`은 bind sentinel이지 접속 URL이 아닙니다.
 
-브라우저가 안 열리면 현재 공인 IPv4가 Terraform의 `allowed_ingress_cidr` `/32`와 같은지 먼저 확인합니다. Terraform은 TCP/18080을 그 한 주소에만 허용하며 브라우저는 `EC2_PUBLIC_IP:18080`으로 접속합니다. 기존의 수동 all-protocol 규칙도 해당 `/32`에 한정된 경우 TCP/18080을 포함하지만, 권장 규칙은 TCP/18080 단일 포트입니다. `127.0.0.1/32`와 `0.0.0.0/0`은 사용하지 않습니다.
+기본 `allowed_ingress_cidr = "127.0.0.1/32"`에서는 외부 브라우저가 EC2 공인 IP에 직접 접속할 수 없습니다. SSM 포트포워딩을 사용하거나, 직접 접속이 필요하면 현재 공인 IPv4 `/32`로 바꿉니다. `0.0.0.0/0`은 사용하지 않습니다.
 
 ```bash
 # [로컬 노트북]
@@ -222,7 +223,7 @@ aws ec2 describe-instances \
 즉시 중지:
 
 ```bash
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 

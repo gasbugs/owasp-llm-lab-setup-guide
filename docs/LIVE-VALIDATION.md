@@ -17,11 +17,9 @@ COURSE_COMMIT=$(git -C /absolute/path/to/owasp-top-10-for-llm rev-parse origin/m
 SETUP_COMMIT="$SETUP_COMMIT" \
 COURSE_COMMIT="$COURSE_COMMIT" \
 COURSE_REPO=/absolute/path/to/owasp-top-10-for-llm \
-ALERT_EMAIL=instructor@example.com \
 AWS_PROFILE=owasp-llm \
 AWS_REGION=us-east-1 \
-STUDENT=validator \
-EMERGENCY_STOP_MINUTES=120 \
+RUN_DEADLINE_MINUTES=120 \
   bash infrastructure/scripts/instructor/run-commit-live-validation.sh
 ```
 
@@ -29,7 +27,7 @@ controller는 setup과 course의 명시한 40자리 commit이 각각 공개 `ori
 
 EC2 생성 전에는 선택한 Playwright package/browser를 실제 headless launch/close하고 로컬 `18011`, `18501`, `15000` 포트가 비어 있는지도 확인합니다. 원격 strict core가 끝나면 controller가 SSM forward `8011→18011`, `8501→18501`, `5000→15000`을 bounded child process로 열고 Day 3 UI/DVLA와 LLMGoat A01 harness를 실행합니다. LLMGoat UI는 API `response`의 정확한 DOM 반영과 boolean `solved`에 따른 overlay/sidebar 일치를 검사하며, solved 자체는 관찰값으로만 남깁니다. 결과와 세 forward cleanup 증거를 원격 raw bundle에 원자적으로 전달한 뒤에만 archive를 닫습니다. `STRICT_ACCEPTANCE=true TRIALS=5` full-cycle의 종료 코드를 그대로 사용하며 LLM10 timeout 같은 결과를 controller가 임의로 성공으로 바꾸지 않습니다. raw evidence archive와 SHA-256은 기본적으로 `$HOME/owasp-llm-live-evidence/<run-id>/remote/`에 회수됩니다.
 
-테스트가 실패해도 원격 runner의 EXIT trap이 현재 증거를 먼저 archive합니다. 원격 timeout/crash면 controller가 기존 run root를 `partial=true`로 별도 archive해 회수합니다. 그 직후 captured instance ID와 고유 `Course` 태그로 EC2 terminate를 직접 요청하고 terminated 상태를 확인한 다음, `terraform destroy`로 나머지 자원을 정리합니다. 마지막에는 Terraform state뿐 아니라 EC2, EBS, 네트워크, Lambda, EventBridge, SNS, IAM, Budget을 직접 조회합니다. 증거 회수·직접 terminate·destroy·잔여 자원 확인 중 하나라도 실패하면 전체 명령도 실패합니다. 이 controller에는 인스턴스를 남기는 옵션이 없습니다.
+테스트가 실패해도 원격 runner의 EXIT trap이 현재 증거를 먼저 archive합니다. 원격 timeout/crash면 controller가 기존 run root를 `partial=true`로 별도 archive해 회수합니다. 그 직후 captured instance ID와 고유 `Course` 태그로 EC2 terminate를 직접 요청하고 terminated 상태를 확인한 다음, `terraform destroy`로 나머지 자원을 정리합니다. 마지막에는 Terraform state뿐 아니라 EC2, EBS, 네트워크, SNS, IAM을 직접 조회하고 legacy Lambda·EventBridge도 남지 않았는지 확인합니다. 증거 회수·직접 terminate·destroy·잔여 자원 확인 중 하나라도 실패하면 전체 명령도 실패합니다. 이 controller에는 인스턴스를 남기는 옵션이 없습니다.
 
 ## 1. 검증 커밋과 이미지 세트 고정
 
@@ -136,7 +134,9 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 
 | 포트 | 서비스 | 계약 |
 |---:|---|---|
+| 80 | `lab-reverse-proxy` | `/`와 UI별 URI를 Compose 서비스로 전달 |
 | 8000 | `lab-prompt-rag` | `default_scenario=day1` |
+| 8004 | `lab-llm04-rag` | `default_scenario=llm04` |
 | 8010 | `lab-data-rag` | `default_scenario=day2` |
 | 8011 | `lab-output-rag` | `default_scenario=day3` |
 | 8012 | `lab-knowledge-rag` | `default_scenario=day4` |
@@ -145,29 +145,34 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 | 8002 | `lab-fake-registry` | `/api/v1/models` JSON |
 | 8080 | `lab-portal` | HTTP 200 |
 | 5000 | `lab-llmgoat` | web/API |
-| 8501 | `lab-dvla` | Streamlit health |
+| 8501 | `lab-reverse-proxy` → `lab-dvla` | 기존 Streamlit URL·health 호환 전달 |
 | 11434 | `lab-ollama` | `/api/tags` JSON |
 
 RAG health의 canonical JSON shape은 다음과 같습니다.
 
 ```json
-{"ok":true,"default_scenario":"day3","scenarios":["day1","day2","day3","day4","day5"]}
+{"ok":true,"default_scenario":"day3","scenarios":["day1","day2","llm04","day3","day4","day5"]}
 ```
 
-다섯 포트의 scenario를 한 번에 확인합니다.
+여섯 포트의 scenario를 한 번에 확인합니다.
 
 ```bash
-for pair in day1:8000 day2:8010 day3:8011 day4:8012 day5:8013; do
+for pair in day1:8000 day2:8010 llm04:8004 day3:8011 day4:8012 day5:8013; do
   scenario=${pair%%:*}
   port=${pair##*:}
   curl -fsS "http://localhost:${port}/healthz" \
     | jq -e --arg scenario "$scenario" \
-        '.ok == true and .default_scenario == $scenario and (.scenarios | length == 5)'
+        '.ok == true and .default_scenario == $scenario and (.scenarios | length == 6)'
 done
 
 curl -fsS http://localhost:8001/healthz \
   | jq -e '.ok == true and (.tools | length == 7)'
 curl -fsS http://localhost:8002/api/v1/models | jq -e '.models | length > 0'
+curl -fsS http://localhost/ >/dev/null
+curl -fsS http://localhost/prompt-rag/healthz
+curl -fsS http://localhost/llm04-rag/healthz
+curl -fsS http://localhost/llmgoat/api/model_status
+curl -fsS http://localhost/dvla/_stcore/health
 curl -fsS http://localhost:8080/ >/dev/null
 curl -fsS http://localhost:5000/api/model_status \
   | jq -e '.model_busy == false'
@@ -198,7 +203,7 @@ TRIALS=5 \
 TRIALS=5 bash tests/e2e/run-full-cycle.sh
 ```
 
-full-cycle은 다섯 RAG 포트와 Agent를 순회한 뒤 LLMGoat
+full-cycle은 LLM01 직접 입력 서비스와 다섯 RAG 포트, Agent를 순회한 뒤 LLMGoat
 A01/A02/A04/A06/A08 API를 실제 호출하고, 마지막에 LLM10을 실행합니다. LLMGoat의
 각 HTTP request/response는 `llmgoat/raw/requests.jsonl`에 원문 JSON과 SHA-256으로
 남습니다. A04는 review 추가 전·후·reset 상태 hash, A08은 vector export·import·reset
@@ -259,17 +264,17 @@ raw 응답에는 실습용 비밀값과 공격 payload가 포함될 수 있습�
 
 ## 7. 종료
 
-증거 확인 후 자동 중지 시각을 기다리지 말고 강사 머신에서 직접 종료합니다. `SETUP_REPO`는 이 저장소의 로컬 checkout 절대 경로입니다.
+증거 확인 직후 강사 머신에서 직접 종료합니다. Terraform은 자동 중지 Lambda·EventBridge를 만들지 않습니다. `SETUP_REPO`는 이 저장소의 로컬 checkout 절대 경로입니다.
 
 ```bash
 SETUP_REPO=/absolute/path/to/owasp-llm-lab-setup-guide
 cd "$SETUP_REPO"
 
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 
-Terraform의 기본 18:00 KST 자동 중지는 수동 종료 누락에 대비한 보조 안전장치입니다. 정상 검증 절차의 마지막 단계는 항상 직접 `stop-lab.sh`를 실행하는 것입니다.
+`stop-lab.sh`는 ASG desired capacity를 0으로 낮춰 EC2와 root EBS를 즉시 삭제합니다. 전체 강의 종료 뒤에는 기존 계정별 nuke 절차로 Terraform 밖의 잔여 자원까지 확인합니다.
 
 한 번만 사용하는 강사용 검증 환경이고 증거 회수가 끝났다면 stop으로 끝내지 말고 리소스를 삭제합니다. plan을 검토한 뒤 실행하세요.
 

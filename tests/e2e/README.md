@@ -17,6 +17,7 @@
 | 항목 | 대상 | 런타임 |
 |---|---|---|
 | LLM01 | `http://localhost:8000` | `lab-prompt-rag` |
+| LLM04 RAG 번역기 | `http://localhost:8004` | `lab-llm04-rag` |
 | LLM02, LLM08 RAG corpus | `http://localhost:8010` | `lab-data-rag` |
 | Day 4 LLM03 | `http://localhost:8002` | `lab-fake-registry` (호환 unit 이름) |
 | LLM05 | `http://localhost:8011` | `lab-output-rag` |
@@ -25,12 +26,12 @@
 | LLM10 | `http://localhost:8013` | `lab-resource-rag` |
 | LLMGoat A01/A02/A04/A06/A08 | `http://localhost:5000` | `lab-llmgoat` |
 
-LLM02 검증은 C-2001 Bearer token으로 인증한 뒤 실제 Ollama Structured Planner가 C-2002와 민감 field를 제안하는지 5회 반복합니다. 취약 실행기의 DB 조회·노출과 안전 실행기의 조회 전 `customer-scope-denied`·`field-not-allowed`, body identity 입력 `422`, 정상 배송 요청 보존을 각각 검사합니다.
+LLM02 검증은 C-2001 Bearer token으로 인증한 뒤 실제 Ollama Structured Planner가 C-2002와 민감 field를 제안하는지 5회 반복합니다. 취약 실행기의 DB 조회·결정적 노출, 안전 실행기의 조회 전 `customer-scope-denied`·`field-not-allowed`, 지원하지 않는 질문의 무조회 `cannot_answer`, body identity 입력 `422`, 정상 배송 요청 보존을 각각 검사합니다. Answer LLM에는 인가된 레코드만 전달하며, 구조화 출력이 Tool 결과와 정확히 같은지 검사한 뒤 Python이 응답 문장을 만듭니다.
 
 RAG 스크립트는 실행 전 `/healthz`의 `default_scenario`를 확인합니다. 현재 계약은 다음과 같습니다.
 
 ```json
-{"ok":true,"default_scenario":"day3","scenarios":["day1","day2","day3","day4","day5"]}
+{"ok":true,"default_scenario":"day3","scenarios":["day1","day2","llm04","day3","day4","day5"]}
 ```
 
 ## 실행
@@ -60,7 +61,7 @@ TRIALS=5 GOAT_URL=http://localhost:5000 \
   bash tests/e2e/llmgoat/run-all.sh
 ```
 
-full-cycle은 시작 전에 다섯 RAG 코퍼스와 Agent의 in-memory 상태를 기준선으로 복원합니다. 문서 주입 테스트와 Agent 삭제 테스트도 종료 trap으로 자신이 바꾼 상태를 정리합니다. LLMGoat는 challenge별 cookie jar를 격리하고 A04 review와 A08 vector 상태를 매 실행 전후 reset합니다. LLM10 동시 요청 부하는 Ollama queue가 뒤 항목을 오염시키지 않도록 LLMGoat 다음, 전체 cycle의 마지막에 실행합니다.
+full-cycle은 시작 전에 LLM01을 제외한 다섯 RAG 코퍼스와 Agent의 in-memory 상태를 기준선으로 복원합니다. LLM01은 문서 endpoint가 없는 직접 입력 앱이고 LLM04는 독립 corpus를 사용합니다. 문서 주입 테스트와 Agent 삭제 테스트도 종료 trap으로 자신이 바꾼 상태를 정리합니다. LLMGoat는 challenge별 cookie jar를 격리하고 A04 review와 A08 vector 상태를 매 실행 전후 reset합니다. LLM10 동시 요청 부하는 Ollama queue가 뒤 항목을 오염시키지 않도록 LLMGoat 다음, 전체 cycle의 마지막에 실행합니다.
 
 LLMGoat A01/A02/A04/A06/A08의 `solved` 값은 모델 변동성 관찰값이므로
 0회 성공도 그 자체로 배포 실패가 아닙니다. 대신 모든 HTTP 응답의 JSON shape,
@@ -89,7 +90,7 @@ probe만 같은 제한 재시도 정책을 사용합니다.
 
 기본값(`STRICT_ACCEPTANCE=false`)은 같은 분류와 raw 증거를 남기되 확률적 기준 미달만으로 종료 코드를 실패로 바꾸지 않습니다. API 오류, JSON 파손, 허용 범위 밖 동적 fetch 같은 인프라/결정적 계약 실패는 두 모드 모두 실패합니다.
 
-`test_llm08_shared_corpus.py`는 모델 성공률을 재는 테스트가 아닙니다. 동일한 Day 2 앱 인스턴스에서 문서 주입 전 검색 0건과 주입 후 검색 1건을 비교해 공유 코퍼스의 교차 요청 영향을 확인하는 회귀 테스트입니다. LLM04 E2E는 실제 LoRA 학습 전후의 고정 trigger 행동 변화를 별도로 검증합니다.
+`test_llm08_shared_corpus.py`는 모델 성공률을 재는 테스트가 아닙니다. 동일한 Day 2 앱 인스턴스에서 문서 주입 전 검색 0건과 주입 후 검색 1건을 비교해 공유 코퍼스의 교차 요청 영향을 확인하는 회귀 테스트입니다. LLM04 디렉터리는 전용 RAG 번역기의 검색 컨텍스트 전달과 기존 LoRA 학습 전후 고정 trigger 행동을 서로 다른 E2E로 검증합니다.
 
 ## 결과
 

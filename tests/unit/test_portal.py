@@ -12,8 +12,12 @@ class PortalIdentityTests(unittest.TestCase):
         cls.source = PORTAL.read_text(encoding="utf-8")
 
     def test_cards_use_application_names_instead_of_day_labels(self) -> None:
+        self.assertIn("클씨랩 AI Security Lab", self.source)
+        self.assertIn("보안 실습 선택", self.source)
+        self.assertNotIn("실습 애플리케이션<span>바로가기", self.source)
         for name in (
             "번역기 봇",
+            "RAG 번역기",
             "CloudSecurityLab Bank",
             "회사 노트북",
             "PrivateGPT-Lite",
@@ -37,13 +41,14 @@ class PortalIdentityTests(unittest.TestCase):
                 self.assertNotIn(old_title, self.source)
 
     def test_portal_keeps_all_runtime_ports(self) -> None:
-        for port in (5000, 8000, 8001, 8002, 8010, 8011, 8012, 8013, 8501, 11434):
+        for port in (5000, 8000, 8001, 8002, 8004, 8010, 8011, 8012, 8013, 8501, 11434):
             with self.subTest(port=port):
                 self.assertIn(f"port: {port}", self.source)
 
     def test_primary_actions_name_the_actual_destination(self) -> None:
         for service_id, port, label in (
             ("prompt-rag", 8000, "번역기 열기"),
+            ("llm04-rag", 8004, "RAG 번역기 열기"),
             ("data-rag", 8010, "은행 앱 열기"),
             ("output-rag", 8011, "노트북 열기"),
             ("knowledge-rag", 8012, "챗봇 열기"),
@@ -59,8 +64,25 @@ class PortalIdentityTests(unittest.TestCase):
                     self.source,
                     rf'id: "{service_id}".*port: {port}.*openLabel: "{label}"',
                 )
-        self.assertIn("${service.openLabel}</a>", self.source)
+        self.assertIn("${service.openLabel} ${externalIcon}</a>", self.source)
         self.assertNotIn(">앱 열기</a>", self.source)
+
+    def test_browser_actions_use_the_port_80_uri_router(self) -> None:
+        for path in (
+            "/prompt-rag/",
+            "/llm04-rag/",
+            "/data-rag/",
+            "/output-rag/",
+            "/knowledge-rag/",
+            "/resource-rag/",
+            "/vuln-agent/",
+            "/llmgoat/",
+            "/dvla/",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(f'proxyUrl("{path}")', self.source)
+        self.assertIn("Lab console · port 80", self.source)
+        self.assertIn('directUrl(11434, "/api/tags")', self.source)
 
     def test_portal_supports_light_and_dark_themes_without_promotional_copy(self) -> None:
         self.assertIn('id="theme-toggle"', self.source)
@@ -87,6 +109,7 @@ class PortalIdentityTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('"prompt-rag": "http://prompt-rag:8000/healthz"', server)
+        self.assertIn('"llm04-rag": "http://llm04-rag:8004/healthz"', server)
         self.assertIn('command: ["python", "/app/server.py"]', compose)
         self.assertIn('infrastructure/portal/server.py"', installer)
 

@@ -10,7 +10,6 @@
 - Terraform 1.x
 - Git
 - 강사가 공지한 AWS 리전
-- 비용 알람을 받을 이메일
 
 Ubuntu PC에서 위 도구를 한 번에 준비하려면 다음 선택적 스크립트를 실행할 수
 있습니다. 이 스크립트의 Docker는 로컬 개발용이며, EC2 실습 앱은 7단계의
@@ -72,35 +71,15 @@ aws_profile = "owasp-llm"
 region      = "us-east-1"
 course_id   = "owasp-llm-2026"
 
-# 기본값은 g6.xlarge를 제공하는 모든 AZ를 ASG에 전달합니다.
-# 장애 분석 목적 외에는 단일 AZ를 지정하지 않습니다.
-
-student_ids = ["yourname"]
-
-course_dates = [
-  "2026-09-07",
-  "2026-09-08",
-  "2026-09-09",
-  "2026-09-10",
-  "2026-09-11",
-]
-
-# AMI ID는 직접 입력하지 않습니다.
-# Terraform이 기존 검증 계열의 최신 DLAMI를 자동 조회합니다.
-
-# 본인 노트북의 현재 공인 IPv4 하나만 허용합니다.
-allowed_ingress_cidr = "203.0.113.10/32"
-
-# 기본값은 수동 설치입니다.
+# false는 SSM 접속 후 수동 설치, true는 EC2 최초 부팅 때 자동 설치입니다.
 enable_user_data_bootstrap = false
 
-daily_budget_usd  = 20
-course_budget_usd = 120
-alert_email       = "student@example.com"
+# 기본값은 외부 접속을 열지 않습니다.
+allowed_ingress_cidr = "127.0.0.1/32"
 
-# 기본 인스턴스 타입은 g6.xlarge입니다.
-# instance_type = "g6.xlarge"
 ```
+
+AMI ID는 직접 입력하지 않습니다. Terraform이 검증된 계열의 최신 DLAMI를 조회하고 `g6.xlarge`, 100GB를 기본값으로 적용합니다. `enable_user_data_bootstrap = false`는 수강생이 SSM으로 접속해 설치 과정을 직접 확인하는 정본이며, 강사용 자동 설치에서는 이 값을 `true`로 바꿉니다. EC2 공인 IP에 직접 접속하려면 `allowed_ingress_cidr`를 본인의 현재 공인 IPv4 `/32`로 바꿉니다. AMI·commit 고정이 필요한 강사용 환경만 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 참고합니다.
 
 ## 5. VM 생성
 
@@ -110,7 +89,7 @@ terraform plan
 terraform apply -auto-approve
 ```
 
-성공하면 `ami_id`, `ami_name`, `availability_zones`, `autoscaling_group_names`, `instance_lookup_commands`, `public_ip_lookup_commands`, `start_commands`, `stop_commands`, `ssm_session_commands`가 출력됩니다.
+성공하면 `ami_id`, `ami_name`, `availability_zones`, `autoscaling_group_name`, `instance_lookup_command`, `public_ip_lookup_command`, `start_command`, `stop_command`, `ssm_session_command`가 출력됩니다.
 
 ## 6. SSM 접속
 
@@ -119,8 +98,7 @@ terraform apply -auto-approve
 저장소 루트에서 실행합니다.
 
 ```bash
-export STUDENT=yourname
-export INSTANCE_ID=$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT="$STUDENT" \
+export INSTANCE_ID=$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/instance-id.sh)
 
 aws ssm start-session --profile owasp-llm --region us-east-1 \
@@ -129,7 +107,7 @@ aws ssm start-session --profile owasp-llm --region us-east-1 \
 
 ## 7. 실습 앱 직접 설치
 
-SSM 세션 안에서 아래 명령을 실행합니다. Terraform output의 `manual_install_commands`에 같은 명령이 표시됩니다.
+SSM 세션 안에서 아래 명령을 실행합니다. Terraform output의 `manual_install_command`에 같은 명령이 표시됩니다.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/install-lab.sh | sudo bash
@@ -142,21 +120,24 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Ollama 컨테이너 실행
 - `llama3.1:8b-instruct-q4_K_M` 생성 모델과 `bge-m3:latest` embedding 모델 pull 및 warm-up
 - LLM08 서버 vector 분석용 `~/work/llm08-analysis-venv` 준비(NumPy만 설치)
-- 실습 포털 실행: `lab-portal`, port `8080`
-- 역할별 취약 RAG 앱 실행: `lab-prompt-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, ports `8000`, `8010`, `8011`, `8012`, `8013`
+- URI reverse proxy 실행: `lab-reverse-proxy`, port `80`
+- 실습 포털 backend 실행: `lab-portal`, 기존 port `8080`
+- 역할별 취약 앱 실행: `lab-prompt-rag`, `lab-llm04-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, ports `8000`, `8004`, `8010`, `8011`, `8012`, `8013`
 - 취약 Agent 앱 실행: `lab-vuln-agent`, port `8001`
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
-- DVLA 실행: `lab-dvla`, port `8501`
+- DVLA 실행: `lab-dvla`, 내부 port `8501` (`lab-reverse-proxy`가 `/dvla/`와 기존 host `8501`로 전달)
 - Day 4 LLM03 fake model registry 실행: `lab-fake-registry`, port `8002`
 - 단일 Docker Compose 파일로 모든 서비스 실행
 - EC2 재부팅 후 자동 복구를 위한 `restart: always`와 `Docker daemon` 설정
-- Terraform 기본 설정으로 매일 18:00 KST Lambda 기반 EC2 자동 중지 등록. `auto_stop_schedule_mode`로 기존 17:30 모드, 야간 반복 모드 또는 custom cron 선택 가능
+- 자동 중지 Lambda·EventBridge는 설치하지 않음. 실습 직후 `stop-lab.sh`로 ASG를 0으로 낮춰 EC2와 root EBS 삭제
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
 
 ### 본인 공인 IPv4에서 실습 서비스에 접속
 
-Terraform은 `allowed_ingress_cidr`에 적은 본인 공인 IPv4 `/32`에서만 실습 포트를 받습니다. `public_ip_lookup_commands`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. 예를 들어 Portal은 `http://EC2_PUBLIC_IP:8080`입니다. `0.0.0.0/0`으로 넓히지 않으며, 노트북의 공인 IP가 바뀌면 현재 값으로 `terraform apply`를 다시 실행합니다.
+Terraform은 포트별 Security Group 규칙을 만들지 않습니다. 기본 `127.0.0.1/32`는 외부 인바운드를 열지 않으므로 SSM 포트포워딩을 사용합니다. 직접 접속이 필요하면 `allowed_ingress_cidr`에 본인 공인 IPv4 `/32`를 입력합니다. 이 경우 그 주소의 모든 프로토콜과 포트를 ingress 규칙 하나로 허용하며, `public_ip_lookup_command`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. Portal은 `http://EC2_PUBLIC_IP/`이고 UI는 `/prompt-rag/`, `/llm04-rag/`, `/data-rag/`, `/output-rag/`, `/knowledge-rag/`, `/resource-rag/`, `/vuln-agent/`, `/llmgoat/`, `/dvla/`에서 엽니다. `0.0.0.0/0`으로 넓히지 않습니다.
+
+Nginx는 URI를 내부 서비스로 연결할 뿐 인증·인가를 대신하지 않습니다. 기존 `curl http://localhost:<port>/...` 명령은 그대로 사용하고 브라우저 UI만 port 80 진입점을 사용합니다.
 
 ### LLM08 추가 셋업
 
@@ -179,20 +160,26 @@ LLM08 설치가 끝나면 최소 다음 계약을 확인합니다.
 enable_user_data_bootstrap = true
 ```
 
-강사가 commit 고정값을 공지한 경우에는 `lab_setup_repo_raw_url`, `lab_image_namespace`, `lab_image_tag`도 공지값을 그대로 사용합니다. 이 값들은 최초 `terraform apply` 전에 설정해야 합니다. 기존 인스턴스에서 값을 바꿔도 `user_data_replace_on_change = false` 설정 때문에 자동 설치가 다시 실행되지는 않습니다.
+강사가 commit 고정값을 공지한 경우에는 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)의 `lab_setup_repo_raw_url`, `lab_image_namespace`, `lab_image_tag`를 공지값대로 추가합니다. 이 값들은 최초 `terraform apply` 전에 설정해야 합니다. 기존 인스턴스에서 값을 바꿔도 `user_data_replace_on_change = false` 설정 때문에 자동 설치가 다시 실행되지는 않습니다.
 
 ## 8. 컨테이너 상태 확인
 
 SSM 세션 안에서 실행합니다.
 
-모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. `docker ps`의 `PORTS` 열에는 각 앱이 host의 같은 번호에 publish된 mapping이 표시됩니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
+모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. 기존 직접 포트와 Nginx 80·8501 호환 포트는 `docker ps`의 `PORTS` 열에서 확인합니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
 
 ```bash
 sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && docker compose ps'
 sudo -u ubuntu docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+curl -s http://localhost/ | head
+curl -s http://localhost/prompt-rag/healthz
+curl -s http://localhost/llm04-rag/healthz
+curl -s http://localhost/llmgoat/api/model_status
+curl -s http://localhost/dvla/_stcore/health
 curl -s http://localhost:8080/ | head
 curl -s http://localhost:11434/api/tags | head
 curl -s http://localhost:8000/healthz
+curl -s http://localhost:8004/healthz
 curl -s http://localhost:8010/healthz
 curl -s http://localhost:8011/healthz
 curl -s http://localhost:8012/healthz
@@ -219,7 +206,8 @@ raw `/healthz`를 확인합니다. 먼저 `cd ~/.config/owasp-llm-lab`로 이동
 
 | 실습 | 재시작 명령 | 원본 확인 명령 |
 |---|---|---|
-| LLM01 시큐어 코딩·LLM01-B | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
+| LLM01 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
+| LLM04 RAG | `docker compose up -d --no-deps --force-recreate llm04-rag` | `curl -sS http://localhost:8004/healthz` |
 | LLM02 시큐어 코딩·LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost:8010/healthz` |
 | LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
 | LLM06 삭제 실습 | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |
@@ -270,18 +258,18 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 ## 11. 매일 시작
 
 ```bash
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/start-lab.sh
 ```
 
 ## 12. 매일 종료
 
 ```bash
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 
-이 명령을 실행하면 EC2 시간당 요금이 멈춥니다. EBS 비용은 남습니다.
+이 명령은 ASG를 0으로 낮춰 EC2와 root EBS를 삭제하므로 두 자원의 비용이 멈춥니다.
 
 ## 13. 강의 종료 후 삭제
 

@@ -23,6 +23,10 @@ from telemetry import configure_telemetry
 
 
 AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
+USE_EC2_INSTANCE_ROLE = os.getenv("USE_EC2_INSTANCE_ROLE", "false").lower() == "true"
+if USE_EC2_INSTANCE_ROLE:
+    # An explicit profile prevents Botocore from falling through to EC2 IMDS.
+    os.environ.pop("AWS_PROFILE", None)
 MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
 INPUT_USD_PER_MILLION = float(os.getenv("BEDROCK_INPUT_USD_PER_MILLION", "0.06"))
 OUTPUT_USD_PER_MILLION = float(os.getenv("BEDROCK_OUTPUT_USD_PER_MILLION", "0.24"))

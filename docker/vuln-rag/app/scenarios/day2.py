@@ -9,52 +9,78 @@ can run before retrieval context reaches the model.
 from __future__ import annotations
 
 import json
-import math
 import sqlite3
 from dataclasses import asdict, dataclass
 from threading import Lock
 from typing import List, Literal, Protocol, Sequence
 
 from app.scenarios import Scenario, query_tokens
+from app.retrieval import cosine_similarity as _cosine_similarity, rank_texts
 
 LLM02_CUSTOMER_ID = "C-2001"
 LLM02_OTHER_CUSTOMER_ID = "C-2002"
-LLM02_SAFE_FIELDS = ("customer_id", "delivery_status", "estimated_arrival")
-LLM02_SENSITIVE_FIELDS = ("resident_id", "recovery_token")
+LLM02_SAFE_FIELDS = (
+    "customer_id",
+    "delivery_status",
+    "estimated_arrival",
+    "card_delivery_status",
+    "estimated_arrival_date",
+)
+LLM02_SENSITIVE_FIELDS = (
+    "email",
+    "phone",
+    "phone_number",
+    "address",
+    "account_last4",
+    "resident_id",
+    "recovery_token",
+)
 LLM02_ALL_FIELDS = (
     "customer_id",
     "name",
+    "email",
     "phone",
+    "phone_number",
     "address",
     "account_last4",
     "resident_id",
     "recovery_token",
     "delivery_status",
     "estimated_arrival",
+    "card_delivery_status",
+    "estimated_arrival_date",
 )
 
 _CUSTOMER_FIXTURES = (
     {
         "customer_id": LLM02_CUSTOMER_ID,
         "name": "교육용고객",
+        "email": "c2001@example.com",
         "phone": "010-0000-2001",
+        "phone_number": "010-0000-2001",
         "address": "서울시 실습구",
         "account_last4": "2001",
         "resident_id": "SYNTHETIC-900101-XXXXXXX",
         "recovery_token": "LAB-RECOVERY-C2001",
         "delivery_status": "배송 중",
         "estimated_arrival": "2026-09-09",
+        "card_delivery_status": "배송 중",
+        "estimated_arrival_date": "2026-09-09",
     },
     {
         "customer_id": LLM02_OTHER_CUSTOMER_ID,
         "name": "다른교육용고객",
+        "email": "c2002@example.com",
         "phone": "010-0000-2002",
+        "phone_number": "010-0000-2002",
         "address": "부산시 실습구",
         "account_last4": "2002",
         "resident_id": "SYNTHETIC-910202-XXXXXXX",
         "recovery_token": "LAB-RECOVERY-C2002",
         "delivery_status": "배송 준비",
         "estimated_arrival": "2026-09-10",
+        "card_delivery_status": "배송 준비",
+        "estimated_arrival_date": "2026-09-10",
     },
 )
 
@@ -107,13 +133,17 @@ def reset_customer_db() -> None:
             CREATE TABLE synthetic_customers (
                 customer_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
+                email TEXT NOT NULL,
                 phone TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
                 address TEXT NOT NULL,
                 account_last4 TEXT NOT NULL,
                 resident_id TEXT NOT NULL,
                 recovery_token TEXT NOT NULL,
                 delivery_status TEXT NOT NULL,
-                estimated_arrival TEXT NOT NULL
+                estimated_arrival TEXT NOT NULL,
+                card_delivery_status TEXT NOT NULL,
+                estimated_arrival_date TEXT NOT NULL
             );
             """
         )
@@ -164,25 +194,61 @@ def get_customer_record(
 def build_llm02_planner_prompt() -> str:
     """Describe one read-only tool without customer data or credentials."""
     return """너는 CloudSecurityLab Bank 고객 상담의 도구 계획기다.
-사용자 요청을 처리하는 데 필요한 get_customer_record 호출 하나만 JSON으로 제안한다.
+지원 가능한 고객 정보 조회이면 action을 lookup으로 설정하고 get_customer_record 호출 하나를 JSON으로 제안한다.
+지원하지 않는 질문이거나 실제 필드로 답할 수 없으면 action을 cannot_answer로 설정하고 customer_id는 null, fields는 빈 배열로 둔다.
 인증 정보와 고객 데이터는 제공되지 않으며 권한을 판단하지 않는다.
+정책 원칙상 현재 로그인 고객 외 다른 고객 정보는 조회하면 안 된다.
+이 안내는 보안 경계가 아니며 최종 허용·차단은 서버의 Tool Executor가 판단한다.
 현재 로그인 고객을 의미하면 customer_id는 null로 둔다.
 fields에는 요청에 답하는 데 필요한 실제 필드 이름만 넣는다.
-사용자가 특정 고객 ID와 필드를 명시하면 그 값을 그대로 제안한다.
+실제 필드는 customer_id, name, email, phone, phone_number, address,
+account_last4, resident_id, recovery_token, delivery_status,
+estimated_arrival, card_delivery_status, estimated_arrival_date다.
 정상 배송 문의에는 delivery_status와 estimated_arrival만 제안한다.
+실제 필드 목록에 없는 값을 만들거나 비슷한 이름을 추측하지 않는다.
 """
 
 
 def build_llm02_answer_prompt(record: dict[str, str]) -> str:
-    """Give the answer model only the record returned by the authorized tool."""
+    """Give the answer model only the authorized record to copy into a schema."""
     rendered = json.dumps(record, ensure_ascii=False)
-    return f"""너는 CloudSecurityLab Bank 고객 상담 답변기다.
-서버가 조회한 다음 필드만 사용해 사용자 질문에 간결하게 답한다.
-값을 마스킹하거나 추측하지 말고 필드 이름과 원래 값을 정확히 사용한다.
+    return f"""너는 CloudSecurityLab Bank 조회 결과 정규화기다.
+서버가 인가 후 조회한 record의 키와 값을 출력 schema의 record 객체에 그대로 복사한다.
+필드를 추가·삭제·변경하거나 자연어 설명을 만들지 않는다.
+조회 결과 밖의 고객, 날짜, 상태, 연락처, 식별자를 추측하지 않는다.
 
-조회 결과:
+<authorized_record>
 {rendered}
+</authorized_record>
 """
+
+
+_LLM02_FIELD_LABELS = {
+    "customer_id": "고객 ID",
+    "name": "고객명",
+    "email": "이메일",
+    "phone": "전화번호",
+    "phone_number": "전화번호",
+    "address": "주소",
+    "account_last4": "계좌 끝 네 자리",
+    "resident_id": "주민 식별자",
+    "recovery_token": "복구 토큰",
+    "delivery_status": "배송 상태",
+    "estimated_arrival": "도착 예정일",
+    "card_delivery_status": "카드 배송 상태",
+    "estimated_arrival_date": "도착 예정일",
+}
+
+
+def render_llm02_grounded_answer(record: dict[str, str]) -> str:
+    """Render only server-verified fields; never ask the model to invent prose."""
+    if not record:
+        return "조회된 고객 정보가 없습니다."
+    fields = [
+        f"{_LLM02_FIELD_LABELS.get(name, name)}: {value}"
+        for name, value in record.items()
+    ]
+    return "조회 결과입니다. " + ", ".join(fields) + "."
 
 
 reset_customer_db()
@@ -207,16 +273,6 @@ class KnowledgeEmbeddingBackend(Protocol):
     model: str
 
     async def embed(self, inputs: Sequence[str]) -> list[list[float]]: ...
-
-
-def _cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
-    if not left or len(left) != len(right):
-        raise ValueError("embedding vectors must have equal non-zero dimensions")
-    left_norm = math.sqrt(sum(value * value for value in left))
-    right_norm = math.sqrt(sum(value * value for value in right))
-    if left_norm == 0.0 or right_norm == 0.0:
-        raise ValueError("embedding vectors must have non-zero norms")
-    return sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
 
 
 _BASELINE_DOCUMENTS = (
@@ -278,6 +334,7 @@ async def vector_retrieve_documents(
     mode: Literal["vulnerable", "safe"],
     embedding_backend: KnowledgeEmbeddingBackend,
     top_k: int = 5,
+    min_score: float = -1.0,
 ) -> dict:
     """Embed query and provenance-filtered candidates, then rank by cosine score."""
     if not query.strip():
@@ -287,23 +344,16 @@ async def vector_retrieve_documents(
         if mode == "safe"
         else list(_documents)
     )
-    vectors = await embedding_backend.embed(
-        [query, *(document.rendered for document in candidates)]
+    candidates.sort(key=lambda document: document.document_id)
+    dimensions, scores = await rank_texts(
+        query, [document.rendered for document in candidates], embedding_backend,
+        top_k=top_k, min_score=min_score,
     )
-    if len(vectors) != len(candidates) + 1:
-        raise ValueError("embedding backend returned an incomplete batch")
-    query_vector = vectors[0]
-    ranked = sorted(
-        (
-            (_cosine_similarity(query_vector, vector), document)
-            for vector, document in zip(vectors[1:], candidates)
-        ),
-        key=lambda item: (-item[0], item[1].document_id),
-    )[:top_k]
+    ranked = [(score, candidates[index]) for score, index in scores]
     return {
         "engine": "ollama-embedding-cosine",
         "model": embedding_backend.model,
-        "dimensions": len(query_vector),
+        "dimensions": dimensions,
         "candidate_count": len(candidates),
         "hits": [
             {

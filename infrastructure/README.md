@@ -5,19 +5,21 @@
 ## 현재 운영 모델
 
 - Terraform은 `g6.xlarge`를 제공하는 모든 AZ에 subnet을 만들고 ASG가 가용 용량을 찾아 배치하게 한다.
-- 수강생은 `terraform apply`로 본인 ASG, Launch Template, IAM instance profile, 보안 그룹, 비용 알람을 만든다.
+- 수강생은 `terraform apply`로 본인 계정에 ASG, Launch Template, IAM instance profile, 보안 그룹을 만든다.
 - 매일 아침 `start-lab.sh`로 ASG desired capacity를 1로 올려 새 인스턴스를 만든다.
 - 매일 종료 시 `stop-lab.sh`로 desired capacity를 0으로 낮춰 인스턴스와 root EBS를 삭제한다.
-- 기본 Terraform 설정은 매일 18:00 KST에 Lambda를 호출해 ASG를 0으로 축소한다.
-- 마지막 날에는 `terraform destroy -auto-approve`로 EC2, EBS, VPC, 비용 알람을 삭제한다.
-- 기본 웹 접속은 SSM 포트포워딩이다. public IP 직접 접속은 `allowed_ingress_cidr`를 본인 IP `/32`로 제한한 경우에만 사용한다.
+- 자동 중지 Lambda·EventBridge는 만들지 않는다. 실습 직후 `stop-lab.sh`로 ASG를 0으로 축소한다.
+- 마지막 날에는 `terraform destroy -auto-approve`로 EC2, EBS, VPC를 삭제한다.
+- 보안 그룹은 포트별 규칙 대신 `allowed_ingress_cidr`의 본인 공인 IPv4 `/32`에서 오는 전체 인바운드 트래픽을 허용한다. 학습자 웹/API는 EC2 public IP로 직접 접속하고 SSM은 셸 접속에 사용한다.
+- Bootstrap 또는 수동 설치가 끝나면 브라우저 UI는 Nginx의 TCP/80 하나에서 URI별로 연결된다.
 
 ## 구성 요소
 
 | 경로 | 용도 |
 |---|---|
-| `terraform/` | 다중 AZ VPC, ASG, Launch Template, 보안 그룹, IAM instance profile, Budget 알람 |
-| `compose/compose.yaml` | 11개 실습 컨테이너의 단일 Docker Compose 배포 정의 |
+| `terraform/` | 다중 AZ VPC, ASG, Launch Template, 보안 그룹, IAM instance profile |
+| `compose/compose.yaml` | 12개 실습 컨테이너의 단일 Docker Compose 배포 정의 |
+| `reverse-proxy/default.conf` | port 80의 UI URI를 기존 Compose 서비스로 전달하는 Nginx 설정 |
 | `scripts/student/` | 수강생용 preflight, 수동 설치, instance-id, start/stop 및 작업물 보존 안내 헬퍼 |
 
 `scripts/student/upload-capstone.sh`는 런타임이나 e2e의 의존성이 아니라 선택적 SSM 전송 helper입니다. 별도 수강생 패키지 루트에서 실행하며 `TF_DIR`은 이 설정 저장소의 `infrastructure/terraform`을 가리켜야 합니다.
@@ -27,10 +29,10 @@
 ```bash
 cd infrastructure/terraform
 cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars에서 student_ids, region, alert_email을 강사 공지 기준으로 수정
+# terraform.tfvars에서 자동 설치 여부와 접속 IP를 강사 공지 기준으로 확인
 # AMI는 기존 검증 계열의 최신 DLAMI를 data source로 자동 조회
 # 기본값은 user-data 자동 설치 비활성화. SSM 접속 후 install-lab.sh를 직접 실행
-# allowed_ingress_cidr는 기본 127.0.0.1/32 유지. 직접 접속이 필요할 때만 본인 IP/32로 변경
+# allowed_ingress_cidr는 전체 인바운드를 허용할 본인 공인 IPv4/32로 변경
 terraform init
 terraform plan
 terraform apply -auto-approve
@@ -42,7 +44,7 @@ Terraform 적용 후 EC2 안에서 설치를 직접 수행한다.
 curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main/infrastructure/scripts/student/install-lab.sh | sudo bash
 ```
 
-강사 운영상 자동 설치가 필요할 때만 `terraform.tfvars`에 아래 값을 추가한다.
+강사 운영상 자동 설치가 필요할 때만 `terraform.tfvars`의 `enable_user_data_bootstrap`을 아래처럼 바꾼다. AMI·commit 고정과 이전 변수 제거 방법은 [Terraform 고급 설정](../docs/TERRAFORM-ADVANCED-OPTIONS.md)에 모아 둔다.
 
 ```hcl
 enable_user_data_bootstrap = true
@@ -56,13 +58,13 @@ enable_user_data_bootstrap = true
 AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/preflight-local.sh
 
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/start-lab.sh
 
-export INSTANCE_ID=$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+export INSTANCE_ID=$(AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/instance-id.sh)
 
-AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
+AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 
@@ -70,8 +72,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 STUDENT=yourname \
 
 - `g6.xlarge`는 실행 중일 때 비용이 발생한다.
 - ASG를 0으로 줄이면 EC2와 root EBS가 삭제되어 해당 리소스 비용이 멈춘다.
-- `terraform.tfvars.example`의 Budget 금액은 예시다. 실제 일일/전체 예산은 강사가 공지한 최신 리전, 단가, 환율, VAT, 실습 시간 기준으로 조정한다.
-- Budget은 경보다. 알람이 오면 즉시 `stop-lab.sh` 또는 강사 호출로 확인한다.
+- 이 Terraform은 Budget 알람을 만들지 않는다. 강사가 공지한 종료 시각과 실제 실행 시간을 직접 확인한다.
 
 ## 작업물 보존
 

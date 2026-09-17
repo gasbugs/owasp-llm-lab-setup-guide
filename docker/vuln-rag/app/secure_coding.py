@@ -119,11 +119,7 @@ def execute_customer_tool_safe(
     if target != principal.customer_id:
         raise LLM02AuthorizationError("customer-scope-denied")
 
-    allowed_fields = {
-        "customer_id",
-        "delivery_status",
-        "estimated_arrival",
-    }
+    allowed_fields = set(day2_scenario.LLM02_SAFE_FIELDS)
     if requested_fields - allowed_fields:
         raise LLM02AuthorizationError("field-not-allowed")
 
@@ -163,7 +159,6 @@ def select_llm08_rag_provenance_filter() -> Literal["vulnerable", "safe"]:
 
 
 # Compatibility alias for older course evidence and API clients.
-select_llm04_provenance_filter = select_llm08_rag_provenance_filter
 
 
 def search_all_tenants() -> Literal["vulnerable", "safe"]:

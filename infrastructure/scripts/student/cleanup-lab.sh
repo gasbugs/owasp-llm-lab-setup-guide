@@ -87,8 +87,10 @@ if [ -f "$compose_dir/compose.yaml" ]; then
     -f "$compose_dir/compose.yaml" down --remove-orphans
 fi
 containers=(
+  lab-reverse-proxy
   lab-ollama
   lab-prompt-rag
+  lab-llm04-rag
   lab-data-rag
   lab-output-rag
   lab-knowledge-rag
@@ -111,6 +113,7 @@ CLEANSH
     rm -rf /home/ubuntu/.LLMGoat
     rm -rf /home/ubuntu/work/fake-registry
     rm -rf /home/ubuntu/work/portal
+    rm -rf /home/ubuntu/work/reverse-proxy
     rm -rf /home/ubuntu/work/embedding-venv
     rm -rf /home/ubuntu/work/llm08-analysis-venv
     rm -rf /home/ubuntu/work/runtime-src

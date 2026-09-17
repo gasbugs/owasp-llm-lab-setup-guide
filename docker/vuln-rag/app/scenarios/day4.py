@@ -4,12 +4,12 @@ Multi-tenant 문서 챗봇 + 시스템 프롬프트 leak 잘 되도록 약한 �
 """
 from __future__ import annotations
 
-import math
 import secrets
 from dataclasses import dataclass
 from typing import List, Literal, Protocol, Sequence
 
 from app.scenarios import Scenario, query_tokens
+from app.retrieval import cosine_similarity, rank_texts
 
 LLM07_POLICY_CANONICAL = {
     "policy_id": "PG-LITE-POLICY-2026-07",
@@ -118,16 +118,6 @@ def authenticate_tenant(authorization: str | None) -> TenantPrincipal:
     raise TenantAuthenticationError("invalid bearer token")
 
 
-def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
-    if not left or len(left) != len(right):
-        raise ValueError("embedding vectors must have equal non-zero dimensions")
-    left_norm = math.sqrt(sum(value * value for value in left))
-    right_norm = math.sqrt(sum(value * value for value in right))
-    if left_norm == 0.0 or right_norm == 0.0:
-        raise ValueError("embedding vectors must have non-zero norms")
-    return sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
-
-
 def vector_documents() -> list[VectorDocument]:
     documents: list[VectorDocument] = []
     for tenant, raw_documents in _tenants.items():
@@ -166,20 +156,12 @@ async def vector_search(
         if filter_applied
         else documents
     )
-    vectors = await embedding_backend.embed(
-        [query, *(document.text for document in candidates)]
+    candidates.sort(key=lambda document: document.document_id)
+    dimensions, scores = await rank_texts(
+        query, [document.text for document in candidates], embedding_backend,
+        top_k=top_k,
     )
-    if len(vectors) != len(candidates) + 1:
-        raise ValueError("embedding backend returned an incomplete batch")
-
-    query_vector = vectors[0]
-    ranked = sorted(
-        (
-            (cosine_similarity(query_vector, vector), document)
-            for vector, document in zip(vectors[1:], candidates)
-        ),
-        key=lambda item: (-item[0], item[1].document_id),
-    )[:top_k]
+    ranked = [(score, candidates[index]) for score, index in scores]
     hits = [
         {
             "document_id": document.document_id,
@@ -196,7 +178,7 @@ async def vector_search(
         "engine": "educational-in-memory-cosine",
         "engine_label": "교육용 인메모리 cosine 검색기",
         "model": embedding_backend.model,
-        "dimensions": len(query_vector),
+        "dimensions": dimensions,
         "query": query,
         "top_k": top_k,
         "authenticated_context": {
@@ -266,7 +248,7 @@ def delete_doc(index: int) -> str | None:
 
 scenario = Scenario(
     id="day4",
-    title="PrivateGPT-Lite (Day 2 LLM08 · Day 4 LLM07/LLM09)",
+    title="PrivateGPT-Lite (LLM07 · LLM08 · LLM09)",
     intro="Multi-tenant 사내 문서 챗봇. 시스템 프롬프트 leak + tenant 경계 우회.",
     warning="의도적 취약 — tenant 검증 누락.",
     build_system_prompt=build_system_prompt,

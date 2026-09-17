@@ -2,9 +2,8 @@
 # 수강생용 — ASG desired capacity를 1로 올려 새 실습 인스턴스 생성
 set -euo pipefail
 
-: "${AWS_PROFILE:?usage: AWS_PROFILE=<profile> AWS_REGION=<region> STUDENT=<id> bash start-lab.sh}"
+: "${AWS_PROFILE:?usage: AWS_PROFILE=<profile> AWS_REGION=<region> bash start-lab.sh}"
 : "${AWS_REGION:=us-east-1}"
-: "${STUDENT:?STUDENT 환경변수 필요 — 본인 student-id}"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ASG_NAME=$(bash "$SCRIPT_DIR/asg-name.sh")
@@ -20,11 +19,11 @@ aws autoscaling update-auto-scaling-group \
 echo "creating a new instance in an available AZ: $ASG_NAME"
 INSTANCE_ID=""
 for _ in $(seq 1 120); do
-  INSTANCE_ID=$(aws ec2 describe-instances \
+  INSTANCE_ID=$(aws autoscaling describe-auto-scaling-groups \
     --profile "$AWS_PROFILE" \
     --region "$AWS_REGION" \
-    --filters "Name=tag:Student,Values=$STUDENT" "Name=instance-state-name,Values=pending,running" \
-    --query 'Reservations[0].Instances[0].InstanceId' \
+    --auto-scaling-group-names "$ASG_NAME" \
+    --query 'AutoScalingGroups[0].Instances[0].InstanceId' \
     --output text 2>/dev/null || true)
   if [[ "$INSTANCE_ID" == i-* ]]; then
     break

@@ -1,0 +1,10 @@
+# CUSTOM FILE: Module 10의 제어면과 관측 스택을 한 번에 조립한다.
+# Format: https://docs.docker.com/reference/compose-file/include/
+# Docker Compose Specification license: Apache-2.0
+name: llm-security-module10
+
+include:
+  - path: ../../llm-security-control-plane/compose.yaml
+    env_file: ../../llm-security-control-plane/.state/module10-compose.env
+  - path: ./compose.yaml
+    env_file: ../../llm-security-control-plane/.state/module10-compose.env

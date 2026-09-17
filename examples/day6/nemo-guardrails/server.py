@@ -54,7 +54,7 @@ CLASSIFIED_RAG_INTERNAL_TOKEN = os.getenv(
     "day7-classified-rag-internal",
 )
 
-app = FastAPI(title="Day 6 NeMo Guardrails integration API")
+app = FastAPI(title="NeMo Guardrails integration API")
 
 
 class ScanRequest(BaseModel):

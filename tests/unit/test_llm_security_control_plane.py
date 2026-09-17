@@ -198,6 +198,8 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("FAILED|DELETE_UNSUCCESSFUL", source)
         self.assertIn("DELETING", source)
         self.assertIn("wait_for_data_source_available", source)
+        self.assertIn("export AWS_REGION AWS_PROFILE", source)
+        self.assertIn("AWS authentication failed for profile", source)
         self.assertIn("knowledge_base=DEFERRED", runtime)
         self.assertNotIn("create-knowledge-base", runtime)
         self.assertIn("write_module08_compose_env", runtime)
@@ -330,6 +332,17 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn('REQUESTED_LEGACY_STATIC_TOKEN_MODE="${LEGACY_STATIC_TOKEN_MODE-}"', start)
         self.assertIn('LEGACY_STATIC_TOKEN_MODE="$REQUESTED_LEGACY_STATIC_TOKEN_MODE"', start)
 
+    def test_start_stack_supports_explicit_ec2_instance_role_credentials(self) -> None:
+        start = (CONTROL / "deploy/start-stack.sh").read_text()
+        compose = (CONTROL / "compose.yaml").read_text()
+        gateway = (CONTROL / "bedrock-gateway/server.py").read_text()
+        self.assertIn('USE_EC2_INSTANCE_ROLE="${USE_EC2_INSTANCE_ROLE:-false}"', start)
+        self.assertIn('elif [ "$USE_EC2_INSTANCE_ROLE" != true ]; then', start)
+        self.assertIn('AWS_CREDENTIAL_ARGS=(', start)
+        self.assertIn('"${AWS_CREDENTIAL_ARGS[@]}"', start)
+        self.assertIn("USE_EC2_INSTANCE_ROLE", compose)
+        self.assertIn('os.environ.pop("AWS_PROFILE", None)', gateway)
+
     def test_compose_secrets_are_generated_and_have_no_runtime_defaults(self) -> None:
         runtime = (CONTROL / "deploy/prepare-module08-runtime.sh").read_text()
         env_helper = (CONTROL / "deploy/lib/module08-compose-env.sh").read_text()
@@ -344,7 +357,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
             "BEDROCK_GATEWAY_TOKEN",
             "AUTH_ADMIN_TOKEN",
         ):
-            self.assertIn(f"{secret}:?Run prepare-module08-runtime.sh", compose)
+            self.assertIn(f"{secret}:?Set {secret} in the selected Compose env file", compose)
         self.assertNotIn(":-module08-bedrock-gateway-token", compose)
         self.assertNotIn(":-llm-monitor-acme-token", monitor_compose)
 

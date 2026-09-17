@@ -253,7 +253,7 @@ class Llm08VectorBackendTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     DAY4.cosine_similarity(left, right)
 
-    def test_api_routes_are_paired_and_legacy_chat_stays_keyword_based(self) -> None:
+    def test_api_routes_are_paired_and_chat_uses_shared_retrieval(self) -> None:
         source = (VULN_RAG_ROOT / "app" / "main.py").read_text(encoding="utf-8")
         self.assertIn('@app.post("/api/labs/llm08/vulnerable/search")', source)
         self.assertIn('@app.post("/api/labs/llm08/safe/search")', source)
@@ -276,8 +276,8 @@ class Llm08VectorBackendTest(unittest.TestCase):
         legacy_chat = source.split('@app.post("/api/chat")', 1)[1].split(
             '@app.post("/api/admin/inject-doc")', 1
         )[0]
-        self.assertIn("context = selected.retrieve(req.message)", legacy_chat)
-        self.assertNotIn("vector_search", legacy_chat)
+        self.assertIn("retrieval = await search_documents(", legacy_chat)
+        self.assertIn('context = retrieval["retrieved_chunks"]', legacy_chat)
 
     def test_ollama_batch_embedding_and_installer_contract(self) -> None:
         embedding_source = (VULN_RAG_ROOT / "app" / "embedding.py").read_text(

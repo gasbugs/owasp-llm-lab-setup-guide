@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>Cloud Security Lab · Launchpad</title>
+  <title>클씨랩 AI Security Lab</title>
   <style>
     :root {
       color-scheme: dark;
@@ -303,14 +303,14 @@
   <main class="shell">
     <header class="masthead">
       <div>
-        <p class="brand">Cloud Security Lab</p>
-        <h1>실습 애플리케이션<span>바로가기</span></h1>
+        <p class="brand">OWASP LLM TOP 10 · HANDS-ON</p>
+        <h1>클씨랩<span>AI Security Lab</span></h1>
       </div>
       <aside class="host-panel" aria-label="현재 실습 서버">
         <span class="utility">ACTIVE LAB HOST</span>
         <strong id="host-badge">host</strong>
         <div class="host-actions">
-          <span>Launchpad · port 8080</span>
+          <span>Lab console · port 80</span>
           <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false">밝게 보기</button>
         </div>
       </aside>
@@ -329,7 +329,7 @@
 
     <section aria-labelledby="apps-heading">
       <div class="section-head">
-        <div><h2 id="apps-heading">취약한 애플리케이션</h2><p class="section-note">서비스 이름을 선택하면 해당 실습 화면으로 이동합니다.</p></div>
+        <div><h2 id="apps-heading">보안 실습 선택</h2><p class="section-note">LLM 번호와 서비스 이름을 보고 실습 화면으로 이동합니다.</p></div>
       </div>
       <div class="grid" id="app-grid"></div>
     </section>
@@ -341,13 +341,14 @@
       <div class="grid" id="infra-grid"></div>
     </section>
 
-    <footer class="footer"><span>OWASP Top 10 for LLM Applications 실습 환경</span><span>Cloud Security Lab</span></footer>
+    <footer class="footer"><span>OWASP Top 10 for LLM Applications 실습 환경</span><span>클씨랩 AI Security Lab</span></footer>
   </main>
 
   <script>
     const host = window.location.hostname || "localhost";
     const protocol = window.location.protocol || "http:";
-    const url = (port, path = "/") => `${protocol}//${host}:${port}${path}`;
+    const proxyUrl = (path = "/") => `${protocol}//${host}${path}`;
+    const directUrl = (port, path = "/") => `${protocol}//${host}:${port}${path}`;
     document.getElementById("host-badge").textContent = host;
 
     const themeButton = document.getElementById("theme-toggle");
@@ -368,27 +369,30 @@
     });
 
     const services = [
-      { id: "prompt-rag", group: "app", title: "번역기 봇", route: "LLM01 · Prompt Injection", port: 8000, href: url(8000), openLabel: "번역기 열기", check: url(8000, "/healthz"), checkLabel: "Health", tags: ["번역", "RAG", "비밀 추출"], color: "#59d6e8", desc: "번역 요청처럼 보이는 입력으로 시스템 지시와 비밀 코드의 경계를 시험합니다." },
-      { id: "data-rag", group: "app", title: "CloudSecurityLab Bank", route: "LLM02 · LLM08", port: 8010, href: url(8010), openLabel: "은행 앱 열기", check: url(8010, "/healthz"), checkLabel: "Health", tags: ["고객 데이터", "RAG 출처", "인가"], color: "#8da9ff", desc: "합성 고객정보의 과다 전달과 승인되지 않은 지식 문서 채택을 서로 다른 흐름으로 확인합니다." },
-      { id: "output-rag", group: "app", title: "회사 노트북", route: "LLM05 · Output Handling", port: 8011, href: url(8011), openLabel: "노트북 열기", check: url(8011, "/healthz"), checkLabel: "Health", tags: ["HTML", "렌더링", "XSS"], color: "#ff8ea0", desc: "모델 응답을 HTML로 믿고 렌더링할 때 브라우저에서 어떤 부작용이 생기는지 관찰합니다." },
-      { id: "knowledge-rag", group: "app", title: "PrivateGPT-Lite", route: "LLM07 · LLM08 · LLM09", port: 8012, href: url(8012), openLabel: "챗봇 열기", check: url(8012, "/healthz"), checkLabel: "Health", tags: ["Tenant", "Prompt Leak", "Misinformation"], color: "#b595ff", desc: "사내 문서 챗봇에서 Tenant 검색 경계, 시스템 프롬프트 노출과 잘못된 추천을 시험합니다." },
-      { id: "resource-rag", group: "app", title: "IT 헬프데스크 봇", route: "LLM10 · Unbounded Consumption", port: 8013, href: url(8013), openLabel: "헬프데스크 열기", check: url(8013, "/healthz"), checkLabel: "Health", tags: ["입력 크기", "동시 요청", "Token"], color: "#f5bb63", desc: "요청 크기와 생성량 제한이 없을 때 모델 서버 자원이 어떻게 소모되는지 확인합니다." },
-      { id: "vuln-agent", group: "app", title: "Goat Farm Helper", route: "LLM06 · Excessive Agency", port: 8001, href: url(8001), openLabel: "에이전트 열기", check: url(8001, "/healthz"), checkLabel: "Health", tags: ["Agent", "Tool", "권한"], color: "#65dda6", desc: "낮은 권한의 사용자가 자연어를 통해 관리자 Tool 실행을 유도하는 취약 Agent입니다." },
-      { id: "llmgoat", group: "app", title: "LLMGoat", route: "OWASP LLM Challenges", port: 5000, href: url(5000), openLabel: "문제 열기", check: url(5000, "/api/model_status"), checkLabel: "Model status", tags: ["A01–A10", "Challenge", "Flag"], color: "#ff7185", desc: "OWASP Top 10 항목을 문제와 Flag로 풀어보는 독립형 웹 챌린지입니다." },
-      { id: "dvla", group: "app", title: "Damn Vulnerable LLM Agent", route: "DVLA · ReAct Agent", port: 8501, href: url(8501), openLabel: "에이전트 열기", check: url(8501, "/_stcore/health"), checkLabel: "Health", tags: ["ReAct", "SQL Tool", "Prompt Injection"], color: "#55b8ff", desc: "ReAct 방식 Agent의 생각·도구 호출 흐름을 보며 Prompt Injection을 비교합니다." },
-      { id: "fake-registry", group: "infra", title: "Fake Model Registry", route: "LLM03 · Supply Chain", port: 8002, href: url(8002, "/api/v1/models"), openLabel: "레지스트리 보기", check: url(8002, "/api/v1/models"), checkLabel: "Models API", tags: ["Registry", "Hash", "Artifact"], color: "#f5bb63", desc: "모델 파일의 출처와 무결성 검증을 연습하기 위한 가짜 모델 저장소 API입니다." },
-      { id: "ollama", group: "infra", title: "Ollama Model Server", route: "Local Inference Runtime", port: 11434, href: url(11434, "/api/tags"), openLabel: "모델 목록 보기", check: url(11434, "/api/tags"), checkLabel: "Models", tags: ["Generate", "Chat", "Embed"], color: "#59d6e8", desc: "실습 앱의 Prompt를 실제 추론으로 바꾸고 로컬 모델 파일을 관리하는 서버입니다." }
+      { id: "prompt-rag", group: "app", title: "번역기 봇", route: "LLM01 · Prompt Injection", port: 8000, href: proxyUrl("/prompt-rag/"), openLabel: "번역기 열기", check: proxyUrl("/prompt-rag/healthz"), checkLabel: "Health", tags: ["번역", "직접 입력", "비밀 추출"], color: "#59d6e8", desc: "검색 없이 번역 요청만 전달하고 시스템 지시와 비밀 코드의 경계를 시험합니다." },
+      { id: "llm04-rag", group: "app", title: "RAG 번역기", route: "LLM04 · RAG Prompt Injection", port: 8004, href: proxyUrl("/llm04-rag/"), openLabel: "RAG 번역기 열기", check: proxyUrl("/llm04-rag/healthz"), checkLabel: "Health", tags: ["번역", "문서 검색", "간접 주입"], color: "#6ad4b6", desc: "LLM01 번역기에 별도 문서 corpus를 연결해 검색 문서의 지시가 모델 컨텍스트로 들어가는 과정을 확인합니다." },
+      { id: "data-rag", group: "app", title: "CloudSecurityLab Bank", route: "LLM02 · LLM08", port: 8010, href: proxyUrl("/data-rag/"), openLabel: "은행 앱 열기", check: proxyUrl("/data-rag/healthz"), checkLabel: "Health", tags: ["고객 데이터", "RAG 출처", "인가"], color: "#8da9ff", desc: "합성 고객정보의 과다 전달과 승인되지 않은 지식 문서 채택을 서로 다른 흐름으로 확인합니다." },
+      { id: "output-rag", group: "app", title: "회사 노트북", route: "LLM05 · Output Handling", port: 8011, href: proxyUrl("/output-rag/"), openLabel: "노트북 열기", check: proxyUrl("/output-rag/healthz"), checkLabel: "Health", tags: ["HTML", "렌더링", "XSS"], color: "#ff8ea0", desc: "모델 응답을 HTML로 믿고 렌더링할 때 브라우저에서 어떤 부작용이 생기는지 관찰합니다." },
+      { id: "knowledge-rag", group: "app", title: "PrivateGPT-Lite", route: "LLM07 · LLM08 · LLM09", port: 8012, href: proxyUrl("/knowledge-rag/"), openLabel: "챗봇 열기", check: proxyUrl("/knowledge-rag/healthz"), checkLabel: "Health", tags: ["Tenant", "Prompt Leak", "Misinformation"], color: "#b595ff", desc: "사내 문서 챗봇에서 Tenant 검색 경계, 시스템 프롬프트 노출과 잘못된 추천을 시험합니다." },
+      { id: "resource-rag", group: "app", title: "IT 헬프데스크 봇", route: "LLM10 · Unbounded Consumption", port: 8013, href: proxyUrl("/resource-rag/"), openLabel: "헬프데스크 열기", check: proxyUrl("/resource-rag/healthz"), checkLabel: "Health", tags: ["입력 크기", "동시 요청", "Token"], color: "#f5bb63", desc: "요청 크기와 생성량 제한이 없을 때 모델 서버 자원이 어떻게 소모되는지 확인합니다." },
+      { id: "vuln-agent", group: "app", title: "Goat Farm Helper", route: "LLM06 · Excessive Agency", port: 8001, href: proxyUrl("/vuln-agent/"), openLabel: "에이전트 열기", check: proxyUrl("/vuln-agent/healthz"), checkLabel: "Health", tags: ["Agent", "Tool", "권한"], color: "#65dda6", desc: "낮은 권한의 사용자가 자연어를 통해 관리자 Tool 실행을 유도하는 취약 Agent입니다." },
+      { id: "llmgoat", group: "app", title: "LLMGoat", route: "OWASP LLM Challenges", port: 5000, href: proxyUrl("/llmgoat/"), openLabel: "문제 열기", check: proxyUrl("/llmgoat/api/model_status"), checkLabel: "Model status", tags: ["A01–A10", "Challenge", "Flag"], color: "#ff7185", desc: "OWASP Top 10 항목을 문제와 Flag로 풀어보는 독립형 웹 챌린지입니다." },
+      { id: "dvla", group: "app", title: "Damn Vulnerable LLM Agent", route: "DVLA · ReAct Agent", port: 8501, href: proxyUrl("/dvla/"), openLabel: "에이전트 열기", check: proxyUrl("/dvla/_stcore/health"), checkLabel: "Health", tags: ["ReAct", "SQL Tool", "Prompt Injection"], color: "#55b8ff", desc: "ReAct 방식 Agent의 생각·도구 호출 흐름을 보며 Prompt Injection을 비교합니다." },
+      { id: "fake-registry", group: "infra", title: "Fake Model Registry", route: "LLM03 · Supply Chain", port: 8002, href: proxyUrl("/fake-registry/api/v1/models"), openLabel: "레지스트리 보기", check: proxyUrl("/fake-registry/api/v1/models"), checkLabel: "Models API", tags: ["Registry", "Hash", "Artifact"], color: "#f5bb63", desc: "모델 파일의 출처와 무결성 검증을 연습하기 위한 가짜 모델 저장소 API입니다." },
+      { id: "ollama", group: "infra", title: "Ollama Model Server", route: "Local Inference Runtime", port: 11434, href: directUrl(11434, "/api/tags"), openLabel: "모델 목록 보기", check: directUrl(11434, "/api/tags"), checkLabel: "Models", tags: ["Generate", "Chat", "Embed"], color: "#59d6e8", desc: "실습 앱의 Prompt를 실제 추론으로 바꾸고 로컬 모델 파일을 관리하는 서버입니다." }
     ];
 
     const state = new Map(services.map((service) => [service.title, "checking"]));
 
     function renderCard(service) {
+      const externalIcon = ['llmgoat', 'dvla'].includes(service.id)
+        ? '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7"/></svg>' : '';
       const tags = service.tags.map((tag) => `<span class="tag">${tag}</span>`).join("");
       return `<article class="card" data-service="${service.title}" style="--card-accent:${service.color}">
         <div class="card-top"><div><div class="route">${service.route}</div><h3>${service.title}</h3></div><span class="status checking" data-status-for="${service.title}">확인 중</span></div>
         <div class="tags"><span class="tag port">PORT ${service.port}</span>${tags}</div>
         <p class="desc">${service.desc}</p><p class="url">${service.href}</p>
-        <div class="actions"><a class="button" href="${service.href}" target="_blank" rel="noreferrer" aria-label="${service.openLabel}: ${service.title}">${service.openLabel}</a><a class="button secondary" href="${service.check}" target="_blank" rel="noreferrer">${service.checkLabel}</a></div>
+        <div class="actions"><a class="button" href="${service.href}" target="_blank" rel="noopener noreferrer" aria-label="${service.openLabel}: ${service.title} (새 탭)">${service.openLabel} ${externalIcon}</a><a class="button secondary" href="${service.check}" target="_blank" rel="noopener noreferrer">${service.checkLabel}</a></div>
       </article>`;
     }
 
