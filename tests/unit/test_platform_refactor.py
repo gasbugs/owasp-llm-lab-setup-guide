@@ -31,15 +31,17 @@ class PlatformRefactorTests(unittest.TestCase):
         self.assertFalse(response.json()['trace']['answer_model_called'])
 
     def test_ambiguous_customer_request_never_queries(self):
-        planner = AsyncMock(return_value={"action": "lookup", "customer_id": "C-2001",
-                                         "fields": ["delivery_status"], "reason": "delivery"})
+        planner = AsyncMock(side_effect=AssertionError("Ambiguous input must not reach the model"))
         with patch.object(MAIN.llm, "structured_chat", planner), TestClient(MAIN.app) as client:
             response = client.post('/api/labs/llm02/safe/chat',
                 headers={"Authorization": "Bearer llm02-c2001-demo-token"},
                 json={"message": "C-2001과 C-2002 중 배송 상태 확인"})
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()['trace']['blocking_reason'], 'customer-target-ambiguous')
+        planner.assert_not_awaited()
+        self.assertFalse(response.json()['trace']['planner_model_called'])
         self.assertFalse(response.json()['trace']['customer_query_called'])
+        self.assertFalse(response.json()['trace']['answer_model_called'])
 
     def test_documents_search_context_and_delete_share_current_corpus(self):
         # Deliberately controlled vectors test plumbing, not real model semantics.

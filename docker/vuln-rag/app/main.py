@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.embedding import EmbeddingBackendError, EmbeddingClient
 from app.customer_grounding import (
     CustomerChatRequest, LLM02ToolProposal, LLM02GroundedAnswer,
-    validate_customer_target,
+    validate_customer_request, validate_customer_target,
 )
 from app.retrieval import search_corpus
 from app.classified_rag import (
@@ -268,6 +268,16 @@ def emit_llm02_trace(trace: dict) -> None:
     )
 
 
+def reject_llm02_target(trace: dict, reason: str) -> JSONResponse:
+    trace["blocking_reason"] = reason
+    emit_llm02_trace(trace)
+    return JSONResponse(status_code=422, content={
+        "detail": reason,
+        "reply": "조회할 고객 ID 하나와 필요한 항목을 명확히 지정해 주세요. 고객 정보는 조회하지 않았습니다.",
+        "trace": trace,
+    })
+
+
 async def run_llm02_tool_chat(
     request_body: LLM02WorkshopRequest | LLM02VulnerableChatRequest | LLM02SafeChatRequest | ChatRequest,
     request: Request,
@@ -304,6 +314,11 @@ async def run_llm02_tool_chat(
         )
 
     try:
+        validate_customer_request(request_body.message)
+    except ValueError as exc:
+        return reject_llm02_target(trace, str(exc))
+
+    try:
         raw_proposal = await llm.structured_chat(
             system=day2_scenario.build_llm02_planner_prompt(),
             user=request_body.message,
@@ -332,13 +347,7 @@ async def run_llm02_tool_chat(
         try:
             validate_customer_target(request_body.message, proposal.customer_id, principal.customer_id)
         except ValueError as exc:
-            trace["blocking_reason"] = str(exc)
-            emit_llm02_trace(trace)
-            return JSONResponse(status_code=422, content={
-                "detail": str(exc),
-                "reply": "조회할 고객 ID 하나와 필요한 항목을 명확히 지정해 주세요. 고객 정보는 조회하지 않았습니다.",
-                "trace": trace,
-            })
+            return reject_llm02_target(trace, str(exc))
 
     if proposal.action == "cannot_answer":
         trace["blocking_reason"] = "request-not-supported"

@@ -24,11 +24,16 @@ class LLM02GroundedAnswer(BaseModel):
     record: dict[str, str]
 
 
-def validate_customer_target(message: str, proposed: str | None, authenticated: str) -> None:
+def validate_customer_request(message: str) -> set[str]:
     mentioned = set(re.findall(r"(?<![A-Za-z0-9])C-\d{4}(?!\d)", message, re.I))
     mentioned = {value.upper() for value in mentioned}
-    target = proposed or authenticated
     if len(mentioned) > 1:
         raise ValueError("customer-target-ambiguous")
+    return mentioned
+
+
+def validate_customer_target(message: str, proposed: str | None, authenticated: str) -> None:
+    mentioned = validate_customer_request(message)
+    target = proposed or authenticated
     if target not in (mentioned or {authenticated}):
         raise ValueError("customer-target-not-grounded")
