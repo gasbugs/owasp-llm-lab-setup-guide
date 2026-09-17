@@ -13,7 +13,7 @@ if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
 fi
 
 # 1) 실제 Compose 런타임 이미지 pull
-sudo -u ubuntu -i docker pull docker.io/ollama/ollama:latest
+sudo -u ubuntu -i docker pull docker.io/ollama/ollama:0.34.1
 sudo -u ubuntu -i docker pull docker.io/library/python:3.12-slim
 
 # 동일 커밋의 이미지 세트가 하나라도 없으면 AMI 빌드를 실패시킨다.
@@ -32,7 +32,7 @@ sudo -u ubuntu -i docker run --rm -d \
   --gpus all \
   -v /home/ubuntu/ollama-models:/root/.ollama \
   -p 11434:11434 \
-  docker.io/ollama/ollama:latest
+  docker.io/ollama/ollama:0.34.1
 
 # Ollama listening 대기
 for i in $(seq 1 60); do

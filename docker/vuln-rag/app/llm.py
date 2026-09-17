@@ -9,7 +9,7 @@ import httpx
 class LLMClient:
     def __init__(self) -> None:
         self.base = os.environ.get("OLLAMA_URL", "http://ollama:11434")
-        self.model = os.environ.get("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
+        self.model = os.environ.get("OLLAMA_MODEL", "qwen3:14b-q4_K_M")
         configured_num_predict = os.environ.get("OLLAMA_NUM_PREDICT")
         self.num_predict = (
             int(configured_num_predict) if configured_num_predict is not None else None
@@ -27,6 +27,7 @@ class LLMClient:
             payload = {
                 "model": self.model,
                 "stream": False,
+                "think": False,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
@@ -58,6 +59,7 @@ class LLMClient:
                 json={
                     "model": self.model,
                     "stream": False,
+                    "think": False,
                     "format": schema,
                     "messages": [
                         {"role": "system", "content": system},

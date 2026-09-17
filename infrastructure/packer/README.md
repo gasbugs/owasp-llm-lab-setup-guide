@@ -10,7 +10,7 @@
 - **Docker Engine + Docker Compose v2** (일반 daemon, `ubuntu`는 `docker` 그룹)
 - AWS CLI v2 + SSM 에이전트
 - 강의용 컨테이너 이미지 (공개 GHCR에서 사전 anonymous docker pull)
-- LLM 모델 weights (`llama3.1:8b-instruct-q4_K_M`, 약 5GB)
+- LLM 모델 weights (`qwen3:14b-q4_K_M`, 약 9.3GB)
 
 포함하지 않는 것:
 

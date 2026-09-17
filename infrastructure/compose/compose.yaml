@@ -5,7 +5,7 @@ x-rag-common: &rag-common
   restart: always
   environment: &rag-environment
     OLLAMA_URL: http://ollama:11434
-    OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+    OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b-q4_K_M}
     OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3:latest}
   depends_on:
     ollama:
@@ -38,7 +38,7 @@ services:
 
   ollama:
     container_name: lab-ollama
-    image: docker.io/ollama/ollama:latest
+    image: docker.io/ollama/ollama:0.34.1
     restart: always
     gpus: all
     ports:
@@ -129,7 +129,7 @@ services:
       - "8001:8001"
     environment:
       OLLAMA_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b-q4_K_M}
     depends_on:
       ollama:
         condition: service_started

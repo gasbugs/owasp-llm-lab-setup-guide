@@ -26,7 +26,7 @@ IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REFRESH_IMAGES="${REFRESH_IMAGES:-true}"
 APT_LOCK_TIMEOUT_SECONDS="${APT_LOCK_TIMEOUT_SECONDS:-600}"
-OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3:14b-q4_K_M}"
 OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-bge-m3:latest}"
 OLLAMA_COMPAT_MODEL="${OLLAMA_COMPAT_MODEL:-llama3}"
 LLMGOAT_N_GPU_LAYERS="${LLMGOAT_N_GPU_LAYERS:-20}"
@@ -365,7 +365,7 @@ if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" 
   fi
 fi
 WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost:11434/api/generate \
-  -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"options\":{\"num_predict\":5}}")
+  -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":5}}")
 printf '%s' "\$WARMUP_RESPONSE" \
   | jq -e '.done == true and (.response | type == "string")' >/dev/null
 echo "[install-lab] ollama warm-up done"

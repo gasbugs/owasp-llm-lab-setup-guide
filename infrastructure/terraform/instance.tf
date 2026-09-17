@@ -14,6 +14,7 @@ locals {
     lab_setup_repo_raw_url = var.lab_setup_repo_raw_url
     lab_image_namespace    = var.lab_image_namespace
     lab_image_tag          = var.lab_image_tag
+    ollama_model           = var.ollama_model
   })
 }
 

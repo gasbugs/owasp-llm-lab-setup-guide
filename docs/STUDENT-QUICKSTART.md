@@ -118,7 +118,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Docker 설치
 - NVIDIA CDI 설정
 - Ollama 컨테이너 실행
-- `llama3.1:8b-instruct-q4_K_M` 생성 모델과 `bge-m3:latest` embedding 모델 pull 및 warm-up
+- `qwen3:14b-q4_K_M` 생성 모델(9.3GB)과 `bge-m3:latest` embedding 모델 pull 및 warm-up. 로컬 Guard 모델은 설치하지 않습니다. 자체 앱은 `think:false`로 답변·구조화 JSON만 생성하며 서버 인가와 근거 검증은 별도로 유지합니다.
 - LLM08 서버 vector 분석용 `~/work/llm08-analysis-venv` 준비(NumPy만 설치)
 - URI reverse proxy 실행: `lab-reverse-proxy`, port `80`
 - 실습 포털 backend 실행: `lab-portal`, 기존 port `8080`

@@ -52,7 +52,7 @@ variable "ami_name_prefix" {
 variable "default_model" {
   description = "Ollama가 사전 pull할 모델 ID"
   type        = string
-  default     = "llama3.1:8b-instruct-q4_K_M"
+  default     = "qwen3:14b-q4_K_M"
 }
 
 variable "image_namespace" {

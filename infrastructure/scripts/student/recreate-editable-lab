@@ -48,7 +48,7 @@ fi
 
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
-OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_M}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3:14b-q4_K_M}"
 OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-bge-m3:latest}"
 
 container="$1"

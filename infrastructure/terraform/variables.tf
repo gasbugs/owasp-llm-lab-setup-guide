@@ -120,3 +120,13 @@ variable "allowed_ingress_cidr" {
 
 
 # backup_retention_days 변수 제거 — S3 백업 자체를 안 씀
+variable "ollama_model" {
+  description = "Main Ollama model installed by optional bootstrap. Embeddings use a separate model."
+  type        = string
+  default     = "qwen3:14b-q4_K_M"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9][A-Za-z0-9_.:/-]*$", var.ollama_model))
+    error_message = "Use an Ollama model name and tag without shell metacharacters."
+  }
+}
