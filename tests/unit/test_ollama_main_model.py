@@ -71,6 +71,7 @@ class MainModelTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("OLLAMA_GUARD_MODEL", content)
         self.assertNotIn("llama-guard", content)
         self.assertIn("OLLAMA_EMBED_MODEL", content)
+        self.assertIn("--max-time 300 http://localhost:11434/api/generate", content)
 
 
 if __name__ == "__main__":

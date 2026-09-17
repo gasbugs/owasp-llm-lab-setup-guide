@@ -364,7 +364,7 @@ if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" 
     echo "[install-lab] created $OLLAMA_COMPAT_MODEL compatibility alias for DVLA"
   fi
 fi
-WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost:11434/api/generate \
+WARMUP_RESPONSE=\$(curl -fsS --max-time 300 http://localhost:11434/api/generate \
   -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":5}}")
 printf '%s' "\$WARMUP_RESPONSE" \
   | jq -e '.done == true and (.response | type == "string")' >/dev/null
