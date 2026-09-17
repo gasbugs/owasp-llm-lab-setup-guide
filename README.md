@@ -142,4 +142,11 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 
 ## 라이선스와 주의
 
-이 저장소 자체는 MIT License로 배포됩니다. 단, `docker/llmgoat`와 `docker/dvla`는 각각 SECFORCE/LLMGoat와 ReversecLabs/damn-vulnerable-llm-agent를 컨테이너화한 wrapper이며, 해당 원본 프로젝트의 라이선스와 고지 사항을 함께 따릅니다.
+이 저장소에서 직접 작성한 부분은 이중 라이선스로 제공합니다.
+
+- 개인 학습·연구·취미 등 비상업적 사용은 [PolyForm Noncommercial License 1.0.0](LICENSE)에 따라 무료입니다.
+- 기업의 사내 교육, 업무, 유료 교육, 컨설팅, 제품·서비스 포함 등 상업적 사용에는 [별도의 서면 상업용 라이선스](COMMERCIAL-LICENSE.md)가 필요합니다.
+
+이 정책은 현재 `LICENSE`와 `NOTICE.md`가 포함된 revision부터 적용됩니다. 과거 MIT License로 배포된 revision의 기존 권리는 취소되지 않습니다.
+
+이 저장소는 source-available이지만 상업적 사용을 제한하므로 OSI가 정의하는 Open Source Software는 아닙니다. `docker/llmgoat`, `docker/dvla`, base image, package와 model 같은 외부 구성요소에는 각각의 원래 라이선스가 적용됩니다. 자세한 적용 범위와 고지는 [NOTICE.md](NOTICE.md)와 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md)를 확인하세요.
