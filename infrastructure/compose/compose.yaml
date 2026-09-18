@@ -7,6 +7,7 @@ x-rag-common: &rag-common
     OLLAMA_URL: http://ollama:11434
     OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b-q4_K_M}
     OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3:latest}
+    SHOW_GUARDRAIL_PANEL: "false"
   depends_on:
     ollama:
       condition: service_started

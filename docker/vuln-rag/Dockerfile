@@ -28,6 +28,7 @@ ENV PORT=8000 \
     OLLAMA_EMBED_MODEL=bge-m3:latest \
     DEFAULT_SCENARIO=day1 \
     GUARD_ENGINE=off \
+    SHOW_GUARDRAIL_PANEL=false \
     PRESIDIO_URL=http://host.docker.internal:18091 \
     NEMO_GUARD_URL=http://host.docker.internal:18092
 

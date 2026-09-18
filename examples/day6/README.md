@@ -68,6 +68,7 @@ docker run -d --name day6-guardrail-ui \
   --network llm-security-control-plane \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=nemo \
+  -e SHOW_GUARDRAIL_PANEL=true \
   -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   localhost/day6-guardrail-ui:latest
 ```
@@ -91,12 +92,15 @@ docker run -d --name day6-guardrail-ui \
   --network llm-security-control-plane \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
+  -e SHOW_GUARDRAIL_PANEL=true \
   -e PRESIDIO_URL=http://day6-presidio-api:8013 \
   -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   -e CLASSIFIED_RAG_INTERNAL_TOKEN=day7-classified-rag-internal \
   localhost/day6-guardrail-ui:latest
 ```
 
+`SHOW_GUARDRAIL_PANEL=true`는 Module 08 전용 화면에서만 판정 패널을 표시한다.
+일반 LLM01~10 Compose는 이 값을 `false`로 고정해 운영 내부 정보를 노출하지 않는다.
 UI의 `GUARD_ENGINE`은 `off`, `presidio`, `nemo` 중 하나다. 각 guard API의
 `GUARD_MODE`는 `off`, `audit`, `enforce` 중 하나다. 환경변수는 프로세스 시작 시
 읽으므로 값을 바꾼 뒤 컨테이너를 재생성해야 한다.

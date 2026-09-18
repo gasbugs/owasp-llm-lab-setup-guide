@@ -176,6 +176,7 @@ docker run -d --name day6-guardrail-ui \
   --network "$DAY6_NETWORK" \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
+  -e SHOW_GUARDRAIL_PANEL=true \
   -e PRESIDIO_URL=http://day6-presidio-api:8013 \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
@@ -270,6 +271,7 @@ docker run -d --name day6-guardrail-ui \
   --network "$DAY6_NETWORK" \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=nemo \
+  -e SHOW_GUARDRAIL_PANEL=true \
   -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
@@ -284,6 +286,7 @@ docker run -d --name day6-guardrail-ui \
   --network "$DAY6_NETWORK" \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=nemo \
+  -e SHOW_GUARDRAIL_PANEL=true \
   -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
@@ -297,6 +300,7 @@ docker run -d --name day6-guardrail-ui \
   --network "$DAY6_NETWORK" \
   -p 127.0.0.1:18090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
+  -e SHOW_GUARDRAIL_PANEL=true \
   -e PRESIDIO_URL=http://day6-presidio-api:8013 \
   -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   -e CLASSIFIED_RAG_INTERNAL_TOKEN=day7-classified-rag-internal \

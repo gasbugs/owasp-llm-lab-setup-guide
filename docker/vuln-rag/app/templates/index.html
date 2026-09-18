@@ -176,10 +176,12 @@
       </section>
       {% endif %}
 
+      {% if show_guardrail_panel %}
       <section id="guard-panel" class="panel" hidden>
         <header class="panel-head"><div><div class="eyebrow">Security telemetry</div><h2>서버 측 가드레일</h2></div><span class="panel-code">READ ONLY</span></header>
         <div class="panel-body"><p>브라우저는 같은 FastAPI backend만 호출합니다. Engine과 mode는 컨테이너 설정이며 화면에서 변경할 수 없습니다.</p><div class="guard-grid"><div class="guard-field"><strong>Engine</strong><span id="guard-engine">off</span></div><div class="guard-field"><strong>Mode</strong><span id="guard-mode">off</span></div><div class="guard-field"><strong>Decision</strong><span id="guard-decision">-</span></div><div class="guard-field"><strong>Ollama main called</strong><span id="guard-upstream">-</span></div><div class="guard-field"><strong>Duration</strong><span id="guard-duration">-</span></div><div class="guard-field"><strong>Blocking reason</strong><span id="guard-reason">-</span></div></div><pre id="guard-checks">input/output checks: -</pre></div>
       </section>
+      {% endif %}
     </aside>
   </div>
 </main>
@@ -340,6 +342,7 @@ async function loadSystemPrompt() {
 }
 
 function showGuardrailPanel(engine, mode) {
+  if (!guardPanel) return false;
   if (!engine || engine === 'off' || !mode || mode === 'off') return false;
   guardPanel.hidden = false;
   guardEngine.textContent = engine;
@@ -348,6 +351,7 @@ function showGuardrailPanel(engine, mode) {
 }
 
 async function loadGuardrailPolicy() {
+  if (!guardPanel) return;
   guardPanel.hidden = true;
   try {
     const response = await fetch(appUrl('/api/guardrails/policy'));

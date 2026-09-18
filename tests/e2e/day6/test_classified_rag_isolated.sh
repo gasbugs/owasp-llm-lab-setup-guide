@@ -50,6 +50,7 @@ docker run -d --name codex-classified-ui \
   --network "$DAY6_NETWORK" \
   -p 127.0.0.1:28090:8000 \
   -e PORT=8000 -e DEFAULT_SCENARIO=day1 -e GUARD_ENGINE=presidio \
+  -e SHOW_GUARDRAIL_PANEL=true \
   -e PRESIDIO_URL=http://codex-classified-presidio:8013 \
   -e NEMO_GUARD_URL=http://codex-classified-nemo:8013 \
   -e CLASSIFIED_RAG_INTERNAL_TOKEN="$INTERNAL_TOKEN" \

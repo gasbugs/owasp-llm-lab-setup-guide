@@ -5,6 +5,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from jinja2 import Environment
+
 
 ROOT = Path(__file__).resolve().parents[2]
 RAG_UI = ROOT / "docker/vuln-rag/app/templates/index.html"
@@ -89,11 +91,30 @@ class UiDesignSystemTests(unittest.TestCase):
         self.assertIn("renderModelOutputSafe", self.rag)
 
     def test_optional_panels_only_activate_when_backing_data_exists(self) -> None:
+        self.assertIn("{% if show_guardrail_panel %}", self.rag)
         self.assertIn('id="guard-panel" class="panel" hidden', self.rag)
+        self.assertIn("if (!guardPanel) return false", self.rag)
+        self.assertIn("if (!guardPanel) return;", self.rag)
         self.assertIn("guardPanel.hidden = true", self.rag)
         self.assertIn("showGuardrailPanel(data.guard_engine, data.guard_mode)", self.rag)
         self.assertIn("scenarioSelect.value !== 'day2' && !isLlm04Rag", self.rag)
         self.assertIn('{% if scenario_id not in ("day2", "llm04") %} hidden{% endif %}', self.rag)
+
+    def test_general_labs_do_not_render_the_guardrail_panel(self) -> None:
+        template = Environment(autoescape=True).from_string(self.rag)
+        common = {
+            "scenario_id": "day1",
+            "scenario_title": "LLM01",
+            "scenario_intro": "",
+            "warning": "",
+            "scenarios": [],
+        }
+        general_html = template.render(**common, show_guardrail_panel=False)
+        module08_html = template.render(**common, show_guardrail_panel=True)
+        self.assertNotIn("Security telemetry", general_html)
+        self.assertNotIn("서버 측 가드레일", general_html)
+        self.assertIn("Security telemetry", module08_html)
+        self.assertIn("서버 측 가드레일", module08_html)
 
     def test_first_party_apps_share_a_responsive_llm_navigation_rail(self) -> None:
         for source in (self.rag, self.agent):

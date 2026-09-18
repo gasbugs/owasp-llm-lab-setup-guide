@@ -61,6 +61,9 @@ llm = LLMClient()
 embedding = EmbeddingClient()
 guardrail_proxy = GuardrailProxy()
 MODEL_PROVENANCE_PATH = os.environ.get("MODEL_PROVENANCE_PATH")
+SHOW_GUARDRAIL_PANEL = os.environ.get(
+    "SHOW_GUARDRAIL_PANEL", "false"
+).strip().lower() in {"1", "true", "yes", "on"}
 
 
 class LLM10ConcurrencyGate:
@@ -1066,6 +1069,7 @@ async def index(request: Request, scenario: str | None = None):
             "scenario_intro": selected.intro,
             "warning": selected.warning,
             "scenarios": SCENARIOS.values(),
+            "show_guardrail_panel": SHOW_GUARDRAIL_PANEL,
         },
     )
 
