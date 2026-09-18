@@ -24,7 +24,7 @@ if [[ ! "$TAG" =~ ^sha-[0-9a-f]{40}$ ]] && [ "${ALLOW_NONIMMUTABLE_TAG:-false}" 
   exit 2
 fi
 
-for name in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+for name in base-gpu vuln-rag vuln-agent llmgoat dvla portal common; do
   image="ghcr.io/$NS/owasp-llm-${name}:${TAG}"
   inspect_output="$(mktemp)"
   if docker manifest inspect "$image" >"$inspect_output" 2>&1; then
@@ -51,8 +51,12 @@ done
 build_and_push() {
   local name="$1"
   local context="$2"
+  local dockerfile="${3:-}"
   local image="ghcr.io/$NS/owasp-llm-${name}:${TAG}"
   local extra_args=(--build-arg "VCS_REF=${TAG#sha-}")
+  if [ -n "$dockerfile" ]; then
+    extra_args+=(-f "$dockerfile")
+  fi
   if [ "$name" = "vuln-rag" ] || [ "$name" = "vuln-agent" ]; then
     extra_args+=(--build-arg "BASE_IMAGE=ghcr.io/$NS/owasp-llm-base-gpu:${TAG}")
   fi
@@ -69,6 +73,8 @@ build_and_push "vuln-rag"    "./vuln-rag"
 build_and_push "vuln-agent"  "./vuln-agent"
 build_and_push "llmgoat"     "./llmgoat"
 build_and_push "dvla"        "./dvla"
+build_and_push "portal"      "../infrastructure/portal"
+build_and_push "common"      "." "./common/Dockerfile"
 
 echo
 echo "=========================================="

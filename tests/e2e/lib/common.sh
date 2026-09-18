@@ -109,7 +109,9 @@ chat() {
   fi
 
   request_json=$(jq -n --arg m "$message" --arg u "$user_id" --arg t "$tenant" \
-    '{message: $m, user_id: $u, tenant: $t}')
+    --arg lab "${CHAT_LAB:-}" \
+    '{message: $m, user_id: $u, tenant: $t}
+      + (if $lab == "" then {} else {lab: $lab} end)')
   tmpdir=$(mktemp -d)
   attempts_file="$tmpdir/attempts.jsonl"
   body_file="$tmpdir/body"
@@ -120,7 +122,18 @@ chat() {
     : > "$body_file"
     : > "$error_file"
     curl_metrics=""
-    if curl_metrics=$(curl --noproxy '*' -sS --max-time "$CHAT_REQUEST_TIMEOUT" \
+    if [ -n "${CHAT_AUTHORIZATION:-}" ]; then
+      if curl_metrics=$(curl --noproxy '*' -sS --max-time "$CHAT_REQUEST_TIMEOUT" \
+        -X POST "$TARGET_URL/api/chat" \
+        -H "Authorization: $CHAT_AUTHORIZATION" \
+        -H 'Content-Type: application/json' \
+        --data-binary "$request_json" \
+        -o "$body_file" -w $'%{http_code}\t%{time_total}' 2>"$error_file"); then
+        curl_rc=0
+      else
+        curl_rc=$?
+      fi
+    elif curl_metrics=$(curl --noproxy '*' -sS --max-time "$CHAT_REQUEST_TIMEOUT" \
       -X POST "$TARGET_URL/api/chat" \
       -H 'Content-Type: application/json' \
       --data-binary "$request_json" \

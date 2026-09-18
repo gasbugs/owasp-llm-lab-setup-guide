@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>클씨랩 AI Security Lab · Agent Workbench</title>
   <style>
-    :root { color-scheme:dark; --canvas:#071018; --surface:#0d1924; --surface-raised:#132333; --line:#294052; --line-soft:#1b3040; --ink:#eaf5f7; --muted:#8eabb5; --signal:#55c2d8; --signal-soft:#123d4a; --incident:#ff6978; --warning:#f6c453; --success:#65d6a4; --shadow:0 18px 45px rgba(0,0,0,.28); }
+    :root { color-scheme:dark; --canvas:#0b0b0c; --surface:#151517; --surface-raised:#1c1c1f; --rail:#252529; --line:#303036; --line-soft:#242428; --ink:#f2f2f3; --muted:#a2a2aa; --signal:#64d5e6; --signal-soft:rgba(100,213,230,.1); --incident:#ff7185; --warning:#f5bb63; --success:#65dda6; --verified:#65dda6; --shadow:0 24px 70px rgba(0,0,0,.42); }
     :root[data-theme="light"] { color-scheme:light; --canvas:#eaf1f3; --surface:#f8fbfc; --surface-raised:#fff; --line:#b8cbd1; --line-soft:#d8e4e7; --ink:#12252d; --muted:#58717a; --signal:#087f98; --signal-soft:#d9f1f5; --incident:#c92f43; --warning:#9a6500; --success:#167a55; --shadow:0 18px 45px rgba(28,61,72,.12); }
     * { box-sizing:border-box; }
     body { margin:0; min-width:320px; min-height:100vh; overflow-x:hidden; background:var(--canvas); color:var(--ink); font-family:Inter,"Noto Sans KR",system-ui,sans-serif; }
@@ -75,6 +75,7 @@
     @media (max-width: 720px) { .shell { padding:10px; }.masthead { padding:14px; }.vuln-beacon { display:none; }.identity-bar { grid-template-columns:1fr; }.tools { grid-template-columns:1fr; }.grid { grid-template-columns:minmax(0,1fr); gap:12px; }.splitter { display: none; }.chat,.trace { height:auto; min-height:340px; }.composer { grid-template-columns:1fr; }.send-button { min-height:46px; } }
     @media (max-width:560px) { .masthead { grid-template-columns:1fr; }.brand { grid-column:1; grid-row:1; }.top-actions { grid-column:1; grid-row:2; justify-content:flex-start; }.mission { grid-column:1; grid-row:3; } }
   </style>
+  <link rel="stylesheet" href="/common/theme.css">
 </head>
 <body>
   <div class="app-layout">

@@ -55,8 +55,17 @@ class RuntimeContractTest(unittest.TestCase):
             'org.opencontainers.image.source='
             '"https://github.com/gasbugs/owasp-llm-lab-setup-guide"'
         )
-        for image in ("base-gpu", "vuln-rag", "vuln-agent", "llmgoat", "dvla"):
-            dockerfile = read(f"docker/{image}/Dockerfile")
+        images = {
+            "base-gpu": "docker/base-gpu/Dockerfile",
+            "vuln-rag": "docker/vuln-rag/Dockerfile",
+            "vuln-agent": "docker/vuln-agent/Dockerfile",
+            "llmgoat": "docker/llmgoat/Dockerfile",
+            "dvla": "docker/dvla/Dockerfile",
+            "portal": "infrastructure/portal/Dockerfile",
+            "common": "docker/common/Dockerfile",
+        }
+        for image, path in images.items():
+            dockerfile = read(path)
             self.assertIn(source_label, dockerfile, image)
             self.assertIn("ARG VCS_REF=unknown", dockerfile, image)
             self.assertIn('org.opencontainers.image.revision="$VCS_REF"', dockerfile, image)
@@ -64,9 +73,50 @@ class RuntimeContractTest(unittest.TestCase):
     def test_manual_compose_ignores_the_deprecated_image_tag_variable(self) -> None:
         compose = read("infrastructure/compose/compose.yaml")
         installer = read("infrastructure/scripts/student/install-lab.sh")
-        self.assertEqual(compose.count("${COMPOSE_IMAGE_TAG:-latest}"), 4)
+        self.assertEqual(compose.count("${COMPOSE_IMAGE_TAG:-latest}"), 5)
         self.assertNotIn("${IMAGE_TAG:-latest}", compose)
         self.assertIn("COMPOSE_IMAGE_TAG=$IMAGE_TAG", installer)
+        self.assertIn("COMMON_IMAGE_TAG=$IMAGE_TAG", installer)
+
+    def test_portal_is_a_published_non_root_image_without_host_source_mounts(self) -> None:
+        compose = read("infrastructure/compose/compose.yaml")
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        dockerfile = read("infrastructure/portal/Dockerfile")
+        portal_service = compose.split("\n  portal:", 1)[1]
+        self.assertIn(
+            "image: ghcr.io/gasbugs/owasp-llm-portal:${COMPOSE_IMAGE_TAG:-latest}",
+            portal_service,
+        )
+        self.assertNotIn("/home/ubuntu/work/portal:/app", portal_service)
+        self.assertNotIn('command: ["python", "/app/server.py"]', portal_service)
+        self.assertNotIn("preparing lab portal files", installer)
+        self.assertNotIn('infrastructure/portal/index.html"', installer)
+        self.assertNotIn('infrastructure/portal/server.py"', installer)
+        self.assertIn("USER 10001:10001", dockerfile)
+        self.assertIn("HEALTHCHECK", dockerfile)
+        self.assertIn('CMD ["python", "/app/server.py"]', dockerfile)
+
+    def test_common_ui_is_an_internal_static_container_with_safe_fallbacks(self) -> None:
+        compose = read("infrastructure/compose/compose.yaml")
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        common_dockerfile = read("docker/common/Dockerfile")
+        common_config = read("docker/common/default.conf")
+        for page in (
+            "infrastructure/portal/index.html",
+            "docker/vuln-rag/app/templates/index.html",
+            "docker/vuln-agent/app/templates/index.html",
+        ):
+            self.assertIn('<link rel="stylesheet" href="/common/theme.css">', read(page), page)
+            self.assertIn("--canvas", read(page), page)
+        self.assertIn(
+            "image: ghcr.io/gasbugs/owasp-llm-common:${COMMON_IMAGE_TAG:-latest}",
+            compose,
+        )
+        self.assertNotIn('"8080:8080"', compose.split("\n  common:", 1)[1].split("\n  portal:", 1)[0])
+        self.assertIn("lab-common", installer)
+        self.assertIn("nginxinc/nginx-unprivileged:1.27-alpine", common_dockerfile)
+        self.assertIn("USER 101:101", common_dockerfile)
+        self.assertIn("location = /theme.css", common_config)
 
     def test_compose_sets_same_published_port_for_each_rag_process(self) -> None:
         compose = read("infrastructure/compose/compose.yaml")
@@ -190,7 +240,7 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
-            "docker/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh",
+            "docker/ infrastructure/portal/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh",
             workflow,
         )
 
@@ -335,7 +385,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("docker/build-push-action@v7", test_job)
         self.assertIn("packer validate -syntax-only", test_job)
         self.assertIn("find infrastructure tests docker", test_job)
-        self.assertEqual(test_job.count("call: check"), 5)
+        self.assertEqual(test_job.count("call: check"), 7)
         self.assertNotIn("packages: write", test_job)
         self.assertIn("needs: test", build)
         self.assertIn("IMAGE_REGISTRY: ghcr.io", workflow)
@@ -352,6 +402,10 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('case "$status" in', build)
         self.assertIn("confirmed absent", build)
         self.assertIn("VCS_REF=${{ github.sha }}", build)
+        self.assertIn("context: ./infrastructure/portal", workflow)
+        self.assertIn("owasp-llm-portal:${{ env.SHA_TAG }}", build)
+        self.assertIn("base-gpu vuln-rag vuln-agent llmgoat dvla portal common", workflow)
+        self.assertIn("owasp-llm-common:${{ env.SHA_TAG }}", build)
         self.assertNotIn("docker buildx imagetools inspect", build)
         self.assertIn("needs: build", promote)
         self.assertIn("packages: write", promote)

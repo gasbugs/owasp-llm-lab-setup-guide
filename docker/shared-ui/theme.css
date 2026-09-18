@@ -1,0 +1,20 @@
+/* OWASP LLM Lab first-party UI theme tokens.
+ * Keep page-specific layout rules local; share only stable visual primitives.
+ */
+:root {
+  color-scheme: dark;
+  --canvas: #0b0b0c;
+  --surface: #151517;
+  --surface-raised: #1c1c1f;
+  --rail: #252529;
+  --line: #303036;
+  --line-soft: #242428;
+  --ink: #f2f2f3;
+  --muted: #a2a2aa;
+  --signal: #64d5e6;
+  --signal-soft: rgba(100, 213, 230, 0.1);
+  --warning: #f5bb63;
+  --incident: #ff7185;
+  --verified: #65dda6;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}

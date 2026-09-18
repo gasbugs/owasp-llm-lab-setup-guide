@@ -26,7 +26,7 @@
 | LLM10 | `http://localhost:8013` | `lab-resource-rag` |
 | LLMGoat A01/A02/A04/A06/A08 | `http://localhost:5000` | `lab-llmgoat` |
 
-LLM02 검증은 C-2001 Bearer token으로 인증한 뒤 실제 Ollama Structured Planner가 C-2002와 민감 field를 제안하는지 5회 반복합니다. 취약 실행기의 DB 조회·결정적 노출, 안전 실행기의 조회 전 `customer-scope-denied`·`field-not-allowed`, 지원하지 않는 질문의 무조회 `cannot_answer`, body identity 입력 `422`, 정상 배송 요청 보존을 각각 검사합니다. Answer LLM에는 인가된 레코드만 전달하며, 구조화 출력이 Tool 결과와 정확히 같은지 검사한 뒤 Python이 응답 문장을 만듭니다.
+LLM02 검증은 C-2001 Bearer token으로 인증한 뒤 평문 교차 고객 요청이 `cannot_answer`로 끝나 DB를 조회하지 않는지 먼저 검사합니다. 이어 prompt injection으로 실제 Ollama Structured Planner가 C-2002와 민감 field를 제안하는지 5회 반복합니다. 취약 실행기의 DB 조회·결정적 노출, 안전 실행기의 조회 전 `customer-scope-denied`·`field-not-allowed`, body identity 입력 `422`, 정상 배송 요청 보존을 각각 검사합니다. Answer LLM에는 인가된 레코드만 전달하며, 구조화 출력이 Tool 결과와 정확히 같은지 검사한 뒤 Python이 응답 문장을 만듭니다.
 
 RAG 스크립트는 실행 전 `/healthz`의 `default_scenario`를 확인합니다. 현재 계약은 다음과 같습니다.
 

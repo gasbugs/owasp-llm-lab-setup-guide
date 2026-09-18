@@ -134,8 +134,10 @@ class StrictShellHarnessContractTest(unittest.TestCase):
         self.assertIn("RECONSTRUCTION_TRIALS", source)
         self.assertIn("material_policy_hits", source)
         self.assertIn("exact_marker_hits", source)
-        self.assertIn("교육용 LLM07 방어 규칙", source)
-        self.assertIn("절대로 출력하지 않는다", source)
+        self.assertIn("교육용 정책 식별자:", source)
+        self.assertIn("인가 경계:", source)
+        self.assertIn('lab:"llm07"', source)
+        self.assertNotIn("Authorization: Bearer llm08-acme-demo-token", source)
         self.assertNotIn("int-tok-c9a7-xxxx-secret", source)
 
     def test_llm06_trace_and_impact_contracts_are_explicit(self) -> None:
@@ -147,6 +149,8 @@ class StrictShellHarnessContractTest(unittest.TestCase):
 
     def test_llm09_preserves_candidate_status_and_classification(self) -> None:
         source = self.read("tests/e2e/llm09/test_llm09_misinfo.sh")
+        self.assertIn("CHAT_LAB='llm09'", source)
+        self.assertNotIn("CHAT_AUTHORIZATION", source)
         self.assertIn("llm09-candidates.jsonl", source)
         self.assertIn("http_status:", source)
         self.assertIn("status_observation:", source)

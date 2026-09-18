@@ -10,13 +10,13 @@
 | LLM05 | `/app/app/templates/index.html` | 기존 UI의 같은 모델 응답 재렌더링 | `innerHTML` 대신 `textContent` 사용 |
 | LLM06 | `/app/app/main.py` | `/api/labs/llm06/workshop/execute` | Bearer 인증과 도구·객체 인가 |
 | LLM08 | `/app/app/secure_coding.py` | `/api/labs/llm08/workshop/search` | vector scoring 전 tenant filter |
-| LLM09 | `/app/app/secure_coding.py` | `/api/labs/llm09/workshop/install` | 모델 추천과 분리된 서버 package allowlist |
+| LLM09 | `/app/app/secure_coding.py` | `/api/labs/llm09/workshop/install` | 실제 모델이 만든 패키지 후보를 설치 직전 서버 package allowlist로 검증 |
 | LLM10 | `/app/app/secure_coding.py` | `/api/labs/llm10/workshop/chat` | 입력 크기와 생성 token 예산 |
 | Day 6 | `/app/secure_coding.py` | `/api/labs/secure-coding/scan` | 모델 호출 전 Presidio 개인정보 탐지·비식별화 |
 
 LLM03·LLM07은 억지로 한 줄 전환 형태로 만들지 않는다. LLM03은 모델 파일 생성·서명·검증·등록의 생명주기 전체가 방어 경계다. LLM07은 시스템 프롬프트에서 비밀과 권한 결정을 제거하고 서버 정책으로 옮기는 아키텍처 문제다. 이 두 항목을 한 줄짜리 `safe=True`로 축소하면 수강생이 실제 방어 범위를 오해한다. LLM09의 한 줄 전환은 패키지를 실제 설치하는 코드가 아니라 설치 직전의 신뢰 경계만 비교하며, 기존 격리 설치 실습은 별도로 유지한다.
 
-`tools/check_secure_coding_pairs.py`는 아홉 표식이 각각 한 번 존재하는지, 취약 호출이 활성화돼 있는지, 안전 호출이 바로 아래에 주석 상태로 있는지 검사한다. 관련 단위 테스트는 같은 API에서 전환 전후의 정책 결과가 실제로 달라지는지 검증한다. `tests/e2e/secure-coding/run-workshop.sh`의 safe 모드는 취약 source로 image를 한 번 build한 뒤 source를 안전 호출로 전환하고 같은 container의 restart만으로 결과가 바뀌는지 검증한다. 설치 계약 테스트는 모든 RAG 컨테이너와 Agent에서 `/app/app` mount가 없고 이미지 source가 쓰기 가능하며 `Network=host` 없이 각 고정 포트가 publish되는지도 검사한다. `tools/toggle_secure_coding_lab.py`는 이 게시자 E2E에서만 사용하는 보조 도구이며 수강생 교재에는 노출하지 않는다. 수강생은 로컬 `vi`에서 두 줄을 직접 바꿔 코드 차이를 읽는다.
+`tools/check_secure_coding_pairs.py`는 아홉 표식이 각각 한 번 존재하는지, 취약 호출이 활성화돼 있는지, 안전 호출이 바로 아래에 주석 상태로 있는지 검사한다. 관련 단위 테스트는 같은 API에서 전환 전후의 정책 결과가 실제로 달라지는지 검증한다. LLM09 endpoint는 두 모드 모두 먼저 실제 모델의 구조화된 패키지 후보를 받은 뒤 같은 후보를 취약 신뢰 함수 또는 서버 allowlist에 전달한다. `tests/e2e/secure-coding/run-workshop.sh`의 safe 모드는 취약 source로 image를 한 번 build한 뒤 source를 안전 호출로 전환하고 같은 container의 restart만으로 결과가 바뀌는지 검증한다. 설치 계약 테스트는 모든 RAG 컨테이너와 Agent에서 `/app/app` mount가 없고 이미지 source가 쓰기 가능하며 `Network=host` 없이 각 고정 포트가 publish되는지도 검사한다. `tools/toggle_secure_coding_lab.py`는 이 게시자 E2E에서만 사용하는 보조 도구이며 수강생 교재에는 노출하지 않는다. 수강생은 로컬 `vi`에서 두 줄을 직접 바꿔 코드 차이를 읽는다.
 LLM02 수강생 흐름은 C-2001 Bearer token으로 서버 principal을 만든 뒤 Ollama Planner가 read-only `get_customer_record` 제안을 생성하게 한다. Planner는 token·DB credential·고객 레코드를 받지 않는다. 취약 실행기는 제안된 C-2002와 민감 field를 애플리케이션의 DB 권한으로 조회하지만, 안전 실행기는 `customer-scope-denied`와 `field-not-allowed`를 DB 조회 전에 적용한다. 같은 `run_llm02_policy_chat()`을 workshop endpoint와 `/api/chat`이 공유하므로 UI도 동일한 Tool Executor를 사용한다. body의 `customer_id`는 안전 direct API가 Planner 호출 전에 `422`로 거부하며, 이는 핵심 LLM02 공격이 아니라 일반 IDOR 대조군이다. 실습이 끝나면 `docker compose up -d --no-deps --force-recreate data-rag`가 공개 취약 이미지에서 `data-rag`를 다시 생성한다.
 
 LLM08 RAG 실습도 `run_llm08_rag_policy_chat()`이 출처 필터를 한 번 선택한 뒤 `run_llm08_rag_chat()`을 호출한다. 전용 workshop endpoint와 8010 UI의 `/api/chat`은 이 함수를 공유하므로 주석 전환이 두 경로에 동시에 적용된다. UI의 `lab` 값은 `llm02`와 `llm08-rag-poisoning`만 정본으로 사용하며 인증이나 문서 승인 상태를 결정하지 않는다. 문서 주입과 목록도 `/api/labs/llm08/rag-poisoning/documents`를 사용해 별도 UI corpus가 생기지 않는다.

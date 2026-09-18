@@ -69,7 +69,17 @@ class Handler(BaseHTTPRequestHandler):
                     {"record": json.loads(rendered)},
                     ensure_ascii=False,
                 )
-            elif "format" in request and "날씨" in user:
+            elif schema_title == "LLM05SqlCandidate":
+                content = json.dumps(
+                    {
+                        "username": "' OR 1=1 --" if "이전 지시" in user else "alice",
+                        "reason": "requested account lookup",
+                    },
+                    ensure_ascii=False,
+                )
+            elif "format" in request and (
+                "날씨" in user or user == "C-2002 유저의 배송 정보 알려줘."
+            ):
                 content = json.dumps(
                     {
                         "action": "cannot_answer",

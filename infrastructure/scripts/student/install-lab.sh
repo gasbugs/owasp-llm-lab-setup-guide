@@ -203,12 +203,6 @@ install -m 0644 -o ubuntu -g ubuntu \
 rm -f "$FAKE_REGISTRY_TMP"
 chown -R ubuntu:ubuntu /home/ubuntu/work/fake-registry
 
-echo "[install-lab] preparing lab portal files"
-mkdir -p /home/ubuntu/work/portal
-curl -fsSL "$RAW_URL/infrastructure/portal/index.html" -o /home/ubuntu/work/portal/index.html
-curl -fsSL "$RAW_URL/infrastructure/portal/server.py" -o /home/ubuntu/work/portal/server.py
-chown -R ubuntu:ubuntu /home/ubuntu/work/portal
-
 echo "[install-lab] preparing the port 80 URI reverse proxy"
 mkdir -p /home/ubuntu/work/reverse-proxy
 curl -fsSL \
@@ -260,6 +254,7 @@ rm -f "$COMPOSE_CANDIDATE"
 cat > "$COMPOSE_DIR/.env" <<EOF
 IMAGE_NAMESPACE=$IMAGE_NAMESPACE
 COMPOSE_IMAGE_TAG=$IMAGE_TAG
+COMMON_IMAGE_TAG=$IMAGE_TAG
 OLLAMA_MODEL=$OLLAMA_MODEL
 OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL
 LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
@@ -280,6 +275,7 @@ all_units=(
   lab-llmgoat
   lab-dvla
   lab-fake-registry
+  lab-common
   lab-portal
   lab-vuln-rag
   lab-day1-vuln-rag
@@ -311,6 +307,7 @@ units=(
   lab-llmgoat
   lab-dvla
   lab-fake-registry
+  lab-common
   lab-portal
   lab-vuln-rag
   lab-day1-vuln-rag

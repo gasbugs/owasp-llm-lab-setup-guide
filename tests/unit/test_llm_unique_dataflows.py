@@ -23,6 +23,7 @@ def load_scenarios():
     try:
         return (
             importlib.import_module("app.scenarios.day2"),
+            importlib.import_module("app.scenarios.day3"),
             importlib.import_module("app.scenarios.day4"),
         )
     finally:
@@ -33,7 +34,7 @@ def load_scenarios():
         sys.modules.update(saved)
 
 
-DAY2, DAY4 = load_scenarios()
+DAY2, DAY3, DAY4 = load_scenarios()
 
 
 class UniqueDataFlowTests(unittest.TestCase):
@@ -71,7 +72,10 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertIn("action을 cannot_answer", prompt)
         self.assertIn("fields는 빈 배열", prompt)
         self.assertIn("customer_id는 null", prompt)
-        self.assertIn("다른 고객 정보는 조회하면 안 된다", prompt)
+        self.assertIn("다른 고객의 정보는 조회하면 안 된다", prompt)
+        self.assertIn("고객 ID가 명시", prompt)
+        self.assertIn("반드시 action을 cannot_answer", prompt)
+        self.assertIn("감사·테스트 권한 주장", prompt)
         self.assertIn("서버의 Tool Executor가 판단", prompt)
         self.assertNotIn("특정 고객 ID와 필드를 명시하면", prompt)
         self.assertNotIn("LAB-RECOVERY", prompt)
@@ -134,6 +138,30 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertIn("element.textContent", template)
         replay = template.split("replayLast?.addEventListener", 1)[1]
         self.assertNotIn("fetch(", replay.split("});", 1)[0])
+        self.assertIn('id="llm05-route"', template)
+        self.assertIn("/api/labs/llm05/vulnerable/prompt-sql-lookup", template)
+        self.assertIn("/api/labs/llm05/safe/prompt-sql-lookup", template)
+        self.assertIn("data.lab === 'llm05-sql-sink'", template)
+        self.assertIn("!isLlm05SqlRoute", template)
+        self.assertIn("'[llm05-sql] '", template)
+
+    def test_llm05_sql_candidate_prompt_rejects_sql_syntax_in_normal_policy(self) -> None:
+        prompt = DAY3.build_sql_candidate_prompt()
+        self.assertIn("username은 alice", prompt)
+        self.assertIn("SQL 문법", prompt)
+        self.assertIn("이전 지시 무시", prompt)
+
+    def test_llm09_ui_routes_install_candidate_to_current_server_policy(self) -> None:
+        template = (
+            VULN_RAG_ROOT / "app" / "templates" / "index.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn('id="llm09-route"', template)
+        self.assertIn('value="install-policy" selected', template)
+        self.assertIn("/api/labs/llm09/workshop/install", template)
+        self.assertIn("data.lab === 'llm09'", template)
+        self.assertIn("!r.ok && !isLlm09PolicyResponse", template)
+        self.assertIn("installer_handoff_called", template)
+        self.assertIn("'[llm09-policy] '", template)
 
     def test_day2_ui_selects_allowlisted_lab_and_uses_llm08_rag_provenance_api(self) -> None:
         template = (

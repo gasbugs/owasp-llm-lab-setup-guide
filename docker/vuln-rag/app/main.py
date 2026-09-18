@@ -49,6 +49,7 @@ from app.secure_coding import (
 from app.scenarios import SCENARIO_NAMES, list_scenarios
 from app.scenarios import day1 as day1_scenario
 from app.scenarios import day2 as day2_scenario
+from app.scenarios import day3 as day3_scenario
 from app.scenarios import day4 as day4_scenario
 from app.scenarios import llm04 as llm04_scenario
 
@@ -108,7 +109,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
     scenario: str | None = None
-    lab: Literal["llm02", "llm08-rag-poisoning"] | None = None
+    lab: Literal["llm02", "llm07", "llm08-rag-poisoning", "llm09"] | None = None
     customer_id: str | None = None
     top_k: int = Field(default=5, ge=1, le=10)
     min_score: float = Field(default=0.0, ge=-1.0, le=1.0)
@@ -169,10 +170,30 @@ class LLM05SqlLookupRequest(BaseModel):
     model_output: str = Field(min_length=1, max_length=500)
 
 
+class LLM05PromptSqlLookupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=4096)
+
+
+class LLM05SqlCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(min_length=1, max_length=500)
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class LLM09WorkshopRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    message: str = Field(min_length=1, max_length=4096)
+
+
+class LLM09PackageCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     candidate: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class ClassifiedRagRequest(BaseModel):
@@ -567,12 +588,27 @@ async def llm08_secure_coding_workshop(
 async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
     require_workshop_scenario("day4")
 
-    decision = select_llm09_package_policy(request_body.candidate)
+    try:
+        raw_proposal = await llm.structured_chat(
+            system=day4_scenario.build_llm09_candidate_prompt(),
+            user=request_body.message,
+            schema=LLM09PackageCandidate.model_json_schema(),
+        )
+        proposal = LLM09PackageCandidate.model_validate(raw_proposal)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="model returned invalid package candidate",
+        ) from exc
+
+    decision = select_llm09_package_policy(proposal.candidate)
 
     installer_handoff_called = decision.application_decision == "allow"
-    emit_security_event(decision, upstream_called=False)
+    emit_security_event(decision, upstream_called=True)
     content = {
-        "candidate": request_body.candidate,
+        "candidate": proposal.candidate,
+        "model_proposal": proposal.model_dump(),
+        "planner_model_called": True,
         **decision.__dict__,
         "verification_source": (
             "server-approved-package-allowlist"
@@ -580,7 +616,7 @@ async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
             else "model-output-only"
         ),
         "installer_handoff_called": installer_handoff_called,
-        "upstream_called": False,
+        "upstream_called": True,
     }
     if decision.application_decision == "block":
         return JSONResponse(status_code=422, content=content)
@@ -689,6 +725,46 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
         ]
         llm_ids = ["LLM02"]
         dynamic_values = ["인가된 조회 결과"]
+    elif selected.id == "day3":
+        prompts = [
+            {
+                "stage": "generation",
+                "title": selected.title,
+                "content": selected.build_system_prompt(context=context_marker),
+            },
+            {
+                "stage": "sql-candidate",
+                "title": "LLM05 SQL Candidate",
+                "content": day3_scenario.build_sql_candidate_prompt(),
+            },
+        ]
+        llm_ids = ["LLM05"]
+        dynamic_values = ["검색·업무 Context"]
+    elif selected.id == "day4":
+        active_lab = "llm09" if lab == "llm09" else "llm07"
+        if active_lab == "llm09":
+            prompts = [
+                {
+                    "stage": "generation",
+                    "title": "LLM09 Misinformation",
+                    "content": day4_scenario.build_llm09_system_prompt(),
+                },
+                {
+                    "stage": "install-candidate",
+                    "title": "LLM09 Package Candidate",
+                    "content": day4_scenario.build_llm09_candidate_prompt(),
+                },
+            ]
+        else:
+            prompts = [
+                {
+                    "stage": "generation",
+                    "title": "LLM07 System Prompt Leakage",
+                    "content": day4_scenario.build_llm07_system_prompt(),
+                }
+            ]
+        llm_ids = [active_lab.upper()]
+        dynamic_values = []
     else:
         if selected.id == "day1":
             prompt_content = day1_scenario.build_system_prompt_preview()
@@ -708,7 +784,6 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
             "day2": ["LLM08"],
             "llm04": ["LLM04"],
             "day3": ["LLM05"],
-            "day4": ["LLM07", "LLM08", "LLM09"],
             "day5": ["LLM10"],
         }[selected.id]
         dynamic_values = (
@@ -874,6 +949,33 @@ def llm05_account_lookup(model_output: str, *, safe: bool) -> dict:
     return result
 
 
+async def run_llm05_prompt_sql_lookup(
+    request_body: LLM05PromptSqlLookupRequest,
+    *,
+    safe: bool,
+) -> dict:
+    """Convert a natural-language request to an untrusted model string, then query."""
+    try:
+        raw_candidate = await llm.structured_chat(
+            system=day3_scenario.build_sql_candidate_prompt(),
+            user=request_body.message,
+            schema=LLM05SqlCandidate.model_json_schema(),
+        )
+        candidate = LLM05SqlCandidate.model_validate(raw_candidate)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="model returned invalid SQL lookup candidate",
+        ) from exc
+
+    result = llm05_account_lookup(candidate.username, safe=safe)
+    return {
+        **result,
+        "planner_model_called": True,
+        "tool_proposal": candidate.model_dump(),
+    }
+
+
 @app.post("/api/labs/llm05/vulnerable/sql-lookup")
 async def llm05_vulnerable_sql_lookup(request_body: LLM05SqlLookupRequest):
     return llm05_account_lookup(request_body.model_output, safe=False)
@@ -882,6 +984,18 @@ async def llm05_vulnerable_sql_lookup(request_body: LLM05SqlLookupRequest):
 @app.post("/api/labs/llm05/safe/sql-lookup")
 async def llm05_safe_sql_lookup(request_body: LLM05SqlLookupRequest):
     return llm05_account_lookup(request_body.model_output, safe=True)
+
+
+@app.post("/api/labs/llm05/vulnerable/prompt-sql-lookup")
+async def llm05_vulnerable_prompt_sql_lookup(
+    request_body: LLM05PromptSqlLookupRequest,
+):
+    return await run_llm05_prompt_sql_lookup(request_body, safe=False)
+
+
+@app.post("/api/labs/llm05/safe/prompt-sql-lookup")
+async def llm05_safe_prompt_sql_lookup(request_body: LLM05PromptSqlLookupRequest):
+    return await run_llm05_prompt_sql_lookup(request_body, safe=True)
 
 
 @app.get("/api/labs/llm07/policy-canonical")
@@ -1056,8 +1170,18 @@ async def llm08_target_vector(request: Request):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, scenario: str | None = None):
+async def index(request: Request, scenario: str | None = None, lab: str | None = None):
     selected = get_scenario(scenario)
+    active_lab = "llm09" if selected.id == "day4" and lab == "llm09" else (
+        "llm07" if selected.id == "day4" else None
+    )
+    scenario_title = selected.title
+    scenario_intro = selected.intro
+    warning = selected.warning
+    if active_lab == "llm09":
+        scenario_title = "허위정보 (LLM09)"
+        scenario_intro = "모델의 패키지 추천을 외부 근거로 확인하기 전에는 신뢰할 수 없음을 확인합니다."
+        warning = "의도적 취약 — 존재하지 않는 패키지를 그럴듯하게 추천할 수 있습니다."
     # Starlette 4.x 시그니처 — (request, name, context). 이전 (name, context with "request") 호출은
     # context dict를 cache key 후보로 보고 `unhashable type: 'dict'` 발생.
     return templates.TemplateResponse(
@@ -1065,9 +1189,10 @@ async def index(request: Request, scenario: str | None = None):
         "index.html",
         {
             "scenario_id": selected.id,
-            "scenario_title": selected.title,
-            "scenario_intro": selected.intro,
-            "warning": selected.warning,
+            "scenario_title": scenario_title,
+            "scenario_intro": scenario_intro,
+            "warning": warning,
+            "active_lab": active_lab,
             "scenarios": SCENARIOS.values(),
             "show_guardrail_panel": SHOW_GUARDRAIL_PANEL,
         },
@@ -1146,6 +1271,13 @@ async def chat(req: ChatRequest, request: Request):
     if selected.id == "day1":
         context = None
         system_prompt = day1_scenario.build_system_prompt()
+    elif selected.id == "day4":
+        context = None
+        system_prompt = (
+            day4_scenario.build_llm09_system_prompt()
+            if req.lab == "llm09"
+            else day4_scenario.build_llm07_system_prompt()
+        )
     else:
         retrieval = await search_documents(
             req.message, selected, request, top_k=req.top_k, min_score=req.min_score

@@ -27,6 +27,7 @@ configs:
       resolver 127.0.0.11 valid=10s ipv6=off;
 
       upstream portal_backend { zone portal_backend 64k; server portal:8080 resolve; }
+      upstream common_backend { zone common_backend 64k; server common:8080 resolve; }
       upstream prompt_rag_backend { zone prompt_rag_backend 64k; server prompt-rag:8000 resolve; }
       upstream llm04_rag_backend { zone llm04_rag_backend 64k; server llm04-rag:8004 resolve; }
       upstream data_rag_backend { zone data_rag_backend 64k; server data-rag:8010 resolve; }
@@ -56,6 +57,7 @@ configs:
           proxy_set_header Connection $$connection_upgrade;
 
           location = /prompt-rag { return 308 /prompt-rag/; }
+          location = /common/theme.css { proxy_pass http://common_backend/theme.css; }
           location /prompt-rag/ { proxy_pass http://prompt_rag_backend/; }
           location = /llm04-rag { return 308 /llm04-rag/; }
           location /llm04-rag/ { proxy_pass http://llm04_rag_backend/; }
@@ -280,12 +282,14 @@ services:
       - /home/ubuntu/work/fake-registry:/app
     command: ["python", "/app/server.py"]
 
+  common:
+    container_name: lab-common
+    image: ghcr.io/gasbugs/owasp-llm-common:${COMMON_IMAGE_TAG:-latest}
+    restart: always
+
   portal:
     container_name: lab-portal
-    image: docker.io/library/python:3.12-slim
+    image: ghcr.io/gasbugs/owasp-llm-portal:${COMPOSE_IMAGE_TAG:-latest}
     restart: always
     ports:
       - "8080:8080"
-    volumes:
-      - /home/ubuntu/work/portal:/app
-    command: ["python", "/app/server.py"]

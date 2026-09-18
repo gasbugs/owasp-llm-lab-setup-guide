@@ -7,10 +7,10 @@
   <style>
     :root {
       color-scheme:dark;
-      --canvas:#071018; --surface:#0c1822; --surface-raised:#112330; --rail:#1b3445;
-      --line:#284353; --line-soft:#1a303d; --ink:#e8f0f4; --muted:#8fa7b5;
-      --signal:#55c2d8; --warning:#f0b35b; --incident:#ff6978; --verified:#55d69e;
-      --shadow:0 24px 70px rgba(0,0,0,.34); --radius:14px;
+      --canvas:#0b0b0c; --surface:#151517; --surface-raised:#1c1c1f; --rail:#252529;
+      --line:#303036; --line-soft:#242428; --ink:#f2f2f3; --muted:#a2a2aa;
+      --signal:#64d5e6; --signal-soft:rgba(100,213,230,.1); --warning:#f5bb63; --incident:#ff7185; --verified:#65dda6;
+      --shadow:0 24px 70px rgba(0,0,0,.42); --radius:14px;
     }
     html[data-theme="light"] {
       color-scheme:light;
@@ -71,7 +71,7 @@
     .composer { display:grid; gap:10px; }.composer textarea { min-height:96px; resize:vertical; }.composer-actions { display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
     button { border:1px solid transparent; border-radius:9px; padding:10px 14px; background:var(--signal); color:#06131a; font-weight:800; cursor:pointer; }.secondary { border-color:var(--line); background:transparent; color:var(--ink); }button:disabled { opacity:.42; cursor:not-allowed; }
     .render-toggle { display:flex; align-items:center; gap:8px; margin-right:auto; color:var(--muted); font-size:12px; }.render-toggle input { accent-color:var(--warning); }
-    .row { display:grid; gap:6px; margin:11px 0; }textarea { min-height:72px; }#doc-text { min-height:116px; }
+    .row { display:grid; gap:6px; margin:11px 0; }.route-note { margin:0; padding-left:9px; border-left:2px solid var(--warning); color:var(--muted); font-size:11px; }textarea { min-height:72px; }#doc-text { min-height:116px; }
     .status { margin-top:10px; color:var(--muted); font:12px ui-monospace,monospace; min-height:20px; }
     .guard-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }.guard-field { border-left:3px solid var(--line); padding:9px 10px; background:var(--surface-raised); }.guard-field strong { display:block; color:var(--muted); font:10px ui-monospace,monospace; text-transform:uppercase; letter-spacing:.07em; }.guard-field span { display:block; margin-top:4px; overflow-wrap:anywhere; }
     #guard-checks { max-height:210px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; padding:10px; background:var(--surface-raised); font:11px/1.5 ui-monospace,monospace; }
@@ -82,6 +82,7 @@
     @media(max-width:560px){.masthead{grid-template-columns:1fr}.brand{grid-column:1;grid-row:1}.top-actions{grid-column:1;grid-row:2;justify-content:flex-start}.mission{grid-column:1;grid-row:3}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}.pending-dot{animation:none;opacity:.7;transform:none}}
   </style>
+  <link rel="stylesheet" href="/common/theme.css">
 </head>
 <body>
 <div class="app-layout">
@@ -131,6 +132,8 @@
         <div class="panel-body">
           <form id="form" class="composer">
             <label for="message">프롬프트 입력</label><textarea id="message" placeholder="페이로드 또는 자연어 입력..." required></textarea>
+            {% if scenario_id == "day3" %}<div class="row"><label for="llm05-route">LLM05 실행 경로</label><select id="llm05-route"><option value="chat">메모 채팅 · HTML 출력</option><option value="vulnerable-sql">취약 SQL 조회 · 문자열 결합</option><option value="safe-sql">안전 SQL 조회 · Parameter binding</option></select></div>{% endif %}
+            {% if active_lab == "llm09" %}<div class="row"><label for="llm09-route">LLM09 실행 경로</label><select id="llm09-route"><option value="install-policy" selected>설치 정책 검증 · 현재 서버 정책</option><option value="chat">일반 추천 · 모델 응답</option></select><p class="route-note">실제 패키지를 설치하지 않고, 모델 후보가 설치 단계로 전달됐는지만 표시합니다.</p></div>{% endif %}
             <div class="composer-actions">{% if scenario_id == "day3" %}<label class="render-toggle"><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 · LLM05 전용</label>{% endif %}<button id="chat-submit" type="submit">요청 전송</button>{% if scenario_id == "day3" %}<button id="replay-last" type="button" disabled class="secondary">마지막 응답 다시 렌더링</button>{% endif %}</div>
           </form>
         </div>
@@ -152,15 +155,12 @@
           </form>
         </div>
       </section>
-      {% if scenario_id != "day1" %}
+      {% if scenario_id not in ("day1", "day4") %}
       <section id="retrieval-panel" class="panel">
         <header class="panel-head"><div><div class="eyebrow">Retrieval evidence</div><h2>문서 유사도 검색</h2></div></header>
         <div class="panel-body">
           <p>검색어와 문서를 임베딩으로 바꿔 cosine 유사도를 비교합니다. 점수가 클수록 의미가 가깝지만, 사실 여부나 접근 권한을 뜻하지는 않습니다. 검색만 실행하면 답변 모델은 호출하지 않습니다.</p>
           <form id="search-form">
-            {% if scenario_id == "day4" %}
-            <div class="row"><label for="search-token">문서 접근용 Bearer token</label><input id="search-token" type="password" autocomplete="off" placeholder="본인 Tenant의 토큰을 입력합니다" required></div>
-            {% endif %}
             <div class="row"><label for="search-query">검색어</label><input id="search-query" type="text" required maxlength="4096"></div>
             <div class="row"><label for="search-top-k">최대 결과 수</label><input id="search-top-k" type="number" min="1" max="10" value="5" required></div>
             <div class="row"><label for="search-min-score">최소 유사도 (-1~1)</label><input id="search-min-score" type="number" min="-1" max="1" step="0.05" value="0" required></div>
@@ -229,9 +229,12 @@ const msg = document.getElementById('message');
 const submitButton = document.getElementById('chat-submit');
 const renderHTML = document.getElementById('render-html');
 const replayLast = document.getElementById('replay-last');
+const llm05Route = document.getElementById('llm05-route');
+const llm09Route = document.getElementById('llm09-route');
 const scenarioSelect = document.getElementById('scenario');
 const labSelect = document.getElementById('lab');
 const requestedLab = new URLSearchParams(window.location.search).get('lab');
+const serverActiveLab = '{{ active_lab or "" }}';
 if (labSelect && [...labSelect.options].some((option) => option.value === requestedLab)) {
   labSelect.value = requestedLab;
 }
@@ -239,7 +242,7 @@ const activeLab = scenarioSelect.value === 'day1' ? 'llm01'
   : scenarioSelect.value === 'day2' ? (labSelect?.value === 'llm08-rag-poisoning' ? 'llm08' : 'llm02')
   : scenarioSelect.value === 'llm04' ? 'llm04'
   : scenarioSelect.value === 'day3' ? 'llm05'
-  : scenarioSelect.value === 'day4' ? (requestedLab === 'llm09' ? 'llm09' : 'llm07')
+  : scenarioSelect.value === 'day4' ? (serverActiveLab || (requestedLab === 'llm09' ? 'llm09' : 'llm07'))
   : scenarioSelect.value === 'day5' ? 'llm10'
   : null;
 function markActiveLab(lab) {
@@ -318,6 +321,7 @@ async function loadSystemPrompt() {
   try {
     const params = new URLSearchParams({scenario: scenarioSelect.value});
     if (labSelect) params.set('lab', labSelect.value);
+    if (scenarioSelect.value === 'day4') params.set('lab', activeLab);
     const response = await fetch(appUrl(`/api/system-prompt?${params}`));
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
@@ -436,8 +440,22 @@ form.addEventListener('submit', async (e) => {
   const headers = {'Content-Type': 'application/json'};
   const searchToken = document.getElementById('search-token')?.value.trim();
   if (searchToken) headers.Authorization = `Bearer ${searchToken}`;
-  const body = { message: text, session_id: 'default', scenario: scenarioSelect.value };
-  if (retrievalPanel && !retrievalPanel.hidden) {
+  let endpoint = '/api/chat';
+  let body = { message: text, session_id: 'default', scenario: scenarioSelect.value };
+  if (scenarioSelect.value === 'day4') body.lab = activeLab;
+  const isLlm05SqlRoute = scenarioSelect.value === 'day3' && llm05Route?.value !== 'chat';
+  if (isLlm05SqlRoute) {
+    endpoint = llm05Route.value === 'safe-sql'
+      ? '/api/labs/llm05/safe/prompt-sql-lookup'
+      : '/api/labs/llm05/vulnerable/prompt-sql-lookup';
+    body = {message: text};
+  }
+  const isLlm09InstallRoute = activeLab === 'llm09' && llm09Route?.value === 'install-policy';
+  if (isLlm09InstallRoute) {
+    endpoint = '/api/labs/llm09/workshop/install';
+    body = {message: text};
+  }
+  if (retrievalPanel && !retrievalPanel.hidden && !isLlm05SqlRoute) {
     body.top_k = Number(document.getElementById('search-top-k').value);
     body.min_score = Number(document.getElementById('search-min-score').value);
   }
@@ -449,7 +467,7 @@ form.addEventListener('submit', async (e) => {
     }
   }
   try {
-    const r = await fetch(appUrl('/api/chat'), {
+    const r = await fetch(appUrl(endpoint), {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -458,14 +476,23 @@ form.addEventListener('submit', async (e) => {
     pending.remove();
     const retrieval = data.retrieval || data.debug?.retrieval || data.vector_search;
     if (retrieval) showRetrieval(retrieval);
-    if (!r.ok) {
+    const isLlm09PolicyResponse = data.lab === 'llm09'
+      && data.model_proposal
+      && typeof data.installer_handoff_called === 'boolean';
+    if (!r.ok && !isLlm09PolicyResponse) {
       lastBotReply = null;
       if (replayLast) replayLast.disabled = true;
       add('debug', `HTTP ${r.status} · ${data.reply || data.detail || '요청 처리 실패'}`);
       if (data.trace) add('debug', JSON.stringify(data.trace));
       return;
     }
-    const reply = data.reply ?? data.detail ?? `HTTP ${r.status}`;
+    const sqlReply = data.lab === 'llm05-sql-sink'
+      ? `model_output=${JSON.stringify(data.model_output)} · policy=${data.policy} · rows=${JSON.stringify(data.rows)}`
+      : null;
+    const llm09Reply = isLlm09PolicyResponse
+      ? `HTTP ${r.status} · ${data.installer_handoff_called ? '설치 단계 전달' : '설치 전 차단'} · candidate=${JSON.stringify(data.candidate)} · policy=${data.policy}`
+      : null;
+    const reply = data.reply ?? sqlReply ?? llm09Reply ?? data.detail ?? `HTTP ${r.status}`;
     lastBotReply = reply;
     if (replayLast) replayLast.disabled = false;
     add('bot', reply, renderHTML?.checked === true);
@@ -479,7 +506,26 @@ form.addEventListener('submit', async (e) => {
       }));
       add('debug', '[retrieved] ' + JSON.stringify(data.retrieval.hits ?? []));
     }
-    if (data.tool_proposal || data.trace?.blocking_reason) {
+    if (data.lab === 'llm05-sql-sink') {
+      add('debug', '[llm05-sql] ' + JSON.stringify({
+        proposal: data.tool_proposal ?? null,
+        model_output: data.model_output ?? null,
+        policy: data.policy ?? null,
+        row_count: data.row_count ?? null,
+      }));
+    } else if (isLlm09PolicyResponse) {
+      add('debug', '[llm09-policy] ' + JSON.stringify({
+        http_status: r.status,
+        model_proposal: data.model_proposal,
+        planner_model_called: data.planner_model_called,
+        upstream_called: data.upstream_called,
+        policy: data.policy,
+        application_decision: data.application_decision,
+        blocking_reason: data.blocking_reason ?? null,
+        verification_source: data.verification_source,
+        installer_handoff_called: data.installer_handoff_called,
+      }));
+    } else if (data.tool_proposal || data.trace?.blocking_reason) {
       add('debug', '[llm02-tool] ' + JSON.stringify({
         tool: data.tool ?? 'get_customer_record',
         proposal: data.tool_proposal ?? null,

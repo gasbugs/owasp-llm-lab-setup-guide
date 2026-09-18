@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+import re
 from pathlib import Path
 
 from jinja2 import Environment
@@ -12,6 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 RAG_UI = ROOT / "docker/vuln-rag/app/templates/index.html"
 AGENT_UI = ROOT / "docker/vuln-agent/app/templates/index.html"
 CONTROL_UI = ROOT / "llm-security-control-plane/application-gateway/index.html"
+PORTAL_UI = ROOT / "infrastructure/portal/index.html"
+THEME_TOKENS = ROOT / "docker/shared-ui/theme.css"
 PRESIDIO_API = ROOT / "examples/day6/presidio/server.py"
 NEMO_API = ROOT / "examples/day6/nemo-guardrails/server.py"
 RAG_SCENARIOS = ROOT / "docker/vuln-rag/app/scenarios"
@@ -23,6 +26,8 @@ class UiDesignSystemTests(unittest.TestCase):
         cls.rag = RAG_UI.read_text(encoding="utf-8")
         cls.agent = AGENT_UI.read_text(encoding="utf-8")
         cls.control = CONTROL_UI.read_text(encoding="utf-8")
+        cls.portal = PORTAL_UI.read_text(encoding="utf-8")
+        cls.theme = THEME_TOKENS.read_text(encoding="utf-8")
 
     def test_three_apps_share_brand_theme_and_core_tokens(self) -> None:
         for source in (self.rag, self.agent):
@@ -33,10 +38,46 @@ class UiDesignSystemTests(unittest.TestCase):
         for source in (self.rag, self.agent, self.control):
             self.assertIn('id="theme-toggle"', source)
             self.assertIn("llm-lab-theme", source)
-            for token in ("--canvas:#071018", "--signal:#55c2d8", "--incident:#ff6978"):
-                self.assertIn(token, source)
             self.assertIn("prefers-reduced-motion:reduce", source)
             self.assertIn("@media", source)
+
+    def test_first_party_dark_modes_match_the_shared_neutral_token_library(self) -> None:
+        token_names = (
+            "canvas",
+            "surface",
+            "surface-raised",
+            "rail",
+            "line",
+            "line-soft",
+            "ink",
+            "muted",
+            "signal",
+            "signal-soft",
+            "warning",
+            "incident",
+            "verified",
+            "shadow",
+        )
+
+        def dark_tokens(source: str) -> dict[str, str]:
+            dark_block = source.split("html[data-theme=", 1)[0].split(
+                ":root[data-theme=", 1
+            )[0]
+            values = dict(re.findall(r"--([\w-]+)\s*:\s*([^;]+);", dark_block))
+            return {
+                name: re.sub(r"\s+", "", values[name]).replace("0.", ".")
+                for name in token_names
+            }
+
+        expected = dark_tokens(self.theme)
+        for name, source in (
+            ("portal", self.portal),
+            ("vuln-rag", self.rag),
+            ("vuln-agent", self.agent),
+            ("control-plane", self.control),
+        ):
+            with self.subTest(name=name):
+                self.assertEqual(dark_tokens(source), expected)
 
     def test_agent_ui_preserves_execution_workbench_controls(self) -> None:
         for control_id in (
@@ -68,6 +109,8 @@ class UiDesignSystemTests(unittest.TestCase):
             "message",
             "render-html",
             "replay-last",
+            "llm05-route",
+            "llm09-route",
             "document-panel",
             "inject-form",
             "refresh-docs",
@@ -83,6 +126,7 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn(f'id="{control_id}"', self.rag)
         for endpoint in (
             "/api/chat",
+            "/api/labs/llm09/workshop/install",
             "/api/labs/llm08/rag-poisoning/documents",
             "/api/admin/inject-doc",
         ):
@@ -105,7 +149,10 @@ class UiDesignSystemTests(unittest.TestCase):
             "replayLast?.addEventListener", 1
         )[0]
         self.assertIn("const retrievalPanel = document.getElementById('retrieval-panel');", self.rag)
-        self.assertIn("if (retrievalPanel && !retrievalPanel.hidden)", submit_handler)
+        self.assertIn(
+            "if (retrievalPanel && !retrievalPanel.hidden && !isLlm05SqlRoute)",
+            submit_handler,
+        )
         self.assertNotIn("document.getElementById('retrieval-panel').hidden", submit_handler)
         self.assertIn('id="chat-submit" type="submit"', self.rag)
         self.assertIn("submitButton.textContent = '응답 대기 중…';", self.rag)
@@ -162,6 +209,22 @@ class UiDesignSystemTests(unittest.TestCase):
             self.rag,
         )
         self.assertIn("renderHTML?.checked === true", self.rag)
+
+    def test_llm09_install_policy_control_only_renders_for_llm09(self) -> None:
+        template = Environment(autoescape=True).from_string(self.rag)
+        common = {
+            "scenario_id": "day4",
+            "scenario_title": "Knowledge Lab",
+            "scenario_intro": "",
+            "warning": "",
+            "scenarios": [],
+            "show_guardrail_panel": False,
+        }
+        llm09 = template.render(**common, active_lab="llm09")
+        llm07 = template.render(**common, active_lab="llm07")
+        self.assertIn('id="llm09-route"', llm09)
+        self.assertIn("실제 패키지를 설치하지 않고", llm09)
+        self.assertNotIn('id="llm09-route"', llm07)
 
     def test_vulnerable_rag_ui_hides_internal_day_identifiers(self) -> None:
         for visible_fragment in (
