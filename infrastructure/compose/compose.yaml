@@ -1,7 +1,7 @@
 name: owasp-llm-lab
 
 x-rag-common: &rag-common
-  image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-vuln-rag:${IMAGE_TAG:-latest}
+  image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-vuln-rag:${COMPOSE_IMAGE_TAG:-latest}
   restart: always
   environment: &rag-environment
     OLLAMA_URL: http://ollama:11434
@@ -225,7 +225,7 @@ services:
 
   vuln-agent:
     container_name: lab-vuln-agent
-    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-vuln-agent:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-vuln-agent:${COMPOSE_IMAGE_TAG:-latest}
     restart: always
     ports:
       - "8001:8001"
@@ -238,7 +238,7 @@ services:
 
   llmgoat:
     container_name: lab-llmgoat
-    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-llmgoat:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-llmgoat:${COMPOSE_IMAGE_TAG:-latest}
     restart: always
     gpus: all
     ports:
@@ -256,7 +256,7 @@ services:
 
   dvla:
     container_name: lab-dvla
-    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-dvla:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-dvla:${COMPOSE_IMAGE_TAG:-latest}
     restart: always
     environment:
       OLLAMA_HOST: http://ollama:11434

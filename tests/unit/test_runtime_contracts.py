@@ -61,6 +61,13 @@ class RuntimeContractTest(unittest.TestCase):
             self.assertIn("ARG VCS_REF=unknown", dockerfile, image)
             self.assertIn('org.opencontainers.image.revision="$VCS_REF"', dockerfile, image)
 
+    def test_manual_compose_ignores_the_deprecated_image_tag_variable(self) -> None:
+        compose = read("infrastructure/compose/compose.yaml")
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        self.assertEqual(compose.count("${COMPOSE_IMAGE_TAG:-latest}"), 4)
+        self.assertNotIn("${IMAGE_TAG:-latest}", compose)
+        self.assertIn("COMPOSE_IMAGE_TAG=$IMAGE_TAG", installer)
+
     def test_compose_sets_same_published_port_for_each_rag_process(self) -> None:
         compose = read("infrastructure/compose/compose.yaml")
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
