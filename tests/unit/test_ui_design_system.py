@@ -100,6 +100,21 @@ class UiDesignSystemTests(unittest.TestCase):
         self.assertIn("scenarioSelect.value !== 'day2' && !isLlm04Rag", self.rag)
         self.assertIn('{% if scenario_id not in ("day2", "llm04") %} hidden{% endif %}', self.rag)
 
+    def test_chat_submit_handles_absent_retrieval_panel_and_shows_progress(self) -> None:
+        submit_handler = self.rag.split("form.addEventListener('submit'", 1)[1].split(
+            "replayLast?.addEventListener", 1
+        )[0]
+        self.assertIn("const retrievalPanel = document.getElementById('retrieval-panel');", self.rag)
+        self.assertIn("if (retrievalPanel && !retrievalPanel.hidden)", submit_handler)
+        self.assertNotIn("document.getElementById('retrieval-panel').hidden", submit_handler)
+        self.assertIn('id="chat-submit" type="submit"', self.rag)
+        self.assertIn("submitButton.textContent = '응답 대기 중…';", self.rag)
+        self.assertIn("'응답을 준비하는 중'", self.rag)
+        self.assertIn("'모델 응답을 기다리는 중'", self.rag)
+        self.assertIn("window.clearInterval(progressTimer)", self.rag)
+        self.assertIn("submitButton.disabled = false", self.rag)
+        self.assertIn("ERR · 응답을 받지 못했습니다.", self.rag)
+
     def test_general_labs_do_not_render_the_guardrail_panel(self) -> None:
         template = Environment(autoescape=True).from_string(self.rag)
         common = {

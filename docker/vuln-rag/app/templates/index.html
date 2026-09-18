@@ -66,7 +66,7 @@
     .chat { min-height:420px; max-height:58vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:18px; background:linear-gradient(180deg,var(--surface-raised),var(--surface)); }
     .chat:empty::before { content:"NO MESSAGE TRAFFIC / 프롬프트를 보내면 대화와 증거가 여기에 표시됩니다."; margin:auto; color:var(--muted); font:11px ui-monospace,monospace; text-align:center; }
     .msg { max-width:86%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .msg.user { align-self:flex-end; border-color:var(--signal); background:color-mix(in srgb,var(--signal) 9%,var(--surface-raised)); }.msg.bot,.msg.bot-replay { align-self:flex-start; border-color:var(--verified); background:color-mix(in srgb,var(--verified) 7%,var(--surface-raised)); }.msg.debug { align-self:stretch; max-width:100%; border-style:dashed; color:var(--muted); font:11px/1.5 ui-monospace,monospace; }
+    .msg.user { align-self:flex-end; border-color:var(--signal); background:color-mix(in srgb,var(--signal) 9%,var(--surface-raised)); }.msg.bot,.msg.bot-replay { align-self:flex-start; border-color:var(--verified); background:color-mix(in srgb,var(--verified) 7%,var(--surface-raised)); }.msg.pending { border-color:var(--warning); color:var(--warning); font-family:ui-monospace,"SFMono-Regular",Consolas,monospace; }.msg.debug { align-self:stretch; max-width:100%; border-style:dashed; color:var(--muted); font:11px/1.5 ui-monospace,monospace; }
     .composer { display:grid; gap:10px; }.composer textarea { min-height:96px; resize:vertical; }.composer-actions { display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
     button { border:1px solid transparent; border-radius:9px; padding:10px 14px; background:var(--signal); color:#06131a; font-weight:800; cursor:pointer; }.secondary { border-color:var(--line); background:transparent; color:var(--ink); }button:disabled { opacity:.42; cursor:not-allowed; }
     .render-toggle { display:flex; align-items:center; gap:8px; margin-right:auto; color:var(--muted); font-size:12px; }.render-toggle input { accent-color:var(--warning); }
@@ -130,7 +130,7 @@
         <div class="panel-body">
           <form id="form" class="composer">
             <label for="message">프롬프트 입력</label><textarea id="message" placeholder="페이로드 또는 자연어 입력..." required></textarea>
-            <div class="composer-actions">{% if scenario_id == "day3" %}<label class="render-toggle"><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 · LLM05 전용</label>{% endif %}<button type="submit">요청 전송</button>{% if scenario_id == "day3" %}<button id="replay-last" type="button" disabled class="secondary">마지막 응답 다시 렌더링</button>{% endif %}</div>
+            <div class="composer-actions">{% if scenario_id == "day3" %}<label class="render-toggle"><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 · LLM05 전용</label>{% endif %}<button id="chat-submit" type="submit">요청 전송</button>{% if scenario_id == "day3" %}<button id="replay-last" type="button" disabled class="secondary">마지막 응답 다시 렌더링</button>{% endif %}</div>
           </form>
         </div>
       </section>
@@ -225,6 +225,7 @@ themeButton.addEventListener('click', () => setTheme(document.documentElement.da
 const chat = document.getElementById('chat');
 const form = document.getElementById('form');
 const msg = document.getElementById('message');
+const submitButton = document.getElementById('chat-submit');
 const renderHTML = document.getElementById('render-html');
 const replayLast = document.getElementById('replay-last');
 const scenarioSelect = document.getElementById('scenario');
@@ -255,6 +256,7 @@ const docSource = document.getElementById('doc-source');
 const injectStatus = document.getElementById('inject-status');
 const refreshDocs = document.getElementById('refresh-docs');
 const docList = document.getElementById('doc-list');
+const retrievalPanel = document.getElementById('retrieval-panel');
 const guardPanel = document.getElementById('guard-panel');
 const guardEngine = document.getElementById('guard-engine');
 const guardMode = document.getElementById('guard-mode');
@@ -384,6 +386,7 @@ function add(role, text, html=false) {
   }
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
+  return d;
 }
 
 function renderModelOutputVulnerable(element, role, text) {
@@ -402,11 +405,28 @@ form.addEventListener('submit', async (e) => {
   if (!text) return;
   add('user', text);
   msg.value = '';
+  submitButton.disabled = true;
+  submitButton.textContent = '응답 대기 중…';
+  const pending = add('bot', '응답을 준비하는 중.');
+  pending.classList.add('pending');
+  pending.setAttribute('role', 'status');
+  pending.setAttribute('aria-live', 'polite');
+  const startedAt = Date.now();
+  let dotCount = 1;
+  const progressTimer = window.setInterval(() => {
+    const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+    const label = elapsedSeconds < 15
+      ? '응답을 준비하는 중'
+      : '모델 응답을 기다리는 중';
+    dotCount = dotCount % 3 + 1;
+    pending.textContent = `bot: ${label}${'.'.repeat(dotCount)} (${elapsedSeconds}초)`;
+    chat.scrollTop = chat.scrollHeight;
+  }, 1000);
   const headers = {'Content-Type': 'application/json'};
   const searchToken = document.getElementById('search-token')?.value.trim();
   if (searchToken) headers.Authorization = `Bearer ${searchToken}`;
   const body = { message: text, session_id: 'default', scenario: scenarioSelect.value };
-  if (!document.getElementById('retrieval-panel').hidden) {
+  if (retrievalPanel && !retrievalPanel.hidden) {
     body.top_k = Number(document.getElementById('search-top-k').value);
     body.min_score = Number(document.getElementById('search-min-score').value);
   }
@@ -417,71 +437,83 @@ form.addEventListener('submit', async (e) => {
       headers.Authorization = `Bearer ${token}`;
     }
   }
-  const r = await fetch(appUrl('/api/chat'), {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  const data = await r.json();
-  const retrieval = data.retrieval || data.debug?.retrieval || data.vector_search;
-  if (retrieval) showRetrieval(retrieval);
-  if (!r.ok) {
+  try {
+    const r = await fetch(appUrl('/api/chat'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    pending.remove();
+    const retrieval = data.retrieval || data.debug?.retrieval || data.vector_search;
+    if (retrieval) showRetrieval(retrieval);
+    if (!r.ok) {
+      lastBotReply = null;
+      if (replayLast) replayLast.disabled = true;
+      add('debug', `HTTP ${r.status} · ${data.reply || data.detail || '요청 처리 실패'}`);
+      if (data.trace) add('debug', JSON.stringify(data.trace));
+      return;
+    }
+    const reply = data.reply ?? data.detail ?? `HTTP ${r.status}`;
+    lastBotReply = reply;
+    if (replayLast) replayLast.disabled = false;
+    add('bot', reply, renderHTML?.checked === true);
+    if (data.debug?.retrieved_chunks?.length) {
+      add('debug', '[retrieved] ' + JSON.stringify(data.debug.retrieved_chunks));
+    }
+    if (data.retrieval) {
+      add('debug', '[retrieval-policy] ' + JSON.stringify({
+        mode: data.mode,
+        provenance_filter_applied: data.retrieval.provenance_filter_applied,
+      }));
+      add('debug', '[retrieved] ' + JSON.stringify(data.retrieval.hits ?? []));
+    }
+    if (data.tool_proposal || data.trace?.blocking_reason) {
+      add('debug', '[llm02-tool] ' + JSON.stringify({
+        tool: data.tool ?? 'get_customer_record',
+        proposal: data.tool_proposal ?? null,
+        result: data.tool_result ?? null,
+        trace: data.trace ?? null,
+      }));
+    }
+    if (data.debug?.runtime_model) {
+      add('debug', '[model] ' + JSON.stringify({
+        runtime_model: data.debug.runtime_model,
+        provenance: data.debug.model_provenance ?? null,
+      }));
+    }
+    if (data.guardrail && showGuardrailPanel(data.guardrail.engine, data.guardrail.mode)) {
+      const innerGuardrail = data.guardrail.inner_guardrail ?? null;
+      const effectiveDecision = innerGuardrail?.decision === 'block'
+        ? 'block'
+        : data.guardrail.decision;
+      const mainModelCalled = innerGuardrail
+        ? innerGuardrail.upstream_called
+        : data.guardrail.upstream_called;
+      const effectiveReason = innerGuardrail?.blocking_reason
+        ?? data.guardrail.blocking_reason;
+      guardEngine.textContent = data.guardrail.engine ?? '-';
+      guardMode.textContent = data.guardrail.mode ?? '-';
+      guardDecision.textContent = effectiveDecision ?? '-';
+      guardUpstream.textContent = String(mainModelCalled ?? '-');
+      guardDuration.textContent = `${data.guardrail.duration_ms ?? '-'} ms`;
+      guardReason.textContent = effectiveReason ?? '-';
+      guardChecks.textContent = 'input/output checks: ' + JSON.stringify({
+        input: data.guardrail.input_checks ?? [],
+        output: data.guardrail.output_checks ?? [],
+        inner_input: innerGuardrail?.input_checks ?? [],
+        inner_output: innerGuardrail?.output_checks ?? [],
+      }, null, 2);
+    }
+  } catch (error) {
+    pending.remove();
     lastBotReply = null;
     if (replayLast) replayLast.disabled = true;
-    add('debug', `HTTP ${r.status} · ${data.reply || data.detail || '요청 처리 실패'}`);
-    if (data.trace) add('debug', JSON.stringify(data.trace));
-    return;
-  }
-  const reply = data.reply ?? data.detail ?? `HTTP ${r.status}`;
-  lastBotReply = reply;
-  if (replayLast) replayLast.disabled = false;
-  add('bot', reply, renderHTML?.checked === true);
-  if (data.debug?.retrieved_chunks?.length) {
-    add('debug', '[retrieved] ' + JSON.stringify(data.debug.retrieved_chunks));
-  }
-  if (data.retrieval) {
-    add('debug', '[retrieval-policy] ' + JSON.stringify({
-      mode: data.mode,
-      provenance_filter_applied: data.retrieval.provenance_filter_applied,
-    }));
-    add('debug', '[retrieved] ' + JSON.stringify(data.retrieval.hits ?? []));
-  }
-  if (data.tool_proposal || data.trace?.blocking_reason) {
-    add('debug', '[llm02-tool] ' + JSON.stringify({
-      tool: data.tool ?? 'get_customer_record',
-      proposal: data.tool_proposal ?? null,
-      result: data.tool_result ?? null,
-      trace: data.trace ?? null,
-    }));
-  }
-  if (data.debug?.runtime_model) {
-    add('debug', '[model] ' + JSON.stringify({
-      runtime_model: data.debug.runtime_model,
-      provenance: data.debug.model_provenance ?? null,
-    }));
-  }
-  if (data.guardrail && showGuardrailPanel(data.guardrail.engine, data.guardrail.mode)) {
-    const innerGuardrail = data.guardrail.inner_guardrail ?? null;
-    const effectiveDecision = innerGuardrail?.decision === 'block'
-      ? 'block'
-      : data.guardrail.decision;
-    const mainModelCalled = innerGuardrail
-      ? innerGuardrail.upstream_called
-      : data.guardrail.upstream_called;
-    const effectiveReason = innerGuardrail?.blocking_reason
-      ?? data.guardrail.blocking_reason;
-    guardEngine.textContent = data.guardrail.engine ?? '-';
-    guardMode.textContent = data.guardrail.mode ?? '-';
-    guardDecision.textContent = effectiveDecision ?? '-';
-    guardUpstream.textContent = String(mainModelCalled ?? '-');
-    guardDuration.textContent = `${data.guardrail.duration_ms ?? '-'} ms`;
-    guardReason.textContent = effectiveReason ?? '-';
-    guardChecks.textContent = 'input/output checks: ' + JSON.stringify({
-      input: data.guardrail.input_checks ?? [],
-      output: data.guardrail.output_checks ?? [],
-      inner_input: innerGuardrail?.input_checks ?? [],
-      inner_output: innerGuardrail?.output_checks ?? [],
-    }, null, 2);
+    add('debug', `ERR · 응답을 받지 못했습니다. 네트워크 연결과 서버 상태를 확인해 주세요. (${error.message})`);
+  } finally {
+    window.clearInterval(progressTimer);
+    submitButton.disabled = false;
+    submitButton.textContent = '요청 전송';
   }
 });
 
