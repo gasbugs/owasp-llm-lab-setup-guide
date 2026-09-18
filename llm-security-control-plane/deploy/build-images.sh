@@ -21,5 +21,6 @@ docker build \
 
 docker build \
   -f "$ROOT/application-gateway/Containerfile" \
+  --build-arg "APP_VERSION=$IMAGE_VERSION" \
   -t "localhost/llm-security-application-gateway:$IMAGE_VERSION" \
   "$ROOT"

@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import json
+import os
+from html import escape
+from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
@@ -22,6 +25,11 @@ SERVICES = {
     "fake-registry": "http://fake-registry:8002/api/v1/models",
     "ollama": "http://ollama:11434/api/tags",
 }
+
+
+def render_index() -> bytes:
+    source = Path(__file__).with_name("index.html").read_text(encoding="utf-8")
+    return source.replace("__APP_VERSION__", escape(os.getenv("APP_VERSION", "dev"))).encode("utf-8")
 
 
 def check_service(service_id: str) -> dict[str, object]:
@@ -45,6 +53,15 @@ class PortalHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory="/app", **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - standard-library handler API
+        if self.path.split("?", 1)[0] in {"/", "/index.html"}:
+            payload = render_index()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         prefix = "/api/status/"
         if not self.path.startswith(prefix):
             super().do_GET()

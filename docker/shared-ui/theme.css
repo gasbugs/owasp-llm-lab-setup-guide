@@ -19,3 +19,16 @@
   --verified: #65dda6;
   --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
 }
+
+.app-version {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(6px, env(safe-area-inset-bottom));
+  z-index: 20;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--canvas);
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  pointer-events: none;
+}

@@ -25,6 +25,15 @@ class FakeResponse:
 
 
 class PortalStatusServerTests(TestCase):
+    def test_portal_displays_the_container_version_and_escapes_it(self) -> None:
+        with patch.dict(SERVER.os.environ, {"APP_VERSION": "v2026.09.19.08.50"}):
+            html = SERVER.render_index().decode("utf-8")
+        self.assertIn('aria-label="컨테이너 버전">v2026.09.19.08.50</small>', html)
+        self.assertNotIn("__APP_VERSION__", html)
+        with patch.dict(SERVER.os.environ, {"APP_VERSION": "<test>"}):
+            html = SERVER.render_index().decode("utf-8")
+        self.assertIn("&lt;test&gt;</small>", html)
+
     def test_targets_are_fixed_compose_services(self) -> None:
         self.assertEqual(
             SERVER.SERVICES,

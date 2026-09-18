@@ -189,6 +189,7 @@
       .service-node { min-height:88px; padding:10px 7px; }.exchange-head { align-items:flex-start; }.exchange { gap:8px; padding:10px; }
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; } }
+    .app-version { position:fixed; right:max(12px,env(safe-area-inset-right)); bottom:max(6px,env(safe-area-inset-bottom)); z-index:20; padding:2px 6px; border-radius:4px; color:var(--muted); background:var(--canvas); font:10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; pointer-events:none; }
   </style>
 </head>
 <body>
@@ -319,5 +320,6 @@ function renderInvestigationLinks(data){const traceId=data.trace_id||'';const te
 $('send').onclick=async()=>{const body={message:$('message').value,classification:$('classification').value,purpose:$('purpose').value};$('decision').className='decision-badge';$('decision').textContent='IN FLIGHT';$('decision-copy').textContent='정책 경계를 순서대로 통과하고 있습니다.';$('stages').innerHTML='<div class="empty-strip">REQUEST IN FLIGHT / 처리 중</div>';
 try{if(!accessToken)await login();let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});if(r.status===401&&await refresh())r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(body)});const d=await r.json();const decision=d.application_decision||'infra';$('decision').className=`decision-badge ${decision}`;$('decision').textContent=decision.toUpperCase();$('decision-copy').textContent=`request_id=${d.request_id||'-'} · trace_id=${d.trace_id||'-'}`;$('reply').textContent=d.reply||JSON.stringify(d);const stages=composeTraceStages(d);renderStages(stages);renderExchanges(stages);renderInvestigationLinks(d);$('raw').textContent=JSON.stringify(d,null,2)}catch(e){$('decision').className='decision-badge infra';$('decision').textContent='INFRA';$('decision-copy').textContent='요청 경로를 완료하지 못했습니다.';$('reply').textContent=String(e);renderStages([]);renderExchanges([]);renderInvestigationLinks({})}};
 </script>
+<small class="app-version" aria-label="컨테이너 버전">__APP_VERSION__</small>
 </body>
 </html>

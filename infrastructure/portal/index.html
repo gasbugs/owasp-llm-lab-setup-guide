@@ -349,6 +349,7 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
     }
+    .app-version { position:fixed; right:max(12px,env(safe-area-inset-right)); bottom:max(6px,env(safe-area-inset-bottom)); z-index:20; padding:2px 6px; border-radius:4px; color:var(--muted); background:var(--canvas); font:10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; pointer-events:none; }
   </style>
   <link rel="stylesheet" href="/common/theme.css">
 </head>
@@ -517,5 +518,6 @@
     updateMetrics();
     runChecks();
   </script>
+<small class="app-version" aria-label="컨테이너 버전">__APP_VERSION__</small>
 </body>
 </html>

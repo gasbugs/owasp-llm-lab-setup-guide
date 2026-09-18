@@ -4,6 +4,9 @@ ARG BASE_IMAGE=ghcr.io/gasbugs/owasp-llm-base-gpu:latest
 FROM ${BASE_IMAGE}
 
 ARG VCS_REF=unknown
+ARG APP_VERSION=dev
+LABEL org.opencontainers.image.version="$APP_VERSION"
+ENV APP_VERSION=$APP_VERSION
 LABEL org.opencontainers.image.title="owasp-llm-vuln-rag"
 LABEL org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide"
 LABEL org.opencontainers.image.revision="$VCS_REF"

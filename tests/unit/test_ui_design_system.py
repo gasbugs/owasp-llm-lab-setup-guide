@@ -103,6 +103,13 @@ class UiDesignSystemTests(unittest.TestCase):
         self.assertIn("llm06-farmer1-demo-token", self.agent)
         self.assertIn("SERVER AUTHORIZATION DISABLED", self.agent)
 
+    def test_app_version_badges_render_the_image_version(self) -> None:
+        for source in (self.rag, self.agent):
+            rendered = Environment(autoescape=True).from_string(source).render(
+                app_version="v2026.09.19.08.50", scenarios=[], tools={}
+            )
+            self.assertIn('aria-label="컨테이너 버전">v2026.09.19.08.50</small>', rendered)
+
     def test_apps_constrain_panels_inside_mobile_viewport(self) -> None:
         self.assertIn(".panel { min-width:0;", self.control)
         self.assertIn(".stack,.panel { min-width:0; }", self.rag)

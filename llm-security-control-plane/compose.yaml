@@ -87,6 +87,8 @@ services:
     build:
       context: .
       dockerfile: application-gateway/Containerfile
+      args:
+        APP_VERSION: ${IMAGE_VERSION:-1.0.0}
     image: localhost/llm-security-application-gateway:${IMAGE_VERSION:-1.0.0}
     # 인증 상태 bind mount를 만든 수강생 UID로 기록한다.
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"

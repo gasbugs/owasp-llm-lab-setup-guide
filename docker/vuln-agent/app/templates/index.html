@@ -74,6 +74,7 @@
     @media (max-width:760px) { .app-layout { display:block; }.lab-nav { position:sticky; height:auto; max-height:none; padding:9px 10px; border-right:0; border-bottom:1px solid var(--line); overflow:hidden; }.lab-nav-brand,.lab-nav-group { display:none; }.lab-nav-list { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; }.lab-nav-link { flex:0 0 auto; grid-template-columns:auto; min-height:38px; padding:7px 10px; }.lab-nav-name { display:none; } }
     @media (max-width: 720px) { .shell { padding:10px; }.masthead { padding:14px; }.vuln-beacon { display:none; }.identity-bar { grid-template-columns:1fr; }.tools { grid-template-columns:1fr; }.grid { grid-template-columns:minmax(0,1fr); gap:12px; }.splitter { display: none; }.chat,.trace { height:auto; min-height:340px; }.composer { grid-template-columns:1fr; }.send-button { min-height:46px; } }
     @media (max-width:560px) { .masthead { grid-template-columns:1fr; }.brand { grid-column:1; grid-row:1; }.top-actions { grid-column:1; grid-row:2; justify-content:flex-start; }.mission { grid-column:1; grid-row:3; } }
+    .app-version { position:fixed; right:max(12px,env(safe-area-inset-right)); bottom:max(6px,env(safe-area-inset-bottom)); z-index:20; padding:2px 6px; border-radius:4px; color:var(--muted); background:var(--canvas); font:10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; pointer-events:none; }
   </style>
   <link rel="stylesheet" href="/common/theme.css">
 </head>
@@ -268,5 +269,6 @@ form.addEventListener('submit', async (event) => {
   }
 });
 </script>
+<small class="app-version" aria-label="컨테이너 버전">{{ app_version|default('dev', true) }}</small>
 </body>
 </html>

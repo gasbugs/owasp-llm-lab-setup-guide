@@ -7,6 +7,7 @@ LLM06 실습 — 권한 우회로 admin tool을 호출하도록 유도.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -113,7 +114,9 @@ async def system_prompt():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, "index.html", {"tools": TOOLS})
+    return templates.TemplateResponse(
+        request, "index.html", {"tools": TOOLS, "app_version": os.getenv("APP_VERSION", "dev")}
+    )
 
 
 @app.post("/api/chat")

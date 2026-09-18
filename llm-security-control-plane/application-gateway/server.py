@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import hashlib
+from html import escape
 import json
 import os
 import secrets
@@ -216,7 +217,9 @@ async def observe_application_decision(result: dict, direction: str) -> None:
 
 @app.get("/", response_class=HTMLResponse)
 async def index() -> str:
-    return Path("/app/index.html").read_text(encoding="utf-8")
+    return Path("/app/index.html").read_text(encoding="utf-8").replace(
+        "__APP_VERSION__", escape(os.getenv("APP_VERSION", "dev"))
+    )
 
 
 @app.get("/healthz")

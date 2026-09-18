@@ -1,5 +1,8 @@
 # 검증한 Python patch version을 읽기 쉬운 tag로 고정한다.
 FROM docker.io/library/python:3.12.14-slim
+ARG APP_VERSION=dev
+LABEL org.opencontainers.image.version="$APP_VERSION"
+ENV APP_VERSION=$APP_VERSION
 
 # pip cache를 남기지 않고 애플리케이션 로그를 즉시 출력한다.
 ENV PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1

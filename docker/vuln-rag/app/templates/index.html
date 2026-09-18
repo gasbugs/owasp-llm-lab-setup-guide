@@ -81,6 +81,7 @@
     @media(max-width:620px){.shell{padding:10px}.masthead,.scenario-bar,.panel-head,.panel-body{padding:14px}.vuln-beacon{display:none}.guard-grid{grid-template-columns:1fr}.composer-actions button{width:100%}.render-toggle{width:100%}}
     @media(max-width:560px){.masthead{grid-template-columns:1fr}.brand{grid-column:1;grid-row:1}.top-actions{grid-column:1;grid-row:2;justify-content:flex-start}.mission{grid-column:1;grid-row:3}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}.pending-dot{animation:none;opacity:.7;transform:none}}
+    .app-version { position:fixed; right:max(12px,env(safe-area-inset-right)); bottom:max(6px,env(safe-area-inset-bottom)); z-index:20; padding:2px 6px; border-radius:4px; color:var(--muted); background:var(--canvas); font:10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; pointer-events:none; }
   </style>
   <link rel="stylesheet" href="/common/theme.css">
 </head>
@@ -701,5 +702,6 @@ injectForm.addEventListener('submit', async (e) => {
 loadDocs();
 loadGuardrailPolicy();
 </script>
+<small class="app-version" aria-label="컨테이너 버전">{{ app_version|default('dev', true) }}</small>
 </body>
 </html>

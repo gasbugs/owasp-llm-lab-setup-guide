@@ -1248,6 +1248,7 @@ async def index(request: Request, scenario: str | None = None, lab: str | None =
             "scenario_intro": scenario_intro,
             "warning": warning,
             "active_lab": active_lab,
+            "app_version": os.getenv("APP_VERSION", "dev"),
             "scenarios": SCENARIOS.values(),
             "show_guardrail_panel": SHOW_GUARDRAIL_PANEL,
         },

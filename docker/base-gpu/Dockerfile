@@ -4,6 +4,9 @@
 FROM docker.io/nvidia/cuda:12.8.2-runtime-ubuntu24.04
 
 ARG VCS_REF=unknown
+ARG APP_VERSION=dev
+LABEL org.opencontainers.image.version="$APP_VERSION"
+ENV APP_VERSION=$APP_VERSION
 LABEL org.opencontainers.image.title="owasp-llm-lab/base-gpu"
 LABEL org.opencontainers.image.description="CUDA 12.8 + Python 3.12 + uv (training base)"
 LABEL org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide"

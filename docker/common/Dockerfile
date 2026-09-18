@@ -1,6 +1,9 @@
 FROM docker.io/nginxinc/nginx-unprivileged:1.27-alpine
 
 ARG VCS_REF=unknown
+ARG APP_VERSION=dev
+LABEL org.opencontainers.image.version="$APP_VERSION"
+ENV APP_VERSION=$APP_VERSION
 
 LABEL org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide" \
       org.opencontainers.image.revision="$VCS_REF" \

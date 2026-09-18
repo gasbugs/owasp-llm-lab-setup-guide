@@ -16,6 +16,11 @@ cd "$(dirname "$0")"
 
 : "${TAG:?TAG 환경변수 필요. 검증용은 sha-<40자리 Git commit> 사용}"
 NS="$IMAGE_NAMESPACE"
+APP_VERSION="${APP_VERSION:-$(TZ=Asia/Seoul date +v%Y.%m.%d.%H.%M)}"
+if [[ ! "$APP_VERSION" =~ ^v[0-9]{4}(\.[0-9]{2}){4}$ ]]; then
+  echo "ERROR: APP_VERSION must use vYYYY.MM.DD.HH.MM (Asia/Seoul)." >&2
+  exit 2
+fi
 
 if [[ ! "$TAG" =~ ^sha-[0-9a-f]{40}$ ]] && [ "${ALLOW_NONIMMUTABLE_TAG:-false}" != "true" ]; then
   echo "ERROR: TAG는 sha-<40자리 lowercase Git commit> 형식이어야 합니다." >&2
@@ -25,7 +30,8 @@ if [[ ! "$TAG" =~ ^sha-[0-9a-f]{40}$ ]] && [ "${ALLOW_NONIMMUTABLE_TAG:-false}" 
 fi
 
 for name in base-gpu vuln-rag vuln-agent llmgoat dvla portal common; do
-  image="ghcr.io/$NS/owasp-llm-${name}:${TAG}"
+  for release_tag in "$TAG" "$APP_VERSION"; do
+  image="ghcr.io/$NS/owasp-llm-${name}:${release_tag}"
   inspect_output="$(mktemp)"
   if docker manifest inspect "$image" >"$inspect_output" 2>&1; then
     rm -f "$inspect_output"
@@ -46,6 +52,7 @@ for name in base-gpu vuln-rag vuln-agent llmgoat dvla portal common; do
         ;;
     esac
   fi
+  done
 done
 
 build_and_push() {
@@ -53,7 +60,8 @@ build_and_push() {
   local context="$2"
   local dockerfile="${3:-}"
   local image="ghcr.io/$NS/owasp-llm-${name}:${TAG}"
-  local extra_args=(--build-arg "VCS_REF=${TAG#sha-}")
+  local extra_args=(--build-arg "VCS_REF=${TAG#sha-}" --build-arg "APP_VERSION=$APP_VERSION")
+  local version_image="ghcr.io/$NS/owasp-llm-${name}:${APP_VERSION}"
   if [ -n "$dockerfile" ]; then
     extra_args+=(-f "$dockerfile")
   fi
@@ -61,9 +69,10 @@ build_and_push() {
     extra_args+=(--build-arg "BASE_IMAGE=ghcr.io/$NS/owasp-llm-base-gpu:${TAG}")
   fi
   echo "=== Building $image (context: $context) ==="
-  docker build --platform linux/amd64 "${extra_args[@]}" -t "$image" "$context"
+  docker build --platform linux/amd64 "${extra_args[@]}" -t "$image" -t "$version_image" "$context"
   echo "=== Pushing $image ==="
   docker push "$image"
+  docker push "$version_image"
 }
 
 # base-gpu가 vuln-rag/vuln-agent의 FROM 이미지라 먼저 빌드 + push

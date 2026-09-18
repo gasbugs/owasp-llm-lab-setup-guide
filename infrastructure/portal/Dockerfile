@@ -1,6 +1,9 @@
 FROM docker.io/library/python:3.12-slim
 
 ARG VCS_REF=unknown
+ARG APP_VERSION=dev
+LABEL org.opencontainers.image.version="$APP_VERSION"
+ENV APP_VERSION=$APP_VERSION
 
 LABEL org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide" \
       org.opencontainers.image.revision="$VCS_REF" \
