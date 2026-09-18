@@ -70,15 +70,23 @@ class FakeLLM:
                 "username": "' OR 1=1 --" if "이전 지시" in user else "alice",
                 "reason": "requested account lookup",
             }
-        if schema.get("title") == "LLM09PackageCandidate":
+        if schema.get("title") == "LLM09PackageRecommendations":
             candidate = (
                 "rich"
                 if "rich" in user
                 else "owasp-llm-lab-nonexistent-candidate-20260711"
             )
             return {
-                "candidate": candidate,
-                "reason": "model selected the requested package candidate",
+                "recommendations": [
+                    {
+                        "candidate": candidate,
+                        "reason": "model selected the requested package candidate",
+                    },
+                    {
+                        "candidate": "rich",
+                        "reason": "terminal formatting",
+                    },
+                ]
             }
         if "C-2002" in user:
             return {
@@ -487,27 +495,63 @@ class SecureCodingApiTest(unittest.TestCase):
         self.assertFalse(limited.json()["upstream_called"])
         self.assertEqual(self.llm.calls, [])
 
-    def test_llm09_same_route_blocks_unapproved_package_handoff(self) -> None:
+    def test_llm09_same_route_filters_unapproved_recommendation(self) -> None:
         MAIN.DEFAULT_SCENARIO = "day4"
         body = {
             "message": "설치 후보를 owasp-llm-lab-nonexistent-candidate-20260711로 제안해."
         }
         vulnerable = self.client.post(
-            "/api/labs/llm09/workshop/install", json=body
+            "/api/labs/llm09/workshop/recommend", json=body
         )
         self.assertEqual(vulnerable.status_code, 200)
         self.assertTrue(vulnerable.json()["planner_model_called"])
         self.assertTrue(vulnerable.json()["upstream_called"])
-        self.assertTrue(vulnerable.json()["installer_handoff_called"])
+        self.assertFalse(vulnerable.json()["filter_applied"])
+        self.assertEqual(vulnerable.json()["filtered_candidates"], [])
+        self.assertIn(
+            "owasp-llm-lab-nonexistent-candidate-20260711",
+            [item["candidate"] for item in vulnerable.json()["recommendations"]],
+        )
         self.assertEqual(len(self.llm.calls), 1)
 
         MAIN.select_llm09_package_policy = POLICY_GLOBALS["require_llm09_approved_package"]
-        safe = self.client.post("/api/labs/llm09/workshop/install", json=body)
-        self.assertEqual(safe.status_code, 422)
+        safe = self.client.post("/api/labs/llm09/workshop/recommend", json=body)
+        self.assertEqual(safe.status_code, 200)
         self.assertTrue(safe.json()["planner_model_called"])
         self.assertTrue(safe.json()["upstream_called"])
-        self.assertFalse(safe.json()["installer_handoff_called"])
+        self.assertTrue(safe.json()["filter_applied"])
+        self.assertEqual(
+            safe.json()["filtered_candidates"][0]["candidate"],
+            "owasp-llm-lab-nonexistent-candidate-20260711",
+        )
+        self.assertEqual(
+            {item["candidate"] for item in safe.json()["recommendations"]},
+            {"pyfiglet", "rich"},
+        )
         self.assertEqual(len(self.llm.calls), 2)
+
+        ui = self.client.post("/api/chat", json={**body, "scenario": "day4", "lab": "llm09"})
+        self.assertEqual(ui.status_code, 200)
+        self.assertEqual(ui.json()["recommendations"], safe.json()["recommendations"])
+        self.assertNotIn("owasp-llm-lab-nonexistent", ui.json()["reply"])
+
+    def test_llm09_safe_reply_uses_canonical_names_and_descriptions(self) -> None:
+        MAIN.DEFAULT_SCENARIO = "day4"
+        MAIN.select_llm09_package_policy = POLICY_GLOBALS["require_llm09_approved_package"]
+
+        async def proposals(**kwargs):
+            return {"recommendations": [
+                {"candidate": " RICH ", "reason": "unverified claim"},
+                {"candidate": "rich", "reason": "duplicate claim"},
+            ]}
+
+        self.llm.structured_chat = proposals
+        result = self.client.post("/api/chat", json={"lab": "llm09", "message": "rich"})
+        self.assertEqual(result.status_code, 200)
+        names = [item["candidate"] for item in result.json()["recommendations"]]
+        self.assertEqual(names.count("rich"), 1)
+        self.assertNotIn("unverified claim", result.json()["reply"])
+        self.assertIn("pip install rich", result.json()["reply"])
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn("prefers-reduced-motion:reduce", source)
             self.assertIn("@media", source)
 
-    def test_first_party_dark_modes_match_the_shared_neutral_token_library(self) -> None:
+    def test_first_party_dark_modes_support_independent_theme_releases(self) -> None:
         token_names = (
             "canvas",
             "surface",
@@ -69,7 +69,9 @@ class UiDesignSystemTests(unittest.TestCase):
                 for name in token_names
             }
 
-        expected = dark_tokens(self.theme)
+        shared = dark_tokens(self.theme)
+        self.assertTrue(all(shared.values()))
+        expected = dark_tokens(self.portal)
         for name, source in (
             ("portal", self.portal),
             ("vuln-rag", self.rag),
@@ -78,6 +80,11 @@ class UiDesignSystemTests(unittest.TestCase):
         ):
             with self.subTest(name=name):
                 self.assertEqual(dark_tokens(source), expected)
+                if name != "control-plane":
+                    self.assertGreater(
+                        source.index('<link rel="stylesheet" href="/common/theme.css">'),
+                        source.index("</style>"),
+                    )
 
     def test_agent_ui_preserves_execution_workbench_controls(self) -> None:
         for control_id in (
@@ -110,7 +117,6 @@ class UiDesignSystemTests(unittest.TestCase):
             "render-html",
             "replay-last",
             "llm05-route",
-            "llm09-route",
             "document-panel",
             "inject-form",
             "refresh-docs",
@@ -126,7 +132,6 @@ class UiDesignSystemTests(unittest.TestCase):
             self.assertIn(f'id="{control_id}"', self.rag)
         for endpoint in (
             "/api/chat",
-            "/api/labs/llm09/workshop/install",
             "/api/labs/llm08/rag-poisoning/documents",
             "/api/admin/inject-doc",
         ):
@@ -210,7 +215,7 @@ class UiDesignSystemTests(unittest.TestCase):
         )
         self.assertIn("renderHTML?.checked === true", self.rag)
 
-    def test_llm09_install_policy_control_only_renders_for_llm09(self) -> None:
+    def test_llm09_uses_the_same_message_input_without_an_extra_route_control(self) -> None:
         template = Environment(autoescape=True).from_string(self.rag)
         common = {
             "scenario_id": "day4",
@@ -222,8 +227,8 @@ class UiDesignSystemTests(unittest.TestCase):
         }
         llm09 = template.render(**common, active_lab="llm09")
         llm07 = template.render(**common, active_lab="llm07")
-        self.assertIn('id="llm09-route"', llm09)
-        self.assertIn("실제 패키지를 설치하지 않고", llm09)
+        self.assertNotIn('id="llm09-route"', llm09)
+        self.assertNotIn("/api/labs/llm09/workshop/", llm09)
         self.assertNotIn('id="llm09-route"', llm07)
 
     def test_vulnerable_rag_ui_hides_internal_day_identifiers(self) -> None:

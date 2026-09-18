@@ -133,7 +133,6 @@
           <form id="form" class="composer">
             <label for="message">프롬프트 입력</label><textarea id="message" placeholder="페이로드 또는 자연어 입력..." required></textarea>
             {% if scenario_id == "day3" %}<div class="row"><label for="llm05-route">LLM05 실행 경로</label><select id="llm05-route"><option value="chat">메모 채팅 · HTML 출력</option><option value="vulnerable-sql">취약 SQL 조회 · 문자열 결합</option><option value="safe-sql">안전 SQL 조회 · Parameter binding</option></select></div>{% endif %}
-            {% if active_lab == "llm09" %}<div class="row"><label for="llm09-route">LLM09 실행 경로</label><select id="llm09-route"><option value="install-policy" selected>설치 정책 검증 · 현재 서버 정책</option><option value="chat">일반 추천 · 모델 응답</option></select><p class="route-note">실제 패키지를 설치하지 않고, 모델 후보가 설치 단계로 전달됐는지만 표시합니다.</p></div>{% endif %}
             <div class="composer-actions">{% if scenario_id == "day3" %}<label class="render-toggle"><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 · LLM05 전용</label>{% endif %}<button id="chat-submit" type="submit">요청 전송</button>{% if scenario_id == "day3" %}<button id="replay-last" type="button" disabled class="secondary">마지막 응답 다시 렌더링</button>{% endif %}</div>
           </form>
         </div>
@@ -230,7 +229,6 @@ const submitButton = document.getElementById('chat-submit');
 const renderHTML = document.getElementById('render-html');
 const replayLast = document.getElementById('replay-last');
 const llm05Route = document.getElementById('llm05-route');
-const llm09Route = document.getElementById('llm09-route');
 const scenarioSelect = document.getElementById('scenario');
 const labSelect = document.getElementById('lab');
 const requestedLab = new URLSearchParams(window.location.search).get('lab');
@@ -450,11 +448,6 @@ form.addEventListener('submit', async (e) => {
       : '/api/labs/llm05/vulnerable/prompt-sql-lookup';
     body = {message: text};
   }
-  const isLlm09InstallRoute = activeLab === 'llm09' && llm09Route?.value === 'install-policy';
-  if (isLlm09InstallRoute) {
-    endpoint = '/api/labs/llm09/workshop/install';
-    body = {message: text};
-  }
   if (retrievalPanel && !retrievalPanel.hidden && !isLlm05SqlRoute) {
     body.top_k = Number(document.getElementById('search-top-k').value);
     body.min_score = Number(document.getElementById('search-min-score').value);
@@ -478,8 +471,8 @@ form.addEventListener('submit', async (e) => {
     if (retrieval) showRetrieval(retrieval);
     const isLlm09PolicyResponse = data.lab === 'llm09'
       && data.model_proposal
-      && typeof data.installer_handoff_called === 'boolean';
-    if (!r.ok && !isLlm09PolicyResponse) {
+      && Array.isArray(data.recommendations);
+    if (!r.ok) {
       lastBotReply = null;
       if (replayLast) replayLast.disabled = true;
       add('debug', `HTTP ${r.status} · ${data.reply || data.detail || '요청 처리 실패'}`);
@@ -489,10 +482,7 @@ form.addEventListener('submit', async (e) => {
     const sqlReply = data.lab === 'llm05-sql-sink'
       ? `model_output=${JSON.stringify(data.model_output)} · policy=${data.policy} · rows=${JSON.stringify(data.rows)}`
       : null;
-    const llm09Reply = isLlm09PolicyResponse
-      ? `HTTP ${r.status} · ${data.installer_handoff_called ? '설치 단계 전달' : '설치 전 차단'} · candidate=${JSON.stringify(data.candidate)} · policy=${data.policy}`
-      : null;
-    const reply = data.reply ?? sqlReply ?? llm09Reply ?? data.detail ?? `HTTP ${r.status}`;
+    const reply = data.reply ?? sqlReply ?? data.detail ?? `HTTP ${r.status}`;
     lastBotReply = reply;
     if (replayLast) replayLast.disabled = false;
     add('bot', reply, renderHTML?.checked === true);
@@ -517,13 +507,15 @@ form.addEventListener('submit', async (e) => {
       add('debug', '[llm09-policy] ' + JSON.stringify({
         http_status: r.status,
         model_proposal: data.model_proposal,
+        recommendations: data.recommendations,
+        filtered_candidates: data.filtered_candidates,
+        replacement_candidates: data.replacement_candidates,
         planner_model_called: data.planner_model_called,
         upstream_called: data.upstream_called,
         policy: data.policy,
         application_decision: data.application_decision,
-        blocking_reason: data.blocking_reason ?? null,
         verification_source: data.verification_source,
-        installer_handoff_called: data.installer_handoff_called,
+        filter_applied: data.filter_applied,
       }));
     } else if (data.tool_proposal || data.trace?.blocking_reason) {
       add('debug', '[llm02-tool] ' + JSON.stringify({

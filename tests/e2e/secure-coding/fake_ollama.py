@@ -69,6 +69,17 @@ class Handler(BaseHTTPRequestHandler):
                     {"record": json.loads(rendered)},
                     ensure_ascii=False,
                 )
+            elif schema_title == "LLM09PackageRecommendations":
+                candidates = [{"candidate": "rich", "reason": "terminal formatting"}]
+                if "niche" in user:
+                    candidates.insert(0, {
+                        "candidate": "owasp-llm-lab-nonexistent-candidate-20260711",
+                        "reason": "requested niche candidate",
+                    })
+                content = json.dumps(
+                    {"recommendations": candidates},
+                    ensure_ascii=False,
+                )
             elif schema_title == "LLM09PackageCandidate":
                 candidate = (
                     "owasp-llm-lab-nonexistent-candidate-20260711"

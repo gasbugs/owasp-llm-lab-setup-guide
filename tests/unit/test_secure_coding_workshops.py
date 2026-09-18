@@ -168,13 +168,13 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         self.assertEqual(safe.application_decision, "block")
         self.assertEqual(approved.application_decision, "allow")
 
-    def test_publisher_model_double_returns_llm09_candidate_schema(self) -> None:
+    def test_publisher_model_double_returns_llm09_recommendations_schema(self) -> None:
         fake = (ROOT / "tests/e2e/secure-coding/fake_ollama.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn('schema_title == "LLM09PackageCandidate"', fake)
-        self.assertIn('"candidate": candidate', fake)
-        self.assertIn('else "rich"', fake)
+        self.assertIn('schema_title == "LLM09PackageRecommendations"', fake)
+        self.assertIn('"recommendations": candidates', fake)
+        self.assertIn('"candidate": "rich"', fake)
 
     def test_llm02_authentication_is_shared_and_tool_authorization_switches(self) -> None:
         body = Mock()

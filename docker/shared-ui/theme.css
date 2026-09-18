@@ -1,5 +1,6 @@
 /* OWASP LLM Lab first-party UI theme tokens.
  * Keep page-specific layout rules local; share only stable visual primitives.
+ * Publish token value changes with the common image; inline app tokens are fallbacks.
  */
 :root {
   color-scheme: dark;

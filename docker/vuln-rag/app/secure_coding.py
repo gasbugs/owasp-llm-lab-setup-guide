@@ -180,9 +180,15 @@ def trust_llm09_model_recommendation(candidate: str) -> PolicyDecision:
     return PolicyDecision("llm09", "model-recommendation-only", "allow")
 
 
+LLM09_APPROVED_PACKAGE_CATALOG = {
+    "pyfiglet": "FIGlet 글꼴로 ASCII 제목을 만드는 패키지",
+    "rich": "터미널 서식과 표를 출력하는 패키지",
+    "terminaltables": "터미널용 텍스트 표를 만드는 패키지",
+}
+
+
 def require_llm09_approved_package(candidate: str) -> PolicyDecision:
-    approved_packages = {"pyfiglet", "rich", "terminaltables"}
-    if candidate.strip().lower() not in approved_packages:
+    if candidate.strip().lower() not in LLM09_APPROVED_PACKAGE_CATALOG:
         return PolicyDecision(
             "llm09",
             "server-approved-package-allowlist",
@@ -195,7 +201,7 @@ def require_llm09_approved_package(candidate: str) -> PolicyDecision:
 
 
 def select_llm09_package_policy(candidate: str) -> PolicyDecision:
-    # NODEGOAT-LAB: LLM09 — switch the package-install trust boundary here.
+    # NODEGOAT-LAB: LLM09 — switch the recommendation trust boundary here.
     return trust_llm09_model_recommendation(candidate)  # VULNERABLE-ACTIVE
     # return require_llm09_approved_package(candidate)  # SAFE-ENABLE
 

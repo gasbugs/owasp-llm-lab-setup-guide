@@ -29,7 +29,7 @@ class ReplayContractTest(unittest.TestCase):
 
     def test_last_reply_is_cached_from_api_response(self) -> None:
         self.assertIn(
-            "const reply = data.reply ?? sqlReply ?? llm09Reply ?? data.detail ?? `HTTP ${r.status}`;",
+            "const reply = data.reply ?? sqlReply ?? data.detail ?? `HTTP ${r.status}`;",
             self.text,
         )
         self.assertIn("lastBotReply = reply;", self.text)

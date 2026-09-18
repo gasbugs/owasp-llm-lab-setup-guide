@@ -33,6 +33,7 @@ from app.classified_rag import (
 from app.guardrails import GuardrailProxy, GuardrailProxyError
 from app.llm import LLMClient
 from app.secure_coding import (
+    LLM09_APPROVED_PACKAGE_CATALOG,
     LLM02AuthorizationError,
     PolicyDecision,
     emit_security_event,
@@ -194,6 +195,15 @@ class LLM09PackageCandidate(BaseModel):
 
     candidate: str = Field(min_length=1, max_length=200)
     reason: str = Field(min_length=1, max_length=500)
+
+
+class LLM09PackageRecommendations(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    recommendations: list[LLM09PackageCandidate] = Field(
+        min_length=1,
+        max_length=5,
+    )
 
 
 class ClassifiedRagRequest(BaseModel):
@@ -584,7 +594,7 @@ async def llm08_secure_coding_workshop(
     return result
 
 
-@app.post("/api/labs/llm09/workshop/install")
+@app.post("/api/labs/llm09/workshop/recommend")
 async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
     require_workshop_scenario("day4")
 
@@ -592,35 +602,85 @@ async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
         raw_proposal = await llm.structured_chat(
             system=day4_scenario.build_llm09_candidate_prompt(),
             user=request_body.message,
-            schema=LLM09PackageCandidate.model_json_schema(),
+            schema=LLM09PackageRecommendations.model_json_schema(),
         )
-        proposal = LLM09PackageCandidate.model_validate(raw_proposal)
+        proposal = LLM09PackageRecommendations.model_validate(raw_proposal)
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail="model returned invalid package candidate",
+            detail="model returned invalid package recommendations",
         ) from exc
 
-    decision = select_llm09_package_policy(proposal.candidate)
+    decisions = [
+        (item, select_llm09_package_policy(item.candidate))
+        for item in proposal.recommendations
+    ]
+    policy = decisions[0][1].policy
+    filter_applied = policy == "server-approved-package-allowlist"
+    visible = [
+        item
+        for item, decision in decisions
+        if decision.application_decision == "allow"
+    ]
+    filtered = [
+        item
+        for item, decision in decisions
+        if decision.application_decision == "block"
+    ]
+    replacements: list[str] = []
 
-    installer_handoff_called = decision.application_decision == "allow"
-    emit_security_event(decision, upstream_called=True)
-    content = {
-        "candidate": proposal.candidate,
+    if filter_applied:
+        visible_names = dict.fromkeys(item.candidate.strip().lower() for item in visible)
+        visible = [
+            LLM09PackageCandidate(candidate=name, reason=LLM09_APPROVED_PACKAGE_CATALOG[name])
+            for name in visible_names
+        ]
+        target_count = min(len(proposal.recommendations), len(LLM09_APPROVED_PACKAGE_CATALOG))
+        for candidate, reason in LLM09_APPROVED_PACKAGE_CATALOG.items():
+            if len(visible) >= target_count:
+                break
+            if candidate not in visible_names:
+                visible.append(
+                    LLM09PackageCandidate(candidate=candidate, reason=reason)
+                )
+                visible_names[candidate] = None
+                replacements.append(candidate)
+
+    recommendations = [
+        {
+            "candidate": item.candidate,
+            "reason": item.reason,
+            "pip_install": f"pip install {item.candidate}",
+        }
+        for item in visible
+    ]
+    reply = "\n\n".join(
+        f"{index}. `{item['candidate']}` - {item['reason']}\n"
+        f"```bash\n{item['pip_install']}\n```"
+        for index, item in enumerate(recommendations, start=1)
+    )
+    if filter_applied and filtered:
+        reply = "승인 목록에 없는 후보를 제외했습니다. 승인된 패키지를 추천합니다.\n\n" + reply
+    overall_decision = PolicyDecision("llm09", policy, "allow")
+    emit_security_event(overall_decision, upstream_called=True)
+    return {
+        "reply": reply,
         "model_proposal": proposal.model_dump(),
+        "recommendations": recommendations,
+        "filtered_candidates": [item.model_dump() for item in filtered],
+        "replacement_candidates": replacements,
         "planner_model_called": True,
-        **decision.__dict__,
+        **overall_decision.__dict__,
         "verification_source": (
             "server-approved-package-allowlist"
-            if decision.policy == "server-approved-package-allowlist"
+            if filter_applied
             else "model-output-only"
         ),
-        "installer_handoff_called": installer_handoff_called,
+        "filter_applied": filter_applied,
         "upstream_called": True,
+        "scenario": "day4",
+        "debug": {"runtime_model": llm.model, "model_provenance": model_provenance()},
     }
-    if decision.application_decision == "block":
-        return JSONResponse(status_code=422, content=content)
-    return content
 
 
 @app.post("/api/labs/llm10/workshop/chat")
@@ -745,13 +805,8 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
         if active_lab == "llm09":
             prompts = [
                 {
-                    "stage": "generation",
-                    "title": "LLM09 Misinformation",
-                    "content": day4_scenario.build_llm09_system_prompt(),
-                },
-                {
-                    "stage": "install-candidate",
-                    "title": "LLM09 Package Candidate",
+                    "stage": "recommendation-candidates",
+                    "title": "LLM09 Package Recommendations",
                     "content": day4_scenario.build_llm09_candidate_prompt(),
                 },
             ]
@@ -1272,12 +1327,10 @@ async def chat(req: ChatRequest, request: Request):
         context = None
         system_prompt = day1_scenario.build_system_prompt()
     elif selected.id == "day4":
+        if req.lab == "llm09":
+            return await llm09_secure_coding_workshop(LLM09WorkshopRequest(message=req.message))
         context = None
-        system_prompt = (
-            day4_scenario.build_llm09_system_prompt()
-            if req.lab == "llm09"
-            else day4_scenario.build_llm07_system_prompt()
-        )
+        system_prompt = day4_scenario.build_llm07_system_prompt()
     else:
         retrieval = await search_documents(
             req.message, selected, request, top_k=req.top_k, min_score=req.min_score

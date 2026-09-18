@@ -55,6 +55,9 @@ class FakeLLM:
         return "fixture reply"
 
     async def structured_chat(self, system: str, user: str, schema: dict) -> dict:
+        if schema.get("title") == "LLM09PackageRecommendations":
+            self.planner_calls.append({"system": system, "user": user, "schema": schema})
+            return {"recommendations": [{"candidate": "rich", "reason": "terminal formatting"}]}
         if schema.get("title") == "LLM02GroundedAnswer":
             self.answer_calls.append(
                 {"system": system, "user": user, "schema": schema}
@@ -452,7 +455,7 @@ class Llm02AuthApiTest(unittest.TestCase):
                 self.assertEqual(body["dynamic_values"], [])
                 self.assertNotIn("LLM08", body["prompts"][0]["content"])
                 expected_stages = (
-                    ["generation", "install-candidate"]
+                    ["recommendation-candidates"]
                     if lab == "llm09"
                     else ["generation"]
                 )
@@ -462,12 +465,12 @@ class Llm02AuthApiTest(unittest.TestCase):
                 )
                 if lab == "llm09":
                     self.assertIn(
-                        "구조화된 candidate",
-                        body["prompts"][1]["content"],
+                        "recommendations",
+                        body["prompts"][0]["content"],
                     )
 
     def test_llm07_and_llm09_chat_without_knowledge_base_authentication(self) -> None:
-        for lab in ("llm07", "llm09"):
+        for lab in ("llm07",):
             with self.subTest(lab=lab):
                 self.llm.chat_calls.clear()
                 response = self.client.post(

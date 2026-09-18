@@ -62,7 +62,7 @@ jobs:
           elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           elif git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- \
-            docker/ ':(exclude)docker/common/**' ':(exclude)docker/shared-ui/**' \
+            docker/ ':(exclude)docker/common/**' ':(exclude)docker/shared-ui/theme.css' \
             infrastructure/portal/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -84,7 +84,7 @@ jobs:
           elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           elif git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- \
-            docker/common/ docker/shared-ui/; then
+            docker/common/ docker/shared-ui/theme.css; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"

@@ -34,9 +34,9 @@ class WorkflowActionRuntimeTests(unittest.TestCase):
         self.assertIn("needs.test.outputs.common_changed == 'true'", workflow)
         self.assertIn("needs.test.outputs.runtime_changed != 'true'", workflow)
         self.assertIn("Build and publish common UI only", workflow)
-        self.assertIn("docker/common/ docker/shared-ui/", workflow)
+        self.assertIn("docker/common/ docker/shared-ui/theme.css", workflow)
         self.assertIn("':(exclude)docker/common/**'", workflow)
-        self.assertIn("':(exclude)docker/shared-ui/**'", workflow)
+        self.assertIn("':(exclude)docker/shared-ui/theme.css'", workflow)
         self.assertIn(
             'git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- \\',
             workflow,

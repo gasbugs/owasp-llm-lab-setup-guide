@@ -151,16 +151,16 @@ class UniqueDataFlowTests(unittest.TestCase):
         self.assertIn("SQL 문법", prompt)
         self.assertIn("이전 지시 무시", prompt)
 
-    def test_llm09_ui_routes_install_candidate_to_current_server_policy(self) -> None:
+    def test_llm09_ui_uses_one_recommendation_path_with_current_policy(self) -> None:
         template = (
             VULN_RAG_ROOT / "app" / "templates" / "index.html"
         ).read_text(encoding="utf-8")
-        self.assertIn('id="llm09-route"', template)
-        self.assertIn('value="install-policy" selected', template)
-        self.assertIn("/api/labs/llm09/workshop/install", template)
+        self.assertNotIn('id="llm09-route"', template)
+        self.assertNotIn("/api/labs/llm09/workshop/", template)
+        self.assertIn("if (scenarioSelect.value === 'day4') body.lab = activeLab", template)
         self.assertIn("data.lab === 'llm09'", template)
-        self.assertIn("!r.ok && !isLlm09PolicyResponse", template)
-        self.assertIn("installer_handoff_called", template)
+        self.assertIn("filtered_candidates", template)
+        self.assertIn("filter_applied", template)
         self.assertIn("'[llm09-policy] '", template)
 
     def test_day2_ui_selects_allowlisted_lab_and_uses_llm08_rag_provenance_api(self) -> None:
