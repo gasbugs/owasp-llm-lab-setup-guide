@@ -173,7 +173,7 @@ class SecureCodingWorkshopTest(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('schema_title == "LLM09PackageRecommendations"', fake)
-        self.assertIn('"recommendations": candidates', fake)
+        self.assertIn('{"recommendations": candidates}', fake)
         self.assertIn('"candidate": "rich"', fake)
 
     def test_llm02_authentication_is_shared_and_tool_authorization_switches(self) -> None:
