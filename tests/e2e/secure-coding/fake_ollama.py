@@ -69,6 +69,19 @@ class Handler(BaseHTTPRequestHandler):
                     {"record": json.loads(rendered)},
                     ensure_ascii=False,
                 )
+            elif schema_title == "LLM09PackageCandidate":
+                candidate = (
+                    "owasp-llm-lab-nonexistent-candidate-20260711"
+                    if "owasp-llm-lab-nonexistent-candidate-20260711" in user
+                    else "rich"
+                )
+                content = json.dumps(
+                    {
+                        "candidate": candidate,
+                        "reason": "requested package candidate",
+                    },
+                    ensure_ascii=False,
+                )
             elif schema_title == "LLM05SqlCandidate":
                 content = json.dumps(
                     {
