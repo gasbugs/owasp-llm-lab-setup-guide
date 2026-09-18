@@ -66,7 +66,8 @@
     .chat { min-height:420px; max-height:58vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:18px; background:linear-gradient(180deg,var(--surface-raised),var(--surface)); }
     .chat:empty::before { content:"NO MESSAGE TRAFFIC / 프롬프트를 보내면 대화와 증거가 여기에 표시됩니다."; margin:auto; color:var(--muted); font:11px ui-monospace,monospace; text-align:center; }
     .msg { max-width:86%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .msg.user { align-self:flex-end; border-color:var(--signal); background:color-mix(in srgb,var(--signal) 9%,var(--surface-raised)); }.msg.bot,.msg.bot-replay { align-self:flex-start; border-color:var(--verified); background:color-mix(in srgb,var(--verified) 7%,var(--surface-raised)); }.msg.pending { border-color:var(--warning); color:var(--warning); font-family:ui-monospace,"SFMono-Regular",Consolas,monospace; }.msg.debug { align-self:stretch; max-width:100%; border-style:dashed; color:var(--muted); font:11px/1.5 ui-monospace,monospace; }
+    .msg.user { align-self:flex-end; border-color:var(--signal); background:color-mix(in srgb,var(--signal) 9%,var(--surface-raised)); }.msg.bot,.msg.bot-replay { align-self:flex-start; border-color:var(--verified); background:color-mix(in srgb,var(--verified) 7%,var(--surface-raised)); }.msg.pending { border-color:var(--warning); color:var(--warning); font-family:ui-monospace,"SFMono-Regular",Consolas,monospace; }.pending-dots { display:inline-flex; width:2.6em; margin:0 .35em; justify-content:space-around; vertical-align:middle; }.pending-dot { display:inline-block; width:.55em; text-align:center; transform-origin:center; animation:pending-pulse 1.2s ease-in-out infinite; }.pending-dot:nth-child(2) { animation-delay:.16s; }.pending-dot:nth-child(3) { animation-delay:.32s; }.pending-elapsed { display:inline-block; width:7ch; font-variant-numeric:tabular-nums; text-align:left; }.msg.debug { align-self:stretch; max-width:100%; border-style:dashed; color:var(--muted); font:11px/1.5 ui-monospace,monospace; }
+    @keyframes pending-pulse { 0%,70%,100% { opacity:.35; transform:scale(.65); } 35% { opacity:1; transform:scale(1.35); } }
     .composer { display:grid; gap:10px; }.composer textarea { min-height:96px; resize:vertical; }.composer-actions { display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
     button { border:1px solid transparent; border-radius:9px; padding:10px 14px; background:var(--signal); color:#06131a; font-weight:800; cursor:pointer; }.secondary { border-color:var(--line); background:transparent; color:var(--ink); }button:disabled { opacity:.42; cursor:not-allowed; }
     .render-toggle { display:flex; align-items:center; gap:8px; margin-right:auto; color:var(--muted); font-size:12px; }.render-toggle input { accent-color:var(--warning); }
@@ -79,7 +80,7 @@
     @media(max-width:760px){.app-layout{display:block}.lab-nav{position:sticky;height:auto;max-height:none;padding:9px 10px;border-right:0;border-bottom:1px solid var(--line);overflow:hidden}.lab-nav-brand,.lab-nav-group{display:none}.lab-nav-list{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}.lab-nav-link{flex:0 0 auto;grid-template-columns:auto;min-height:38px;padding:7px 10px}.lab-nav-name{display:none}}
     @media(max-width:620px){.shell{padding:10px}.masthead,.scenario-bar,.panel-head,.panel-body{padding:14px}.vuln-beacon{display:none}.guard-grid{grid-template-columns:1fr}.composer-actions button{width:100%}.render-toggle{width:100%}}
     @media(max-width:560px){.masthead{grid-template-columns:1fr}.brand{grid-column:1;grid-row:1}.top-actions{grid-column:1;grid-row:2;justify-content:flex-start}.mission{grid-column:1;grid-row:3}}
-    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}.pending-dot{animation:none;opacity:.7;transform:none}}
   </style>
 </head>
 <body>
@@ -407,19 +408,29 @@ form.addEventListener('submit', async (e) => {
   msg.value = '';
   submitButton.disabled = true;
   submitButton.textContent = '응답 대기 중…';
-  const pending = add('bot', '응답을 준비하는 중.');
+  const pending = add('bot', '');
   pending.classList.add('pending');
   pending.setAttribute('role', 'status');
   pending.setAttribute('aria-live', 'polite');
+  const pendingLabel = document.createElement('span');
+  pendingLabel.textContent = '응답을 준비하는 중';
+  const pendingDots = document.createElement('span');
+  pendingDots.className = 'pending-dots';
+  pendingDots.setAttribute('aria-hidden', 'true');
+  for (let index = 0; index < 3; index += 1) {
+    const dot = document.createElement('span');
+    dot.className = 'pending-dot';
+    dot.textContent = '•';
+    pendingDots.appendChild(dot);
+  }
+  const pendingElapsed = document.createElement('span');
+  pendingElapsed.className = 'pending-elapsed';
+  pendingElapsed.textContent = '(000초)';
+  pending.replaceChildren(document.createTextNode('bot: '), pendingLabel, pendingDots, pendingElapsed);
   const startedAt = Date.now();
-  let dotCount = 1;
   const progressTimer = window.setInterval(() => {
     const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
-    const label = elapsedSeconds < 15
-      ? '응답을 준비하는 중'
-      : '모델 응답을 기다리는 중';
-    dotCount = dotCount % 3 + 1;
-    pending.textContent = `bot: ${label}${'.'.repeat(dotCount)} (${elapsedSeconds}초)`;
+    pendingElapsed.textContent = `(${String(elapsedSeconds).padStart(3, '0')}초)`;
     chat.scrollTop = chat.scrollHeight;
   }, 1000);
   const headers = {'Content-Type': 'application/json'};
