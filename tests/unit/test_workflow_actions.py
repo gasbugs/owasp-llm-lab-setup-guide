@@ -31,12 +31,18 @@ class WorkflowActionRuntimeTests(unittest.TestCase):
             ROOT / ".github" / "workflows" / "build-and-push.yaml"
         ).read_text(encoding="utf-8")
         self.assertIn("needs.test.outputs.runtime_changed == 'true'", workflow)
+        self.assertIn("needs.test.outputs.common_changed == 'true'", workflow)
+        self.assertIn("needs.test.outputs.runtime_changed != 'true'", workflow)
+        self.assertIn("Build and publish common UI only", workflow)
+        self.assertIn("docker/common/ docker/shared-ui/", workflow)
+        self.assertIn("':(exclude)docker/common/**'", workflow)
+        self.assertIn("':(exclude)docker/shared-ui/**'", workflow)
         self.assertIn(
             'git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- \\',
             workflow,
         )
         self.assertIn(
-            "docker/ infrastructure/portal/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh",
+            "infrastructure/portal/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh",
             workflow,
         )
         self.assertIn("fetch-depth: 0", workflow)

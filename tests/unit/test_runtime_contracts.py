@@ -240,7 +240,7 @@ class RuntimeContractTest(unittest.TestCase):
             installer,
         )
         self.assertIn(
-            "docker/ infrastructure/portal/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh",
+            "infrastructure/portal/ infrastructure/compose/ infrastructure/scripts/student/install-lab.sh",
             workflow,
         )
 
