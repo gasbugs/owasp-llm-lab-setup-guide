@@ -12,7 +12,9 @@
 | `owasp-llm-llmgoat` | cross-platform 챌린지 UI | 5000 |
 | `owasp-llm-dvla` | 고정 upstream commit의 ReAct Agent 앱 | 8501 |
 | `ollama/ollama` | 공용 로컬 모델 API | 11434 |
-| `python:3.12-slim` | Portal과 fake registry의 경량 런타임 | 8080, 8002 |
+| `owasp-llm-portal` | 포털 UI와 앱 바로가기 | 8080 |
+| `owasp-llm-common` | 공통 테마와 버전 표시 CSS | 내부 8080 |
+| `python:3.12-slim` | fake registry의 경량 런타임 | 8002 |
 
 설치 스크립트는 같은 `vuln-rag` image를 여섯 Compose service로 동시에 실행하며 `DEFAULT_SCENARIO`, `PORT`, 실행 command를 함께 고정합니다.
 
@@ -60,7 +62,11 @@ RAG를 사용하는 일반 scenario의 `/api/chat` 응답은 강의 실측을 �
 
 ## 빌드와 commit 태그
 
-정식 publish는 [GitHub Actions workflow](../.github/workflows/build-and-push.yaml)가 담당합니다. 품질 게이트 후 전체 이미지를 `sha-<40자리 commit>`으로 push하고, 이미지 세트가 모두 성공한 뒤에만 `latest`로 승격합니다.
+정식 publish는 [GitHub Actions workflow](../.github/workflows/build-and-push.yaml)가 담당합니다. 품질 게이트 후 7개 이미지를 한국 시간 `vYYYY.MM.DD.HH.MM`과 `sha-<40자리 commit>` 두 태그로 push하고, 이미지 세트가 모두 성공한 뒤에만 `latest`로 승격합니다. 한 릴리스의 날짜 태그, OCI version label, `APP_VERSION`과 자체 앱 화면의 버전은 같은 값입니다.
+
+다음 배포는 게시가 완료된 날짜 태그를 `IMAGE_TAG`에 지정하고, 그 릴리스의 commit으로 Compose 원본도 고정합니다. 기존 배포에서는 `.env`의 `COMPOSE_IMAGE_TAG`와 `COMMON_IMAGE_TAG`를 해당 날짜 태그로 맞춥니다. 실행 컨테이너의 파일만 고치는 방식은 릴리스가 아니며, 이미지 교체 전에 보존할 실습 수정분을 따로 백업해야 합니다.
+
+공통 CSS만 바뀌면 `common`만 새 날짜 태그로 게시합니다. 이 경우 `COMMON_IMAGE_TAG`만 변경해 common 서비스를 교체하고 앱의 `COMPOSE_IMAGE_TAG`는 유지합니다. 공통 메뉴와 앱 코드 변경은 앱 이미지 재빌드 대상입니다.
 
 commit 태그는 최초 publish 뒤 덮어쓰지 않습니다. 다만 LLMGoat·DVLA 등 일부 upstream base가 이동 태그이므로 같은 소스를 나중에 다시 빌드했을 때 byte-identical 결과까지 보장하지 않습니다. 실측 증거에는 commit 태그와 함께 pull된 image digest를 기록합니다.
 
