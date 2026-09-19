@@ -1,0 +1,64 @@
+name: Publish DVLA transport fix
+
+on:
+  push:
+    branches: [codex/dvla-ollama-compat]
+    paths:
+      - docker/dvla/**
+      - tests/unit/test_dvla_model_client.py
+      - .github/workflows/dvla-compat-release.yml
+
+concurrency:
+  group: dvla-compat-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Check model transport contracts
+        run: python -m unittest discover -s tests/unit -p test_dvla_model_client.py -v
+      - name: Set immutable release version
+        id: version
+        run: echo "value=$(TZ=Asia/Seoul date +v%Y.%m.%d.%H.%M)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refuse existing release tags
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          token="$(curl -fsS --get https://ghcr.io/token \
+            --data-urlencode service=ghcr.io \
+            --data-urlencode scope=repository:gasbugs/owasp-llm-dvla:pull | jq -er .token)"
+          for tag in "sha-$GITHUB_SHA" "$RELEASE_VERSION"; do
+            status="$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer $token" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json' \
+              "https://ghcr.io/v2/gasbugs/owasp-llm-dvla/manifests/$tag")"
+            test "$status" = 404 || { echo "Release preflight HTTP $status"; exit 1; }
+          done
+      - name: Build and publish DVLA only
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/dvla
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/gasbugs/owasp-llm-dvla:sha-${{ github.sha }}
+            ghcr.io/gasbugs/owasp-llm-dvla:${{ steps.version.outputs.value }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            APP_VERSION=${{ steps.version.outputs.value }}
+          cache-from: type=registry,ref=ghcr.io/gasbugs/owasp-llm-dvla:buildcache
