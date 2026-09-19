@@ -103,13 +103,27 @@ if command -v docker >/dev/null 2>&1; then
   INSTALLED_DOCKER_COMPOSE_RELEASE=${INSTALLED_DOCKER_COMPOSE_RELEASE#v}
 fi
 
+DOCKER_ENGINE_READY=false
+DOCKER_COMPOSE_READY=false
+DOCKER_BUILDX_READY=false
 if [ -n "$INSTALLED_DOCKER_ENGINE_RELEASE" ] && \
-  [ -n "$INSTALLED_DOCKER_COMPOSE_RELEASE" ] && \
-  dpkg --compare-versions "$INSTALLED_DOCKER_ENGINE_RELEASE" ge "$DOCKER_ENGINE_RELEASE" && \
+  dpkg --compare-versions "$INSTALLED_DOCKER_ENGINE_RELEASE" ge "$DOCKER_ENGINE_RELEASE"; then
+  DOCKER_ENGINE_READY=true
+fi
+if [ -n "$INSTALLED_DOCKER_COMPOSE_RELEASE" ] && \
   dpkg --compare-versions "$INSTALLED_DOCKER_COMPOSE_RELEASE" ge "$DOCKER_COMPOSE_RELEASE"; then
+  DOCKER_COMPOSE_READY=true
+fi
+if docker buildx version >/dev/null 2>&1; then
+  DOCKER_BUILDX_READY=true
+fi
+
+if [ "$DOCKER_ENGINE_READY" = true ] && \
+  [ "$DOCKER_COMPOSE_READY" = true ] && \
+  [ "$DOCKER_BUILDX_READY" = true ]; then
   echo "[install-lab] existing Docker Engine ${INSTALLED_DOCKER_ENGINE_RELEASE} and Compose ${INSTALLED_DOCKER_COMPOSE_RELEASE} meet the minimum versions"
 else
-  echo "[install-lab] installing minimum Docker Engine ${DOCKER_ENGINE_RELEASE} and Compose ${DOCKER_COMPOSE_RELEASE}"
+  echo "[install-lab] installing only Docker components that do not meet the minimum contract"
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     -o /etc/apt/keyrings/docker.asc
@@ -124,11 +138,17 @@ else
   apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" update -y
   DOCKER_ENGINE_VERSION="5:${DOCKER_ENGINE_RELEASE}-1~ubuntu.${VERSION_ID}~${VERSION_CODENAME}"
   DOCKER_COMPOSE_VERSION="${DOCKER_COMPOSE_RELEASE}-1~ubuntu.${VERSION_ID}~${VERSION_CODENAME}"
-  apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" install -y \
-    "docker-ce=$DOCKER_ENGINE_VERSION" \
-    "docker-ce-cli=$DOCKER_ENGINE_VERSION" \
-    containerd.io docker-buildx-plugin \
-    "docker-compose-plugin=$DOCKER_COMPOSE_VERSION"
+  DOCKER_PACKAGES=()
+  if [ "$DOCKER_ENGINE_READY" != true ]; then
+    DOCKER_PACKAGES+=("docker-ce=$DOCKER_ENGINE_VERSION" "docker-ce-cli=$DOCKER_ENGINE_VERSION" containerd.io)
+  fi
+  if [ "$DOCKER_BUILDX_READY" != true ]; then
+    DOCKER_PACKAGES+=(docker-buildx-plugin)
+  fi
+  if [ "$DOCKER_COMPOSE_READY" != true ]; then
+    DOCKER_PACKAGES+=("docker-compose-plugin=$DOCKER_COMPOSE_VERSION")
+  fi
+  apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" install -y "${DOCKER_PACKAGES[@]}"
 fi
 
 # 일반 Docker daemon 설정

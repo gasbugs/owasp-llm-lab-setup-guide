@@ -214,6 +214,9 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
             'dpkg --compare-versions "$INSTALLED_DOCKER_COMPOSE_RELEASE" ge "$DOCKER_COMPOSE_RELEASE"',
             installer,
         )
+        self.assertIn('DOCKER_PACKAGES+=("docker-ce=$DOCKER_ENGINE_VERSION"', installer)
+        self.assertIn('DOCKER_PACKAGES+=("docker-compose-plugin=$DOCKER_COMPOSE_VERSION")', installer)
+        self.assertIn('apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" install -y "${DOCKER_PACKAGES[@]}"', installer)
         self.assertNotIn("--allow-downgrades", installer)
         self.assertIn(
             "rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources",
