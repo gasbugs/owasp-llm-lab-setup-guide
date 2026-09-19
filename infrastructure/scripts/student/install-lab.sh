@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.10"
+SCRIPT_VERSION="0.2.11"
 DOCKER_ENGINE_RELEASE="${DOCKER_ENGINE_RELEASE:-29.7.2}"
 DOCKER_COMPOSE_RELEASE="${DOCKER_COMPOSE_RELEASE:-5.5.0}"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
@@ -79,7 +79,7 @@ step "3/10" "ubuntu 사용자 작업 디렉터리를 준비합니다"
 install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/work
 
 # 4) Docker 설치
-step "4/10" "Docker Engine과 Docker Compose v2를 공식 저장소에서 설치합니다"
+step "4/10" "Docker Engine과 Docker Compose v2의 최소 버전을 확인합니다"
 export DEBIAN_FRONTEND=noninteractive
 case "$APT_LOCK_TIMEOUT_SECONDS" in
   ''|*[!0-9]*)
@@ -87,17 +87,29 @@ case "$APT_LOCK_TIMEOUT_SECONDS" in
     exit 1
     ;;
 esac
-if command -v docker >/dev/null 2>&1 && \
-  [ "$(docker version --format '{{.Client.Version}}' 2>/dev/null)" = "$DOCKER_ENGINE_RELEASE" ] && \
-  [ "$(docker compose version --short 2>/dev/null)" = "$DOCKER_COMPOSE_RELEASE" ] && \
-  command -v jq >/dev/null 2>&1 && \
-  dpkg -s python3-venv >/dev/null 2>&1; then
-  echo "[install-lab] pinned Docker Engine and Compose plugin already installed"
-else
+if ! dpkg -s ca-certificates curl git jq python3-venv >/dev/null 2>&1; then
   echo "[install-lab] waiting up to ${APT_LOCK_TIMEOUT_SECONDS}s for the AMI apt/dpkg lock"
   apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" update -y
   apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT_SECONDS" \
     install -y --no-install-recommends ca-certificates curl git jq python3-venv
+fi
+
+INSTALLED_DOCKER_ENGINE_RELEASE=""
+INSTALLED_DOCKER_COMPOSE_RELEASE=""
+if command -v docker >/dev/null 2>&1; then
+  INSTALLED_DOCKER_ENGINE_RELEASE=$(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',' || true)
+  INSTALLED_DOCKER_COMPOSE_RELEASE=$(docker compose version --short 2>/dev/null || true)
+  INSTALLED_DOCKER_ENGINE_RELEASE=${INSTALLED_DOCKER_ENGINE_RELEASE#v}
+  INSTALLED_DOCKER_COMPOSE_RELEASE=${INSTALLED_DOCKER_COMPOSE_RELEASE#v}
+fi
+
+if [ -n "$INSTALLED_DOCKER_ENGINE_RELEASE" ] && \
+  [ -n "$INSTALLED_DOCKER_COMPOSE_RELEASE" ] && \
+  dpkg --compare-versions "$INSTALLED_DOCKER_ENGINE_RELEASE" ge "$DOCKER_ENGINE_RELEASE" && \
+  dpkg --compare-versions "$INSTALLED_DOCKER_COMPOSE_RELEASE" ge "$DOCKER_COMPOSE_RELEASE"; then
+  echo "[install-lab] existing Docker Engine ${INSTALLED_DOCKER_ENGINE_RELEASE} and Compose ${INSTALLED_DOCKER_COMPOSE_RELEASE} meet the minimum versions"
+else
+  echo "[install-lab] installing minimum Docker Engine ${DOCKER_ENGINE_RELEASE} and Compose ${DOCKER_COMPOSE_RELEASE}"
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     -o /etc/apt/keyrings/docker.asc

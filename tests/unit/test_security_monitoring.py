@@ -207,6 +207,15 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn("docker-ce=", installer)
         self.assertIn("docker-compose-plugin=", installer)
         self.assertIn(
+            'dpkg --compare-versions "$INSTALLED_DOCKER_ENGINE_RELEASE" ge "$DOCKER_ENGINE_RELEASE"',
+            installer,
+        )
+        self.assertIn(
+            'dpkg --compare-versions "$INSTALLED_DOCKER_COMPOSE_RELEASE" ge "$DOCKER_COMPOSE_RELEASE"',
+            installer,
+        )
+        self.assertNotIn("--allow-downgrades", installer)
+        self.assertIn(
             "rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources",
             installer,
         )
