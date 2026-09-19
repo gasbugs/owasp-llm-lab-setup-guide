@@ -27,7 +27,7 @@ RUN git init . \
     && git fetch --depth=1 origin "${REPO_REF}" \
     && git checkout --detach FETCH_HEAD
 
-# ---------- stage 2: runtime (DVLA 원본 Dockerfile 그대로 + ollama env) ----------
+# ---------- stage 2: runtime (upstream agent + native Ollama transport) ----------
 FROM docker.io/library/python:3.11-slim
 
 ARG VCS_REF=unknown
@@ -45,8 +45,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=clone /src/ /app/
+COPY requirements-ollama.txt /app/requirements-ollama.txt
 RUN pip install --no-cache-dir python-dotenv \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.txt -r requirements-ollama.txt
+
+COPY model_client.py configure_model_client.py /app/
+RUN python /app/configure_model_client.py /app/main.py
 
 # Streamlit config + env defaults (Ollama backend)
 COPY --from=clone /src/config.toml /root/.streamlit/config.toml

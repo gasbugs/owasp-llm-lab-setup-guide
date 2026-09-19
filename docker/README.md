@@ -82,6 +82,8 @@ TAG="sha-$SETUP_COMMIT" \
 
 `vuln-rag`와 `vuln-agent`만 같은 태그의 `base-gpu`를 `BASE_IMAGE`로 전달받습니다. LLMGoat와 DVLA는 각 upstream base를 사용합니다.
 
+DVLA의 Ollama 모델은 `langchain-ollama==0.3.10`·`ollama==0.5.3`의 native chat 연결과 `reasoning=False`를 사용합니다. Qwen3의 빈 스트리밍 조각을 구형 LiteLLM completion parser가 연결 오류로 처리하는 문제를 피하며, upstream의 UI·Agent·Tool 구현은 유지합니다. 다른 provider는 기존 LiteLLM 경로를 사용합니다. DVLA만 교체할 때는 `DVLA_IMAGE_TAG`에 게시된 날짜 태그를 지정하고 다른 앱의 `COMPOSE_IMAGE_TAG`는 유지합니다.
+
 ## EC2 운영
 
 수동 `docker run` 대신 저장소 루트의 설치 스크립트를 사용합니다. 설치 스크립트가 단일 Compose 정의를 내려받아 실행합니다.

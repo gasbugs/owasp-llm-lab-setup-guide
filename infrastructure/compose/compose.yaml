@@ -258,7 +258,7 @@ services:
 
   dvla:
     container_name: lab-dvla
-    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-dvla:${COMPOSE_IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-dvla:${DVLA_IMAGE_TAG:-${COMPOSE_IMAGE_TAG:-latest}}
     restart: always
     environment:
       OLLAMA_HOST: http://ollama:11434
