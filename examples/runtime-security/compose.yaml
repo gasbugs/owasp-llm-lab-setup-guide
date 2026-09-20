@@ -1,0 +1,30 @@
+# CUSTOM FILE: project runtime Gateway exercise.
+# Format: https://compose-spec.io/ (Apache-2.0).
+name: runtime-security-operations
+services:
+  gateway:
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: bedrock-gateway/Containerfile
+    image: localhost/runtime-gateway:20260919
+    user: "${LOCAL_UID:?Set LOCAL_UID}:${LOCAL_GID:?Set LOCAL_GID}"
+    env_file: .state/runtime.env
+    environment:
+      HOME: /tmp
+      AWS_SHARED_CREDENTIALS_FILE: /tmp/.aws/credentials
+      AWS_CONFIG_FILE: /tmp/.aws/config
+      BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
+      GATEWAY_OPERATIONS_POLICY: /policy/policy.json
+      GATEWAY_OPERATIONS_DATABASE: /data/usage.db
+    ports: ["127.0.0.1:18097:8080"]
+    volumes:
+      - "${AWS_CREDENTIALS_DIR:?Set isolated runtime credentials directory}:/tmp/.aws:ro"
+      - "./.state/policy.json:/policy/policy.json:ro"
+      - "./.state/ledger:/data:rw"
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [gateway]
+networks:
+  gateway: {}

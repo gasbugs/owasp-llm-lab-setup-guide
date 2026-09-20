@@ -28,7 +28,7 @@ services:
       BEDROCK_OUTPUT_USD_PER_MILLION: ${BEDROCK_OUTPUT_USD_PER_MILLION:-0.24}
       RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
     volumes:
-      - "${HOME}/.aws:/tmp/.aws:ro"
+      - "${AWS_CREDENTIALS_DIR:-${HOME}/.aws}:/tmp/.aws:ro"
 
   presidio:
     container_name: llm-security-presidio-spoke

@@ -1,0 +1,32 @@
+name: Runtime security policies
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Check durable quotas and synthetic approvals
+        run: |
+          python -m unittest discover -s tests/unit -p test_gateway_operations.py -v
+          python -m unittest discover -s tests/unit -p test_runtime_approval.py -v
+          python -m unittest discover -s tests/unit -p test_runtime_prepare.py -v
+      - name: Build the actual Gateway runtime
+        working-directory: llm-security-control-plane
+        run: docker build -f bedrock-gateway/Containerfile -t runtime-gateway:test .
+      - name: Check HTTP boundaries without network or AWS credentials
+        run: >-
+          docker run --rm --network none
+          -v "$GITHUB_WORKSPACE:/repo:ro" -w /repo
+          --entrypoint python runtime-gateway:test
+          -m unittest discover -s tests/unit -p test_gateway_operations_http.py -v

@@ -1,0 +1,7 @@
+# Local credentials and mutable runtime state are never build inputs.
+.state/
+**/*.env
+.git/
+**/__pycache__/
+# Preserve any nested checkout on disk without sending it to the builder.
+owasp-llm-lab-setup-guide/

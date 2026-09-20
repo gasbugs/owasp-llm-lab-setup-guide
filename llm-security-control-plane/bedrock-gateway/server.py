@@ -20,6 +20,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, ge
 from pydantic import BaseModel, ConfigDict, Field
 
 from telemetry import configure_telemetry
+from gateway_operations import GatewayOperations, PolicyDenied
 
 
 AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
@@ -37,6 +38,8 @@ BEDROCK = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 BEDROCK_AGENT_RUNTIME = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION)
 RUNTIME = {"ready": False, "error": "startup-not-complete"}
 TRACER = trace.get_tracer("llm-security-bedrock-gateway")
+OPERATIONS = GatewayOperations.from_environment()
+POLICY_DECISIONS = Counter("gateway_policy_decisions_total", "Gateway admission decisions", ["principal", "reason"])
 
 REQUESTS = Counter(
     "bedrock_requests_total", "Bedrock Converse requests", ["model", "outcome", "task"]
@@ -101,9 +104,16 @@ class RetrievalRequest(BaseModel):
     number_of_results: int = Field(default=3, ge=1, le=10)
 
 
-def require_gateway_token(authorization: str | None = Header(default=None)) -> None:
+def require_gateway_token(authorization: str | None = Header(default=None)) -> str | None:
     """Allow only local services that know the fixed Module 08/09 gateway token."""
     scheme, _, token = (authorization or "").partition(" ")
+    if OPERATIONS is not None:
+        try:
+            if scheme.lower() != "bearer":
+                raise PolicyDenied("invalid-credential", 401)
+            return OPERATIONS.authenticate(token)
+        except PolicyDenied as exc:
+            raise HTTPException(status_code=exc.status, detail={"reason": exc.reason, "upstream_called": False}) from exc
     if scheme.lower() != "bearer" or not hmac.compare_digest(
         token, BEDROCK_GATEWAY_TOKEN
     ):
@@ -188,6 +198,9 @@ def _converse(request: ChatCompletionRequest) -> dict:
             REQUESTS.labels(MODEL_ID, outcome, task).inc()
 
     usage = result.get("usage", {})
+    if OPERATIONS is not None and any(type(usage.get(key)) is not int or usage[key] < 0
+                                      for key in ("inputTokens", "outputTokens")):
+        raise HTTPException(status_code=502, detail="provider usage missing or invalid")
     input_tokens = int(usage.get("inputTokens", 0))
     output_tokens = int(usage.get("outputTokens", 0))
     TOKENS.labels(MODEL_ID, "input", task).inc(input_tokens)
@@ -295,11 +308,44 @@ def metrics() -> Response:
 @app.post("/v1/chat/completions")
 def chat_completions(
     request: ChatCompletionRequest,
-    _authorized: None = Depends(require_gateway_token),
+    _authorized: str | None = Depends(require_gateway_token),
 ) -> dict:
     if not RUNTIME["ready"]:
         raise HTTPException(status_code=503, detail="Bedrock gateway startup check failed")
-    return _converse(request)
+    if OPERATIONS is None:
+        return _converse(request)
+    if request.stream or request.response_format not in (None, {"type": "json_object"}):
+        raise HTTPException(status_code=422, detail="unsupported response mode")
+    if not any(item.role != "system" for item in request.messages):
+        raise HTTPException(status_code=422, detail="at least one user or assistant message is required")
+    try:
+        text = "\n".join(item.content if isinstance(item.content, str)
+                         else "\n".join(part.text for part in item.content) for item in request.messages)
+        reservation = OPERATIONS.admit(_authorized, request.model, text,
+                                       request.max_completion_tokens or request.max_tokens)
+    except PolicyDenied as exc:
+        POLICY_DECISIONS.labels(_authorized, exc.reason).inc()
+        raise HTTPException(status_code=exc.status, detail={"reason": exc.reason, "upstream_called": False}) from exc
+    POLICY_DECISIONS.labels(_authorized, "admitted").inc()
+    try:
+        result = _converse(request)
+        OPERATIONS.settle(reservation, result["usage"]["prompt_tokens"], result["usage"]["completion_tokens"])
+    except ValueError as exc:
+        OPERATIONS.uncertain(reservation)
+        raise HTTPException(status_code=502, detail="provider usage could not be settled") from exc
+    except Exception:
+        OPERATIONS.uncertain(reservation)
+        raise
+    result["gateway_policy"] = {"principal": _authorized, "reservation_id": reservation,
+                                "upstream_called": True, "usage": OPERATIONS.usage(_authorized)}
+    return result
+
+
+@app.get("/v1/usage")
+def client_usage(_authorized: str | None = Depends(require_gateway_token)) -> dict:
+    if OPERATIONS is None:
+        raise HTTPException(status_code=404, detail="Gateway operations policy is not enabled")
+    return OPERATIONS.usage(_authorized)
 
 
 @app.post("/v1/retrieve")
@@ -307,6 +353,8 @@ def retrieve(
     request: RetrievalRequest, _authorized: None = Depends(require_gateway_token)
 ) -> dict:
     """Retrieve through the credential boundary instead of exposing AWS credentials downstream."""
+    if OPERATIONS is not None:
+        raise HTTPException(status_code=403, detail="Retrieval is not enabled on the operations teaching endpoint")
     if not KNOWLEDGE_BASE_ID:
         raise HTTPException(status_code=503, detail="Module 08 Knowledge Base is not configured")
     try:

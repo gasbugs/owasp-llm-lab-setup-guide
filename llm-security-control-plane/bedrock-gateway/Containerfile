@@ -15,6 +15,7 @@ WORKDIR /app
 # 공통 telemetry와 Gateway 코드는 컨테이너 안에서 수정되지 않도록 읽기 전용으로 복사한다.
 COPY --chmod=0444 shared/telemetry.py /app/telemetry.py
 COPY --chmod=0444 bedrock-gateway/server.py /app/server.py
+COPY --chmod=0444 bedrock-gateway/gateway_operations.py /app/gateway_operations.py
 
 # root 권한 없이 실행한다. EXPOSE는 내부 포트를 문서화할 뿐 호스트에 공개하지 않는다.
 USER 65532:65532
