@@ -65,6 +65,7 @@
         "event_name": {"enum": ["guard_scan", "presidio_scan", "lab_case"]},
         "observation_command": {"type": "string", "minLength": 1},
         "build_context": {"type": "string", "minLength": 1},
+        "build_file": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
         "image": {"type": "string", "minLength": 1},
         "container_prefix": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$"},
         "network": {"type": "string", "minLength": 1},

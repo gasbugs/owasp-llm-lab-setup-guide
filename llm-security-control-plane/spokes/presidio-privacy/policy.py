@@ -1,8 +1,9 @@
 """Presidio 개인정보 탐지 Spoke의 정책 정본.
 
 처음에는 ``DEFAULT_ENTITIES``와 ``PrivacyPolicy``에서 탐지 대상과 임계값을
-확인한다. 다음으로 ``_register_project_recognizers``에서 프로젝트 전용 형식을,
-마지막으로 ``analyze``에서 input·retrieval·output을 검사하는 흐름을 읽는다.
+확인한다. 다음으로 ``_register_recognizers``에서 기본 비활성 국가 인식기와
+프로젝트 전용 형식을, 마지막으로 ``analyze``에서 input·retrieval·output을
+검사하는 흐름을 읽는다.
 
 이 모듈은 탐지 결과와 비식별화 후보만 NeMo Hub에 반환한다. allow·block·redact
 중 무엇을 적용할지는 이곳이 아니라 NeMo와 Application이 최종 결정한다.
@@ -15,12 +16,11 @@ from dataclasses import dataclass
 
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_analyzer.nlp_engine import NlpEngineProvider
+from presidio_analyzer.predefined_recognizers import KrRrnRecognizer
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 
 
-# 프로젝트 전용 합성 주민등록번호 형식이다. 실제 주민번호를 fixture로 쓰지 않는다.
-KR_RRN_PATTERN = r"(?<!\d)\d{6}-[1-4]\d{6}(?!\d)"
 DEFAULT_ENTITIES = (
     "EMAIL_ADDRESS",
     "PHONE_NUMBER",
@@ -56,17 +56,15 @@ class PrivacyAnalyzer:
             supported_languages=[self.settings.language],
         )
         self.anonymizer = AnonymizerEngine()
-        self._register_project_recognizers()
+        self._register_recognizers()
 
-    def _register_project_recognizers(self) -> None:
-        # Presidio 기본 Recognizer에 없는 교육용 Entity를 명시적으로 등록한다.
+    def _register_recognizers(self) -> None:
+        # 공식 KR_RRN 인식기는 국가별 기본 비활성 항목이다. 영어 NLP pipeline과
+        # 같은 language로 직접 등록해 정규식뿐 아니라 날짜·checksum 검증도 쓴다.
         self.analyzer.registry.add_recognizer(
-            PatternRecognizer(
-                supported_entity="KR_RRN",
-                supported_language=self.settings.language,
-                patterns=[Pattern("synthetic_kr_rrn", KR_RRN_PATTERN, 0.85)],
-            )
+            KrRrnRecognizer(supported_language=self.settings.language)
         )
+        # DEMO_API_KEY만 프로젝트가 정의한 합성 Entity다.
         self.analyzer.registry.add_recognizer(
             PatternRecognizer(
                 supported_entity="DEMO_API_KEY",
@@ -136,8 +134,10 @@ class PrivacyAnalyzer:
             "language": self.settings.language,
             "score_threshold": self.settings.score_threshold,
             "entities": list(self.settings.entities),
+            "predefined_recognizers": {
+                "KR_RRN": "KrRrnRecognizer",
+            },
             "custom_recognizers": {
-                "KR_RRN": KR_RRN_PATTERN,
                 "DEMO_API_KEY": r"\bDEMO_API_KEY=[A-Za-z0-9-]+\b",
             },
         }

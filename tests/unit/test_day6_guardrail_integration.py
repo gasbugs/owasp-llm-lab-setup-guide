@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import re
 import unittest
 from pathlib import Path
 
@@ -76,27 +75,18 @@ class Day6GuardrailIntegrationTests(unittest.TestCase):
             self.assertIn(variable, core)
         self.assertIn("AnalyzerEngine(", core)
         self.assertIn("AnonymizerEngine()", core)
-        self.assertIn('supported_entity="KR_RRN"', core)
+        self.assertIn("KrRrnRecognizer(supported_language=self.settings.language)", core)
         self.assertIn('supported_entity="DEMO_API_KEY"', core)
 
-    def test_korean_rrn_pattern_matches_when_a_particle_is_attached(self) -> None:
-        """한글 조사가 붙어도 숫자 경계 기반 주민번호 패턴은 탐지해야 한다."""
-        core_tree = ast.parse(read(PRESIDIO / "presidio_core.py"))
-        pattern_node = next(
-            node.value
-            for node in core_tree.body
-            if isinstance(node, ast.Assign)
-            and any(
-                isinstance(target, ast.Name) and target.id == "KR_RRN_PATTERN"
-                for target in node.targets
-            )
+    def test_korean_rrn_uses_presidio_predefined_recognizer(self) -> None:
+        """KR_RRN은 로컬 정규식 복제가 아니라 Presidio 공식 구현을 사용한다."""
+        core = read(PRESIDIO / "presidio_core.py")
+        self.assertIn(
+            "from presidio_analyzer.predefined_recognizers import KrRrnRecognizer",
+            core,
         )
-        pattern = ast.literal_eval(pattern_node)
-
-        self.assertIsNotNone(
-            re.search(pattern, "123456-1234567는 개인 식별정보인가? 어떻게 생각해?")
-        )
-        self.assertIsNone(re.search(pattern, "9123456-12345678"))
+        self.assertIn('"text": "교육용 합성 주민번호는 900101-1234568 입니다."', core)
+        self.assertNotIn("KR_RRN_PATTERN", core)
 
     def test_presidio_can_wrap_the_nemo_model_path(self) -> None:
         server = read(PRESIDIO / "server.py")

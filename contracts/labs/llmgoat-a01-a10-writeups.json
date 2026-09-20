@@ -4,34 +4,34 @@
   "lab_id": "llmgoat-a01-a10-writeups",
   "related_lessons": [
     {
-      "path": "01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md"
+      "path": "01-owasp-top-10/01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md"
     },
     {
-      "path": "02-llm-data-knowledge-vulnerabilities/02-llmgoat-a02-sensitive-information-disclosure.md"
+      "path": "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/02-llmgoat-a02-sensitive-information-disclosure.md"
     },
     {
-      "path": "05-llm-operations-infrastructure/02-llmgoat-a03-supply-chain.md"
+      "path": "01-owasp-top-10/05-llm-operations-infrastructure/02-llmgoat-a03-supply-chain.md"
     },
     {
-      "path": "02-llm-data-knowledge-vulnerabilities/04-llmgoat-a04-data-model-poisoning.md"
+      "path": "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/04-llmgoat-a04-data-model-poisoning.md"
     },
     {
-      "path": "03-llm-output-post-processing/02-llmgoat-a05-improper-output-handling.md"
+      "path": "01-owasp-top-10/03-llm-output-post-processing/02-llmgoat-a05-improper-output-handling.md"
     },
     {
-      "path": "04-llm-agent-authorization-execution/02-llmgoat-a06-excessive-agency.md"
+      "path": "01-owasp-top-10/04-llm-agent-authorization-execution/02-llmgoat-a06-excessive-agency.md"
     },
     {
-      "path": "01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md"
+      "path": "01-owasp-top-10/01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md"
     },
     {
-      "path": "02-llm-data-knowledge-vulnerabilities/08-llmgoat-a08-vector-embedding-weaknesses.md"
+      "path": "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/08-llmgoat-a08-vector-embedding-weaknesses.md"
     },
     {
-      "path": "03-llm-output-post-processing/04-llmgoat-a09-misinformation.md"
+      "path": "01-owasp-top-10/03-llm-output-post-processing/04-llmgoat-a09-misinformation.md"
     },
     {
-      "path": "05-llm-operations-infrastructure/04-llmgoat-a10-unbounded-consumption.md"
+      "path": "01-owasp-top-10/05-llm-operations-infrastructure/04-llmgoat-a10-unbounded-consumption.md"
     }
   ],
   "policy": {
@@ -546,7 +546,7 @@
   ],
   "book_bindings": [
     {
-      "lesson_path": "01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md",
+      "lesson_path": "01-owasp-top-10/01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a01-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -564,7 +564,7 @@
       ]
     },
     {
-      "lesson_path": "02-llm-data-knowledge-vulnerabilities/02-llmgoat-a02-sensitive-information-disclosure.md",
+      "lesson_path": "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/02-llmgoat-a02-sensitive-information-disclosure.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a02-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -582,7 +582,7 @@
       ]
     },
     {
-      "lesson_path": "05-llm-operations-infrastructure/02-llmgoat-a03-supply-chain.md",
+      "lesson_path": "01-owasp-top-10/05-llm-operations-infrastructure/02-llmgoat-a03-supply-chain.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a03-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -600,7 +600,7 @@
       ]
     },
     {
-      "lesson_path": "02-llm-data-knowledge-vulnerabilities/04-llmgoat-a04-data-model-poisoning.md",
+      "lesson_path": "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/04-llmgoat-a04-data-model-poisoning.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a04-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -618,7 +618,7 @@
       ]
     },
     {
-      "lesson_path": "03-llm-output-post-processing/02-llmgoat-a05-improper-output-handling.md",
+      "lesson_path": "01-owasp-top-10/03-llm-output-post-processing/02-llmgoat-a05-improper-output-handling.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a05-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -636,7 +636,7 @@
       ]
     },
     {
-      "lesson_path": "04-llm-agent-authorization-execution/02-llmgoat-a06-excessive-agency.md",
+      "lesson_path": "01-owasp-top-10/04-llm-agent-authorization-execution/02-llmgoat-a06-excessive-agency.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a06-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -654,7 +654,7 @@
       ]
     },
     {
-      "lesson_path": "01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md",
+      "lesson_path": "01-owasp-top-10/01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a07-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -672,7 +672,7 @@
       ]
     },
     {
-      "lesson_path": "02-llm-data-knowledge-vulnerabilities/08-llmgoat-a08-vector-embedding-weaknesses.md",
+      "lesson_path": "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/08-llmgoat-a08-vector-embedding-weaknesses.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a08-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -690,7 +690,7 @@
       ]
     },
     {
-      "lesson_path": "03-llm-output-post-processing/04-llmgoat-a09-misinformation.md",
+      "lesson_path": "01-owasp-top-10/03-llm-output-post-processing/04-llmgoat-a09-misinformation.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a09-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -708,7 +708,7 @@
       ]
     },
     {
-      "lesson_path": "05-llm-operations-infrastructure/04-llmgoat-a10-unbounded-consumption.md",
+      "lesson_path": "01-owasp-top-10/05-llm-operations-infrastructure/04-llmgoat-a10-unbounded-consumption.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a10-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -739,16 +739,16 @@
       "tests/e2e/llmgoat/"
     ],
     "course": [
-      "01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md",
-      "02-llm-data-knowledge-vulnerabilities/02-llmgoat-a02-sensitive-information-disclosure.md",
-      "05-llm-operations-infrastructure/02-llmgoat-a03-supply-chain.md",
-      "02-llm-data-knowledge-vulnerabilities/04-llmgoat-a04-data-model-poisoning.md",
-      "03-llm-output-post-processing/02-llmgoat-a05-improper-output-handling.md",
-      "04-llm-agent-authorization-execution/02-llmgoat-a06-excessive-agency.md",
-      "01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md",
-      "02-llm-data-knowledge-vulnerabilities/08-llmgoat-a08-vector-embedding-weaknesses.md",
-      "03-llm-output-post-processing/04-llmgoat-a09-misinformation.md",
-      "05-llm-operations-infrastructure/04-llmgoat-a10-unbounded-consumption.md"
+      "01-owasp-top-10/01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md",
+      "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/02-llmgoat-a02-sensitive-information-disclosure.md",
+      "01-owasp-top-10/05-llm-operations-infrastructure/02-llmgoat-a03-supply-chain.md",
+      "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/04-llmgoat-a04-data-model-poisoning.md",
+      "01-owasp-top-10/03-llm-output-post-processing/02-llmgoat-a05-improper-output-handling.md",
+      "01-owasp-top-10/04-llm-agent-authorization-execution/02-llmgoat-a06-excessive-agency.md",
+      "01-owasp-top-10/01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md",
+      "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/08-llmgoat-a08-vector-embedding-weaknesses.md",
+      "01-owasp-top-10/03-llm-output-post-processing/04-llmgoat-a09-misinformation.md",
+      "01-owasp-top-10/05-llm-operations-infrastructure/04-llmgoat-a10-unbounded-consumption.md"
     ],
     "skills": [
       "tests/unit/test_llmgoat_solution_cases.py"

@@ -3,7 +3,7 @@
   "schema_version": 1,
   "lab_id": "day6-presidio",
   "related_lessons": [
-    {"path": "08-llm-guardrails/04-presidio-input-output-controls.md"}
+    {"path": "02-bedrock-guardrails-observability/08-llm-guardrails/05-presidio-input-output-controls.md"}
   ],
   "policy": {
     "source": "examples/day6/presidio/presidio_core.py",
@@ -13,7 +13,7 @@
       "AnonymizerEngine()",
       "PRESIDIO_SCORE_THRESHOLD",
       "PRESIDIO_ENTITIES",
-      "supported_entity=\"KR_RRN\"",
+      "KrRrnRecognizer(supported_language=self.settings.language)",
       "supported_entity=\"DEMO_API_KEY\"",
       "OperatorConfig(\"replace\"",
       "\"application_decision\": \"redact\" if findings else \"allow\""
@@ -25,6 +25,7 @@
     "event_name": "presidio_scan",
     "observation_command": "docker logs",
     "build_context": "examples/day6/presidio",
+    "build_file": "Containerfile",
     "image": "localhost/day6-presidio:2.2.362",
     "container_prefix": "lecture-loop-day6-presidio",
     "network": "none",
@@ -78,8 +79,8 @@
       "case_id": "input-kr-rrn",
       "role": "risk",
       "direction": "input",
-      "input": {"kind": "literal", "value": "교육용 합성 주민번호는 900101-1234567 입니다.", "display": "교육용 합성 주민번호는 900101-1234567 입니다."},
-      "policy": "PresidioAnalyzer+custom-recognizer",
+      "input": {"kind": "literal", "value": "교육용 합성 주민번호는 900101-1234568 입니다.", "display": "교육용 합성 주민번호는 900101-1234568 입니다."},
+      "policy": "PresidioAnalyzer+KrRrnRecognizer",
       "expected_decision": "redact",
       "required_evidence_fields": ["case", "direction", "original_text", "sanitized_text", "valid", "risk_score", "entity_types", "application_decision"],
       "correlation_fields": ["case", "original_text"]
@@ -119,10 +120,10 @@
     }
   ],
   "book_bindings": [
-    {"lesson_path": "08-llm-guardrails/04-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "08-llm-guardrails/04-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "08-llm-guardrails/04-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-custom-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "08-llm-guardrails/04-presidio-input-output-controls.md", "section": "2. Presidio 이미지 빌드와 독립 Suite 실행", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]}
+    {"lesson_path": "02-bedrock-guardrails-observability/08-llm-guardrails/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "02-bedrock-guardrails-observability/08-llm-guardrails/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "02-bedrock-guardrails-observability/08-llm-guardrails/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-predefined-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "02-bedrock-guardrails-observability/08-llm-guardrails/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]}
   ],
   "state": {
     "mutation_type": "process",
@@ -133,7 +134,7 @@
   },
   "watch_paths": {
     "setup": ["contracts/labs/day6-presidio.json", "examples/day6/presidio/", "docker/vuln-rag/", "tools/lab_contract.py", "tools/run_lab_contract.py"],
-    "course": ["08-llm-guardrails/04-presidio-input-output-controls.md", "evidence/"],
+    "course": ["02-bedrock-guardrails-observability/08-llm-guardrails/05-presidio-input-output-controls.md", "evidence/"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py"]
   }
 }

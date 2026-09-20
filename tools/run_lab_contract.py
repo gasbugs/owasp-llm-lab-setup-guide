@@ -103,7 +103,14 @@ def main() -> int:
             command_env.update(runtime.get("environment", {}))
         else:
             if not args.skip_build:
-                run(["docker", "build", "--tag", image, str(root / runtime["build_context"])])
+                build_context = root / runtime["build_context"]
+                build_command = ["docker", "build", "--tag", image]
+                if runtime.get("build_file"):
+                    build_command.extend(
+                        ["--file", str(build_context / runtime["build_file"])]
+                    )
+                build_command.append(str(build_context))
+                run(build_command)
             suite_args = list(runtime["suite_args"])
             by_case = {case["case_id"]: case for case in contract["cases"]}
             for override in runtime["case_overrides"]:

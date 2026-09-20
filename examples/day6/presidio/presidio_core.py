@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_analyzer.nlp_engine import NlpEngineProvider
+from presidio_analyzer.predefined_recognizers import KrRrnRecognizer
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 
@@ -26,10 +27,6 @@ from presidio_anonymizer.entities import OperatorConfig
 FRAMEWORK = "microsoft-presidio"
 FRAMEWORK_VERSION = "2.2.362"
 NLP_MODEL = "en_core_web_sm"
-# ``\b``는 한글도 단어 문자로 취급하므로 ``...1234567는``처럼 조사가
-# 바로 붙으면 경계를 찾지 못한다. 숫자열의 앞뒤만 검사하면 한글 문장에서도
-# 주민번호 부분을 안정적으로 분리할 수 있다.
-KR_RRN_PATTERN = r"(?<!\d)\d{6}-[1-4]\d{6}(?!\d)"
 # 이 목록은 호출자가 임의의 Entity를 검사하도록 허용하는 목록이 아니라,
 # 애플리케이션 정책이 검사 대상으로 승인한 Entity allowlist다.
 DEFAULT_ENTITIES = (
@@ -88,7 +85,7 @@ class PolicySettings:
 
     def as_public_dict(self) -> dict:
         """비밀값 없이 현재 정책을 API 응답이나 실습 화면에 공개한다."""
-        # 원문 입력이나 탐지된 값은 공개하지 않고 활성 정책과 Pattern만 반환한다.
+        # 원문 입력이나 탐지된 값은 공개하지 않고 활성 정책과 인식기만 반환한다.
         return {
             "analyzer": {
                 "enabled_for_input": self.input_enabled,
@@ -102,8 +99,10 @@ class PolicySettings:
                 "operator": "replace",
                 "replacement_format": "<ENTITY_TYPE>",
             },
+            "predefined_recognizers": {
+                "KR_RRN": "KrRrnRecognizer",
+            },
             "custom_recognizers": {
-                "KR_RRN": KR_RRN_PATTERN,
                 "DEMO_API_KEY": r"\bDEMO_API_KEY=[A-Za-z0-9-]+\b",
             },
         }
@@ -138,9 +137,9 @@ CASES = {
     },
     "input-kr-rrn": {
         "direction": "input",
-        "scanner": "PresidioAnalyzer+custom-recognizer",
-        "text": "교육용 합성 주민번호는 900101-1234567 입니다.",
-        "purpose": "project custom Korean resident-number recognizer",
+        "scanner": "PresidioAnalyzer+KrRrnRecognizer",
+        "text": "교육용 합성 주민번호는 900101-1234568 입니다.",
+        "purpose": "Presidio predefined Korean resident-number recognizer",
     },
     "output-clean": {
         "direction": "output",
@@ -167,7 +166,7 @@ CASES = {
 
 
 class PresidioCore:
-    """Analyzer, Anonymizer와 프로젝트 사용자 정의 recognizer를 묶은 정책 객체."""
+    """Analyzer, Anonymizer와 명시적으로 활성화한 recognizer를 묶은 정책 객체."""
 
     def __init__(self, settings: PolicySettings | None = None) -> None:
         self.settings = settings or PolicySettings.from_env()
@@ -190,26 +189,19 @@ class PresidioCore:
         # Analyzer와 Anonymizer는 역할이 다르다. Analyzer는 위치를 찾고,
         # Anonymizer는 그 위치에 실제 치환 연산을 적용한다.
         self.anonymizer = AnonymizerEngine()
-        self._register_custom_recognizers()
+        self._register_recognizers()
 
-    def _register_custom_recognizers(self) -> None:
-        """Presidio 기본 목록에 없는 교육용 엔터티 패턴을 등록한다."""
+    def _register_recognizers(self) -> None:
+        """기본 비활성 국가 인식기와 프로젝트 전용 인식기를 등록한다."""
 
-        # PatternRecognizer는 정규식 기반 확장 지점이다. score는 정규식이
-        # 일치했을 때 부여할 신뢰도이며 전체 정책 threshold와 비교된다.
+        # Presidio 2.2.362에는 공식 한국 주민등록번호 인식기가 포함되어 있지만
+        # 국가별 인식기라 기본 registry에서는 비활성이다. 이 서비스는 영어 NLP
+        # pipeline 하나를 쓰므로 같은 language로 인스턴스를 명시적으로 등록한다.
         self.analyzer.registry.add_recognizer(
-            PatternRecognizer(
-                supported_entity="KR_RRN",
-                supported_language=self.settings.language,
-                patterns=[
-                    Pattern(
-                        name="kr_rrn_synthetic_training_pattern",
-                        regex=KR_RRN_PATTERN,
-                        score=0.85,
-                    )
-                ],
-            )
+            KrRrnRecognizer(supported_language=self.settings.language)
         )
+        # DEMO_API_KEY는 Presidio 기본 Entity가 아닌 이 프로젝트의 합성 형식이다.
+        # PatternRecognizer의 score는 일치했을 때 정책 threshold와 비교된다.
         self.analyzer.registry.add_recognizer(
             PatternRecognizer(
                 supported_entity="DEMO_API_KEY",

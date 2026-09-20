@@ -3,7 +3,7 @@
   "schema_version": 1,
   "lab_id": "day4-llm03-real-model-lifecycle",
   "related_lessons": [
-    {"path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md"}
+    {"path": "01-owasp-top-10/05-llm-operations-infrastructure/01-llm03-supply-chain.md"}
   ],
   "policy": {
     "source": "examples/llm03/lifecycle_core.py",
@@ -150,7 +150,7 @@
   ],
   "book_bindings": [
     {
-      "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
+      "lesson_path": "01-owasp-top-10/05-llm-operations-infrastructure/01-llm03-supply-chain.md",
       "section": "2. 실제 GGUF를 Parser와 Loader에 전달해 구조·정상 응답 확인",
       "observation_id": "day4-llm03-real-gguf-parser",
       "observation_command": "jq -c '{case:\"real-gguf-parser\"",
@@ -182,7 +182,7 @@
       "required_projection_fields": ["case", "input_prompt", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
+      "lesson_path": "01-owasp-top-10/05-llm-operations-infrastructure/01-llm03-supply-chain.md",
       "section": "4. Loader·서명·Registry·Ollama의 공급망 Gate 검증",
       "observation_id": "day4-llm03-unauthorized-sign-rejected",
       "observation_command": "curl -sS --max-time 30",
@@ -198,7 +198,7 @@
       "required_projection_fields": ["case", "scanner", "original_text", "application_decision", "details"]
     },
     {
-      "lesson_path": "05-llm-operations-infrastructure/01-llm03-supply-chain.md",
+      "lesson_path": "01-owasp-top-10/05-llm-operations-infrastructure/01-llm03-supply-chain.md",
       "section": "4. Loader·서명·Registry·Ollama의 공급망 Gate 검증",
       "observation_id": "day4-llm03-final-signature-valid",
       "observation_command": "jq '{data:{valid:.data.valid}}'",
@@ -223,7 +223,7 @@
   },
   "watch_paths": {
     "setup": ["contracts/labs/day4-llm03-real-model-lifecycle.json", "examples/llm03/", "tests/e2e/llm03/run_real_model_lifecycle.sh", "tools/lab_contract.py", "tools/run_lab_contract.py", "docker/vuln-rag/"],
-    "course": ["05-llm-operations-infrastructure/01-llm03-supply-chain.md", "publisher-evidence/day4-llm03-format-regression.md", "evidence/2026-07-17-day4-llm03-real-model-lifecycle.md"],
+    "course": ["01-owasp-top-10/05-llm-operations-infrastructure/01-llm03-supply-chain.md", "publisher-evidence/day4-llm03-format-regression.md", "evidence/2026-07-17-day4-llm03-real-model-lifecycle.md"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py", "tests/test_content_loop.py"]
   }
 }

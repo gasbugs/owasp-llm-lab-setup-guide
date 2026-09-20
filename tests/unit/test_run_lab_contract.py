@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -30,6 +31,12 @@ class MixedHostHarnessOutputTests(unittest.TestCase):
             [record["case"] for record in records],
             ["baseline-request", "large-input-request"],
         )
+
+    def test_day6_contract_declares_its_containerfile(self) -> None:
+        contract = json.loads(
+            (ROOT / "contracts/labs/day6-presidio.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(contract["runtime"]["build_file"], "Containerfile")
 
 
 if __name__ == "__main__":
