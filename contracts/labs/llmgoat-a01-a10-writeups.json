@@ -4,7 +4,7 @@
   "lab_id": "llmgoat-a01-a10-writeups",
   "related_lessons": [
     {
-      "path": "01-owasp-top-10/01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md"
+      "path": "01-owasp-top-10/01-llm-input-prompt-attacks/02-llmgoat-a01-prompt-injection.md"
     },
     {
       "path": "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/02-llmgoat-a02-sensitive-information-disclosure.md"
@@ -22,7 +22,7 @@
       "path": "01-owasp-top-10/04-llm-agent-authorization-execution/02-llmgoat-a06-excessive-agency.md"
     },
     {
-      "path": "01-owasp-top-10/01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md"
+      "path": "01-owasp-top-10/01-llm-input-prompt-attacks/05-llmgoat-a07-system-prompt-leakage.md"
     },
     {
       "path": "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/08-llmgoat-a08-vector-embedding-weaknesses.md"
@@ -546,7 +546,7 @@
   ],
   "book_bindings": [
     {
-      "lesson_path": "01-owasp-top-10/01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md",
+      "lesson_path": "01-owasp-top-10/01-llm-input-prompt-attacks/02-llmgoat-a01-prompt-injection.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a01-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -654,7 +654,7 @@
       ]
     },
     {
-      "lesson_path": "01-owasp-top-10/01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md",
+      "lesson_path": "01-owasp-top-10/01-llm-input-prompt-attacks/05-llmgoat-a07-system-prompt-leakage.md",
       "section": "4. 풀이",
       "observation_id": "llmgoat-a07-writeup",
       "observation_command": "exact target plus solved=true in lab_case evidence",
@@ -739,13 +739,13 @@
       "tests/e2e/llmgoat/"
     ],
     "course": [
-      "01-owasp-top-10/01-llm-input-prompt-attacks/04-llmgoat-a01-prompt-injection.md",
+      "01-owasp-top-10/01-llm-input-prompt-attacks/02-llmgoat-a01-prompt-injection.md",
       "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/02-llmgoat-a02-sensitive-information-disclosure.md",
       "01-owasp-top-10/05-llm-operations-infrastructure/02-llmgoat-a03-supply-chain.md",
       "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/04-llmgoat-a04-data-model-poisoning.md",
       "01-owasp-top-10/03-llm-output-post-processing/02-llmgoat-a05-improper-output-handling.md",
       "01-owasp-top-10/04-llm-agent-authorization-execution/02-llmgoat-a06-excessive-agency.md",
-      "01-owasp-top-10/01-llm-input-prompt-attacks/08-llmgoat-a07-system-prompt-leakage.md",
+      "01-owasp-top-10/01-llm-input-prompt-attacks/05-llmgoat-a07-system-prompt-leakage.md",
       "01-owasp-top-10/02-llm-data-knowledge-vulnerabilities/08-llmgoat-a08-vector-embedding-weaknesses.md",
       "01-owasp-top-10/03-llm-output-post-processing/04-llmgoat-a09-misinformation.md",
       "01-owasp-top-10/05-llm-operations-infrastructure/04-llmgoat-a10-unbounded-consumption.md"
