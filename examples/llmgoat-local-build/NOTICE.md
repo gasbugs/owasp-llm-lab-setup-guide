@@ -3,7 +3,9 @@
 - Upstream project: SECFORCE/LLMGoat
 - Upstream version: v0.1.0
 - Upstream commit: `9388bd2c1a629f3bd56be56140d3aae97d01e6cf`
-- Source: <https://github.com/SECFORCE/LLMGoat/tree/v0.1.0>
+- Installation source fork: <https://github.com/gasbugs/LLMGoat/tree/v0.1.0>
+- Original source: <https://github.com/SECFORCE/LLMGoat/tree/v0.1.0>
+- Mirrored GPU image: `ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3`
 - License: GNU General Public License v3.0
 
 이 로컬 Build는 LLMGoat 애플리케이션 코드를 수정하지 않는다. 확인한 upstream

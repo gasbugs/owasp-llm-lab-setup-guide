@@ -1,13 +1,14 @@
 # SECFORCE/LLMGoat v0.1.0 local training image
 # Upstream source: https://github.com/SECFORCE/LLMGoat/tree/v0.1.0
+# Installation source fork: https://github.com/gasbugs/LLMGoat/tree/v0.1.0
 # Upstream license: GPL-3.0
 
-# 태그만 믿지 않고 확인한 manifest digest까지 고정한다.
-FROM ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
+# gasbugs GHCR에 복제한 image를 태그와 확인한 manifest digest로 함께 고정한다.
+FROM ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
 
 LABEL org.opencontainers.image.title="LLMGoat local training image" \
       org.opencontainers.image.description="SECFORCE LLMGoat v0.1.0 with its corresponding source and GPL license" \
-      org.opencontainers.image.source="https://github.com/SECFORCE/LLMGoat" \
+      org.opencontainers.image.source="https://github.com/gasbugs/LLMGoat" \
       org.opencontainers.image.revision="9388bd2c1a629f3bd56be56140d3aae97d01e6cf" \
       org.opencontainers.image.version="0.1.0" \
       org.opencontainers.image.licenses="GPL-3.0"
@@ -15,7 +16,7 @@ LABEL org.opencontainers.image.title="LLMGoat local training image" \
 # 실행 파일과 같은 v0.1.0 소스 묶음을 checksum으로 확인한 뒤 이미지 안에 보관한다.
 # checksum이 달라지면 Build가 멈추므로 같은 태그가 다른 내용으로 바뀌어도 넘어가지 않는다.
 ADD --checksum=sha256:4e3251ebd6ae59a4003791e18606a23ae94708bb48236caf51aa51cffbe34e29 \
-    https://codeload.github.com/SECFORCE/LLMGoat/tar.gz/refs/tags/v0.1.0 \
+    https://codeload.github.com/gasbugs/LLMGoat/tar.gz/refs/tags/v0.1.0 \
     /tmp/llmgoat-v0.1.0.tar.gz
 
 RUN mkdir -p /usr/src/llmgoat-v0.1.0 /usr/share/licenses/llmgoat \

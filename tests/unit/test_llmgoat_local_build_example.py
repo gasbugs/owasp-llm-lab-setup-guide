@@ -11,10 +11,12 @@ class LlmgoatLocalBuildExampleTests(unittest.TestCase):
         containerfile = (EXAMPLE / "Containerfile").read_text(encoding="utf-8")
 
         self.assertIn(
-            "ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:"
+            "ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3@sha256:"
             "b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611",
             containerfile,
         )
+        self.assertIn("codeload.github.com/gasbugs/LLMGoat", containerfile)
+        self.assertNotIn("ghcr.io/secforce/llmgoat-gpu", containerfile)
         self.assertIn(
             "ADD --checksum=sha256:"
             "4e3251ebd6ae59a4003791e18606a23ae94708bb48236caf51aa51cffbe34e29",

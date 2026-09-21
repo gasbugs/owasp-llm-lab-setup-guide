@@ -1,9 +1,10 @@
 # SECFORCE/LLMGoat v0.1.0 local training image
 # Upstream source: https://github.com/SECFORCE/LLMGoat/tree/v0.1.0
+# Installation source fork: https://github.com/gasbugs/LLMGoat/tree/v0.1.0
 # Upstream license: GPL-3.0
 
-# 실행 코드가 들어 있는 upstream GPU image를 tag와 manifest digest로 함께 고정한다.
-FROM ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
+# 검증한 upstream GPU image를 gasbugs GHCR에 복제하고 tag와 manifest digest를 함께 고정한다.
+FROM ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
 
 ARG VCS_REF=unknown
 ARG APP_VERSION=dev
@@ -13,13 +14,13 @@ LABEL org.opencontainers.image.title="OWASP LLMGoat local training image" \
       org.opencontainers.image.revision="$VCS_REF" \
       org.opencontainers.image.version="$APP_VERSION" \
       org.opencontainers.image.licenses="GPL-3.0" \
-      org.opencontainers.image.url="https://github.com/SECFORCE/LLMGoat/tree/v0.1.0"
+      org.opencontainers.image.url="https://github.com/gasbugs/LLMGoat/tree/v0.1.0"
 ENV APP_VERSION=$APP_VERSION
 
 # 실행 image와 같은 v0.1.0 전체 소스를 checksum으로 확인해 image 안에 보관한다.
 # checksum이 달라지면 Build가 중단되므로 바뀐 소스를 조용히 실행하지 않는다.
 ADD --checksum=sha256:4e3251ebd6ae59a4003791e18606a23ae94708bb48236caf51aa51cffbe34e29 \
-    https://codeload.github.com/SECFORCE/LLMGoat/tar.gz/refs/tags/v0.1.0 \
+    https://codeload.github.com/gasbugs/LLMGoat/tar.gz/refs/tags/v0.1.0 \
     /tmp/llmgoat-v0.1.0.tar.gz
 
 RUN mkdir -p /usr/src/llmgoat-v0.1.0 /usr/share/licenses/llmgoat \

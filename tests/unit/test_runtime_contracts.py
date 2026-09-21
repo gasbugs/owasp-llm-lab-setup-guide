@@ -37,7 +37,11 @@ class RuntimeContractTest(unittest.TestCase):
     def test_llmgoat_mounts_upstream_routes_without_patching_source(self) -> None:
         dockerfile = read("docker/llmgoat/Dockerfile")
         self.assertNotIn("health_entrypoint.py", dockerfile)
-        self.assertIn("ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:", dockerfile)
+        self.assertIn(
+            "ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3@sha256:", dockerfile
+        )
+        self.assertIn("codeload.github.com/gasbugs/LLMGoat", dockerfile)
+        self.assertNotIn("ghcr.io/secforce/llmgoat-gpu", dockerfile)
         self.assertIn("ADD --checksum=sha256:", dockerfile)
         self.assertIn("/usr/src/llmgoat-v0.1.0", dockerfile)
         self.assertIn("/usr/share/licenses/llmgoat/GPL-3.0.txt", dockerfile)

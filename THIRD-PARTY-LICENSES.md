@@ -6,7 +6,7 @@ The PolyForm and commercial licensing paths cover only original material for whi
 
 | Component | Repository use | Upstream license | Source |
 |---|---|---|---|
-| SECFORCE LLMGoat | `docker/llmgoat/` image wrapper and runtime | GPL-3.0 | <https://github.com/SECFORCE/LLMGoat> |
+| SECFORCE LLMGoat | `docker/llmgoat/` image wrapper and runtime | GPL-3.0 | Original: <https://github.com/SECFORCE/LLMGoat>, installation fork: <https://github.com/gasbugs/LLMGoat> |
 | ReversecLabs Damn Vulnerable LLM Agent | `docker/dvla/` build and runtime | Apache-2.0 | <https://github.com/ReversecLabs/damn-vulnerable-llm-agent> |
 | llama.cpp | `examples/llm03/Dockerfile.llama-cpp` build dependency | MIT | <https://github.com/ggml-org/llama.cpp> |
 

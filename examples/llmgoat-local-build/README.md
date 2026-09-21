@@ -3,10 +3,11 @@
 이 예제는 기존 `docker/llmgoat/Dockerfile`과 통합 실습용 Compose를 바꾸지 않는다.
 별도 image·container·volume을 만들고, 기존 5000번 대신 15000번 포트를 사용한다.
 
-`Containerfile`은 확인한 LLMGoat `v0.1.0` GPU image를 고정해서 가져온다. 같은
-버전의 전체 소스와 GPL 원문도 image 안에 넣는다. `compose.yaml`은 이 image를
-Build하고 GPU, 포트, 모델 저장 volume을 연결한다. Registry에 게시한 우리 custom
-image를 내려받지 않고 현재 디렉터리의 `Containerfile`로 직접 Build한다.
+`Containerfile`은 `gasbugs/LLMGoat` 포크의 `v0.1.0` 소스와 `gasbugs` GHCR에
+복제한 GPU image를 고정해서 가져온다. 같은 버전의 전체 소스와 GPL 원문도 image
+안에 넣는다. `compose.yaml`은 이 image를 Build하고 GPU, 포트, 모델 저장 volume을
+연결한다. 완성된 과정용 image를 내려받지 않고 현재 디렉터리의 `Containerfile`로
+직접 Build한다.
 
 LLMGoat `v0.1.0`은 Ollama API를 호출하지 않는다. 애플리케이션 안의
 `llama-cpp-python`이 `gemma-2-9b-it-Q4_K_M.gguf`를 직접 불러오는 구조다. 따라서

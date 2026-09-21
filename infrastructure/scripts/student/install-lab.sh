@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.11"
+SCRIPT_VERSION="0.2.12"
 DOCKER_ENGINE_RELEASE="${DOCKER_ENGINE_RELEASE:-29.7.2}"
 DOCKER_COMPOSE_RELEASE="${DOCKER_COMPOSE_RELEASE:-5.5.0}"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
@@ -373,7 +373,7 @@ done
 if [ "$REFRESH_IMAGES" = "true" ]; then
   docker compose pull --ignore-buildable
 fi
-# LLMGoat만 build 정의를 가지므로 이 명령은 고정 upstream과 setup wrapper를 로컬에서 만든다.
+# LLMGoat만 build 정의를 가지므로 이 명령은 고정 gasbugs fork와 setup wrapper를 로컬에서 만든다.
 echo "[install-lab] running: docker compose build"
 docker compose build
 echo "[install-lab] running: docker compose up -d"
