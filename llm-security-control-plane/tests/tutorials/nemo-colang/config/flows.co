@@ -11,6 +11,9 @@ define user request transfer
 define bot refuse transfer
   "송금은 대화 Rail이 실행하지 않습니다."
 
+define bot refuse unsupported request
+  "허용되지 않은 요청입니다. 보안 사고 신고 연락처 조회만 사용할 수 있습니다."
+
 define flow security contact lookup
   user ask security contact
   $contact = execute get_security_contact()
@@ -19,3 +22,7 @@ define flow security contact lookup
 define flow block transfer
   user request transfer
   bot refuse transfer
+
+define flow default deny
+  user unsupported request
+  bot refuse unsupported request

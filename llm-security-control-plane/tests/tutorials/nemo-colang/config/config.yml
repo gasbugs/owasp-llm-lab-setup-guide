@@ -7,6 +7,7 @@ rails:
     user_messages:
       embeddings_only: true
       embeddings_only_similarity_threshold: 0.45
+      embeddings_only_fallback_intent: unsupported request
 core:
   embedding_search_provider:
     name: default
