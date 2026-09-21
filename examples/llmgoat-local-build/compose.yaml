@@ -10,8 +10,10 @@ services:
       context: .
       dockerfile: Containerfile
     image: localhost/llmgoat-local-build:v0.1.0
+    # docker compose build로 만든 로컬 image만 사용한다.
+    pull_policy: never
     container_name: llmgoat-local-build
-    restart: unless-stopped
+    restart: always
     gpus: all
     ports:
       # 기존 교재의 5000번 포트와 겹치지 않도록 Host에서는 15000번을 사용한다.
@@ -19,12 +21,13 @@ services:
     environment:
       LLMGOAT_SERVER_HOST: 0.0.0.0
       LLMGOAT_SERVER_PORT: "5000"
+      # LLMGoat가 첫 실행에 이 GGUF를 내려받아 llama-cpp로 직접 불러온다.
       LLMGOAT_DEFAULT_MODEL: gemma-2.gguf
       LLMGOAT_N_GPU_LAYERS: "20"
       LLMGOAT_N_THREADS: "4"
       LLMGOAT_VERBOSE: "1"
     volumes:
-      # 모델과 cache는 컨테이너를 다시 만들어도 재사용한다.
+      # Gemma GGUF와 A09 cache는 image를 다시 Build해도 재사용한다.
       - llmgoat-local-models:/root/.LLMGoat/models
       - llmgoat-local-cache:/root/.LLMGoat/cache
     healthcheck:

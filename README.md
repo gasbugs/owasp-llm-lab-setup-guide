@@ -46,7 +46,9 @@ Day 6 가드레일 실습은 [docs/DAY6-GUARDRAILS-SETUP.md](docs/DAY6-GUARDRAIL
 기존 통합 배포와 분리해 LLMGoat만 직접 Build하려면
 [examples/llmgoat-local-build/README.md](examples/llmgoat-local-build/README.md)를
 따릅니다. 고정한 upstream image에 같은 버전의 전체 소스와 GPL 원문을 포함하고,
-`docker compose up -d --build` 한 줄로 별도 15000번 포트에 배포합니다.
+`docker compose build` 뒤 `docker compose up -d`로 별도 15000번 포트에
+배포합니다. Gemma는 Ollama에 중복 설치하지 않고 LLMGoat의 원래 llama-cpp
+경로에서 전용 volume으로 관리합니다.
 
 가장 짧은 흐름은 다음과 같습니다.
 
@@ -82,7 +84,8 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 2. Terraform이 현재 AWS 계정에 EC2 `g6.xlarge` 1대를 만듭니다.
 3. 기본값에서는 user-data 자동 설치가 실행되지 않습니다.
 4. 수강생이 SSM으로 EC2에 접속해 `install-lab.sh`를 직접 실행합니다.
-5. 설치 스크립트가 Docker을 설치하고 실습 컨테이너 이미지를 pull합니다.
+5. 설치 스크립트가 Docker을 설치하고 프로젝트 image를 pull합니다. LLMGoat는
+   setup의 고정 Containerfile과 전체 GPL 소스를 내려받아 EC2에서 직접 Build합니다.
 6. `lab-ollama`, `lab-portal`, `lab-prompt-rag`, `lab-llm04-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, `lab-vuln-agent`, `lab-llmgoat`, `lab-dvla`, `lab-fake-registry` 컨테이너를 실행합니다.
 7. 단일 Docker Compose 정의로 서비스를 실행하고 `restart: always` 정책과 `Docker daemon`로 EC2 재부팅 후 자동 복구합니다.
 
@@ -119,7 +122,7 @@ loopback API로 실제 호출합니다. 각 응답은 `llmgoat/raw/requests.json
 enable_user_data_bootstrap = true
 ```
 
-자동 설치를 켜도 내부적으로는 수강생용 `infrastructure/scripts/student/install-lab.sh`와 같은 설치 절차를 실행합니다.
+자동 설치를 켜도 내부적으로는 수강생용 `infrastructure/scripts/student/install-lab.sh`와 같은 설치 절차를 실행합니다. 이 스크립트는 LLMGoat에 대해 `docker compose build`를 먼저 실행하고, 이어 `docker compose up -d`로 전체 서비스를 시작합니다. Gemma GGUF는 별도 Ollama가 아니라 LLMGoat 전용 volume에서 재사용합니다.
 강사용 실측에서는 `lab_setup_repo_raw_url`과 `lab_image_tag`를 같은 40자리 main commit으로 고정해야 합니다. 예시는 [Terraform 고급 설정](docs/TERRAFORM-ADVANCED-OPTIONS.md)과 [LIVE-VALIDATION.md](docs/LIVE-VALIDATION.md)에 있습니다.
 
 `user_data_replace_on_change = false`이므로 이 pin은 최초 `terraform apply` 전에 설정하세요. 기존 인스턴스에서 URL이나 이미지 태그만 바꿔도 user-data가 다시 실행되거나 인스턴스가 자동 교체되지는 않습니다.

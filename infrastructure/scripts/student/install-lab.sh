@@ -179,7 +179,7 @@ install -d -m 0755 -o ubuntu -g ubuntu /home/ubuntu/ollama-models
 step "8/10" "실습 컨테이너 이미지를 확인하고 최신 이미지를 pull합니다"
 "${RUN_AS_UBUNTU[@]}" bash <<PULLSH
 set -euo pipefail
-for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-llmgoat owasp-llm-dvla; do
+for img in owasp-llm-base-gpu owasp-llm-vuln-rag owasp-llm-vuln-agent owasp-llm-dvla; do
   if [ "${REFRESH_IMAGES}" != "true" ] && docker image inspect "ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}" >/dev/null; then
     echo "[install-lab] image already exists: ghcr.io/${IMAGE_NAMESPACE}/\${img}:${IMAGE_TAG}"
     continue
@@ -279,6 +279,17 @@ COMPOSE_FILE="$COMPOSE_DIR/compose.yaml"
 COMPOSE_CANDIDATE="$COMPOSE_DIR/compose.yaml.next"
 install -d -m 0755 -o ubuntu -g ubuntu "$COMPOSE_DIR"
 
+LLMGOAT_BUILD_DIR="$COMPOSE_DIR/llmgoat-build"
+install -d -m 0755 -o ubuntu -g ubuntu "$LLMGOAT_BUILD_DIR"
+echo "[install-lab] downloading the LLMGoat local Build context"
+for build_file in Dockerfile proxy_entrypoint.py NOTICE.md; do
+  curl -fsSL "$RAW_URL/docker/llmgoat/$build_file" \
+    -o "$LLMGOAT_BUILD_DIR/$build_file.next"
+  install -m 0644 -o ubuntu -g ubuntu \
+    "$LLMGOAT_BUILD_DIR/$build_file.next" "$LLMGOAT_BUILD_DIR/$build_file"
+  rm -f "$LLMGOAT_BUILD_DIR/$build_file.next"
+done
+
 echo "[install-lab] downloading the single Docker Compose service definition"
 curl -fsSL "$RAW_URL/infrastructure/compose/compose.yaml" -o "$COMPOSE_CANDIDATE"
 install -m 0644 -o ubuntu -g ubuntu "$COMPOSE_CANDIDATE" "$COMPOSE_FILE"
@@ -290,6 +301,8 @@ COMMON_IMAGE_TAG=$IMAGE_TAG
 OLLAMA_MODEL=$OLLAMA_MODEL
 OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL
 LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
+LLMGOAT_BUILD_CONTEXT=$LLMGOAT_BUILD_DIR
+LLMGOAT_SOURCE_REVISION=${RAW_URL##*/}
 EOF
 chown ubuntu:ubuntu "$COMPOSE_DIR/.env"
 
@@ -358,8 +371,12 @@ for unit in "${units[@]}"; do
   docker rm -f "$unit" >/dev/null 2>&1 || true
 done
 if [ "$REFRESH_IMAGES" = "true" ]; then
-  docker compose pull
+  docker compose pull --ignore-buildable
 fi
+# LLMGoat만 build 정의를 가지므로 이 명령은 고정 upstream과 setup wrapper를 로컬에서 만든다.
+echo "[install-lab] running: docker compose build"
+docker compose build
+echo "[install-lab] running: docker compose up -d"
 docker compose up -d
 docker compose ps
 COMPOSESH
@@ -449,7 +466,6 @@ declare -A expected_images=(
   [lab-knowledge-rag]="owasp-llm-vuln-rag"
   [lab-resource-rag]="owasp-llm-vuln-rag"
   [lab-vuln-agent]="owasp-llm-vuln-agent"
-  [lab-llmgoat]="owasp-llm-llmgoat"
   [lab-dvla]="owasp-llm-dvla"
 )
 
@@ -473,6 +489,20 @@ for container in "${!expected_images[@]}"; do
     exit 1
   fi
 done
+
+expected_llmgoat="localhost/owasp-llm-llmgoat:${IMAGE_TAG}"
+expected_llmgoat_id=$(docker image inspect --format '{{.Id}}' "$expected_llmgoat")
+actual_llmgoat_name=$(docker inspect --format '{{.Config.Image}}' lab-llmgoat)
+actual_llmgoat_id=$(docker inspect --format '{{.Image}}' lab-llmgoat)
+if [ "$actual_llmgoat_name" != "$expected_llmgoat" ] || \
+  [ "$actual_llmgoat_id" != "$expected_llmgoat_id" ]; then
+  echo "ERROR: lab-llmgoat runs $actual_llmgoat_name ($actual_llmgoat_id), expected $expected_llmgoat ($expected_llmgoat_id)" >&2
+  exit 1
+fi
+docker exec lab-llmgoat test -f /usr/src/llmgoat-v0.1.0/llmgoat/app.py
+docker exec lab-llmgoat test -f /usr/share/licenses/llmgoat/GPL-3.0.txt
+docker exec lab-llmgoat test -f /usr/share/doc/llmgoat/NOTICE.md
+echo "[install-lab] LLMGoat local image and corresponding source ready: $expected_llmgoat"
 
 declare -A container_layer_source_files=(
   [lab-prompt-rag]="/app/app/secure_coding.py"

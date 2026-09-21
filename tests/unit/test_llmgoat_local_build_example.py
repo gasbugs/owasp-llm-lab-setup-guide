@@ -24,14 +24,19 @@ class LlmgoatLocalBuildExampleTests(unittest.TestCase):
         self.assertIn("/usr/share/licenses/llmgoat/GPL-3.0.txt", containerfile)
         self.assertNotIn("llmgoat-gpu:latest", containerfile)
 
-    def test_compose_uses_isolated_names_and_one_line_guide(self):
+    def test_compose_uses_isolated_names_and_local_build_then_up(self):
         compose = (EXAMPLE / "compose.yaml").read_text(encoding="utf-8")
         guide = (EXAMPLE / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("name: llmgoat-local-build", compose)
         self.assertIn('container_name: llmgoat-local-build', compose)
         self.assertIn('- "15000:5000"', compose)
-        self.assertIn("docker compose up -d --build", guide)
+        self.assertIn("pull_policy: never", compose)
+        self.assertIn("docker compose build", guide)
+        self.assertIn("docker compose up -d", guide)
+        self.assertNotIn("docker compose up -d --build", guide)
+        self.assertIn("llama-cpp-python", guide)
+        self.assertNotIn("ollama:", compose)
         self.assertIn("기존 5000번 대신 15000번", guide)
 
 

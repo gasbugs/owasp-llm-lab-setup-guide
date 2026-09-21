@@ -37,9 +37,31 @@ class RuntimeContractTest(unittest.TestCase):
     def test_llmgoat_mounts_upstream_routes_without_patching_source(self) -> None:
         dockerfile = read("docker/llmgoat/Dockerfile")
         self.assertNotIn("health_entrypoint.py", dockerfile)
+        self.assertIn("ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:", dockerfile)
+        self.assertIn("ADD --checksum=sha256:", dockerfile)
+        self.assertIn("/usr/src/llmgoat-v0.1.0", dockerfile)
+        self.assertIn("/usr/share/licenses/llmgoat/GPL-3.0.txt", dockerfile)
+        self.assertNotIn("llmgoat-gpu:latest", dockerfile)
         self.assertIn("COPY proxy_entrypoint.py", dockerfile)
         self.assertIn("ENTRYPOINT", dockerfile)
         self.assertNotIn("sed -i", dockerfile)
+
+    def test_llmgoat_is_built_locally_before_compose_up(self) -> None:
+        compose = read("infrastructure/compose/compose.yaml")
+        installer = read("infrastructure/scripts/student/install-lab.sh")
+        service = compose.split("\n  llmgoat:", 1)[1].split("\n  dvla:", 1)[0]
+
+        self.assertIn("build:", service)
+        self.assertIn("${LLMGOAT_BUILD_CONTEXT:-../../docker/llmgoat}", service)
+        self.assertIn("localhost/owasp-llm-llmgoat:", service)
+        self.assertIn("pull_policy: never", service)
+        self.assertIn('\"$RAW_URL/docker/llmgoat/$build_file\"', installer)
+        self.assertNotIn("owasp-llm-llmgoat owasp-llm-dvla", installer)
+        build = installer.index("docker compose build")
+        up = installer.index("docker compose up -d", build)
+        self.assertLess(build, up)
+        self.assertIn('[install-lab] running: docker compose build', installer)
+        self.assertIn('[install-lab] running: docker compose up -d', installer)
 
     def test_vuln_agent_exposes_read_only_state_for_publisher_verification(self) -> None:
         main = read("docker/vuln-agent/app/main.py")
@@ -272,7 +294,9 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('curl -fsSL "$RAW_URL/infrastructure/fake-registry/server.py"', installer)
         self.assertIn('FAKE_REGISTRY_CHANGED=true', installer)
         self.assertIn('curl -fsSL "$RAW_URL/infrastructure/compose/compose.yaml"', installer)
+        self.assertIn('LLMGOAT_BUILD_DIR="$COMPOSE_DIR/llmgoat-build"', installer)
         self.assertIn("docker compose config", installer)
+        self.assertIn("docker compose build", installer)
         self.assertIn("docker compose up -d", installer)
         self.assertIn('[ "$REFRESH_IMAGES" = "true" ]', installer)
         self.assertIn('LAB_ENV_CANDIDATE=/etc/lab/env.pending', installer)

@@ -240,7 +240,16 @@ services:
 
   llmgoat:
     container_name: lab-llmgoat
-    image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-llmgoat:${COMPOSE_IMAGE_TAG:-latest}
+    build:
+      # 저장소에서는 docker/llmgoat, 설치된 EC2에서는 내려받은 context를 사용한다.
+      context: ${LLMGOAT_BUILD_CONTEXT:-../../docker/llmgoat}
+      dockerfile: Dockerfile
+      args:
+        VCS_REF: ${LLMGOAT_SOURCE_REVISION:-unknown}
+        APP_VERSION: ${COMPOSE_IMAGE_TAG:-local}
+    image: localhost/owasp-llm-llmgoat:${COMPOSE_IMAGE_TAG:-latest}
+    # docker compose build로 만든 image만 실행하고 Registry fallback은 사용하지 않는다.
+    pull_policy: never
     restart: always
     gpus: all
     ports:

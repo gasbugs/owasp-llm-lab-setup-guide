@@ -1,11 +1,17 @@
-# LLMGoat를 한 줄로 로컬 Build·배포하기
+# LLMGoat를 로컬 Build한 뒤 실행하기
 
 이 예제는 기존 `docker/llmgoat/Dockerfile`과 통합 실습용 Compose를 바꾸지 않는다.
 별도 image·container·volume을 만들고, 기존 5000번 대신 15000번 포트를 사용한다.
 
 `Containerfile`은 확인한 LLMGoat `v0.1.0` GPU image를 고정해서 가져온다. 같은
 버전의 전체 소스와 GPL 원문도 image 안에 넣는다. `compose.yaml`은 이 image를
-Build하고 GPU, 포트, 모델 저장 volume을 연결한다.
+Build하고 GPU, 포트, 모델 저장 volume을 연결한다. Registry에 게시한 우리 custom
+image를 내려받지 않고 현재 디렉터리의 `Containerfile`로 직접 Build한다.
+
+LLMGoat `v0.1.0`은 Ollama API를 호출하지 않는다. 애플리케이션 안의
+`llama-cpp-python`이 `gemma-2-9b-it-Q4_K_M.gguf`를 직접 불러오는 구조다. 따라서
+별도 Ollama 서비스를 추가하지 않고 이 원래 구조를 유지한다. 그래야 upstream
+챌린지 코드와 이미 확인한 응답 경로를 바꾸지 않는다.
 
 ## 준비 상태 확인
 
@@ -21,24 +27,39 @@ nvidia-smi
 
 두 명령이 각각 Compose 버전과 GPU 정보를 표시하면 다음 단계로 진행한다.
 
-## 한 줄로 Build하고 배포하기
+## Image Build하기
 
-이 디렉터리에서 다음 한 줄을 실행한다. `--build`는 로컬 image를 만들고, `-d`는
-완성된 container를 백그라운드에서 시작한다. image를 registry에 push하지 않는다.
+이 디렉터리에서 먼저 image를 만든다. 이 단계는 Containerfile과 대응 소스·GPL
+원문을 image에 넣지만, 약 5GB의 Gemma model은 아직 내려받지 않는다.
 
 ```bash
-docker compose up -d --build
+docker compose build
 ```
 
-첫 Build에는 CUDA가 들어 있는 GPU base image 수 GB를 내려받는다. 첫 실행에는
-Gemma 2 GGUF model 약 5GB와 이미지 문제에 사용하는 Salesforce BLIP model도
-별도로 내려받으므로 시간이 걸린다. 파일은 이후 Docker cache와 전용 volume에서
-재사용한다. Gemma model은 LLMGoat 소스의 GPL과 별도로 Google Gemma 이용
+첫 Build에는 CUDA가 들어 있는 고정 GPU base image 수 GB를 내려받는다. 완료되면
+`localhost/llmgoat-local-build:v0.1.0` image가 로컬에 생긴다. Compose의
+`pull_policy: never`는 다음 실행에서 Registry image 대신 이 로컬 image만 쓰게
+한다.
+
+## Container 실행하기
+
+Build한 image로 container를 백그라운드에서 실행한다.
+
+```bash
+docker compose up -d
+```
+
+첫 실행에는 LLMGoat가 Gemma 2 GGUF model 약 5GB를 Hugging Face에서 내려받아
+`llmgoat-local-models` volume에 저장한다. 이미지 문제에 사용하는 Salesforce
+BLIP model도 `llmgoat-local-cache` volume에 저장한다. 두 volume은 image를 다시
+Build하거나 container를 다시 만들어도 유지되므로 다음 실행에서는 같은 파일을
+재사용한다. Gemma model에는 LLMGoat 소스의 GPL과 별도로 Google Gemma 이용
 조건이 적용된다.
 
 ## 실행 결과 확인
 
-`STATUS`가 처음에는 `health: starting`일 수 있다. model 다운로드와 로딩이 끝나면
+`STATUS`가 처음에는 `health: starting`일 수 있다. 이때는 웹 서버가 고장 난 것이
+아니라 Gemma를 내려받거나 GPU에 올리는 중이다. 다운로드와 로딩이 끝나면
 `healthy`로 바뀐다.
 
 ```bash

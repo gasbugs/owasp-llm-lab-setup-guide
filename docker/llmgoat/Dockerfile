@@ -1,34 +1,38 @@
-# docker/llmgoat/Dockerfile
-# SECFORCE/LLMGoat wrapper — Day 1·3·5 cross-platform 학습용 (gemma-2-9b GGUF, llama-cpp)
-#
-# 원본: https://github.com/SECFORCE/LLMGoat (GPL-3.0)
-# 빌드:
-#   docker build -t ghcr.io/gasbugs/owasp-llm-llmgoat:sha-<commit> .
-# 실행 (본 강의 인프라):
-#   docker run -d --name lab-llmgoat --gpus all -p 5000:5000 \
-#     -e LLMGOAT_SERVER_HOST=0.0.0.0 -e LLMGOAT_DEFAULT_MODEL=gemma-2.gguf \
-#     -e LLMGOAT_N_GPU_LAYERS=20 \
-#     -v ~/.LLMGoat/models:/root/.LLMGoat/models \
-#     -v ~/.LLMGoat/cache:/root/.LLMGoat/cache \
-#     ghcr.io/gasbugs/owasp-llm-llmgoat:sha-<commit>
-#
-# 첫 부팅 시 gemma-2-9b-it-Q4_K_M GGUF (~5GB)를 Hugging Face에서 자동 다운로드.
+# SECFORCE/LLMGoat v0.1.0 local training image
+# Upstream source: https://github.com/SECFORCE/LLMGoat/tree/v0.1.0
+# Upstream license: GPL-3.0
 
-FROM ghcr.io/secforce/llmgoat-gpu:latest
+# 실행 코드가 들어 있는 upstream GPU image를 tag와 manifest digest로 함께 고정한다.
+FROM ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
 
 ARG VCS_REF=unknown
 ARG APP_VERSION=dev
-LABEL org.opencontainers.image.version="$APP_VERSION"
+LABEL org.opencontainers.image.title="OWASP LLMGoat local training image" \
+      org.opencontainers.image.description="SECFORCE LLMGoat v0.1.0 with the course URI-prefix wrapper" \
+      org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide" \
+      org.opencontainers.image.revision="$VCS_REF" \
+      org.opencontainers.image.version="$APP_VERSION" \
+      org.opencontainers.image.licenses="GPL-3.0" \
+      org.opencontainers.image.url="https://github.com/SECFORCE/LLMGoat/tree/v0.1.0"
 ENV APP_VERSION=$APP_VERSION
-LABEL org.opencontainers.image.source="https://github.com/gasbugs/owasp-llm-lab-setup-guide"
-LABEL org.opencontainers.image.revision="$VCS_REF"
 
-# LLMGoat 원본은 비-Docker 환경에서 부팅 시 interactive disclaimer prompt를 띄움.
-# /.dockerenv 파일이 있으면 컨테이너로 인식하고 disclaimer를 건너뜀.
-# Docker은 /.dockerenv를 자동 생성하지 않으므로 이미지 레벨에서 마커 박음.
-RUN touch /.dockerenv
+# 실행 image와 같은 v0.1.0 전체 소스를 checksum으로 확인해 image 안에 보관한다.
+# checksum이 달라지면 Build가 중단되므로 바뀐 소스를 조용히 실행하지 않는다.
+ADD --checksum=sha256:4e3251ebd6ae59a4003791e18606a23ae94708bb48236caf51aa51cffbe34e29 \
+    https://codeload.github.com/SECFORCE/LLMGoat/tar.gz/refs/tags/v0.1.0 \
+    /tmp/llmgoat-v0.1.0.tar.gz
 
-# Preserve the pinned upstream routes while mounting its UI below /llmgoat.
+RUN mkdir -p /usr/src/llmgoat-v0.1.0 /usr/share/licenses/llmgoat \
+    && tar -xzf /tmp/llmgoat-v0.1.0.tar.gz \
+        --strip-components=1 -C /usr/src/llmgoat-v0.1.0 \
+    && cp /usr/src/llmgoat-v0.1.0/LICENSE /app/LICENSE \
+    && cp /usr/src/llmgoat-v0.1.0/LICENSE \
+        /usr/share/licenses/llmgoat/GPL-3.0.txt \
+    && rm /tmp/llmgoat-v0.1.0.tar.gz
+
+COPY NOTICE.md /usr/share/doc/llmgoat/NOTICE.md
+
+# 원본 challenge 코드는 바꾸지 않고, 통합 포털의 /llmgoat 경로만 연결한다.
 COPY proxy_entrypoint.py /opt/owasp-llm/proxy_entrypoint.py
 
 EXPOSE 5000
