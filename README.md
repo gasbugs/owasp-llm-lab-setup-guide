@@ -24,6 +24,7 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 | `infrastructure/packer/` | 선택 사항: 강사용 Golden AMI 빌드 |
 | `infrastructure/compose/compose.yaml` | 포트·이미지·환경변수·볼륨·GPU·의존관계를 한눈에 보는 단일 서비스 배포 정의 |
 | `docker/` | 이미지 Dockerfile·build helper·취약 앱 소스 |
+| `examples/llmgoat-local-build/` | 기존 배포를 바꾸지 않고 LLMGoat를 로컬 Build·배포하는 선택형 Compose 예제 |
 | `tests/unit/` | 파서·UI 계약·공개 저장소 PII/secret 회귀 검사 |
 | `tests/e2e/` | 공개 강사용 런타임 실측 검증. 수강생 과제나 채점 기준이 아님 |
 
@@ -41,6 +42,11 @@ Ubuntu 로컬 PC의 선택적 도구 설치는
 Day 2 LLM08에서는 일반 셋업 뒤 [docs/LLM08-SETUP.md](docs/LLM08-SETUP.md)의 `bge-m3:latest`/Day 4 API 검증, 미니 앱 실행·SSM forwarding·증거 보존을 추가로 수행합니다. 강사·콘텐츠 배포자가 먼저 publish gate를 통과해 40자리 setup commit을 공지하며, 수강생은 로컬 PC에 Docker을 추가 설치하지 않습니다. LLM08 변경이 로컬 워킹트리에만 있거나 같은 commit의 이미지가 아직 공개 GHCR에 없으면 gate에서 중단하며, 현재 원격 `main`에 이미 배포됐다고 가정하지 않습니다.
 
 Day 6 가드레일 실습은 [docs/DAY6-GUARDRAILS-SETUP.md](docs/DAY6-GUARDRAILS-SETUP.md)를 따릅니다. 두 프레임워크는 호스트 Python이 아니라 독립된 Docker 이미지에 설치되며, 기존 one-shot CLI와 loopback HTTP 통합 서버를 함께 제공합니다.
+
+기존 통합 배포와 분리해 LLMGoat만 직접 Build하려면
+[examples/llmgoat-local-build/README.md](examples/llmgoat-local-build/README.md)를
+따릅니다. 고정한 upstream image에 같은 버전의 전체 소스와 GPL 원문을 포함하고,
+`docker compose up -d --build` 한 줄로 별도 15000번 포트에 배포합니다.
 
 가장 짧은 흐름은 다음과 같습니다.
 
