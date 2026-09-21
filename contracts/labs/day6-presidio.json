@@ -3,7 +3,7 @@
   "schema_version": 1,
   "lab_id": "day6-presidio",
   "related_lessons": [
-    {"path": "02-bedrock-guardrails-observability/03-llm-guardrails/05-presidio-input-output-controls.md"}
+    {"path": "02-bedrock-guardrails-observability/03-llm-guardrail-foundations/05-presidio-input-output-controls.md"}
   ],
   "policy": {
     "source": "examples/day6/presidio/presidio_core.py",
@@ -120,10 +120,10 @@
     }
   ],
   "book_bindings": [
-    {"lesson_path": "02-bedrock-guardrails-observability/03-llm-guardrails/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "02-bedrock-guardrails-observability/03-llm-guardrails/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "02-bedrock-guardrails-observability/03-llm-guardrails/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-predefined-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
-    {"lesson_path": "02-bedrock-guardrails-observability/03-llm-guardrails/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]}
+    {"lesson_path": "02-bedrock-guardrails-observability/03-llm-guardrail-foundations/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-email-pair", "case_ids": ["input-clean", "input-email"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "02-bedrock-guardrails-observability/03-llm-guardrail-foundations/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-structured-pii-pair", "case_ids": ["input-phone", "input-credit-card"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "02-bedrock-guardrails-observability/03-llm-guardrail-foundations/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-predefined-rrn", "case_ids": ["input-kr-rrn"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]},
+    {"lesson_path": "02-bedrock-guardrails-observability/03-llm-guardrail-foundations/05-presidio-input-output-controls.md", "section": "3. 입력과 출력에서 개인정보 찾기", "observation_id": "day6-presidio-output-pair", "case_ids": ["output-clean", "output-email", "output-api-key"], "required_projection_fields": ["case", "direction", "entity_types", "application_decision", "sanitized_text"]}
   ],
   "state": {
     "mutation_type": "process",
@@ -134,7 +134,7 @@
   },
   "watch_paths": {
     "setup": ["contracts/labs/day6-presidio.json", "examples/day6/presidio/", "docker/vuln-rag/", "tools/lab_contract.py", "tools/run_lab_contract.py"],
-    "course": ["02-bedrock-guardrails-observability/03-llm-guardrails/05-presidio-input-output-controls.md", "evidence/"],
+    "course": ["02-bedrock-guardrails-observability/03-llm-guardrail-foundations/05-presidio-input-output-controls.md", "evidence/"],
     "skills": ["skills/lecture-content-loop/", "tests/test_lecture_loop.py"]
   }
 }
