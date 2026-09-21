@@ -6,9 +6,9 @@ import os
 from pathlib import Path
 import secrets
 
-credentials_dir = Path.home() / ".config" / "owasp-runtime-aws"
+credentials_dir = Path.home() / ".aws"
 if not (credentials_dir / "credentials").is_file() or not (credentials_dir / "config").is_file():
-    raise SystemExit("Prepare isolated runtime credentials before creating the Gateway workspace.")
+    raise SystemExit("Configure ~/.aws credentials and config before creating the Gateway workspace.")
 
 state = Path(".state")
 state.mkdir(mode=0o700, exist_ok=True)

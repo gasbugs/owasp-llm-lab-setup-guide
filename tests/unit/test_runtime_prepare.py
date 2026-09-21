@@ -10,7 +10,7 @@ SCRIPT = Path(__file__).resolve().parents[2] / 'examples/runtime-security/prepar
 
 
 class RuntimePreparationTests(unittest.TestCase):
-    def test_missing_isolated_credentials_does_not_create_workspace(self):
+    def test_missing_aws_credentials_does_not_create_workspace(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             result = subprocess.run([sys.executable, str(SCRIPT)], cwd=root,
@@ -18,10 +18,10 @@ class RuntimePreparationTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse((root / '.state').exists())
 
-    def test_preparation_uses_only_isolated_directory_and_preserves_state(self):
+    def test_preparation_uses_home_aws_directory_and_preserves_state(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            credentials = root / '.config/owasp-runtime-aws'
+            credentials = root / '.aws'
             credentials.mkdir(parents=True)
             (credentials / 'credentials').write_text('[default]\n')
             (credentials / 'config').write_text('[default]\nregion=us-east-1\n')

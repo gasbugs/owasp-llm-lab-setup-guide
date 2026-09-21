@@ -18,7 +18,7 @@ services:
       GATEWAY_OPERATIONS_DATABASE: /data/usage.db
     ports: ["127.0.0.1:18097:8080"]
     volumes:
-      - "${AWS_CREDENTIALS_DIR:?Set isolated runtime credentials directory}:/tmp/.aws:ro"
+      - "${AWS_CREDENTIALS_DIR:?Set AWS credentials directory}:/tmp/.aws:ro"
       - "./.state/policy.json:/policy/policy.json:ro"
       - "./.state/ledger:/data:rw"
     security_opt: [no-new-privileges:true]
