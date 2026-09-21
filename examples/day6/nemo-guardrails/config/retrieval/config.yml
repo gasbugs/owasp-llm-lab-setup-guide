@@ -17,7 +17,7 @@ rails:
   dialog:
     user_messages:
       embeddings_only: true
-      embeddings_only_similarity_threshold: 0.7
+      embeddings_only_similarity_threshold: 0.45
   retrieval:
     flows:
       - mask retrieval with Presidio
@@ -27,6 +27,6 @@ core:
     name: default
     parameters:
       embedding_engine: FastEmbed
-      embedding_model: all-MiniLM-L6-v2
+      embedding_model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
       embedding_parameters:
         cache_dir: /opt/nemo-cache

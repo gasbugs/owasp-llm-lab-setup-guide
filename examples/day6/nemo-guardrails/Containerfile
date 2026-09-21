@@ -10,7 +10,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc g++ python3-dev \
     && python -m pip install --requirement /tmp/requirements.txt \
-    && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2', cache_dir='/opt/nemo-cache').embed(['cache warmup']))" \
+    && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2', cache_dir='/opt/nemo-cache').embed(['한국어 cache 준비']))" \
     && chmod -R a+rwX /opt/nemo-cache \
     && apt-get purge -y --auto-remove gcc g++ python3-dev \
     && rm -rf /var/lib/apt/lists/*

@@ -3,7 +3,7 @@ ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 XDG_C
 RUN apt-get update \
     && apt-get install -y --no-install-recommends g++ \
     && python -m pip install nemoguardrails==0.22.0 langchain-openai==0.3.35 \
-    && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2', cache_dir='/opt/nemo-cache').embed(['cache warmup']))" \
+    && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2', cache_dir='/opt/nemo-cache').embed(['한국어 cache 준비']))" \
     && chmod -R a+rX /opt/nemo-cache \
     && apt-get purge -y --auto-remove g++ \
     && rm -rf /var/lib/apt/lists/*
