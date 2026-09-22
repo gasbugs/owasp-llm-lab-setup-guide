@@ -32,14 +32,17 @@
     <section class="panel workbench">
       <div class="panel-head split"><div><p class="label">PART 01</p><h2>Nova Lite 응답 길이 제한</h2></div><span class="live-chip">LEARNER BUILD</span></div>
       <div class="work-body">
-        <p>Starter는 512 Token 요청을 그대로 보내므로 첫 검증은 <code>HIT</code>가 정상입니다. UI에서 정답을 고르지 말고 <code>policy.py</code>를 수정해 작은 요청은 유지하고 큰 요청은 128 이하로 제한하세요.</p>
+        <p>Starter는 512 Token 요청을 그대로 보내므로 첫 검증은 <code>HIT</code>가 정상입니다. 이 화면은 강사와 함께 진행하는 본 실습이므로 아래 코드를 그대로 작성해 작은 요청은 유지하고 큰 요청은 128 이하로 제한합니다.</p>
         <div class="cost-note"><strong>비용 안내</strong><span>연결 확인은 1회, 현재 구현 검증은 정상·위험 2회의 Nova Lite 요청을 새로 만듭니다.</span></div>
 
         <section class="exercise" aria-labelledby="exercise-title">
           <div>
             <p class="label">LEARNER-OWNED APPLICATION</p>
             <h3 id="exercise-title">고객 상담 앱에 출력 상한 구현하기</h3>
-            <p><code>llm-security-control-plane/guided-labs/01-nova/policy.py</code>의 <code>apply_output_limit</code>를 완성합니다. 성공 조건은 정상 64는 그대로, 위험 512는 128 이하로 Provider에 전달되는 것입니다.</p>
+            <p><code>llm-security-control-plane/guided-labs/01-nova/policy.py</code>의 반환 줄을 다음과 같이 작성합니다. <code>min</code>은 요청값과 128 중 작은 값을 고르므로 64는 유지하고 512는 128로 줄입니다.</p>
+            <pre>def apply_output_limit(requested_max_tokens: int) -&gt; int:
+    return min(requested_max_tokens, 128)</pre>
+            <p>파일을 저장한 뒤 수강생 앱을 다시 Build하고 실행 서비스에 연결합니다.</p>
             <pre>docker compose -f examples/security-monitoring/compose.guided.yaml build guided-student-app
 docker compose -f examples/security-monitoring/compose.guided.yaml up -d --no-deps --force-recreate guided-student-app</pre>
           </div>
