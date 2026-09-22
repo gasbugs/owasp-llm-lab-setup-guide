@@ -217,6 +217,20 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("@media (prefers-color-scheme: dark)", stylesheet)
         self.assertIn("prefers-reduced-motion", stylesheet)
 
+    def test_containerfile_makes_source_readable_to_non_root_runtime(self):
+        containerfile = (CONTROL / "guided-control-center/Containerfile").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "COPY --chmod=0444 guided-control-center/requirements.txt",
+            containerfile,
+        )
+        self.assertIn(
+            "COPY --chmod=0444 guided-control-center/server.py",
+            containerfile,
+        )
+        self.assertIn("USER 65532:65532", containerfile)
+
     def test_front_proxy_is_the_only_host_port_owner(self):
         compose = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
         owners = [name for name, service in compose["services"].items() if "ports" in service]
