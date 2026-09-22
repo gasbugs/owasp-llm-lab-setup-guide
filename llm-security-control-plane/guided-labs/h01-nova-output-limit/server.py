@@ -1,4 +1,4 @@
-"""Learner-owned Part 01 application; it never assigns the course verdict."""
+"""Learner-owned H01 application; it never assigns the course verdict."""
 
 from __future__ import annotations
 

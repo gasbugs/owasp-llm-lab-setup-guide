@@ -1,4 +1,4 @@
-"""Part 01 starter policy that the learner must complete."""
+"""H01 starter policy that the learner completes with the instructor."""
 
 
 def apply_output_limit(requested_max_tokens: int) -> int:

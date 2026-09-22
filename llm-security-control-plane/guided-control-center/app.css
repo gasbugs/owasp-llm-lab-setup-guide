@@ -76,9 +76,9 @@ textarea { min-height: 112px; resize: vertical; }
 .actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 12px; }
 .primary { color: #fff; border-color: var(--blue); background: var(--blue); }
 .secondary { color: var(--blue); border-color: var(--blue); }
-.exercise { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; margin-top: 20px; padding: 15px; border: 1px solid var(--line-strong); background: #fff; }
-.exercise h3 { margin: 4px 0; font: 850 18px var(--display); }
-.exercise p { margin: 0; color: var(--muted); }
+.hands-on { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; margin-top: 20px; padding: 15px; border: 1px solid var(--line-strong); background: #fff; }
+.hands-on h3 { margin: 4px 0; font: 850 18px var(--display); }
+.hands-on p { margin: 0; color: var(--muted); }
 .exercise-actions { display: flex; flex-wrap: wrap; gap: 6px; align-content: start; }
 .exercise-actions button { padding: 8px 10px; font-size: 12px; }
 
@@ -126,7 +126,7 @@ pre { margin: 0; max-height: 360px; overflow: auto; padding: 14px; white-space: 
 
 @media (max-width: 760px) {
   .app { padding: 8px; }
-  .masthead, .tool-rack, .layout, .field-grid, .exercise, .receipt-body { grid-template-columns: minmax(0, 1fr); }
+  .masthead, .tool-rack, .layout, .field-grid, .hands-on, .receipt-body { grid-template-columns: minmax(0, 1fr); }
   .masthead { padding: 18px; }
   .shift-card { text-align: left; }
   .tabs { display: flex; max-height: none; overflow-x: auto; }

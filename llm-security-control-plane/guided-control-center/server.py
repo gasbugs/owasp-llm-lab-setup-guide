@@ -155,14 +155,20 @@ def readyz() -> dict[str, str]:
 def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
     return {
         "csrf_token": session[1]["csrf"],
-        "course": {"tabs": 13, "activities": 22, "implemented_tabs": ["01-nova"]},
+        "course": {
+            "tabs": 13,
+            "hands_on": 22,
+            "practices": 13,
+            "implemented_hands_on": ["H01"],
+            "implemented_practices": [],
+        },
         "official_uis": [
             {
                 "id": "nemo",
                 "name": "NeMo Chat UI",
                 "browser_url": NEMO_BROWSER_URL,
                 "status": "ready",
-                "boundary": "NeMo 단독 Rail 화면이며 파트 01 판정은 Control Center가 수행합니다.",
+                "boundary": "NeMo 단독 Rail 화면이며 H01 판정은 Control Center가 수행합니다.",
             },
             {
                 "id": "bedrock",
@@ -173,8 +179,9 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             },
         ],
         "learner_app": {
+            "hands_on_id": "H01",
             "service": "guided-student-app",
-            "policy_path": "llm-security-control-plane/guided-labs/01-nova/policy.py",
+            "policy_path": "llm-security-control-plane/guided-labs/h01-nova-output-limit/policy.py",
             "compose_path": "examples/security-monitoring/compose.guided.yaml",
         },
     }
@@ -200,13 +207,13 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
             {
                 "case_id": "normal-64",
                 "scenario": "normal",
-                "prompt": "GUIDED-PART01-NORMAL: TLS 인증서 교체 절차를 세 문장으로 요약하세요.",
+                "prompt": "GUIDED-H01-NORMAL: TLS 인증서 교체 절차를 세 문장으로 요약하세요.",
                 "requested_max_output_tokens": 64,
             },
             {
                 "case_id": "risk-512",
                 "scenario": "risk",
-                "prompt": "GUIDED-PART01-RISK: 상담 절차를 출력 한계까지 상세히 작성하세요.",
+                "prompt": "GUIDED-H01-RISK: 상담 절차를 출력 한계까지 상세히 작성하세요.",
                 "requested_max_output_tokens": 512,
             },
         ]
@@ -278,11 +285,11 @@ async def provider_preflight(
     return await execute_suite(session[0], "preflight")
 
 
-@app.post("/api/labs/01-nova/verify")
+@app.post("/api/hands-on/H01/verify")
 async def verify_learner_app(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
 ) -> dict:
     if await request.body():
         raise HTTPException(status_code=422, detail="verification inputs are server-owned")
-    return await execute_suite(session[0], "exercise")
+    return await execute_suite(session[0], "hands_on")

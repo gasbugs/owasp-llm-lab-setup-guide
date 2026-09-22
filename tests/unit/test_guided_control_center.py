@@ -108,20 +108,23 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("application_token", self.home.text.lower())
         self.assertNotIn("gateway_token", self.home.text.lower())
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
-        self.assertEqual(self.bootstrap["course"]["activities"], 22)
+        self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
+        self.assertEqual(self.bootstrap["course"]["practices"], 13)
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01"])
+        self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
-        self.assertEqual(self.client.post("/api/labs/01-nova/verify").status_code, 403)
+        self.assertEqual(self.client.post("/api/hands-on/H01/verify").status_code, 403)
         self.assertEqual(
             self.client.post(
-                "/api/labs/01-nova/verify",
+                "/api/hands-on/H01/verify",
                 headers={**self.headers, "Origin": "https://evil.example"},
             ).status_code,
             403,
         )
         self.assertEqual(
             self.client.post(
-                "/api/labs/01-nova/verify",
+                "/api/hands-on/H01/verify",
                 json={"course_verdict": "PASS", "max_output_tokens": 1},
                 headers=self.headers,
             ).status_code,
@@ -131,7 +134,7 @@ class GuidedControlCenterTests(unittest.TestCase):
     def test_control_center_creates_execution_and_uses_verifier_result(self):
         with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
             response = self.client.post(
-                "/api/labs/01-nova/verify",
+                "/api/hands-on/H01/verify",
                 headers=self.headers,
             )
         self.assertEqual(response.status_code, 200)
@@ -140,7 +143,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         normal_call, risk_call, verifier_call = FakeAsyncClient.calls
         self.assertEqual(normal_call["json"]["requested_max_output_tokens"], 64)
         self.assertEqual(risk_call["json"]["requested_max_output_tokens"], 512)
-        self.assertEqual(verifier_call["json"]["suite_kind"], "exercise")
+        self.assertEqual(verifier_call["json"]["suite_kind"], "hands_on")
         self.assertEqual(len(verifier_call["json"]["cases"]), 2)
         self.assertNotIn("course_verdict", verifier_call["json"])
         self.assertNotIn("unit-control-lab", response.text)
@@ -189,12 +192,22 @@ class GuidedControlCenterTests(unittest.TestCase):
         manifest = yaml.safe_load(
             (CONTROL / "guided-labs/manifest.yaml").read_text(encoding="utf-8")
         )
-        activities = [str(item) for tab in manifest["tabs"] for item in tab["activities"]]
+        hands_on = [str(item) for tab in manifest["tabs"] for item in tab["hands_on"]]
+        practices = [str(tab["practice"]) for tab in manifest["tabs"]]
         self.assertEqual(len(manifest["tabs"]), 13)
-        self.assertEqual(len(activities), 22)
-        self.assertEqual(len(set(activities)), 22)
-        self.assertEqual(manifest["tabs"][0]["status"], "implemented")
-        self.assertTrue(all(tab["status"] == "planned" for tab in manifest["tabs"][1:]))
+        self.assertEqual(len(hands_on), 22)
+        self.assertEqual(len(set(hands_on)), 22)
+        self.assertEqual(len(practices), 13)
+        self.assertEqual(len(set(practices)), 13)
+        self.assertEqual(hands_on[0], "H01")
+        self.assertEqual(practices[0], "P01")
+        self.assertEqual(manifest["tabs"][0]["hands_on_status"], "implemented")
+        self.assertTrue(
+            all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][1:])
+        )
+        self.assertTrue(
+            all(tab["practice_status"] == "planned" for tab in manifest["tabs"])
+        )
 
 
 if __name__ == "__main__":

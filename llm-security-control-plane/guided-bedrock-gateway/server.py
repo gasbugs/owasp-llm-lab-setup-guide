@@ -114,7 +114,7 @@ def call_provider(
         # unbounded starter is deterministically distinguishable from a fix.
         output_tokens = (
             max_output_tokens
-            if "GUIDED-PART01-RISK" in prompt
+            if "GUIDED-H01-RISK" in prompt
             else min(max_output_tokens, 48)
         )
         return {

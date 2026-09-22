@@ -1,12 +1,12 @@
 FROM docker.io/library/python:3.12.14-slim
 
 ENV PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1
-COPY guided-labs/01-nova/requirements.txt /tmp/requirements.txt
+COPY guided-labs/h01-nova-output-limit/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
-COPY --chmod=0444 guided-labs/01-nova/server.py /app/server.py
-COPY --chmod=0444 guided-labs/01-nova/policy.py /app/policy.py
+COPY --chmod=0444 guided-labs/h01-nova-output-limit/server.py /app/server.py
+COPY --chmod=0444 guided-labs/h01-nova-output-limit/policy.py /app/policy.py
 RUN install -d -o 65532 -g 65532 -m 0700 /state
 
 USER 65532:65532

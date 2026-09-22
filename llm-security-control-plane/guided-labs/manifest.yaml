@@ -6,21 +6,21 @@ schema_version: 1
 course_id: tenant-03-guided-llm-security
 duration_minutes: 1320
 tabs:
-  - {id: 01-nova, activities: [01], status: implemented}
-  - {id: 02-embedding-kb, activities: [02, 03], status: planned}
-  - {id: 03-bedrock-guardrail, activities: [04], status: planned}
-  - {id: 04-nemo-dialog-action, activities: [05, 06], status: planned}
-  - {id: 05-input-safety, activities: [07, 08], status: planned}
-  - {id: 06-privacy-output, activities: [09, 10], status: planned}
-  - {id: 07-rag-boundary, activities: [11, 12], status: planned}
-  - {id: 08-promptfoo, activities: [13], status: planned}
-  - {id: 09-garak-pyrit, activities: [14, 15], status: planned}
-  - {id: 10-policy-promotion, activities: [16], status: planned}
-  - {id: 11-raw-observability, activities: [17, 18], status: planned}
-  - {id: 12-incident-alert, activities: [19, 20], status: planned}
-  - {id: 13-gateway-agent, activities: [21, 22], status: planned}
+  - {id: 01-nova, hands_on: [H01], hands_on_status: implemented, practice: P01, practice_status: planned}
+  - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: planned, practice: P02, practice_status: planned}
+  - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: planned, practice: P03, practice_status: planned}
+  - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: planned, practice: P04, practice_status: planned}
+  - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: planned, practice: P05, practice_status: planned}
+  - {id: 06-privacy-output, hands_on: [H09, H10], hands_on_status: planned, practice: P06, practice_status: planned}
+  - {id: 07-rag-boundary, hands_on: [H11, H12], hands_on_status: planned, practice: P07, practice_status: planned}
+  - {id: 08-promptfoo, hands_on: [H13], hands_on_status: planned, practice: P08, practice_status: planned}
+  - {id: 09-garak-pyrit, hands_on: [H14, H15], hands_on_status: planned, practice: P09, practice_status: planned}
+  - {id: 10-policy-promotion, hands_on: [H16], hands_on_status: planned, practice: P10, practice_status: planned}
+  - {id: 11-raw-observability, hands_on: [H17, H18], hands_on_status: planned, practice: P11, practice_status: planned}
+  - {id: 12-incident-alert, hands_on: [H19, H20], hands_on_status: planned, practice: P12, practice_status: planned}
+  - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: planned, practice: P13, practice_status: planned}
 
-activity_01:
+hands_on_H01:
   executor: guided-student-app
   verifier: guided-evidence-verifier
   provider: amazon-bedrock

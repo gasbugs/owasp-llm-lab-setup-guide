@@ -61,8 +61,8 @@ def main() -> int:
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
         page.locator("#verify").click()
-        exercise = wait_for_result(page, timeout_ms, preflight.get("execution_id"))
-        exercise_verdict = page.locator("#verdict strong").inner_text()
+        hands_on = wait_for_result(page, timeout_ms, preflight.get("execution_id"))
+        hands_on_verdict = page.locator("#verdict strong").inner_text()
         raw_nodes = page.locator("#raw img, #raw script").count()
 
         if args.screenshot:
@@ -91,10 +91,10 @@ def main() -> int:
         "session": browser_cookie_visible == "",
         "preflight": preflight.get("course_verdict") == "PASS"
         and preflight.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 2,
-        "exercise": exercise_verdict == "HIT"
-        and exercise.get("verified_by") == "guided-evidence-verifier"
-        and exercise.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 512
-        and len(exercise.get("result", {}).get("cases", [])) == 2,
+        "hands_on": hands_on_verdict == "HIT"
+        and hands_on.get("verified_by") == "guided-evidence-verifier"
+        and hands_on.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 512
+        and len(hands_on.get("result", {}).get("cases", [])) == 2,
         "learner_work": answer_controls == 0,
         "safe_rendering": raw_nodes == 0,
         "same_origin": internal_requests == 0,
@@ -102,7 +102,7 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"preflight={preflight.get('course_verdict')} exercise={exercise_verdict} "
+        f"preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"answer_controls={answer_controls} raw_nodes={raw_nodes} "
         f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )

@@ -26,7 +26,7 @@ function renderTabs() {
     const strong = document.createElement("strong");
     strong.textContent = name;
     const small = document.createElement("small");
-    small.textContent = index === 0 ? "현재 사용 가능" : "다음 구현 단계";
+    small.textContent = index === 0 ? "H01 · 강사와 함께" : "다음 구현 단계";
     copy.append(strong, small);
     button.append(number, copy);
     tabs.append(button);
@@ -140,6 +140,6 @@ async function bootstrap() {
 }
 
 byId("preflight").addEventListener("click", () => execute("/api/provider-preflight"));
-byId("verify").addEventListener("click", () => execute("/api/labs/01-nova/verify"));
+byId("verify").addEventListener("click", () => execute("/api/hands-on/H01/verify"));
 
 bootstrap().catch(renderError);

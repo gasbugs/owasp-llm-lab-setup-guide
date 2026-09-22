@@ -65,7 +65,7 @@ services:
     <<: *guided-service
     build:
       context: ../../llm-security-control-plane
-      dockerfile: guided-labs/01-nova/Containerfile
+      dockerfile: guided-labs/h01-nova-output-limit/Containerfile
     image: localhost/llm-security-guided-student-app:${GUIDED_IMAGE_VERSION:-0.1.0}
     container_name: llm-security-guided-student-app
     environment:

@@ -55,7 +55,7 @@ class VerifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
-    suite_kind: Literal["preflight", "exercise"]
+    suite_kind: Literal["preflight", "hands_on"]
     cases: list[ExpectedCase] = Field(min_length=1, max_length=2)
 
 
@@ -87,7 +87,7 @@ def config_digest(max_output_tokens: int) -> str:
 def err_envelope(request: VerifyRequest, reason: str) -> dict:
     return {
         "lab_id": "01-nova",
-        "exercise_id": "01",
+        "activity_id": "H01",
         "execution_id": request.suite_id,
         "execution_kind": "learner-application-suite",
         "started_at": request.started_at,
@@ -228,7 +228,7 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
     by_id = {item["case_id"]: item for item in verified_cases}
     verdict = "PASS"
     reason = "Provider 연결과 새 receipt를 확인했습니다."
-    if request.suite_kind == "exercise":
+    if request.suite_kind == "hands_on":
         normal = by_id["normal-64"]
         risk = by_id["risk-512"]
         if normal["effective_max_output_tokens"] != 64:
@@ -247,7 +247,7 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
     focus = verified_cases[-1]
     return {
         "lab_id": "01-nova",
-        "exercise_id": "01",
+        "activity_id": "H01",
         "execution_id": request.suite_id,
         "execution_kind": "learner-application-suite",
         "started_at": request.started_at,

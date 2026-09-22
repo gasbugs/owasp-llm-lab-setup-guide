@@ -56,7 +56,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         return {
             "suite_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             "started_at": "2026-09-22T10:00:00+00:00",
-            "suite_kind": "exercise",
+            "suite_kind": "hands_on",
             "cases": [
                 {
                     "case_id": "normal-64",
