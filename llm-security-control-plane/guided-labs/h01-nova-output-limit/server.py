@@ -47,7 +47,7 @@ class RunRequest(BaseModel):
     started_at: str
     prompt: str = Field(min_length=1, max_length=4000)
     requested_max_output_tokens: int = Field(ge=1, le=512)
-    scenario: Literal["normal", "risk", "preflight"]
+    scenario: Literal["normal", "risk", "preflight", "chat"]
 
 
 def bearer(expected: str, authorization: str | None) -> None:
@@ -129,7 +129,14 @@ def run(request: RunRequest, _authorized: None = Depends(require_control)) -> di
             )
     except sqlite3.IntegrityError as exc:
         raise HTTPException(status_code=409, detail="execution ID already exists") from exc
-    return receipt
+    return {
+        **receipt,
+        "model_id": provider["model_id"],
+        "forwarded_parameters": provider["forwarded_parameters"],
+        "usage": provider["usage"],
+        "stop_reason": provider["stop_reason"],
+        "response_text": provider["output_text"],
+    }
 
 
 @app.get("/v1/build-info")

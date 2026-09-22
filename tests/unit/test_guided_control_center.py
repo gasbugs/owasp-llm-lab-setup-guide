@@ -59,8 +59,18 @@ class FakeAsyncClient:
             return FakeResponse(
                 {
                     "execution_id": json["execution_id"],
+                    "requested_max_output_tokens": json["requested_max_output_tokens"],
+                    "effective_max_output_tokens": json["requested_max_output_tokens"],
+                    "policy_digest": "policy-digest",
                     "config_digest": "executor-is-not-trusted",
                     "provider_request_id": "aws-request-1",
+                    "model_id": "us.amazon.nova-lite-v1:0",
+                    "forwarded_parameters": {
+                        "maxTokens": json["requested_max_output_tokens"]
+                    },
+                    "usage": {"outputTokens": 12},
+                    "stop_reason": "end_turn",
+                    "response_text": "실제 모델 응답",
                 }
             )
         return FakeResponse(
@@ -149,6 +159,32 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("unit-control-lab", response.text)
         self.assertNotIn("unit-control-verifier", response.text)
 
+    def test_exploratory_chat_uses_current_learner_app_without_grading(self):
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H01/chat",
+                json={"prompt": "현재 정책을 거쳐 실제로 답해 주세요."},
+                headers=self.headers,
+            )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["graded"])
+        self.assertEqual(payload["execution_kind"], "exploratory_chat")
+        self.assertEqual(payload["result"]["response_text"], "실제 모델 응답")
+        self.assertEqual(len(FakeAsyncClient.calls), 1)
+        request = FakeAsyncClient.calls[0]["json"]
+        self.assertEqual(request["prompt"], "현재 정책을 거쳐 실제로 답해 주세요.")
+        self.assertEqual(request["requested_max_output_tokens"], 512)
+        self.assertEqual(request["scenario"], "chat")
+
+    def test_exploratory_chat_rejects_client_policy_fields(self):
+        response = self.client.post(
+            "/api/hands-on/H01/chat",
+            json={"prompt": "hello", "max_output_tokens": 1, "course_verdict": "PASS"},
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 422)
+
     def test_unknown_host_is_rejected(self):
         response = self.client.get("/", headers={"Host": "attacker.example"})
         self.assertEqual(response.status_code, 421)
@@ -165,12 +201,15 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("return min(requested_max_tokens, 128)", html)
         self.assertIn("강사와 함께 진행하는 본 실습", html)
         self.assertIn("--env-file llm-security-control-plane/.state/guided-course.env", html)
-        self.assertIn('id="theme-toggle"', html)
+        self.assertIn('data-theme-choice="light"', html)
+        self.assertIn('data-theme-choice="dark"', html)
+        self.assertIn('id="chat-form"', html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
         self.assertNotIn("innerHTML", javascript)
         self.assertIn('matchMedia("(prefers-color-scheme: dark)")', javascript)
         self.assertIn('localStorage.setItem("guided-theme-mode", mode)', javascript)
+        self.assertIn('/api/hands-on/H01/chat', javascript)
         stylesheet = (CONTROL / "guided-control-center/app.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 760px)", stylesheet)
         self.assertIn("color-scheme: light dark", stylesheet)

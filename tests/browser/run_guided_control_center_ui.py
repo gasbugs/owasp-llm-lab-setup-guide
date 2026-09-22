@@ -60,11 +60,11 @@ def main() -> int:
         page.locator("html[data-theme=dark]").wait_for()
         dark_canvas = page.evaluate("() => getComputedStyle(document.body).backgroundColor")
         system_mode = page.evaluate("() => document.documentElement.dataset.themeMode === 'system'")
-        page.locator("#theme-toggle").click()
+        page.locator('[data-theme-choice="light"]').click()
         manual_light = page.evaluate(
             "() => document.documentElement.dataset.themeMode === 'light' && document.documentElement.dataset.theme === 'light'"
         )
-        page.locator("#theme-toggle").click()
+        page.locator('[data-theme-choice="dark"]').click()
         manual_dark = page.evaluate(
             "() => document.documentElement.dataset.themeMode === 'dark' && document.documentElement.dataset.theme === 'dark'"
         )
@@ -72,6 +72,15 @@ def main() -> int:
         persisted_dark = page.evaluate(
             "() => document.documentElement.dataset.themeMode === 'dark' && document.documentElement.dataset.theme === 'dark'"
         )
+        panel_boundary = page.evaluate(
+            "() => { const nav = document.querySelector('.route-panel').getBoundingClientRect(); const work = document.querySelector('.workbench').getBoundingClientRect(); return work.left - nav.right >= 16; }"
+        )
+
+        page.locator("#chat-input").fill("현재 수강생 앱을 거쳐 실제 답변을 보여 주세요.")
+        page.locator("#chat-send").click()
+        page.locator(".chat-message.assistant").nth(1).wait_for(timeout=timeout_ms)
+        chat_text = page.locator(".chat-message.assistant").nth(1).inner_text()
+        chat_meta = page.locator("#chat-meta").inner_text()
 
         page.locator("#preflight").click()
         preflight = wait_for_result(page, timeout_ms)
@@ -108,6 +117,12 @@ def main() -> int:
         "session": browser_cookie_visible == "",
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
+        "panel_boundary": panel_boundary,
+        "chat": bool(chat_text.strip())
+        and chat_text != "모델 응답을 받지 못했습니다."
+        and "requested 512" in chat_meta
+        and "effective 512" in chat_meta
+        and "provider " in chat_meta,
         "preflight": preflight.get("course_verdict") == "PASS"
         and preflight.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 2,
         "hands_on": hands_on_verdict == "HIT"
@@ -124,9 +139,11 @@ def main() -> int:
         f"preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"system_theme={str(light_canvas != dark_canvas and system_mode).lower()} "
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
+        f"panel_boundary={str(panel_boundary).lower()} chat={str(checks['chat']).lower()} "
         f"answer_controls={answer_controls} raw_nodes={raw_nodes} "
         f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )
+    print(f"chat_meta={chat_meta}")
     print("overall_guided_vertical_slice=" + ("PASS" if all(checks.values()) else "FAIL"))
     return 0 if all(checks.values()) else 1
 

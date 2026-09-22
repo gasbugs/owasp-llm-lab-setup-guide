@@ -88,6 +88,11 @@ bash llm-security-control-plane/deploy/stop-stack.sh
 cd ~/owasp-llm-lab-setup-guide
 mkdir -p llm-security-control-plane/.state/guided-gateway
 
+cat > llm-security-control-plane/.state/guided-course.env <<EOF
+AWS_PROFILE=default
+LOCAL_UID=$(id -u)
+LOCAL_GID=$(id -g)
+GUIDED_PROVIDER_MODE=aws
 GUIDED_SESSION_SECRET=$(openssl rand -hex 32)
 GUIDED_CONTROL_LAB01_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_VERIFIER_TOKEN=$(openssl rand -hex 32)
@@ -95,25 +100,17 @@ GUIDED_LAB01_GATEWAY_TOKEN=$(openssl rand -hex 32)
 GUIDED_NEMO_GATEWAY_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_LAB01_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_GATEWAY_TOKEN=$(openssl rand -hex 32)
-
-cat > llm-security-control-plane/.state/guided-course.env <<EOF
-AWS_PROFILE=default
-LOCAL_UID=$(id -u)
-LOCAL_GID=$(id -g)
-GUIDED_SESSION_SECRET=$GUIDED_SESSION_SECRET
-GUIDED_CONTROL_LAB01_TOKEN=$GUIDED_CONTROL_LAB01_TOKEN
-GUIDED_CONTROL_VERIFIER_TOKEN=$GUIDED_CONTROL_VERIFIER_TOKEN
-GUIDED_LAB01_GATEWAY_TOKEN=$GUIDED_LAB01_GATEWAY_TOKEN
-GUIDED_NEMO_GATEWAY_TOKEN=$GUIDED_NEMO_GATEWAY_TOKEN
-GUIDED_VERIFIER_LAB01_TOKEN=$GUIDED_VERIFIER_LAB01_TOKEN
-GUIDED_VERIFIER_GATEWAY_TOKEN=$GUIDED_VERIFIER_GATEWAY_TOKEN
 EOF
+chmod 600 llm-security-control-plane/.state/guided-course.env
+cut -d= -f1 llm-security-control-plane/.state/guided-course.env
 
 docker compose \
   --env-file llm-security-control-plane/.state/guided-course.env \
   --file examples/security-monitoring/compose.guided.yaml \
   up -d --build
 ```
+
+`cut`은 값 대신 변수 이름만 보여 주므로 Token을 터미널에 노출하지 않고 파일이 만들어졌는지 확인한다. 이 env file과 Compose 경로는 H01~H22에서 계속 재사용하는 공개 실행 계약이다. 뒤 차시 구현이 늘어나도 시작 명령은 바꾸지 않으며, 최종 설치 문서는 이 절차를 한곳에 모아 새 환경에서 다시 검증한다.
 
 | Front Proxy 주소 | 연결되는 내부 서비스 | 역할 |
 |---|---|---|

@@ -13,6 +13,7 @@ from pathlib import Path
 import httpx
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 
 ROOT = Path(__file__).parent
@@ -39,6 +40,11 @@ NEMO_BROWSER_URL = os.getenv("GUIDED_NEMO_BROWSER_URL", "http://127.0.0.1:18192"
 SESSIONS: dict[str, dict] = {}
 ACTIVE_SESSIONS: set[str] = set()
 MAX_SESSIONS = 256
+
+
+class ChatInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    prompt: str = Field(min_length=1, max_length=4000)
 
 
 def sign(session_id: str) -> str:
@@ -293,3 +299,48 @@ async def verify_learner_app(
     if await request.body():
         raise HTTPException(status_code=422, detail="verification inputs are server-owned")
     return await execute_suite(session[0], "hands_on")
+
+
+@app.post("/api/hands-on/H01/chat")
+async def chat_with_learner_app(
+    chat: ChatInput,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            response = await client.post(
+                f"{LAB_URL}/v1/run",
+                json={
+                    "execution_id": execution_id,
+                    "started_at": started_at,
+                    "prompt": chat.prompt,
+                    "requested_max_output_tokens": 512,
+                    "scenario": "chat",
+                },
+                headers={"Authorization": f"Bearer {LAB_TOKEN}"},
+            )
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail="guided student app chat failed")
+        result = response.json()
+        return {
+            "activity_id": "H01",
+            "execution_kind": "exploratory_chat",
+            "graded": False,
+            "execution_id": execution_id,
+            "started_at": started_at,
+            "stage_calls": [
+                {"stage": "student_output_policy", "outcome": "completed"},
+                {"stage": "bedrock_main", "outcome": "completed"},
+            ],
+            "result": result,
+        }
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)

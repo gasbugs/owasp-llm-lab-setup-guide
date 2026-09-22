@@ -24,11 +24,9 @@ function applyTheme(mode) {
   const resolved = mode === "system" ? (themePreference.matches ? "dark" : "light") : mode;
   document.documentElement.dataset.theme = resolved;
   document.documentElement.dataset.themeMode = mode;
-  const labels = { system: "시스템", light: "밝게", dark: "어둡게" };
-  const nextMode = themeModes[(themeModes.indexOf(mode) + 1) % themeModes.length];
-  const toggle = byId("theme-toggle");
-  toggle.textContent = `테마 · ${labels[mode]}`;
-  toggle.setAttribute("aria-label", `현재 ${labels[mode]} 모드. 눌러 ${labels[nextMode]} 모드로 변경`);
+  document.querySelectorAll(".theme-choice").forEach((choice) => {
+    choice.setAttribute("aria-pressed", String(choice.dataset.themeChoice === mode));
+  });
 }
 
 function saveThemeMode(mode) {
@@ -38,13 +36,6 @@ function saveThemeMode(mode) {
   } catch {
     // 저장할 수 없는 브라우저에서도 현재 탭의 테마 전환은 유지한다.
   }
-}
-
-function cycleTheme() {
-  const current = document.documentElement.dataset.themeMode || "system";
-  const next = themeModes[(themeModes.indexOf(current) + 1) % themeModes.length];
-  saveThemeMode(next);
-  applyTheme(next);
 }
 
 function setText(id, value) {
@@ -105,7 +96,7 @@ async function request(path, body = undefined) {
 }
 
 function setBusy(busy) {
-  ["preflight", "verify"].forEach((id) => {
+  ["preflight", "verify", "chat-send"].forEach((id) => {
     byId(id).disabled = busy;
   });
   if (busy) {
@@ -114,6 +105,40 @@ function setBusy(busy) {
       gate.className = "gate running";
       gate.querySelector("small").textContent = "실행 중";
     });
+  }
+}
+
+function appendChatMessage(role, text) {
+  const message = document.createElement("div");
+  message.className = `chat-message ${role}`;
+  const label = document.createElement("b");
+  label.textContent = role === "user" ? "YOU" : "MODEL";
+  const copy = document.createElement("p");
+  copy.textContent = text;
+  message.append(label, copy);
+  byId("chat-transcript").append(message);
+  message.scrollIntoView({ block: "nearest" });
+}
+
+async function sendChat(event) {
+  event.preventDefault();
+  const prompt = byId("chat-input").value.trim();
+  if (!prompt) return;
+  appendChatMessage("user", prompt);
+  byId("chat-send").disabled = true;
+  setText("chat-meta", "현재 수강생 앱과 Nova Lite를 호출하는 중입니다.");
+  try {
+    const payload = await request("/api/hands-on/H01/chat", { prompt });
+    appendChatMessage("assistant", payload.result.response_text);
+    setText(
+      "chat-meta",
+      `requested ${payload.result.requested_max_output_tokens} → effective ${payload.result.effective_max_output_tokens} · output ${payload.result.usage.outputTokens} · provider ${payload.result.provider_request_id}`,
+    );
+  } catch (error) {
+    appendChatMessage("assistant", "모델 응답을 받지 못했습니다.");
+    setText("chat-meta", error.message);
+  } finally {
+    byId("chat-send").disabled = false;
   }
 }
 
@@ -179,7 +204,14 @@ async function bootstrap() {
 
 byId("preflight").addEventListener("click", () => execute("/api/provider-preflight"));
 byId("verify").addEventListener("click", () => execute("/api/hands-on/H01/verify"));
-byId("theme-toggle").addEventListener("click", cycleTheme);
+byId("chat-form").addEventListener("submit", sendChat);
+document.querySelectorAll(".theme-choice").forEach((choice) => {
+  choice.addEventListener("click", () => {
+    const mode = choice.dataset.themeChoice;
+    saveThemeMode(mode);
+    applyTheme(mode);
+  });
+});
 themePreference.addEventListener("change", () => {
   if (document.documentElement.dataset.themeMode === "system") applyTheme("system");
 });
