@@ -38,8 +38,8 @@
     .course-meter span { color:var(--muted); font-size:12px; }
     .meter { height:7px; margin-top:10px; overflow:hidden; border:1px solid var(--line); background:var(--canvas); }
     .meter > i { display:block; width:4.55%; height:100%; background:var(--blue); transition:width .2s ease; }
-    .layout { display:grid; grid-template-columns:300px minmax(500px,1fr) 320px; gap:14px; margin-top:14px; align-items:start; }
-    .panel { border:1px solid var(--line); background:var(--paper); box-shadow:var(--shadow); }
+    .layout { display:grid; grid-template-columns:300px minmax(500px,1fr) 320px; gap:14px; margin-top:14px; align-items:start; min-width:0; }
+    .panel { min-width:0; border:1px solid var(--line); background:var(--paper); box-shadow:var(--shadow); }
     .panel-head { display:flex; justify-content:space-between; gap:16px; padding:16px 18px; border-bottom:1px solid var(--line); }
     .panel-head h2 { margin:3px 0 0; font:850 19px/1.2 var(--display); }
     .label { color:var(--blue); }
@@ -55,7 +55,7 @@
     .lesson-button.active .lesson-number { color:#fff; border-color:var(--blue); background:var(--blue); }
     .lesson-button strong { display:block; font-size:13px; line-height:1.35; }
     .lesson-button small { color:var(--muted); font:10px var(--mono); }
-    .workbench { padding:20px; }
+    .workbench { min-width:0; padding:20px; }
     .lesson-thesis { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px; align-items:start; }
     .lesson-thesis h2 { margin:5px 0 7px; font:900 clamp(24px,3vw,38px)/1 var(--display); }
     .lesson-thesis p { margin:0; color:var(--muted); }
@@ -129,7 +129,7 @@
     }
     @media (max-width:760px) {
       .app { padding:8px; }.masthead { grid-template-columns:1fr; padding:18px; }.course-meter { text-align:left; }
-      .layout { grid-template-columns:1fr; }.lesson-list { display:flex; max-height:none; overflow:auto; }
+      .layout { grid-template-columns:minmax(0,1fr); }.lesson-list { display:flex; min-width:0; max-height:none; overflow:auto; }
       .chapter-group { display:contents; }.chapter-title { display:none; }.lesson-button { min-width:210px; }
       .lesson-thesis,.scenario-grid,.receipt-body { grid-template-columns:1fr; }.mode-chip { justify-self:start; }
       .receipt { grid-column:auto; }.belt { grid-template-columns:repeat(6,92px); }

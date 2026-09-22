@@ -64,6 +64,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.text.count("{chapter:"), 22)
         self.assertIn("@media (max-width:760px)", response.text)
+        self.assertIn("grid-template-columns:minmax(0,1fr)", response.text)
+        self.assertIn(".panel { min-width:0", response.text)
         self.assertIn("실제 요청", response.text)
         self.assertIn("고정 학습 기록", response.text)
         self.assertNotIn("__APP_VERSION__", response.text)
