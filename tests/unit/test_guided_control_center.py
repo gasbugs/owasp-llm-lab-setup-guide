@@ -66,7 +66,7 @@ class FakeAsyncClient:
         return FakeResponse(
             {
                 "lab_id": "01-nova",
-                "execution_id": json["execution_id"],
+                "execution_id": json["suite_id"],
                 "course_verdict": "PASS",
                 "verified_by": "guided-evidence-verifier",
                 "stage_calls": [
@@ -75,7 +75,7 @@ class FakeAsyncClient:
                 "evidence": [{"id": "aws-request-1"}],
                 "result": {
                     "model_id": "us.amazon.nova-lite-v1:0",
-                    "forwarded_parameters": {"maxTokens": json["expected_max_output_tokens"]},
+                    "forwarded_parameters": {"maxTokens": 128},
                     "usage": {"outputTokens": 12},
                 },
             }
@@ -111,20 +111,18 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["activities"], 22)
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
-        body = {"prompt": "정상 요청", "max_output_tokens": 80, "run_kind": "observe"}
-        self.assertEqual(self.client.post("/api/labs/01-nova/run", json=body).status_code, 403)
+        self.assertEqual(self.client.post("/api/labs/01-nova/verify").status_code, 403)
         self.assertEqual(
             self.client.post(
-                "/api/labs/01-nova/run",
-                json=body,
+                "/api/labs/01-nova/verify",
                 headers={**self.headers, "Origin": "https://evil.example"},
             ).status_code,
             403,
         )
         self.assertEqual(
             self.client.post(
-                "/api/labs/01-nova/run",
-                json={**body, "course_verdict": "PASS"},
+                "/api/labs/01-nova/verify",
+                json={"course_verdict": "PASS", "max_output_tokens": 1},
                 headers=self.headers,
             ).status_code,
             422,
@@ -133,17 +131,18 @@ class GuidedControlCenterTests(unittest.TestCase):
     def test_control_center_creates_execution_and_uses_verifier_result(self):
         with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
             response = self.client.post(
-                "/api/labs/01-nova/run",
-                json={"prompt": "정상 요청", "max_output_tokens": 80, "run_kind": "observe"},
+                "/api/labs/01-nova/verify",
                 headers=self.headers,
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(len(FakeAsyncClient.calls), 2)
-        lab_call, verifier_call = FakeAsyncClient.calls
-        self.assertNotIn("course_verdict", lab_call["json"])
-        self.assertEqual(verifier_call["json"]["expected_max_output_tokens"], 80)
-        self.assertEqual(len(verifier_call["json"]["expected_config_digest"]), 64)
+        self.assertEqual(len(FakeAsyncClient.calls), 3)
+        normal_call, risk_call, verifier_call = FakeAsyncClient.calls
+        self.assertEqual(normal_call["json"]["requested_max_output_tokens"], 64)
+        self.assertEqual(risk_call["json"]["requested_max_output_tokens"], 512)
+        self.assertEqual(verifier_call["json"]["suite_kind"], "exercise")
+        self.assertEqual(len(verifier_call["json"]["cases"]), 2)
+        self.assertNotIn("course_verdict", verifier_call["json"])
         self.assertNotIn("unit-control-lab", response.text)
         self.assertNotIn("unit-control-verifier", response.text)
 
@@ -175,6 +174,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         serialized = str(verifier)
         self.assertNotIn("/tmp/.aws", serialized)
         self.assertNotIn("docker.sock", serialized)
+        self.assertIn("guided-student-app", compose["services"])
         proxy = (CONTROL / "guided-front-proxy/nginx.conf").read_text(encoding="utf-8")
         self.assertIn("proxy_set_header Upgrade $http_upgrade", proxy)
         self.assertIn("proxy_set_header Connection $connection_upgrade", proxy)

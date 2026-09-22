@@ -110,7 +110,13 @@ def call_provider(
             text = '<img src=x onerror="window.__guided_xss=true"><script>window.__guided_xss=true</script>'
         else:
             text = "계약 테스트 응답입니다. " + ("안전한 출력 상한을 확인했습니다. " * 8)
-        output_tokens = min(max_output_tokens, 48)
+        # The fixed risk probe must consume the forwarded allowance so an
+        # unbounded starter is deterministically distinguishable from a fix.
+        output_tokens = (
+            max_output_tokens
+            if "GUIDED-PART01-RISK" in prompt
+            else min(max_output_tokens, 48)
+        )
         return {
             "request_id": f"contract-{request_id}",
             "text": text,

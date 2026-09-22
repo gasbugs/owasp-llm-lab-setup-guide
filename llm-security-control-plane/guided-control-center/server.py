@@ -4,24 +4,21 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import os
 import secrets
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
 
 import httpx
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
 
 
 ROOT = Path(__file__).parent
 APP_VERSION = os.getenv("RELEASE_VERSION", os.getenv("APP_VERSION", "dev"))
 SESSION_SECRET = os.environ["GUIDED_SESSION_SECRET"].encode()
-LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-lab-01-nova:8000")
+LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-student-app:8000")
 VERIFIER_URL = os.getenv("GUIDED_VERIFIER_URL", "http://guided-evidence-verifier:8000")
 LAB_TOKEN = os.environ["GUIDED_CONTROL_LAB01_TOKEN"]
 VERIFIER_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
@@ -42,13 +39,6 @@ NEMO_BROWSER_URL = os.getenv("GUIDED_NEMO_BROWSER_URL", "http://127.0.0.1:18192"
 SESSIONS: dict[str, dict] = {}
 ACTIVE_SESSIONS: set[str] = set()
 MAX_SESSIONS = 256
-
-
-class RunRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    prompt: str = Field(min_length=1, max_length=4000)
-    max_output_tokens: int = Field(ge=1, le=512)
-    run_kind: Literal["observe", "bounded"] = "observe"
 
 
 def sign(session_id: str) -> str:
@@ -84,21 +74,6 @@ def require_csrf(
     if not x_csrf_token or not hmac.compare_digest(x_csrf_token, session[1]["csrf"]):
         raise HTTPException(status_code=403, detail="CSRF token is invalid")
     return session
-
-
-def expected_digest(max_output_tokens: int) -> str:
-    encoded = json.dumps(
-        {
-            "model_id": MODEL_ID,
-            "inference_config": {
-                "maxTokens": max_output_tokens,
-                "temperature": 0.0,
-            },
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def security_headers(response: Response) -> None:
@@ -140,8 +115,6 @@ def index() -> HTMLResponse:
     session_id = secrets.token_urlsafe(24)
     SESSIONS[session_id] = {
         "csrf": secrets.token_urlsafe(24),
-        "exercise_started": False,
-        "hint_level": 0,
     }
     html = (ROOT / "index.html").read_text(encoding="utf-8").replace(
         "__APP_VERSION__", APP_VERSION
@@ -199,56 +172,93 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "boundary": "AWS 로그인과 수강생 본인 계정 권한을 사용합니다.",
             },
         ],
-        "exercise": {
-            "started": session[1]["exercise_started"],
-            "hint_level": session[1]["hint_level"],
+        "learner_app": {
+            "service": "guided-student-app",
+            "policy_path": "llm-security-control-plane/guided-labs/01-nova/policy.py",
+            "compose_path": "examples/security-monitoring/compose.guided.yaml",
         },
     }
 
 
-async def execute(
-    session_id: str, body: RunRequest, run_kind: Literal["observe", "bounded", "preflight"]
-) -> dict:
+async def execute_suite(session_id: str, suite_kind: str) -> dict:
     if session_id in ACTIVE_SESSIONS:
         raise HTTPException(status_code=409, detail="this session already has a running request")
     ACTIVE_SESSIONS.add(session_id)
-    execution_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
-    max_output_tokens = 2 if run_kind == "preflight" else body.max_output_tokens
-    prompt = "Reply only OK" if run_kind == "preflight" else body.prompt
-    lab_payload = {
-        "execution_id": execution_id,
-        "started_at": started_at,
-        "prompt": prompt,
-        "max_output_tokens": max_output_tokens,
-        "run_kind": run_kind,
-    }
+    suite_id = str(uuid.uuid4())
+    suite_started_at = datetime.now(timezone.utc).isoformat()
+    definitions = (
+        [
+            {
+                "case_id": "provider-preflight",
+                "scenario": "preflight",
+                "prompt": "Reply only OK",
+                "requested_max_output_tokens": 2,
+            }
+        ]
+        if suite_kind == "preflight"
+        else [
+            {
+                "case_id": "normal-64",
+                "scenario": "normal",
+                "prompt": "GUIDED-PART01-NORMAL: TLS 인증서 교체 절차를 세 문장으로 요약하세요.",
+                "requested_max_output_tokens": 64,
+            },
+            {
+                "case_id": "risk-512",
+                "scenario": "risk",
+                "prompt": "GUIDED-PART01-RISK: 상담 절차를 출력 한계까지 상세히 작성하세요.",
+                "requested_max_output_tokens": 512,
+            },
+        ]
+    )
+    cases = []
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            lab_response = await client.post(
-                f"{LAB_URL}/v1/run",
-                json=lab_payload,
-                headers={"Authorization": f"Bearer {LAB_TOKEN}"},
-            )
-            if lab_response.status_code != 200:
-                raise HTTPException(
-                    status_code=502,
-                    detail={
-                        "successful_stage": "control_center",
-                        "stopped_stage": "lab_01_executor",
-                        "downstream_called": False,
-                        "course_verdict": "ERR",
-                        "next_check": "Lab 01과 Bedrock Gateway 상태를 확인합니다.",
+            for definition in definitions:
+                execution_id = str(uuid.uuid4())
+                started_at = datetime.now(timezone.utc).isoformat()
+                lab_response = await client.post(
+                    f"{LAB_URL}/v1/run",
+                    json={
+                        "execution_id": execution_id,
+                        "started_at": started_at,
+                        "prompt": definition["prompt"],
+                        "requested_max_output_tokens": definition[
+                            "requested_max_output_tokens"
+                        ],
+                        "scenario": definition["scenario"],
                     },
+                    headers={"Authorization": f"Bearer {LAB_TOKEN}"},
+                )
+                if lab_response.status_code != 200:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={
+                            "successful_stage": "control_center",
+                            "stopped_stage": "guided_student_app",
+                            "downstream_called": False,
+                            "course_verdict": "ERR",
+                            "next_check": "guided-student-app과 Bedrock Gateway 상태를 확인합니다.",
+                        },
+                    )
+                cases.append(
+                    {
+                        "case_id": definition["case_id"],
+                        "scenario": definition["scenario"],
+                        "execution_id": execution_id,
+                        "started_at": started_at,
+                        "requested_max_output_tokens": definition[
+                            "requested_max_output_tokens"
+                        ],
+                    }
                 )
             verifier_response = await client.post(
                 f"{VERIFIER_URL}/v1/verify/lab-01",
                 json={
-                    "execution_id": execution_id,
-                    "started_at": started_at,
-                    "expected_config_digest": expected_digest(max_output_tokens),
-                    "expected_max_output_tokens": max_output_tokens,
-                    "run_kind": run_kind,
+                    "suite_id": suite_id,
+                    "started_at": suite_started_at,
+                    "suite_kind": suite_kind,
+                    "cases": cases,
                 },
                 headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
             )
@@ -265,48 +275,14 @@ async def execute(
 async def provider_preflight(
     session: tuple[str, dict] = Depends(require_csrf),
 ) -> dict:
-    return await execute(
-        session[0],
-        RunRequest(prompt="Reply only OK", max_output_tokens=2, run_kind="observe"),
-        "preflight",
-    )
+    return await execute_suite(session[0], "preflight")
 
 
-@app.post("/api/labs/01-nova/run")
-async def run_lab(
-    body: RunRequest,
+@app.post("/api/labs/01-nova/verify")
+async def verify_learner_app(
+    request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
 ) -> dict:
-    if body.run_kind == "bounded" and not session[1]["exercise_started"]:
-        raise HTTPException(status_code=409, detail="exercise has not started")
-    return await execute(session[0], body, body.run_kind)
-
-
-@app.post("/api/labs/01-nova/exercise/start")
-def start_exercise(session: tuple[str, dict] = Depends(require_csrf)) -> dict:
-    session[1]["exercise_started"] = True
-    session[1]["hint_level"] = 0
-    return {
-        "started": True,
-        "scenario": "길어진 고객 상담 응답의 실제 Provider 출력 상한을 128 이하로 줄입니다.",
-        "success_condition": "전달한 maxTokens와 AWS 사용량이 함께 확인되고 outputTokens가 선택한 상한을 넘지 않습니다.",
-    }
-
-
-@app.post("/api/labs/01-nova/exercise/hint")
-def hint(session: tuple[str, dict] = Depends(require_csrf)) -> dict:
-    if not session[1]["exercise_started"]:
-        raise HTTPException(status_code=409, detail="exercise has not started")
-    session[1]["hint_level"] = min(session[1]["hint_level"] + 1, 2)
-    hints = {
-        1: "응답 길이만 보지 말고 forwarded_parameters.maxTokens를 먼저 확인합니다.",
-        2: "운영 상한은 128입니다. 더 작은 상한도 정상 응답이 유지되면 통과할 수 있습니다.",
-    }
-    return {"hint_level": session[1]["hint_level"], "hint": hints[session[1]["hint_level"]]}
-
-
-@app.post("/api/labs/01-nova/exercise/reset")
-def reset(session: tuple[str, dict] = Depends(require_csrf)) -> dict:
-    session[1]["exercise_started"] = False
-    session[1]["hint_level"] = 0
-    return {"started": False, "message": "파트 01 선택값만 초기화했습니다."}
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    return await execute_suite(session[0], "exercise")

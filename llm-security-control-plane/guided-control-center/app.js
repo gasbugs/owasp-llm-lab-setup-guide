@@ -67,7 +67,7 @@ async function request(path, body = undefined) {
 }
 
 function setBusy(busy) {
-  ["preflight", "run", "exercise-start", "hint", "reset"].forEach((id) => {
+  ["preflight", "verify"].forEach((id) => {
     byId(id).disabled = busy;
   });
   if (busy) {
@@ -82,10 +82,12 @@ function setBusy(busy) {
 function renderEnvelope(payload) {
   setText("raw", JSON.stringify(payload, null, 2));
   setText("execution-id", payload.execution_id);
-  setText("provider-id", payload.evidence?.[0]?.id);
+  setText("provider-id", payload.result?.provider_request_id);
   setText("model-id", payload.result?.model_id);
+  setText("requested-max", payload.result?.requested_max_output_tokens);
   setText("forwarded-max", payload.result?.forwarded_parameters?.maxTokens);
   setText("output-tokens", payload.result?.usage?.outputTokens);
+  setText("policy-digest", payload.result?.policy_digest?.slice(0, 12));
   setText("verified-by", payload.verified_by);
   setText("reason", payload.reason);
   setText("next-check", `다음 확인: ${payload.next_check}`);
@@ -97,7 +99,7 @@ function renderEnvelope(payload) {
   verdict.querySelector("span").textContent = payload.verified_by || "검증 실패";
 
   const stages = [{ stage: "control_center", outcome: "completed" }, ...(payload.stage_calls || [])];
-  const labels = { control_center: "Control Center", gateway_output_limit: "Gateway Limit", bedrock_main: "Bedrock Main" };
+  const labels = { control_center: "Control Center", student_output_policy: "Student Policy", bedrock_main: "Bedrock Main" };
   const belt = byId("belt");
   belt.replaceChildren();
   stages.forEach((stage) => {
@@ -138,29 +140,6 @@ async function bootstrap() {
 }
 
 byId("preflight").addEventListener("click", () => execute("/api/provider-preflight"));
-byId("run").addEventListener("click", () => execute("/api/labs/01-nova/run", {
-  prompt: byId("prompt").value,
-  max_output_tokens: Number(byId("max-tokens").value),
-  run_kind: byId("run-kind").value
-}));
-byId("exercise-start").addEventListener("click", async () => {
-  try {
-    const result = await request("/api/labs/01-nova/exercise/start");
-    setText("exercise-copy", `${result.scenario} 성공 조건: ${result.success_condition}`);
-    byId("run-kind").value = "bounded";
-  } catch (error) { renderError(error); }
-});
-byId("hint").addEventListener("click", async () => {
-  try { setText("exercise-copy", (await request("/api/labs/01-nova/exercise/hint")).hint); }
-  catch (error) { renderError(error); }
-});
-byId("reset").addEventListener("click", async () => {
-  try {
-    const result = await request("/api/labs/01-nova/exercise/reset");
-    setText("exercise-copy", result.message);
-    byId("max-tokens").value = "512";
-    byId("run-kind").value = "observe";
-  } catch (error) { renderError(error); }
-});
+byId("verify").addEventListener("click", () => execute("/api/labs/01-nova/verify"));
 
 bootstrap().catch(renderError);

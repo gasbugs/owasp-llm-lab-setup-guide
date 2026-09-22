@@ -12,8 +12,8 @@
   <header class="masthead">
     <div>
       <p class="kicker">TENANT 03 · SECURITY INSPECTION LINE</p>
-      <h1>요청을 보내고<br>증거가 남은 곳을 찾는다</h1>
-      <p class="lede">파트 01에서는 Nova Lite에 전달한 출력 상한과 AWS가 돌려준 실제 사용량을 한 장의 검사 영수증으로 맞춥니다.</p>
+      <h1>앱을 고치고<br>증거로 검증한다</h1>
+      <p class="lede">파트 01에서는 Python 출력 정책을 직접 구현하고, 정상·위험 요청이 Provider에 어떤 상한으로 전달됐는지 한 장의 영수증으로 맞춥니다.</p>
     </div>
     <div class="shift-card"><span>현재 검사대</span><strong>01 / 13</strong><small>Nova Lite 요청 경로</small></div>
   </header>
@@ -30,32 +30,31 @@
     </aside>
 
     <section class="panel workbench">
-      <div class="panel-head split"><div><p class="label">PART 01</p><h2>Nova Lite 응답 길이 제한</h2></div><span class="live-chip">LIVE PROVIDER</span></div>
+      <div class="panel-head split"><div><p class="label">PART 01</p><h2>Nova Lite 응답 길이 제한</h2></div><span class="live-chip">LEARNER BUILD</span></div>
       <div class="work-body">
-        <p>짧게 나온 답변만 보고 제한이 적용됐다고 판단하지 않습니다. 아래 요청은 Gateway가 Provider에 실제로 전달한 <code>maxTokens</code>와 AWS 사용량을 함께 확인합니다.</p>
-        <div class="cost-note"><strong>비용 안내</strong><span>연결 확인과 실행 버튼은 각각 Nova Lite 요청을 새로 만듭니다.</span></div>
+        <p>Starter는 512 Token 요청을 그대로 보내므로 첫 검증은 <code>HIT</code>가 정상입니다. UI에서 정답을 고르지 말고 <code>policy.py</code>를 수정해 작은 요청은 유지하고 큰 요청은 128 이하로 제한하세요.</p>
+        <div class="cost-note"><strong>비용 안내</strong><span>연결 확인은 1회, 현재 구현 검증은 정상·위험 2회의 Nova Lite 요청을 새로 만듭니다.</span></div>
 
-        <div class="field-grid">
-          <label class="field wide"><span>일반 사용자용 프롬프트 입력</span><textarea id="prompt">신규 상담원이 따라 할 수 있도록 TLS 인증서 교체 절차를 준비, 적용, 검증, 복구 순서의 체크리스트로 자세히 설명해 주세요.</textarea></label>
-          <label class="field"><span>출력 Token 상한</span><select id="max-tokens"><option value="512">512 · Starter</option><option value="128">128 · 운영 상한</option><option value="80">80 · 짧은 답변</option><option value="32">32 · 최소 확인</option></select></label>
-          <label class="field"><span>실행 목적</span><select id="run-kind"><option value="observe">파라미터 관찰</option><option value="bounded">연습문제 검증</option></select></label>
-        </div>
+        <section class="exercise" aria-labelledby="exercise-title">
+          <div>
+            <p class="label">LEARNER-OWNED APPLICATION</p>
+            <h3 id="exercise-title">고객 상담 앱에 출력 상한 구현하기</h3>
+            <p><code>llm-security-control-plane/guided-labs/01-nova/policy.py</code>의 <code>apply_output_limit</code>를 완성합니다. 성공 조건은 정상 64는 그대로, 위험 512는 128 이하로 Provider에 전달되는 것입니다.</p>
+            <pre>docker compose -f examples/security-monitoring/compose.guided.yaml build guided-student-app
+docker compose -f examples/security-monitoring/compose.guided.yaml up -d --no-deps --force-recreate guided-student-app</pre>
+          </div>
+        </section>
 
         <div class="actions">
           <button id="preflight" class="secondary">Provider 연결 확인</button>
-          <button id="run" class="primary">새 요청 실행</button>
+          <button id="verify" class="primary">현재 구현 검증</button>
         </div>
-
-        <section class="exercise" aria-labelledby="exercise-title">
-          <div><p class="label">15 MINUTE EXERCISE</p><h3 id="exercise-title">길어진 고객 상담 응답 줄이기</h3><p id="exercise-copy">문제 시작을 누르면 상황과 성공 조건이 표시됩니다.</p></div>
-          <div class="exercise-actions"><button id="exercise-start">문제 시작</button><button id="hint">힌트</button><button id="reset">다시 시작</button></div>
-        </section>
 
         <section class="inspection" aria-labelledby="inspection-title">
           <div class="inspection-head"><div><p class="label">STAGE CALLS</p><h3 id="inspection-title">요청 검사 컨베이어</h3></div><span id="execution-state">아직 실행하지 않음</span></div>
           <div id="belt" class="belt">
             <div class="gate waiting"><b>Control Center</b><small>대기</small></div>
-            <div class="gate waiting"><b>Gateway Limit</b><small>대기</small></div>
+            <div class="gate waiting"><b>Student Policy</b><small>대기</small></div>
             <div class="gate waiting"><b>Bedrock Main</b><small>대기</small></div>
           </div>
         </section>
@@ -69,14 +68,16 @@
       <div class="receipt-body">
         <div id="verdict" class="verdict empty"><strong>—</strong><span>검사 전</span></div>
         <dl>
-          <dt>EXECUTION</dt><dd id="execution-id">—</dd>
+          <dt>SUITE</dt><dd id="execution-id">—</dd>
           <dt>PROVIDER</dt><dd id="provider-id">—</dd>
           <dt>MODEL</dt><dd id="model-id">—</dd>
-          <dt>MAX TOKENS</dt><dd id="forwarded-max">—</dd>
+          <dt>REQUESTED</dt><dd id="requested-max">—</dd>
+          <dt>EFFECTIVE</dt><dd id="forwarded-max">—</dd>
           <dt>OUTPUT TOKENS</dt><dd id="output-tokens">—</dd>
+          <dt>POLICY DIGEST</dt><dd id="policy-digest">—</dd>
           <dt>VERIFIED BY</dt><dd id="verified-by">—</dd>
         </dl>
-        <p id="reason" class="reason">실행기 결과가 아니라 읽기 전용 검증기가 실제 영수증을 맞춘 뒤 판정합니다.</p>
+        <p id="reason" class="reason">실행기 결과가 아니라 읽기 전용 검증기가 정상·위험 영수증을 맞춘 뒤 판정합니다.</p>
         <p id="next-check" class="next-check">다음 확인: Provider 연결 확인</p>
       </div>
     </aside>

@@ -47,13 +47,13 @@ services:
       GUIDED_SESSION_SECRET: ${GUIDED_SESSION_SECRET:?Set GUIDED_SESSION_SECRET}
       GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
-      GUIDED_LAB01_URL: http://guided-lab-01-nova:8000
+      GUIDED_LAB01_URL: http://guided-student-app:8000
       GUIDED_VERIFIER_URL: http://guided-evidence-verifier:8000
       GUIDED_ALLOWED_HOSTS: 127.0.0.1:${GUIDED_HOST_PORT:-18097},localhost:${GUIDED_HOST_PORT:-18097}
       GUIDED_ALLOWED_ORIGINS: http://127.0.0.1:${GUIDED_HOST_PORT:-18097},http://localhost:${GUIDED_HOST_PORT:-18097}
       GUIDED_NEMO_BROWSER_URL: http://127.0.0.1:${GUIDED_NEMO_HOST_PORT:-18192}
     depends_on:
-      guided-lab-01-nova: {condition: service_healthy}
+      guided-student-app: {condition: service_healthy}
       guided-evidence-verifier: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host':'127.0.0.1:${GUIDED_HOST_PORT:-18097}'}); urllib.request.urlopen(r, timeout=2)"]
@@ -61,13 +61,13 @@ services:
       timeout: 3s
       retries: 30
 
-  guided-lab-01-nova:
+  guided-student-app:
     <<: *guided-service
     build:
       context: ../../llm-security-control-plane
       dockerfile: guided-labs/01-nova/Containerfile
-    image: localhost/llm-security-guided-lab-01-nova:${GUIDED_IMAGE_VERSION:-0.1.0}
-    container_name: llm-security-guided-lab-01-nova
+    image: localhost/llm-security-guided-student-app:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-student-app
     environment:
       GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
       GUIDED_LAB01_GATEWAY_TOKEN: ${GUIDED_LAB01_GATEWAY_TOKEN:?Set GUIDED_LAB01_GATEWAY_TOKEN}
@@ -93,11 +93,11 @@ services:
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
       GUIDED_VERIFIER_LAB01_TOKEN: ${GUIDED_VERIFIER_LAB01_TOKEN:?Set GUIDED_VERIFIER_LAB01_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
-      GUIDED_LAB01_URL: http://guided-lab-01-nova:8000
+      GUIDED_LAB01_URL: http://guided-student-app:8000
       GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
     volumes: [guided-verifier-state:/state:rw]
     depends_on:
-      guided-lab-01-nova: {condition: service_healthy}
+      guided-student-app: {condition: service_healthy}
       guided-bedrock-gateway: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]

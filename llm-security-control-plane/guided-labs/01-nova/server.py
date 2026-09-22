@@ -1,8 +1,9 @@
-"""Thin executor for activity 01; it never assigns the course verdict."""
+"""Learner-owned Part 01 application; it never assigns the course verdict."""
 
 from __future__ import annotations
 
 import hmac
+import hashlib
 import json
 import os
 import sqlite3
@@ -12,6 +13,8 @@ from typing import Literal
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
+
+from policy import apply_output_limit
 
 
 GATEWAY_URL = os.getenv("GUIDED_BEDROCK_GATEWAY_URL", "http://guided-bedrock-gateway:8080")
@@ -43,8 +46,8 @@ class RunRequest(BaseModel):
     execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
     prompt: str = Field(min_length=1, max_length=4000)
-    max_output_tokens: int = Field(ge=1, le=512)
-    run_kind: Literal["observe", "bounded", "preflight"]
+    requested_max_output_tokens: int = Field(ge=1, le=512)
+    scenario: Literal["normal", "risk", "preflight"]
 
 
 def bearer(expected: str, authorization: str | None) -> None:
@@ -61,7 +64,11 @@ def require_verifier(authorization: str | None = Header(default=None)) -> None:
     bearer(VERIFIER_TOKEN, authorization)
 
 
-app = FastAPI(title="Tenant 03 Lab 01 Nova", docs_url=None, redoc_url=None)
+app = FastAPI(title="Tenant 03 Learner App", docs_url=None, redoc_url=None)
+
+
+def policy_digest() -> str:
+    return hashlib.sha256(Path("/app/policy.py").read_bytes()).hexdigest()
 
 
 @app.get("/livez")
@@ -78,11 +85,14 @@ def readyz() -> dict[str, str]:
 
 @app.post("/v1/run")
 def run(request: RunRequest, _authorized: None = Depends(require_control)) -> dict:
-    endpoint = "/v1/provider-preflight" if request.run_kind == "preflight" else "/v1/nova/invoke"
+    effective_max_tokens = apply_output_limit(request.requested_max_output_tokens)
+    if type(effective_max_tokens) is not int or not 1 <= effective_max_tokens <= 512:
+        raise HTTPException(status_code=500, detail="output policy returned an invalid limit")
+    endpoint = "/v1/provider-preflight" if request.scenario == "preflight" else "/v1/nova/invoke"
     payload = {
         "execution_id": request.execution_id,
         "prompt": request.prompt,
-        "max_output_tokens": request.max_output_tokens,
+        "max_output_tokens": effective_max_tokens,
         "temperature": 0.0,
     }
     try:
@@ -104,7 +114,10 @@ def run(request: RunRequest, _authorized: None = Depends(require_control)) -> di
         "execution_id": request.execution_id,
         "started_at": request.started_at,
         "completed": True,
-        "run_kind": request.run_kind,
+        "scenario": request.scenario,
+        "requested_max_output_tokens": request.requested_max_output_tokens,
+        "effective_max_output_tokens": effective_max_tokens,
+        "policy_digest": policy_digest(),
         "config_digest": provider["config_digest"],
         "provider_request_id": provider["provider_request_id"],
     }
@@ -117,6 +130,11 @@ def run(request: RunRequest, _authorized: None = Depends(require_control)) -> di
     except sqlite3.IntegrityError as exc:
         raise HTTPException(status_code=409, detail="execution ID already exists") from exc
     return receipt
+
+
+@app.get("/v1/build-info")
+def build_info(_authorized: None = Depends(require_verifier)) -> dict[str, str]:
+    return {"component": "guided-student-app", "policy_digest": policy_digest()}
 
 
 @app.get("/v1/receipts/{execution_id}")

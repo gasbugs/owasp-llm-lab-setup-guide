@@ -6,6 +6,7 @@ RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
 COPY --chmod=0444 guided-labs/01-nova/server.py /app/server.py
+COPY --chmod=0444 guided-labs/01-nova/policy.py /app/policy.py
 RUN install -d -o 65532 -g 65532 -m 0700 /state
 
 USER 65532:65532

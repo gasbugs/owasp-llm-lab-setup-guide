@@ -21,7 +21,7 @@ tabs:
   - {id: 13-gateway-agent, activities: [21, 22], status: planned}
 
 activity_01:
-  executor: guided-lab-01-nova
+  executor: guided-student-app
   verifier: guided-evidence-verifier
   provider: amazon-bedrock
   model_id: us.amazon.nova-lite-v1:0
@@ -30,3 +30,6 @@ activity_01:
     - forwarded_parameters.maxTokens
     - usage.outputTokens
     - config_digest
+    - policy_digest
+    - normal-64
+    - risk-512

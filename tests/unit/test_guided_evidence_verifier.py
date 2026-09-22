@@ -1,4 +1,4 @@
-"""Read-only verifier freshness and trust-boundary tests."""
+"""Read-only suite verification and trust-boundary tests."""
 
 from __future__ import annotations
 
@@ -48,38 +48,74 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp.cleanup()
 
-    def request_body(self, execution_id: str) -> dict:
+    def setUp(self):
+        with self.server.connect() as database:
+            database.execute("DELETE FROM used_evidence")
+
+    def body(self) -> dict:
         return {
-            "execution_id": execution_id,
+            "suite_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             "started_at": "2026-09-22T10:00:00+00:00",
-            "expected_config_digest": "a" * 64,
-            "expected_max_output_tokens": 80,
-            "run_kind": "bounded",
+            "suite_kind": "exercise",
+            "cases": [
+                {
+                    "case_id": "normal-64",
+                    "scenario": "normal",
+                    "execution_id": "11111111-1111-1111-1111-111111111111",
+                    "started_at": "2026-09-22T10:00:00+00:00",
+                    "requested_max_output_tokens": 64,
+                },
+                {
+                    "case_id": "risk-512",
+                    "scenario": "risk",
+                    "execution_id": "22222222-2222-2222-2222-222222222222",
+                    "started_at": "2026-09-22T10:00:00+00:00",
+                    "requested_max_output_tokens": 512,
+                },
+            ],
         }
 
-    def fake_get(self, provider_id: str, execution_id: str, observed_at: str):
+    def fake_get(self, risk_effective: int):
+        cases = {
+            "11111111-1111-1111-1111-111111111111": ("normal", 64, 64, 40),
+            "22222222-2222-2222-2222-222222222222": (
+                "risk",
+                512,
+                risk_effective,
+                risk_effective,
+            ),
+        }
+
         def get(url, **_kwargs):
+            execution_id = url.rsplit("/", 1)[-1]
+            scenario, requested, effective, output = cases[execution_id]
+            provider_id = f"request-{execution_id[:8]}-{effective}"
+            digest = self.server.config_digest(effective)
             if "/receipts/" in url:
                 return FakeResponse(
                     {
                         "execution_id": execution_id,
+                        "scenario": scenario,
+                        "requested_max_output_tokens": requested,
+                        "effective_max_output_tokens": effective,
+                        "policy_digest": "b" * 64,
                         "provider_request_id": provider_id,
-                        "config_digest": "a" * 64,
+                        "config_digest": digest,
                     }
                 )
             return FakeResponse(
                 {
                     "execution_id": execution_id,
                     "provider_request_id": provider_id,
-                    "provider_mode": "aws",
-                    "observed_at": observed_at,
+                    "provider_mode": "contract",
+                    "observed_at": "2026-09-22T10:00:01+00:00",
                     "model_id": "us.amazon.nova-lite-v1:0",
                     "region": "us-east-1",
-                    "forwarded_parameters": {"maxTokens": 80, "temperature": 0.0},
-                    "usage": {"inputTokens": 10, "outputTokens": 40, "totalTokens": 50},
-                    "stop_reason": "end_turn",
+                    "forwarded_parameters": {"maxTokens": effective, "temperature": 0.0},
+                    "usage": {"inputTokens": 10, "outputTokens": output, "totalTokens": 10 + output},
+                    "stop_reason": "max_tokens",
                     "output_text": "검증된 응답",
-                    "config_digest": "a" * 64,
+                    "config_digest": digest,
                 }
             )
 
@@ -92,52 +128,34 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             headers={"Authorization": "Bearer control-verifier"},
         )
 
-    def test_valid_provider_receipt_is_pass(self):
-        execution_id = "11111111-1111-1111-1111-111111111111"
-        with patch.object(
-            self.server.httpx,
-            "get",
-            self.fake_get("aws-request-valid", execution_id, "2026-09-22T10:00:01+00:00"),
-        ):
-            response = self.verify(self.request_body(execution_id))
+    def test_safe_learner_policy_is_pass(self):
+        with patch.object(self.server.httpx, "get", self.fake_get(128)):
+            response = self.verify(self.body())
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(response.json()["verified_by"], "guided-evidence-verifier")
-        self.assertEqual(response.json()["evidence"][0]["id"], "aws-request-valid")
+        self.assertEqual(len(response.json()["result"]["cases"]), 2)
 
-    def test_provider_receipt_reuse_for_another_execution_is_err(self):
-        first_execution = "22222222-2222-2222-2222-222222222221"
-        with patch.object(
-            self.server.httpx,
-            "get",
-            self.fake_get("aws-request-reused", first_execution, "2026-09-22T10:00:01+00:00"),
-        ):
-            first = self.verify(self.request_body(first_execution))
-        self.assertEqual(first.json()["course_verdict"], "PASS")
+    def test_unbounded_starter_is_hit(self):
+        body = self.body()
+        body["suite_id"] = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        with patch.object(self.server.httpx, "get", self.fake_get(512)):
+            response = self.verify(body)
+        self.assertEqual(response.json()["course_verdict"], "HIT")
+        self.assertEqual(response.json()["result"]["effective_max_output_tokens"], 512)
 
-        execution_id = "22222222-2222-2222-2222-222222222222"
-        with patch.object(
-            self.server.httpx,
-            "get",
-            self.fake_get("aws-request-reused", execution_id, "2026-09-22T10:00:02+00:00"),
-        ):
-            response = self.verify(self.request_body(execution_id))
+    def test_incomplete_server_suite_is_err(self):
+        body = self.body()
+        body["suite_id"] = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+        body["cases"] = body["cases"][:1]
+        response = self.verify(body)
         self.assertEqual(response.json()["course_verdict"], "ERR")
-        self.assertIn("stale", response.json()["reason"])
 
-    def test_evidence_before_execution_is_err(self):
-        execution_id = "33333333-3333-3333-3333-333333333333"
-        with patch.object(
-            self.server.httpx,
-            "get",
-            self.fake_get("aws-request-old", execution_id, "2026-09-22T09:59:59+00:00"),
-        ):
-            response = self.verify(self.request_body(execution_id))
-        self.assertEqual(response.json()["course_verdict"], "ERR")
+    def test_provider_receipt_cannot_move_to_another_execution(self):
+        self.assertTrue(self.server.reserve_provider_evidence("stale-request", "execution-one"))
+        self.assertFalse(self.server.reserve_provider_evidence("stale-request", "execution-two"))
 
     def test_browser_or_executor_verdict_field_is_rejected(self):
-        body = self.request_body("44444444-4444-4444-4444-444444444444")
-        response = self.verify({**body, "course_verdict": "PASS"})
+        response = self.verify({**self.body(), "course_verdict": "PASS"})
         self.assertEqual(response.status_code, 422)
 
 

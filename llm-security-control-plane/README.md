@@ -80,7 +80,7 @@ bash llm-security-control-plane/deploy/stop-stack.sh
 
 ## 03 UI 후보의 파트 01 수직 시제품
 
-기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 파트 01의 Nova Lite 출력 상한 실습만 처음부터 끝까지 구현한다. 화면에는 전체 13개 탭이 보이지만 02~13은 다음 구현 단계로 잠겨 있다.
+기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 파트 01의 Nova Lite 출력 상한 실습만 처음부터 끝까지 구현한다. 화면에는 전체 13개 탭이 보이지만 02~13은 다음 구현 단계로 잠겨 있다. 파트 01에는 정답을 고르는 출력 상한 UI가 없다. 수강생이 `guided-labs/01-nova/policy.py`를 직접 수정하고 `guided-student-app`을 다시 Build·생성해야 검증 결과가 바뀐다.
 
 처음 실행할 때만 경계별 Token을 따로 만든다. Browser에는 이 값이 전달되지 않고 Control Center의 HttpOnly session cookie만 전달된다.
 
@@ -120,7 +120,22 @@ docker compose \
 | `http://127.0.0.1:18097` | Guided Control Center | 파트 01 실행·단계·검증 영수증 |
 | `http://127.0.0.1:18192` | NeMo Chat UI | 공식 Dialog Rail 화면의 proxy 호환성 확인 |
 
-Host port를 소유하는 컨테이너는 Front Proxy 하나뿐이다. 실행기는 AWS 자격 증명을 갖지 않고 Bedrock Gateway만 `~/.aws`를 읽기 전용으로 확인한다. 별도 evidence verifier는 AWS 자격 증명·상태 변경 Token·Docker socket 없이 실행기와 Gateway의 읽기 전용 영수증을 다시 대조한다.
+Host port를 소유하는 컨테이너는 Front Proxy 하나뿐이다. 수강생 앱은 AWS 자격 증명을 갖지 않고 Bedrock Gateway만 `~/.aws`를 읽기 전용으로 확인한다. 별도 evidence verifier는 AWS 자격 증명·상태 변경 Token·Docker socket 없이 수강생 앱과 Gateway의 읽기 전용 영수증을 다시 대조한다.
+
+Starter는 요청된 512 Token을 그대로 Provider에 전달해 `HIT`가 재현된다. `policy.py`를 완성한 뒤에는 다음 두 명령으로 수강생 앱만 다시 연결한다.
+
+```bash
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-student-app
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-student-app
+```
+
+Control Center의 `현재 구현 검증`은 Browser가 보내지 않는 정상 64 Token·위험 512 Token 요청을 새로 실행한다. verifier는 정상 64는 유지되고 위험 512는 128 이하로 제한됐는지 앱 receipt와 Gateway receipt로 확인한다.
 
 `standard`와 `high-assurance`는 NeMo 공식 profile이 아니라
 `policies/control-plane-policy.yaml`이 정의한 프로젝트 Rail 조합이다. `standard`는

@@ -59,19 +59,11 @@ def main() -> int:
         page.locator("#preflight").click()
         preflight = wait_for_result(page, timeout_ms)
 
-        page.locator("#exercise-start").click()
-        page.locator("#max-tokens").select_option("80")
-        page.locator("#run-kind").select_option("bounded")
-        page.locator("#run").click()
+        answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
+        page.locator("#verify").click()
         exercise = wait_for_result(page, timeout_ms, preflight.get("execution_id"))
         exercise_verdict = page.locator("#verdict strong").inner_text()
-
-        page.locator("#prompt").fill("XSS-REGRESSION")
-        page.locator("#run-kind").select_option("observe")
-        page.locator("#run").click()
-        xss_result = wait_for_result(page, timeout_ms, exercise.get("execution_id"))
-        xss_executed = page.evaluate("() => window.__guided_xss === true")
-        xss_nodes = page.locator("#raw img, #raw script").count()
+        raw_nodes = page.locator("#raw img, #raw script").count()
 
         if args.screenshot:
             page.screenshot(path=args.screenshot, full_page=True)
@@ -86,7 +78,7 @@ def main() -> int:
         urlsplit(url).hostname
         in {
             "guided-control-center",
-            "guided-lab-01-nova",
+            "guided-student-app",
             "guided-evidence-verifier",
             "guided-bedrock-gateway",
         }
@@ -99,19 +91,19 @@ def main() -> int:
         "session": browser_cookie_visible == "",
         "preflight": preflight.get("course_verdict") == "PASS"
         and preflight.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 2,
-        "exercise": exercise_verdict == "PASS"
+        "exercise": exercise_verdict == "HIT"
         and exercise.get("verified_by") == "guided-evidence-verifier"
-        and exercise.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 80,
-        "xss": "<img" in xss_result.get("result", {}).get("output_text", "")
-        and not xss_executed
-        and xss_nodes == 0,
+        and exercise.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 512
+        and len(exercise.get("result", {}).get("cases", [])) == 2,
+        "learner_work": answer_controls == 0,
+        "safe_rendering": raw_nodes == 0,
         "same_origin": internal_requests == 0,
         "mobile": mobile_overflow is False,
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
         f"preflight={preflight.get('course_verdict')} exercise={exercise_verdict} "
-        f"xss_executed={str(xss_executed).lower()} xss_nodes={xss_nodes} "
+        f"answer_controls={answer_controls} raw_nodes={raw_nodes} "
         f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )
     print("overall_guided_vertical_slice=" + ("PASS" if all(checks.values()) else "FAIL"))
