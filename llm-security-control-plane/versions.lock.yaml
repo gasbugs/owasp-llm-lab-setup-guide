@@ -11,6 +11,7 @@ release: 1.0.0
 # 서비스 공통 Python patch version이다.
 runtime:
   python_image: docker.io/library/python:3.12.14-slim
+  nginx_unprivileged_image: docker.io/nginxinc/nginx-unprivileged:1.29.1-alpine
 
 # 회귀·탐색 도구 버전이 바뀌면 판정과 fixture 수가 달라질 수 있으므로 함께 잠근다.
 test_tools:
@@ -46,3 +47,8 @@ images:
   nemo_policy_hub: localhost/llm-security-nemo-policy-hub:1.0.0
   presidio_privacy_spoke: localhost/llm-security-presidio-privacy-spoke:1.0.0
   bedrock_gateway: localhost/llm-security-bedrock-gateway:1.0.0
+  guided_front_proxy: localhost/llm-security-guided-front-proxy:0.1.0
+  guided_control_center: localhost/llm-security-guided-control-center:0.1.0
+  guided_lab_01_nova: localhost/llm-security-guided-lab-01-nova:0.1.0
+  guided_evidence_verifier: localhost/llm-security-guided-evidence-verifier:0.1.0
+  guided_bedrock_gateway: localhost/llm-security-guided-bedrock-gateway:0.1.0

@@ -110,8 +110,22 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         lock = yaml.safe_load((CONTROL / "versions.lock.yaml").read_text())
         self.assertEqual(lock["bedrock"]["provider"], "amazon-bedrock")
         self.assertEqual(lock["bedrock"]["model_id"], "us.amazon.nova-lite-v1:0")
-        for image in lock["images"].values():
+        stable_images = {
+            name: image
+            for name, image in lock["images"].items()
+            if not name.startswith("guided_")
+        }
+        guided_images = {
+            name: image
+            for name, image in lock["images"].items()
+            if name.startswith("guided_")
+        }
+        self.assertTrue(stable_images)
+        self.assertTrue(guided_images)
+        for image in stable_images.values():
             self.assertTrue(image.endswith(":1.0.0"))
+        for image in guided_images.values():
+            self.assertTrue(image.endswith(":0.1.0"))
         self.assertEqual(lock["test_tools"]["promptfoo"], "0.121.20")
         self.assertEqual(lock["test_tools"]["garak"], "0.15.1")
         self.assertEqual(lock["test_tools"]["pyrit"], "1.0.1")

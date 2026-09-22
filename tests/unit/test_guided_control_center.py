@@ -1,23 +1,30 @@
-"""03 테넌트 Guided Control Center의 분리·프록시 계약 검사."""
+"""Tenant 03 vertical slice security and deployment contracts."""
 
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import yaml
 from fastapi.testclient import TestClient
 
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROL = ROOT / "llm-security-control-plane"
-GUIDED = CONTROL / "guided-control-center"
+COMPOSE = ROOT / "examples/security-monitoring/compose.guided.yaml"
+os.environ.setdefault("GUIDED_SESSION_SECRET", "unit-session-secret")
+os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
+os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
 
 
 def load_server():
-    spec = importlib.util.spec_from_file_location("guided_control_center_server", GUIDED / "server.py")
+    spec = importlib.util.spec_from_file_location(
+        "guided_control_center_server", CONTROL / "guided-control-center/server.py"
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -26,16 +33,16 @@ def load_server():
 
 
 class FakeResponse:
-    status_code = 200
+    def __init__(self, payload: dict, status_code: int = 200):
+        self.payload = payload
+        self.status_code = status_code
 
-    @staticmethod
-    def json():
-        return {"application_decision": "allow", "upstream_called": True}
+    def json(self):
+        return self.payload
 
 
 class FakeAsyncClient:
     calls: list[dict] = []
-    gets: list[str] = []
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -48,104 +55,143 @@ class FakeAsyncClient:
 
     async def post(self, url, *, json, headers):
         self.calls.append({"url": url, "json": json, "headers": headers})
-        return FakeResponse()
-
-    async def get(self, url):
-        self.gets.append(url)
-        return FakeResponse()
+        if url.endswith("/v1/run"):
+            return FakeResponse(
+                {
+                    "execution_id": json["execution_id"],
+                    "config_digest": "executor-is-not-trusted",
+                    "provider_request_id": "aws-request-1",
+                }
+            )
+        return FakeResponse(
+            {
+                "lab_id": "01-nova",
+                "execution_id": json["execution_id"],
+                "course_verdict": "PASS",
+                "verified_by": "guided-evidence-verifier",
+                "stage_calls": [
+                    {"stage": "bedrock_main", "attempted": True, "outcome": "completed"}
+                ],
+                "evidence": [{"id": "aws-request-1"}],
+                "result": {
+                    "model_id": "us.amazon.nova-lite-v1:0",
+                    "forwarded_parameters": {"maxTokens": json["expected_max_output_tokens"]},
+                    "usage": {"outputTokens": 12},
+                },
+            }
+        )
 
 
 class GuidedControlCenterTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.server = load_server()
-        cls.client = TestClient(cls.server.app)
 
     def setUp(self):
+        self.client = TestClient(self.server.app)
+        self.home = self.client.get("/")
+        self.bootstrap = self.client.get("/api/bootstrap").json()
+        self.headers = {
+            "Origin": "http://testserver",
+            "X-CSRF-Token": self.bootstrap["csrf_token"],
+        }
         FakeAsyncClient.calls.clear()
-        FakeAsyncClient.gets.clear()
 
-    def test_page_contains_exactly_22_lessons_and_mobile_layout(self):
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.text.count("{chapter:"), 22)
-        self.assertIn("@media (max-width:760px)", response.text)
-        self.assertIn("grid-template-columns:minmax(0,1fr)", response.text)
-        self.assertIn(".panel { min-width:0", response.text)
-        self.assertIn("실제 요청", response.text)
-        self.assertIn("고정 학습 기록", response.text)
-        self.assertIn("제품 공식 UI", response.text)
-        self.assertNotIn("__APP_VERSION__", response.text)
+    def test_session_csp_and_browser_token_boundary(self):
+        cookie = self.home.headers["set-cookie"].lower()
+        self.assertIn("httponly", cookie)
+        self.assertIn("samesite=strict", cookie)
+        csp = self.home.headers["content-security-policy"]
+        self.assertIn("default-src 'self'", csp)
+        self.assertIn("object-src 'none'", csp)
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertNotIn("application_token", self.home.text.lower())
+        self.assertNotIn("gateway_token", self.home.text.lower())
+        self.assertEqual(self.bootstrap["course"]["tabs"], 13)
+        self.assertEqual(self.bootstrap["course"]["activities"], 22)
 
-    def test_official_ui_catalog_reports_local_health_without_internal_urls(self):
-        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
-            response = self.client.get("/api/official-uis")
-        self.assertEqual(response.status_code, 200)
-        items = response.json()["items"]
-        self.assertEqual(len(items), 6)
-        self.assertEqual({item["status"] for item in items[:4]}, {"ready"})
-        self.assertEqual({item["status"] for item in items[4:]}, {"external"})
-        self.assertTrue(all("health_url" not in item for item in items))
-        self.assertTrue(all(url.startswith("http://llm-") for url in FakeAsyncClient.gets))
+    def test_origin_csrf_and_client_verdict_are_rejected(self):
+        body = {"prompt": "정상 요청", "max_output_tokens": 80, "run_kind": "observe"}
+        self.assertEqual(self.client.post("/api/labs/01-nova/run", json=body).status_code, 403)
+        self.assertEqual(
+            self.client.post(
+                "/api/labs/01-nova/run",
+                json=body,
+                headers={**self.headers, "Origin": "https://evil.example"},
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/labs/01-nova/run",
+                json={**body, "course_verdict": "PASS"},
+                headers=self.headers,
+            ).status_code,
+            422,
+        )
 
-    def test_chat_is_proxied_to_application_with_bearer_token(self):
+    def test_control_center_creates_execution_and_uses_verifier_result(self):
         with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
             response = self.client.post(
-                "/api/chat",
-                headers={"Authorization": "Bearer learner-token"},
-                json={"message": "정상 요청"},
+                "/api/labs/01-nova/run",
+                json={"prompt": "정상 요청", "max_output_tokens": 80, "run_kind": "observe"},
+                headers=self.headers,
             )
         self.assertEqual(response.status_code, 200)
-        call = FakeAsyncClient.calls[0]
-        self.assertTrue(call["url"].endswith("/api/chat"))
-        self.assertEqual(call["headers"]["authorization"], "Bearer learner-token")
-        self.assertEqual(response.json()["application_decision"], "allow")
+        self.assertEqual(response.json()["course_verdict"], "PASS")
+        self.assertEqual(len(FakeAsyncClient.calls), 2)
+        lab_call, verifier_call = FakeAsyncClient.calls
+        self.assertNotIn("course_verdict", lab_call["json"])
+        self.assertEqual(verifier_call["json"]["expected_max_output_tokens"], 80)
+        self.assertEqual(len(verifier_call["json"]["expected_config_digest"]), 64)
+        self.assertNotIn("unit-control-lab", response.text)
+        self.assertNotIn("unit-control-verifier", response.text)
 
-    def test_compose_keeps_guided_service_opt_in(self):
-        compose = (CONTROL / "compose.yaml").read_text(encoding="utf-8")
-        guided = compose.split("  guided-control-center:", 1)[1].split(
-            "\n  nemo-official-ui:", 1
-        )[0]
-        self.assertIn("profiles: [guided]", guided)
-        self.assertIn('127.0.0.1:${GUIDED_HOST_PORT:-18097}:8000', guided)
-        self.assertIn("APPLICATION_URL: http://llm-security-application-gateway:8000", guided)
-        self.assertNotIn("BEDROCK_GATEWAY_TOKEN", guided)
-        self.assertNotIn("APPLICATION_INTERNAL_TOKEN", guided)
+    def test_unknown_host_is_rejected(self):
+        response = self.client.get("/", headers={"Host": "attacker.example"})
+        self.assertEqual(response.status_code, 421)
 
-    def test_compose_builds_official_uis_with_loopback_ports(self):
-        compose = (CONTROL / "compose.yaml").read_text(encoding="utf-8")
-        expectations = {
-            "nemo-official-ui": (
-                "promptfoo-official-ui",
-                "${NEMO_OFFICIAL_UI_HOST_PORT:-18192}:8000",
-            ),
-            "promptfoo-official-ui": (
-                "pyrit-official-ui",
-                "${PROMPTFOO_UI_HOST_PORT:-15500}:15500",
-            ),
-            "pyrit-official-ui": ("dialog", "${PYRIT_UI_HOST_PORT:-18098}:8000"),
-        }
-        for service, (next_service, port) in expectations.items():
-            section = compose.split(f"  {service}:", 1)[1].split(
-                f"\n  {next_service}:", 1
-            )[0]
-            self.assertIn("profiles: [guided]", section)
-            self.assertIn(f'127.0.0.1:{port}', section)
-            self.assertIn("healthcheck:", section)
-        self.assertIn("promptfoo-data:/work/.promptfoo:rw", compose)
+    def test_session_store_evicts_idle_sessions_at_the_limit(self):
+        with patch.object(self.server, "MAX_SESSIONS", 2):
+            self.client.get("/")
+            self.client.get("/")
+        self.assertEqual(len(self.server.SESSIONS), 2)
+        self.assertFalse(self.server.ACTIVE_SESSIONS)
 
-        requirements = (
-            CONTROL / "official-uis/nemo/requirements.txt"
-        ).read_text(encoding="utf-8")
-        promptfoo = (
-            CONTROL / "official-uis/promptfoo/Containerfile"
-        ).read_text(encoding="utf-8")
-        pyrit = (CONTROL / "official-uis/pyrit/Containerfile").read_text(
-            encoding="utf-8"
+    def test_rendering_uses_text_nodes_only(self):
+        javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
+        self.assertIn("textContent", javascript)
+        self.assertNotIn("innerHTML", javascript)
+        stylesheet = (CONTROL / "guided-control-center/app.css").read_text(encoding="utf-8")
+        self.assertIn("@media (max-width: 760px)", stylesheet)
+        self.assertIn("prefers-reduced-motion", stylesheet)
+
+    def test_front_proxy_is_the_only_host_port_owner(self):
+        compose = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+        owners = [name for name, service in compose["services"].items() if "ports" in service]
+        self.assertEqual(owners, ["guided-front-proxy"])
+        self.assertEqual(len(compose["services"]["guided-front-proxy"]["ports"]), 2)
+        verifier = compose["services"]["guided-evidence-verifier"]
+        serialized = str(verifier)
+        self.assertNotIn("/tmp/.aws", serialized)
+        self.assertNotIn("docker.sock", serialized)
+        proxy = (CONTROL / "guided-front-proxy/nginx.conf").read_text(encoding="utf-8")
+        self.assertIn("proxy_set_header Upgrade $http_upgrade", proxy)
+        self.assertIn("proxy_set_header Connection $connection_upgrade", proxy)
+        self.assertIn("resolver 127.0.0.11 valid=10s ipv6=off", proxy)
+        self.assertIn("server guided-control-center:8000 resolve", proxy)
+        self.assertIn("server guided-nemo-ui:8000 resolve", proxy)
+
+    def test_manifest_has_13_tabs_and_22_unique_activities(self):
+        manifest = yaml.safe_load(
+            (CONTROL / "guided-labs/manifest.yaml").read_text(encoding="utf-8")
         )
-        self.assertIn("nemoguardrails[chat-ui,server]==0.22.0", requirements)
-        self.assertIn("PROMPTFOO_VERSION=0.121.20", promptfoo)
-        self.assertIn("PYRIT_VERSION=1.0.1", pyrit)
+        activities = [str(item) for tab in manifest["tabs"] for item in tab["activities"]]
+        self.assertEqual(len(manifest["tabs"]), 13)
+        self.assertEqual(len(activities), 22)
+        self.assertEqual(len(set(activities)), 22)
+        self.assertEqual(manifest["tabs"][0]["status"], "implemented")
+        self.assertTrue(all(tab["status"] == "planned" for tab in manifest["tabs"][1:]))
 
 
 if __name__ == "__main__":

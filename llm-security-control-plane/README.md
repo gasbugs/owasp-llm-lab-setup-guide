@@ -78,23 +78,49 @@ bash llm-security-control-plane/deploy/start-stack.sh
 bash llm-security-control-plane/deploy/stop-stack.sh
 ```
 
-## 03 UI 후보와 제품 공식 UI
+## 03 UI 후보의 파트 01 수직 시제품
 
-기본 `docker compose up -d`는 기존 02 실행을 바꾸지 않는다. `guided` profile을 선택하면 Python Guided Control Center와 NeMo Chat UI, Promptfoo Viewer, CoPyRIT를 setup checkout에서 직접 Build한다.
+기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 파트 01의 Nova Lite 출력 상한 실습만 처음부터 끝까지 구현한다. 화면에는 전체 13개 탭이 보이지만 02~13은 다음 구현 단계로 잠겨 있다.
+
+처음 실행할 때만 경계별 Token을 따로 만든다. Browser에는 이 값이 전달되지 않고 Control Center의 HttpOnly session cookie만 전달된다.
 
 ```bash
-cd llm-security-control-plane
-docker compose --profile guided up -d --build
+cd ~/owasp-llm-lab-setup-guide
+mkdir -p llm-security-control-plane/.state/guided-gateway
+
+GUIDED_SESSION_SECRET=$(openssl rand -hex 32)
+GUIDED_CONTROL_LAB01_TOKEN=$(openssl rand -hex 32)
+GUIDED_CONTROL_VERIFIER_TOKEN=$(openssl rand -hex 32)
+GUIDED_LAB01_GATEWAY_TOKEN=$(openssl rand -hex 32)
+GUIDED_NEMO_GATEWAY_TOKEN=$(openssl rand -hex 32)
+GUIDED_VERIFIER_LAB01_TOKEN=$(openssl rand -hex 32)
+GUIDED_VERIFIER_GATEWAY_TOKEN=$(openssl rand -hex 32)
+
+cat > llm-security-control-plane/.state/guided-course.env <<EOF
+AWS_PROFILE=default
+LOCAL_UID=$(id -u)
+LOCAL_GID=$(id -g)
+GUIDED_SESSION_SECRET=$GUIDED_SESSION_SECRET
+GUIDED_CONTROL_LAB01_TOKEN=$GUIDED_CONTROL_LAB01_TOKEN
+GUIDED_CONTROL_VERIFIER_TOKEN=$GUIDED_CONTROL_VERIFIER_TOKEN
+GUIDED_LAB01_GATEWAY_TOKEN=$GUIDED_LAB01_GATEWAY_TOKEN
+GUIDED_NEMO_GATEWAY_TOKEN=$GUIDED_NEMO_GATEWAY_TOKEN
+GUIDED_VERIFIER_LAB01_TOKEN=$GUIDED_VERIFIER_LAB01_TOKEN
+GUIDED_VERIFIER_GATEWAY_TOKEN=$GUIDED_VERIFIER_GATEWAY_TOKEN
+EOF
+
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --build
 ```
 
-| 서비스 | Host 주소 | 역할 |
+| Front Proxy 주소 | 연결되는 내부 서비스 | 역할 |
 |---|---|---|
-| Guided Control Center | `http://127.0.0.1:18097` | 차시 안내·Application 전체 stage·최종 판정 |
-| NeMo Chat UI | `http://127.0.0.1:18192` | 공식 Dialog Rail 채팅 화면 |
-| Promptfoo Viewer | `http://127.0.0.1:15500` | 공식 평가 결과 화면 |
-| CoPyRIT | `http://127.0.0.1:18098` | 공식 PyRIT 웹 화면 |
+| `http://127.0.0.1:18097` | Guided Control Center | 파트 01 실행·단계·검증 영수증 |
+| `http://127.0.0.1:18192` | NeMo Chat UI | 공식 Dialog Rail 화면의 proxy 호환성 확인 |
 
-세 제품 UI도 `guided` profile 뒤에 있으므로 02 기본 실행에는 추가되지 않는다. 모든 Host port는 loopback에만 bind한다. 특히 CoPyRIT backend 자체에는 인증이 없으므로 이 제한은 같은 PC 밖의 접속을 막지만, 애플리케이션 인증·인가를 대신하지는 않는다. Guided Control Center는 내부 health 주소만 조회하고 Browser에는 공개 주소와 상태만 반환한다.
+Host port를 소유하는 컨테이너는 Front Proxy 하나뿐이다. 실행기는 AWS 자격 증명을 갖지 않고 Bedrock Gateway만 `~/.aws`를 읽기 전용으로 확인한다. 별도 evidence verifier는 AWS 자격 증명·상태 변경 Token·Docker socket 없이 실행기와 Gateway의 읽기 전용 영수증을 다시 대조한다.
 
 `standard`와 `high-assurance`는 NeMo 공식 profile이 아니라
 `policies/control-plane-policy.yaml`이 정의한 프로젝트 Rail 조합이다. `standard`는

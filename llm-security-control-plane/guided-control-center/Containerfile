@@ -8,7 +8,8 @@ ENV APP_VERSION=${APP_VERSION} \
 WORKDIR /app
 COPY guided-control-center/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY guided-control-center/server.py guided-control-center/index.html ./
+COPY guided-control-center/server.py guided-control-center/index.html \
+    guided-control-center/app.css guided-control-center/app.js ./
 
 USER 65532:65532
 EXPOSE 8000

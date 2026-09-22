@@ -170,21 +170,40 @@ jobs:
           --url http://127.0.0.1:28095
           --browser-channel chromium
 
-      - name: Start and validate the opt-in guided course UI
+      - name: Build and validate the tenant 03 activity 01 vertical slice
+        env:
+          AWS_CREDENTIALS_DIR: /tmp/guided-aws
+          GUIDED_SESSION_SECRET: ci-guided-session-secret
+          GUIDED_CONTROL_LAB01_TOKEN: ci-control-lab
+          GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
+          GUIDED_LAB01_GATEWAY_TOKEN: ci-lab-gateway
+          GUIDED_NEMO_GATEWAY_TOKEN: ci-nemo-gateway
+          GUIDED_VERIFIER_LAB01_TOKEN: ci-verifier-lab
+          GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
+          GUIDED_PROVIDER_MODE: contract
+          GUIDED_HOST_PORT: "28097"
+          GUIDED_NEMO_HOST_PORT: "28193"
+          LOCAL_UID: "1001"
+          LOCAL_GID: "1001"
         run: |
-          docker run --detach --name llm-security-guided-control-center \
-            --network llm-security-control-plane \
-            --publish 127.0.0.1:28097:8000 \
-            --env APPLICATION_URL=http://llm-security-application-gateway:8000 \
-            --env NEMO_OFFICIAL_UI_BROWSER_URL=http://127.0.0.1:28192 \
-            --env PROMPTFOO_UI_BROWSER_URL=http://127.0.0.1:25500 \
-            --env PYRIT_UI_BROWSER_URL=http://127.0.0.1:28098 \
-            localhost/llm-security-guided-control-center:1.0.0
+          mkdir -p /tmp/guided-aws llm-security-control-plane/.state/guided-gateway
+          docker compose --file examples/security-monitoring/compose.guided.yaml up -d --build
           curl --fail --retry 30 --retry-delay 1 --retry-all-errors \
-            http://127.0.0.1:28097/healthz
+            http://127.0.0.1:28097/proxy-healthz
+          curl --fail --retry 30 --retry-delay 1 --retry-all-errors \
+            http://127.0.0.1:28193/v1/rails/configs | jq -e '.[0].id == "dialog"'
+          proxy_id=$(docker inspect --format '{{.Id}}' llm-security-guided-front-proxy)
+          docker compose --file examples/security-monitoring/compose.guided.yaml \
+            up -d --no-deps --force-recreate guided-nemo-ui
+          curl --fail --retry 30 --retry-delay 1 --retry-all-errors \
+            http://127.0.0.1:28193/v1/rails/configs | jq -e '.[0].id == "dialog"'
+          test "$proxy_id" = \
+            "$(docker inspect --format '{{.Id}}' llm-security-guided-front-proxy)"
           python tests/browser/run_guided_control_center_ui.py \
             --url http://127.0.0.1:28097 \
             --browser-channel chromium
+          test "$(docker ps --filter publish=28097 --format '{{.Names}}')" = \
+            llm-security-guided-front-proxy
 
       - name: Preserve Docker diagnostics on failure
         if: failure()
@@ -197,12 +216,27 @@ jobs:
           docker logs nemo-official-ui || true
           docker logs promptfoo-official-ui || true
           docker logs pyrit-official-ui || true
+          docker compose --file examples/security-monitoring/compose.guided.yaml logs || true
 
       - name: Remove test resources
         if: always()
+        env:
+          AWS_CREDENTIALS_DIR: /tmp/guided-aws
+          GUIDED_SESSION_SECRET: ci-guided-session-secret
+          GUIDED_CONTROL_LAB01_TOKEN: ci-control-lab
+          GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
+          GUIDED_LAB01_GATEWAY_TOKEN: ci-lab-gateway
+          GUIDED_NEMO_GATEWAY_TOKEN: ci-nemo-gateway
+          GUIDED_VERIFIER_LAB01_TOKEN: ci-verifier-lab
+          GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
+          GUIDED_PROVIDER_MODE: contract
+          GUIDED_HOST_PORT: "28097"
+          GUIDED_NEMO_HOST_PORT: "28193"
+          LOCAL_UID: "1001"
+          LOCAL_GID: "1001"
         run: |
+          docker compose --file examples/security-monitoring/compose.guided.yaml down --volumes || true
           docker rm --force module08-bedrock-contract \
-            llm-security-guided-control-center \
             nemo-official-ui promptfoo-official-ui pyrit-official-ui \
             llm-security-application-gateway llm-security-nemo-hub \
             llm-security-presidio-spoke 2>/dev/null || true

@@ -9,6 +9,7 @@ The PolyForm and commercial licensing paths cover only original material for whi
 | SECFORCE LLMGoat | `docker/llmgoat/` runtime and directly importing course wrapper | GPL-3.0-only | Original: <https://github.com/SECFORCE/LLMGoat>, installation fork: <https://github.com/gasbugs/LLMGoat> |
 | ReversecLabs Damn Vulnerable LLM Agent | `docker/dvla/` build and runtime | Apache-2.0 | <https://github.com/ReversecLabs/damn-vulnerable-llm-agent> |
 | llama.cpp | `examples/llm03/Dockerfile.llama-cpp` build dependency | MIT | <https://github.com/ggml-org/llama.cpp> |
+| NGINX Unprivileged | `llm-security-control-plane/guided-front-proxy/` base image and runtime | BSD-2-Clause | <https://github.com/nginxinc/docker-nginx-unprivileged> |
 
 Files copied from, linked with, or derived from these projects must be used and distributed under the applicable upstream terms. In particular, every original file under `docker/llmgoat/` is expressly distributed under GPL-3.0-only as recorded in its `COPYING`; the repository-level PolyForm license does not apply to those files.
 

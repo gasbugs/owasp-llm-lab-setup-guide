@@ -1,0 +1,32 @@
+# CUSTOM FILE
+# Project format: tenant 03 tab, activity, and evidence contract.
+# License: PolyForm-Noncommercial-1.0.0 OR commercial license.
+
+schema_version: 1
+course_id: tenant-03-guided-llm-security
+duration_minutes: 1320
+tabs:
+  - {id: 01-nova, activities: [01], status: implemented}
+  - {id: 02-embedding-kb, activities: [02, 03], status: planned}
+  - {id: 03-bedrock-guardrail, activities: [04], status: planned}
+  - {id: 04-nemo-dialog-action, activities: [05, 06], status: planned}
+  - {id: 05-input-safety, activities: [07, 08], status: planned}
+  - {id: 06-privacy-output, activities: [09, 10], status: planned}
+  - {id: 07-rag-boundary, activities: [11, 12], status: planned}
+  - {id: 08-promptfoo, activities: [13], status: planned}
+  - {id: 09-garak-pyrit, activities: [14, 15], status: planned}
+  - {id: 10-policy-promotion, activities: [16], status: planned}
+  - {id: 11-raw-observability, activities: [17, 18], status: planned}
+  - {id: 12-incident-alert, activities: [19, 20], status: planned}
+  - {id: 13-gateway-agent, activities: [21, 22], status: planned}
+
+activity_01:
+  executor: guided-lab-01-nova
+  verifier: guided-evidence-verifier
+  provider: amazon-bedrock
+  model_id: us.amazon.nova-lite-v1:0
+  required_evidence:
+    - provider_request_id
+    - forwarded_parameters.maxTokens
+    - usage.outputTokens
+    - config_digest

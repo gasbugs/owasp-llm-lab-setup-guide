@@ -9,4 +9,5 @@ opentelemetry-instrumentation-httpx==0.57b0
 opentelemetry-sdk==1.36.0
 prometheus-client==0.22.1
 pydantic==2.13.4
+PyYAML==6.0.3
 PyJWT[crypto]==2.10.1

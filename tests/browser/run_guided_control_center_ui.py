@@ -1,31 +1,34 @@
 #!/usr/bin/env python3
-"""03 테넌트 UI의 실제 Application 경로와 390px 화면을 검사한다."""
+"""Browser E2E for the tenant 03 activity 01 vertical slice."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import time
 from urllib.parse import urlsplit
 
 from day3_ui_helpers import browser_url_is_local, validate_loopback_origin
 
 
-def run_lesson(page, number: int, timeout_ms: int) -> dict:
-    page.locator(".lesson-button").nth(number - 1).click()
-    page.locator("#raw").evaluate("element => { element.textContent = ''; }")
-    page.locator("#run").click()
-    page.wait_for_function(
-        "() => document.querySelector('#raw').textContent.trim().startsWith('{')",
-        timeout=timeout_ms,
-    )
-    return json.loads(page.locator("#raw").text_content() or "")
+def wait_for_result(page, timeout_ms: int, previous_id: str | None = None) -> dict:
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        raw = (page.locator("#raw").text_content() or "").strip()
+        if raw.startswith("{"):
+            payload = json.loads(raw)
+            if payload.get("execution_id") != previous_id:
+                return payload
+        page.wait_for_timeout(100)
+    raise TimeoutError("a new guided execution did not finish")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:18097")
-    parser.add_argument("--timeout-seconds", type=int, default=360)
+    parser.add_argument("--timeout-seconds", type=int, default=180)
     parser.add_argument("--browser-channel", default="chromium")
+    parser.add_argument("--screenshot", default="")
     args = parser.parse_args()
     origin = validate_loopback_origin(args.url)
     timeout_ms = args.timeout_seconds * 1000
@@ -44,23 +47,34 @@ def main() -> int:
         )
         page = context.new_page()
         page.on("request", lambda request: requests.append(request.url))
-        page.goto(origin, wait_until="domcontentloaded", timeout=timeout_ms)
-        lesson_count = page.locator(".lesson-button").count()
-        page.wait_for_function(
-            "() => document.querySelectorAll('.official-card .official-status.ready').length >= 3",
-            timeout=timeout_ms,
-        )
-        official_cards = page.locator(".official-card").count()
-        official_ready = page.locator(".official-card .official-status.ready").count()
-        official_external = page.locator(".official-card .official-status.external").count()
+        response = page.goto(origin, wait_until="networkidle", timeout=timeout_ms)
+        assert response is not None
 
-        normal = run_lesson(page, 1, timeout_ms)
-        normal_verdict = page.locator("#verdict strong").inner_text()
-        model_gate = page.locator('[data-gate="model"]').get_attribute("class") or ""
+        tab_count = page.locator(".tab").count()
+        locked_tabs = page.locator(".tab.locked").count()
+        official_links = page.locator(".official-link").count()
+        csp = response.headers.get("content-security-policy", "")
+        browser_cookie_visible = page.evaluate("() => document.cookie")
 
-        attack = run_lesson(page, 2, timeout_ms)
-        attack_verdict = page.locator("#verdict strong").inner_text()
-        attack_model_gate = page.locator('[data-gate="model"]').get_attribute("class") or ""
+        page.locator("#preflight").click()
+        preflight = wait_for_result(page, timeout_ms)
+
+        page.locator("#exercise-start").click()
+        page.locator("#max-tokens").select_option("80")
+        page.locator("#run-kind").select_option("bounded")
+        page.locator("#run").click()
+        exercise = wait_for_result(page, timeout_ms, preflight.get("execution_id"))
+        exercise_verdict = page.locator("#verdict strong").inner_text()
+
+        page.locator("#prompt").fill("XSS-REGRESSION")
+        page.locator("#run-kind").select_option("observe")
+        page.locator("#run").click()
+        xss_result = wait_for_result(page, timeout_ms, exercise.get("execution_id"))
+        xss_executed = page.evaluate("() => window.__guided_xss === true")
+        xss_nodes = page.locator("#raw img, #raw script").count()
+
+        if args.screenshot:
+            page.screenshot(path=args.screenshot, full_page=True)
 
         page.set_viewport_size({"width": 390, "height": 844})
         mobile_overflow = page.evaluate(
@@ -68,36 +82,39 @@ def main() -> int:
         )
         browser.close()
 
-    same_origin_requests = sum(url == f"{origin}/api/chat" for url in requests)
     internal_requests = sum(
-        urlsplit(url).port in {18093, 18094, 18095, 18096}
+        urlsplit(url).hostname
+        in {
+            "guided-control-center",
+            "guided-lab-01-nova",
+            "guided-evidence-verifier",
+            "guided-bedrock-gateway",
+        }
         for url in requests
-        if urlsplit(url).hostname in {"127.0.0.1", "localhost"}
     )
     checks = {
-        "lessons": lesson_count == 22,
-        "official_uis": official_cards == 6
-        and official_ready >= 3
-        and official_external == 2,
-        "normal": normal.get("application_decision") == "allow"
-        and normal.get("upstream_called") is True
-        and normal_verdict == "PASS"
-        and "pass" in model_gate,
-        "attack": attack.get("application_decision") == "block"
-        and attack.get("upstream_called") is False
-        and attack_verdict == "PASS"
-        and "skip" in attack_model_gate,
-        "same_origin": same_origin_requests == 2 and internal_requests == 0,
+        "tabs": tab_count == 13 and locked_tabs == 12,
+        "official_links": official_links == 2,
+        "csp": "object-src 'none'" in csp and "frame-ancestors 'none'" in csp,
+        "session": browser_cookie_visible == "",
+        "preflight": preflight.get("course_verdict") == "PASS"
+        and preflight.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 2,
+        "exercise": exercise_verdict == "PASS"
+        and exercise.get("verified_by") == "guided-evidence-verifier"
+        and exercise.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 80,
+        "xss": "<img" in xss_result.get("result", {}).get("output_text", "")
+        and not xss_executed
+        and xss_nodes == 0,
+        "same_origin": internal_requests == 0,
         "mobile": mobile_overflow is False,
     }
     print(
-        f"lessons={lesson_count} official_cards={official_cards} "
-        f"official_ready={official_ready} official_external={official_external} "
-        f"normal={normal_verdict} attack={attack_verdict} "
-        f"same_origin_chat={same_origin_requests} internal_requests={internal_requests} "
-        f"mobile_overflow={str(mobile_overflow).lower()}"
+        f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
+        f"preflight={preflight.get('course_verdict')} exercise={exercise_verdict} "
+        f"xss_executed={str(xss_executed).lower()} xss_nodes={xss_nodes} "
+        f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )
-    print("overall_guided_ui=" + ("PASS" if all(checks.values()) else "FAIL"))
+    print("overall_guided_vertical_slice=" + ("PASS" if all(checks.values()) else "FAIL"))
     return 0 if all(checks.values()) else 1
 
 

@@ -1,0 +1,160 @@
+# CUSTOM FILE
+# Format reference: Docker Compose Specification, https://compose-spec.io/
+# Upstream license: Apache-2.0
+
+name: llm-security-guided-course
+
+x-guided-service: &guided-service
+  restart: unless-stopped
+  read_only: true
+  security_opt: [no-new-privileges]
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+  networks: [guided]
+
+services:
+  guided-front-proxy:
+    <<: *guided-service
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=0700
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-front-proxy/Containerfile
+    image: localhost/llm-security-guided-front-proxy:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-front-proxy
+    depends_on:
+      guided-control-center: {condition: service_healthy}
+      guided-nemo-ui: {condition: service_healthy}
+    ports:
+      - 127.0.0.1:${GUIDED_HOST_PORT:-18097}:18097
+      - 127.0.0.1:${GUIDED_NEMO_HOST_PORT:-18192}:18192
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:18097/proxy-healthz]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  guided-control-center:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-control-center/Containerfile
+      args: {APP_VERSION: "${GUIDED_IMAGE_VERSION:-0.1.0}"}
+    image: localhost/llm-security-guided-control-center:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-control-center
+    environment:
+      RELEASE_VERSION: ${GUIDED_IMAGE_VERSION:-0.1.0}
+      GUIDED_SESSION_SECRET: ${GUIDED_SESSION_SECRET:?Set GUIDED_SESSION_SECRET}
+      GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
+      GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
+      GUIDED_LAB01_URL: http://guided-lab-01-nova:8000
+      GUIDED_VERIFIER_URL: http://guided-evidence-verifier:8000
+      GUIDED_ALLOWED_HOSTS: 127.0.0.1:${GUIDED_HOST_PORT:-18097},localhost:${GUIDED_HOST_PORT:-18097}
+      GUIDED_ALLOWED_ORIGINS: http://127.0.0.1:${GUIDED_HOST_PORT:-18097},http://localhost:${GUIDED_HOST_PORT:-18097}
+      GUIDED_NEMO_BROWSER_URL: http://127.0.0.1:${GUIDED_NEMO_HOST_PORT:-18192}
+    depends_on:
+      guided-lab-01-nova: {condition: service_healthy}
+      guided-evidence-verifier: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host':'127.0.0.1:${GUIDED_HOST_PORT:-18097}'}); urllib.request.urlopen(r, timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-lab-01-nova:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/01-nova/Containerfile
+    image: localhost/llm-security-guided-lab-01-nova:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-lab-01-nova
+    environment:
+      GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
+      GUIDED_LAB01_GATEWAY_TOKEN: ${GUIDED_LAB01_GATEWAY_TOKEN:?Set GUIDED_LAB01_GATEWAY_TOKEN}
+      GUIDED_VERIFIER_LAB01_TOKEN: ${GUIDED_VERIFIER_LAB01_TOKEN:?Set GUIDED_VERIFIER_LAB01_TOKEN}
+      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
+    volumes: [guided-lab-01-state:/state:rw]
+    depends_on:
+      guided-bedrock-gateway: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-evidence-verifier:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-evidence-verifier/Containerfile
+    image: localhost/llm-security-guided-evidence-verifier:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-evidence-verifier
+    environment:
+      GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
+      GUIDED_VERIFIER_LAB01_TOKEN: ${GUIDED_VERIFIER_LAB01_TOKEN:?Set GUIDED_VERIFIER_LAB01_TOKEN}
+      GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
+      GUIDED_LAB01_URL: http://guided-lab-01-nova:8000
+      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
+    volumes: [guided-verifier-state:/state:rw]
+    depends_on:
+      guided-lab-01-nova: {condition: service_healthy}
+      guided-bedrock-gateway: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-bedrock-gateway:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-bedrock-gateway/Containerfile
+    image: localhost/llm-security-guided-bedrock-gateway:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-bedrock-gateway
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    environment:
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_REGION: us-east-1
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SHARED_CREDENTIALS_FILE: /tmp/.aws/credentials
+      AWS_CONFIG_FILE: /tmp/.aws/config
+      GUIDED_PROVIDER_MODE: ${GUIDED_PROVIDER_MODE:-aws}
+      GUIDED_LAB01_GATEWAY_TOKEN: ${GUIDED_LAB01_GATEWAY_TOKEN:?Set GUIDED_LAB01_GATEWAY_TOKEN}
+      GUIDED_NEMO_GATEWAY_TOKEN: ${GUIDED_NEMO_GATEWAY_TOKEN:?Set GUIDED_NEMO_GATEWAY_TOKEN}
+      GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
+    volumes:
+      - ${AWS_CREDENTIALS_DIR:-${HOME}/.aws}:/tmp/.aws:ro
+      - ../../llm-security-control-plane/.state/guided-gateway:/state:rw
+    networks:
+      guided:
+        aliases: [llm-security-bedrock-gateway]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-nemo-ui:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: official-uis/nemo/Containerfile
+    image: localhost/llm-security-nemo-official-ui:0.22.0
+    container_name: llm-security-guided-nemo-ui
+    environment:
+      BEDROCK_GATEWAY_TOKEN: ${GUIDED_NEMO_GATEWAY_TOKEN:?Set GUIDED_NEMO_GATEWAY_TOKEN}
+    depends_on:
+      guided-bedrock-gateway: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/rails/configs', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 45
+
+networks:
+  guided: {name: llm-security-guided}
+
+volumes:
+  guided-lab-01-state:
+  guided-verifier-state:
