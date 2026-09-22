@@ -43,8 +43,14 @@
             <pre>def apply_output_limit(requested_max_tokens: int) -&gt; int:
     return min(requested_max_tokens, 128)</pre>
             <p>파일을 저장한 뒤 수강생 앱을 다시 Build하고 실행 서비스에 연결합니다.</p>
-            <pre>docker compose -f examples/security-monitoring/compose.guided.yaml build guided-student-app
-docker compose -f examples/security-monitoring/compose.guided.yaml up -d --no-deps --force-recreate guided-student-app</pre>
+            <pre>docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-student-app
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-student-app</pre>
           </div>
         </section>
 

@@ -164,6 +164,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         self.assertIn("return min(requested_max_tokens, 128)", html)
         self.assertIn("강사와 함께 진행하는 본 실습", html)
+        self.assertIn("--env-file llm-security-control-plane/.state/guided-course.env", html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
         self.assertNotIn("innerHTML", javascript)
