@@ -972,13 +972,13 @@ jq -n \
     checked_at:$checked_at}' >"$LOCAL_RUN_DIR/llm09-fixture-preflight.json"
 log "LLM09 deterministic package fixture is currently PyPI NOT_FOUND"
 
-log "Resolving all five immutable GHCR tag/platform digests"
+log "Resolving all four published immutable GHCR tag/platform digests"
 run_bounded 180 python3 "$PINNED_REPO/infrastructure/scripts/instructor/resolve-image-digests.py" \
   --registry "$IMAGE_REGISTRY" \
   --namespace "$IMAGE_NAMESPACE" \
   --tag "$IMAGE_TAG" \
   --output "$DIGEST_MANIFEST"
-jq -e '.images | length == 5' "$DIGEST_MANIFEST" >/dev/null
+jq -e '.images | length == 4' "$DIGEST_MANIFEST" >/dev/null
 
 run_bounded 60 aws \
   --profile "$AWS_PROFILE" --region "$AWS_REGION" --no-cli-pager \

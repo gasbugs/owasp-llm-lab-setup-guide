@@ -23,7 +23,7 @@ RUN_DEADLINE_MINUTES=120 \
   bash infrastructure/scripts/instructor/run-commit-live-validation.sh
 ```
 
-controller는 setup과 course의 명시한 40자리 commit이 각각 공개 `origin/main`에 있고 course worktree가 완전히 clean인지 먼저 확인합니다. 이후 두 저장소를 임시 `git archive`로 분리하며, Terraform state와 Capstone upload, 로컬 browser harness도 이 고정 복사본만 사용합니다. 공개 GHCR의 다섯 이미지에서 tag digest와 `linux/amd64` digest를 고정하고, EC2의 실제 Podman digest와 `org.opencontainers.image.revision`이 다르면 테스트를 시작하지 않습니다.
+controller는 setup과 course의 명시한 40자리 commit이 각각 공개 `origin/main`에 있고 course worktree가 완전히 clean인지 먼저 확인합니다. 이후 두 저장소를 임시 `git archive`로 분리하며, Terraform state와 Capstone upload, 로컬 browser harness도 이 고정 복사본만 사용합니다. 공개 GHCR의 프로젝트 이미지에서 tag digest와 `linux/amd64` digest를 고정하고, EC2의 실제 Docker digest와 `org.opencontainers.image.revision`이 다르면 테스트를 시작하지 않습니다. LLMGoat는 EC2에서 로컬 Build하므로 이 게시 이미지 집합에서 제외한다.
 
 EC2 생성 전에는 선택한 Playwright package/browser를 실제 headless launch/close하고 로컬 `18011`, `18501`, `15000` 포트가 비어 있는지도 확인합니다. 원격 strict core가 끝나면 controller가 SSM forward `8011→18011`, `8501→18501`, `5000→15000`을 bounded child process로 열고 Day 3 UI/DVLA와 LLMGoat A01 harness를 실행합니다. LLMGoat UI는 API `response`의 정확한 DOM 반영과 boolean `solved`에 따른 overlay/sidebar 일치를 검사하며, solved 자체는 관찰값으로만 남깁니다. 결과와 세 forward cleanup 증거를 원격 raw bundle에 원자적으로 전달한 뒤에만 archive를 닫습니다. `STRICT_ACCEPTANCE=true TRIALS=5` full-cycle의 종료 코드를 그대로 사용하며 LLM10 timeout 같은 결과를 controller가 임의로 성공으로 바꾸지 않습니다. raw evidence archive와 SHA-256은 기본적으로 `$HOME/owasp-llm-live-evidence/<run-id>/remote/`에 회수됩니다.
 
@@ -41,11 +41,11 @@ IMAGE_TAG="sha-$SETUP_COMMIT"
 printf 'SETUP_COMMIT=%s\nIMAGE_TAG=%s\n' "$SETUP_COMMIT" "$IMAGE_TAG"
 ```
 
-GitHub Actions의 `Test, Build & Push Runtime Images`가 성공했는지 확인하고 다섯 manifest가 존재하는지 확인합니다.
+GitHub Actions의 `Test, Build & Push Runtime Images`가 성공했는지 확인하고 네 manifest가 존재하는지 확인합니다.
 이 검사는 저장된 registry credential이 없는 환경에서도 성공해야 하며, 실패하면 package visibility를 `Public`으로 바로잡은 뒤에만 EC2를 생성합니다.
 
 ```bash
-for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+for image in base-gpu vuln-rag vuln-agent dvla; do
   podman manifest inspect \
     "ghcr.io/gasbugs/owasp-llm-${image}:${IMAGE_TAG}" >/dev/null
 done
@@ -67,9 +67,11 @@ terraform -chdir=infrastructure/terraform validate
 packer fmt -check infrastructure/packer/ami.pkr.hcl
 packer init infrastructure/packer/ami.pkr.hcl
 packer validate -syntax-only infrastructure/packer/ami.pkr.hcl
-for context in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+for context in base-gpu vuln-rag vuln-agent dvla; do
   docker build --check "docker/$context"
 done
+docker build --check docker/llmgoat
+docker build --check -f docker/llmgoat/Dockerfile.source-build docker/llmgoat
 ```
 
 unit suite에는 tool-call parser, 동일 응답의 DOM sink replay, 공개 파일의 PII/secret placeholder 검사가 포함됩니다.
@@ -236,7 +238,7 @@ test -n "$EVIDENCE_DIR"
   printf 'ollama_model=%s\n' "${OLLAMA_MODEL:-unknown}"
   sudo -u ubuntu podman ps --format 'image={{.Image}} name={{.Names}} status={{.Status}}'
 
-  for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+  for image in base-gpu vuln-rag vuln-agent dvla; do
     ref="ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-${image}:${IMAGE_TAG}"
     sudo -u ubuntu podman image inspect "$ref" \
       | jq -r --arg reference "$ref" \

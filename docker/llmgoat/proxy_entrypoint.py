@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (c) 2026 gasbugs contributors
 """Mount the pinned upstream LLMGoat application below /llmgoat."""
 
 from __future__ import annotations

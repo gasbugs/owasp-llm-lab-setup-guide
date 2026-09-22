@@ -2,9 +2,11 @@
 # Upstream source: https://github.com/SECFORCE/LLMGoat/tree/v0.1.0
 # Installation source fork: https://github.com/gasbugs/LLMGoat/tree/v0.1.0
 # Upstream license: GPL-3.0
+# This wrapper directory is distributed under GPL-3.0-only; see COPYING.
 
-# 검증한 upstream GPU image를 gasbugs GHCR에 복제하고 tag와 manifest digest를 함께 고정한다.
-FROM ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
+# 평소에는 게시자가 제공한 GPU image를 게시자 registry에서 직접 받는다.
+# gasbugs registry는 이 외부 image를 복제하거나 다시 배포하지 않는다.
+FROM ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
 
 ARG VCS_REF=unknown
 ARG APP_VERSION=dev
@@ -32,6 +34,7 @@ RUN mkdir -p /usr/src/llmgoat-v0.1.0 /usr/share/licenses/llmgoat \
     && rm /tmp/llmgoat-v0.1.0.tar.gz
 
 COPY NOTICE.md /usr/share/doc/llmgoat/NOTICE.md
+COPY COPYING /usr/share/licenses/llmgoat-wrapper/GPL-3.0-only.txt
 
 # 원본 challenge 코드는 바꾸지 않고, 통합 포털의 /llmgoat 경로만 연결한다.
 COPY proxy_entrypoint.py /opt/owasp-llm/proxy_entrypoint.py

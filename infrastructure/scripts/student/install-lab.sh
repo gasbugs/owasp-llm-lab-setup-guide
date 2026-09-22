@@ -19,7 +19,7 @@ LOG_FILE="${LAB_INSTALL_LOG:-/var/log/owasp-llm-lab-install.log}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 RAW_URL="${LAB_SETUP_REPO_RAW_URL:-https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/main}"
-SCRIPT_VERSION="0.2.12"
+SCRIPT_VERSION="0.2.13"
 DOCKER_ENGINE_RELEASE="${DOCKER_ENGINE_RELEASE:-29.7.2}"
 DOCKER_COMPOSE_RELEASE="${DOCKER_COMPOSE_RELEASE:-5.5.0}"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-gasbugs}"
@@ -282,7 +282,7 @@ install -d -m 0755 -o ubuntu -g ubuntu "$COMPOSE_DIR"
 LLMGOAT_BUILD_DIR="$COMPOSE_DIR/llmgoat-build"
 install -d -m 0755 -o ubuntu -g ubuntu "$LLMGOAT_BUILD_DIR"
 echo "[install-lab] downloading the LLMGoat local Build context"
-for build_file in Dockerfile proxy_entrypoint.py NOTICE.md; do
+for build_file in Dockerfile Dockerfile.source-build proxy_entrypoint.py NOTICE.md COPYING; do
   curl -fsSL "$RAW_URL/docker/llmgoat/$build_file" \
     -o "$LLMGOAT_BUILD_DIR/$build_file.next"
   install -m 0644 -o ubuntu -g ubuntu \
@@ -302,6 +302,7 @@ OLLAMA_MODEL=$OLLAMA_MODEL
 OLLAMA_EMBED_MODEL=$OLLAMA_EMBED_MODEL
 LLMGOAT_N_GPU_LAYERS=$LLMGOAT_N_GPU_LAYERS
 LLMGOAT_BUILD_CONTEXT=$LLMGOAT_BUILD_DIR
+LLMGOAT_DOCKERFILE=Dockerfile
 LLMGOAT_SOURCE_REVISION=${RAW_URL##*/}
 EOF
 chown ubuntu:ubuntu "$COMPOSE_DIR/.env"
@@ -373,9 +374,16 @@ done
 if [ "$REFRESH_IMAGES" = "true" ]; then
   docker compose pull --ignore-buildable
 fi
-# LLMGoat만 build 정의를 가지므로 이 명령은 고정 gasbugs fork와 setup wrapper를 로컬에서 만든다.
-echo "[install-lab] running: docker compose build"
-docker compose build
+# 기본 경로는 SECFORCE image를 직접 받는다. 게시자 image가 없어졌을 때만
+# gasbugs source fork와 NVIDIA CUDA image를 사용해 실행 파일을 로컬에서 다시 만든다.
+echo "[install-lab] running: docker compose build llmgoat (publisher image)"
+if docker compose build llmgoat; then
+  echo "[install-lab] LLMGoat publisher image Build completed"
+else
+  echo "[install-lab] publisher image unavailable; building LLMGoat from the gasbugs source fork"
+  export LLMGOAT_DOCKERFILE=Dockerfile.source-build
+  docker compose build llmgoat
+fi
 echo "[install-lab] running: docker compose up -d"
 docker compose up -d
 docker compose ps

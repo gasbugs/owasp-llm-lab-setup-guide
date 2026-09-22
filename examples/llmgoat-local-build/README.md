@@ -3,11 +3,11 @@
 이 예제는 기존 `docker/llmgoat/Dockerfile`과 통합 실습용 Compose를 바꾸지 않는다.
 별도 image·container·volume을 만들고, 기존 5000번 대신 15000번 포트를 사용한다.
 
-`Containerfile`은 `gasbugs/LLMGoat` 포크의 `v0.1.0` 소스와 `gasbugs` GHCR에
-복제한 GPU image를 고정해서 가져온다. 같은 버전의 전체 소스와 GPL 원문도 image
-안에 넣는다. `compose.yaml`은 이 image를 Build하고 GPU, 포트, 모델 저장 volume을
-연결한다. 완성된 과정용 image를 내려받지 않고 현재 디렉터리의 `Containerfile`로
-직접 Build한다.
+`Containerfile`은 SECFORCE가 게시한 GPU image를 원본 registry에서 digest로 직접
+받고, `gasbugs/LLMGoat` 포크의 `v0.1.0` 전체 소스와 GPL 원문을 image 안에 넣는다.
+원본 image가 사라졌을 때만 `Containerfile.source-build`가 NVIDIA CUDA image와
+같은 포크 소스로 GPU 실행 파일을 로컬에서 다시 만든다. `compose.yaml`은 선택한
+Containerfile로 image를 Build하고 GPU, 포트, 모델 저장 volume을 연결한다.
 
 LLMGoat `v0.1.0`은 Ollama API를 호출하지 않는다. 애플리케이션 안의
 `llama-cpp-python`이 `gemma-2-9b-it-Q4_K_M.gguf`를 직접 불러오는 구조다. 따라서
@@ -41,6 +41,13 @@ docker compose build
 `localhost/llmgoat-local-build:v0.1.0` image가 로컬에 생긴다. Compose의
 `pull_policy: never`는 다음 실행에서 Registry image 대신 이 로컬 image만 쓰게
 한다.
+
+SECFORCE image가 실제로 없어졌다는 오류가 확인된 경우에만 포크 소스 Build를
+선택한다. CUDA용 `llama-cpp-python`을 컴파일하므로 이 경로는 더 오래 걸린다.
+
+```bash
+LLMGOAT_DOCKERFILE=Containerfile.source-build docker compose build
+```
 
 ## Container 실행하기
 

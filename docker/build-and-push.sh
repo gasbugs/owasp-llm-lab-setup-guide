@@ -29,7 +29,7 @@ if [[ ! "$TAG" =~ ^sha-[0-9a-f]{40}$ ]] && [ "${ALLOW_NONIMMUTABLE_TAG:-false}" 
   exit 2
 fi
 
-for name in base-gpu vuln-rag vuln-agent llmgoat dvla portal common; do
+for name in base-gpu vuln-rag vuln-agent dvla portal common; do
   for release_tag in "$TAG" "$APP_VERSION"; do
   image="ghcr.io/$NS/owasp-llm-${name}:${release_tag}"
   inspect_output="$(mktemp)"
@@ -80,7 +80,6 @@ build_and_push "base-gpu"    "./base-gpu"
 
 build_and_push "vuln-rag"    "./vuln-rag"
 build_and_push "vuln-agent"  "./vuln-agent"
-build_and_push "llmgoat"     "./llmgoat"
 build_and_push "dvla"        "./dvla"
 build_and_push "portal"      "../infrastructure/portal"
 build_and_push "common"      "." "./common/Dockerfile"

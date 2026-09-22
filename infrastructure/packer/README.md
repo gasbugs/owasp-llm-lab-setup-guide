@@ -82,7 +82,7 @@ ami_name_pattern = "owasp-llm-lab-*"
 - 또는 빌드 인스턴스에서 외부 인터넷 접근 차단 시 → 빌드 VPC는 인터넷 허용해야 함.
 
 **GHCR pull이 `unauthorized`로 실패**
-- `ghcr.io/gasbugs/owasp-llm-*` 다섯 package의 visibility가 모두 `Public`인지 확인한다.
+- Packer가 받는 `base-gpu`, `vuln-rag`, `vuln-agent`, `dvla` package의 visibility가 모두 `Public`인지 확인한다.
 - 로컬 credential 영향이 없는 환경에서 `docker manifest inspect ghcr.io/gasbugs/owasp-llm-base-gpu:<tag>`가 인증 없이 성공해야 AMI 빌드를 시작한다.
 
 **AMI 용량 초과**

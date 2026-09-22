@@ -38,17 +38,23 @@ class RuntimeContractTest(unittest.TestCase):
         dockerfile = read("docker/llmgoat/Dockerfile")
         self.assertNotIn("health_entrypoint.py", dockerfile)
         self.assertIn(
-            "ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3@sha256:", dockerfile
+            "ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:", dockerfile
         )
         self.assertIn("codeload.github.com/gasbugs/LLMGoat", dockerfile)
-        self.assertNotIn("ghcr.io/secforce/llmgoat-gpu", dockerfile)
+        self.assertNotIn("ghcr.io/gasbugs/llmgoat-gpu", dockerfile)
         self.assertIn("ADD --checksum=sha256:", dockerfile)
         self.assertIn("/usr/src/llmgoat-v0.1.0", dockerfile)
         self.assertIn("/usr/share/licenses/llmgoat/GPL-3.0.txt", dockerfile)
         self.assertNotIn("llmgoat-gpu:latest", dockerfile)
         self.assertIn("COPY proxy_entrypoint.py", dockerfile)
+        self.assertIn("COPY COPYING", dockerfile)
         self.assertIn("ENTRYPOINT", dockerfile)
         self.assertNotIn("sed -i", dockerfile)
+
+        fallback = read("docker/llmgoat/Dockerfile.source-build")
+        self.assertIn("nvidia/cuda:12.2.2-devel-ubuntu22.04@sha256:", fallback)
+        self.assertIn("llama-cpp-python==0.3.16", fallback)
+        self.assertIn("codeload.github.com/gasbugs/LLMGoat", fallback)
 
     def test_llmgoat_is_built_locally_before_compose_up(self) -> None:
         compose = read("infrastructure/compose/compose.yaml")
@@ -60,6 +66,8 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("localhost/owasp-llm-llmgoat:", service)
         self.assertIn("pull_policy: never", service)
         self.assertIn('\"$RAW_URL/docker/llmgoat/$build_file\"', installer)
+        self.assertIn("Dockerfile.source-build", installer)
+        self.assertIn("export LLMGOAT_DOCKERFILE=Dockerfile.source-build", installer)
         self.assertNotIn("owasp-llm-llmgoat owasp-llm-dvla", installer)
         build = installer.index("docker compose build")
         up = installer.index("docker compose up -d", build)
@@ -413,7 +421,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("docker/build-push-action@v7", test_job)
         self.assertIn("packer validate -syntax-only", test_job)
         self.assertIn("find infrastructure tests docker", test_job)
-        self.assertEqual(test_job.count("call: check"), 7)
+        self.assertEqual(test_job.count("call: check"), 8)
         self.assertNotIn("packages: write", test_job)
         self.assertIn("needs: test", build)
         self.assertIn("IMAGE_REGISTRY: ghcr.io", workflow)
@@ -432,7 +440,8 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("VCS_REF=${{ github.sha }}", build)
         self.assertIn("context: ./infrastructure/portal", workflow)
         self.assertIn("owasp-llm-portal:${{ env.SHA_TAG }}", build)
-        self.assertIn("base-gpu vuln-rag vuln-agent llmgoat dvla portal common", workflow)
+        self.assertIn("base-gpu vuln-rag vuln-agent dvla portal common", workflow)
+        self.assertNotIn("Build & push llmgoat", workflow)
         self.assertIn("owasp-llm-common:${{ env.SHA_TAG }}", build)
         self.assertNotIn("docker buildx imagetools inspect", build)
         self.assertIn("needs: build", promote)

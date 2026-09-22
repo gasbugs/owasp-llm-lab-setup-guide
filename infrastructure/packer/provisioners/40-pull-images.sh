@@ -17,7 +17,7 @@ sudo -u ubuntu -i docker pull docker.io/ollama/ollama:0.34.1
 sudo -u ubuntu -i docker pull docker.io/library/python:3.12-slim
 
 # 동일 커밋의 이미지 세트가 하나라도 없으면 AMI 빌드를 실패시킨다.
-for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+for image in base-gpu vuln-rag vuln-agent dvla; do
   sudo -u ubuntu -i docker pull \
     "ghcr.io/${IMAGE_NAMESPACE}/owasp-llm-${image}:${IMAGE_TAG}"
 done

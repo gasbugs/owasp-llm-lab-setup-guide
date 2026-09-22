@@ -164,9 +164,9 @@ if ! jq -e \
   --arg registry "$IMAGE_REGISTRY" --arg namespace "$IMAGE_NAMESPACE" --arg tag "$IMAGE_TAG" '
     .schema == "owasp-llm-image-digests/v1"
     and .registry == $registry and .namespace == $namespace and .tag == $tag
-    and (.images | length == 5)
+    and (.images | length == 4)
     and ([.images[].name] | sort
-      == ["base-gpu","dvla","llmgoat","vuln-agent","vuln-rag"])
+      == ["base-gpu","dvla","vuln-agent","vuln-rag"])
     and ([.images[]
       | .reference == ($registry + "/" + $namespace + "/owasp-llm-" + .name + ":" + $tag)]
       | all)
@@ -226,7 +226,7 @@ fi
 jq -s '.' "$runtime_jsonl" >"$RUN_ROOT/runtime-images.json" || DIGEST_RC=1
 
 if [ "$DIGEST_RC" -eq 0 ]; then
-  echo "PASS: all five exact linux/amd64 image digests are present"
+  echo "PASS: all four published linux/amd64 image digests are present"
 else
   echo "FAIL: immutable runtime digest gate" >&2
   FULL_CYCLE_RC=1

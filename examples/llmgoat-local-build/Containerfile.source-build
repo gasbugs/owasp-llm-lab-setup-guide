@@ -1,0 +1,51 @@
+# SECFORCE/LLMGoat v0.1.0 source-build fallback
+# Installation source fork: https://github.com/gasbugs/LLMGoat/tree/v0.1.0
+# Upstream license: GPL-3.0
+
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04@sha256:ae8a022c02aec945c4f8c52f65deaf535de7abb58e840350d19391ec683f4980
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    CUDA_ARCH=default
+WORKDIR /app
+
+LABEL org.opencontainers.image.title="LLMGoat local source build" \
+      org.opencontainers.image.source="https://github.com/gasbugs/LLMGoat" \
+      org.opencontainers.image.revision="9388bd2c1a629f3bd56be56140d3aae97d01e6cf" \
+      org.opencontainers.image.version="0.1.0" \
+      org.opencontainers.image.licenses="GPL-3.0-only"
+
+ADD --checksum=sha256:4e3251ebd6ae59a4003791e18606a23ae94708bb48236caf51aa51cffbe34e29 \
+    https://codeload.github.com/gasbugs/LLMGoat/tar.gz/refs/tags/v0.1.0 \
+    /tmp/llmgoat-v0.1.0.tar.gz
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3.10 python3-pip python3.10-venv git build-essential \
+        ninja-build cmake curl wget ccache \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /usr/src/llmgoat-v0.1.0 /usr/share/licenses/llmgoat \
+    && tar -xzf /tmp/llmgoat-v0.1.0.tar.gz \
+        --strip-components=1 -C /usr/src/llmgoat-v0.1.0 \
+    && rm /tmp/llmgoat-v0.1.0.tar.gz \
+    && python3.10 -m pip install --no-cache-dir --upgrade pip \
+    && export LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$LD_LIBRARY_PATH \
+    && ln -s /usr/local/cuda/lib64/stubs/libcuda.so \
+        /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && CMAKE_ARGS="-DGGML_CUDA=on -DGGML_OPENMP=ON" \
+        FORCE_CMAKE=1 NINJA_NUM_JOBS=$(nproc) \
+        python3.10 -m pip install --no-cache-dir llama-cpp-python==0.3.16 \
+    && rm /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && python3.10 -m pip uninstall -y torch torchvision torchaudio \
+    && python3.10 -m pip install --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.8.0 torchvision torchaudio \
+    && python3.10 -m pip install --no-cache-dir /usr/src/llmgoat-v0.1.0 \
+    && cp /usr/src/llmgoat-v0.1.0/LICENSE /app/LICENSE \
+    && cp /usr/src/llmgoat-v0.1.0/LICENSE \
+        /usr/share/licenses/llmgoat/GPL-3.0.txt
+
+COPY NOTICE.md /usr/share/doc/llmgoat/NOTICE.md
+
+EXPOSE 5000
+ENTRYPOINT ["llmgoat"]

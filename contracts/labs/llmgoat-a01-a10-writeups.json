@@ -49,7 +49,7 @@
     "event_name": "lab_case",
     "observation_command": "run-solution-writeups.sh JSONL lab_case events",
     "build_context": ".",
-    "image": "ghcr.io/gasbugs/owasp-llm-llmgoat@sha256:2d80b137733b45ea2bca3a57c2b586a38cfb4119c1ef8d8a01c99b31056a84bf",
+    "image": "ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611",
     "container_prefix": "llmgoat-writeups",
     "network": "loopback-host",
     "case_source": "tests/e2e/llmgoat/solution_cases.py",

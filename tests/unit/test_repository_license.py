@@ -36,6 +36,12 @@ class RepositoryLicenseTest(unittest.TestCase):
         self.assertIn("GPL-3.0", third_party)
         self.assertIn("GPL-3.0", llmgoat_dockerfile)
         self.assertNotIn("LLMGoat (Apache 2.0)", llmgoat_dockerfile)
+        wrapper = (ROOT / "docker/llmgoat/proxy_entrypoint.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("SPDX-License-Identifier: GPL-3.0-only", wrapper)
+        self.assertTrue((ROOT / "docker/llmgoat/COPYING").is_file())
+        self.assertNotIn("ghcr.io/gasbugs/llmgoat-gpu", llmgoat_dockerfile)
 
 
 if __name__ == "__main__":

@@ -197,6 +197,13 @@ jobs:
           context: ./docker/llmgoat
           call: check
 
+      - name: Check llmgoat source-build fallback configuration
+        uses: docker/build-push-action@v7
+        with:
+          context: ./docker/llmgoat
+          file: ./docker/llmgoat/Dockerfile.source-build
+          call: check
+
       - name: Check DVLA Docker build configuration
         uses: docker/build-push-action@v7
         with:
@@ -255,7 +262,7 @@ jobs:
           set -euo pipefail
           response_file="$(mktemp)"
           trap 'rm -f "$response_file"' EXIT
-          for image in base-gpu vuln-rag vuln-agent llmgoat dvla portal common; do
+          for image in base-gpu vuln-rag vuln-agent dvla portal common; do
             for release_tag in "$SHA_TAG" "$APP_VERSION"; do
             target="${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/owasp-llm-${image}:${release_tag}"
             repository="${IMAGE_NAMESPACE}/owasp-llm-${image}"
@@ -333,22 +340,6 @@ jobs:
           cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:buildcache,mode=max
 
-      # LLMGoat (SECFORCE/LLMGoat, GPL-3.0): cross-platform comparison app.
-      - name: Build & push llmgoat
-        uses: docker/build-push-action@v7
-        with:
-          context: ./docker/llmgoat
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-llmgoat:${{ env.SHA_TAG }}
-            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-llmgoat:${{ env.APP_VERSION }}
-          build-args: |
-            VCS_REF=${{ github.sha }}
-            APP_VERSION=${{ env.APP_VERSION }}
-          cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-llmgoat:buildcache
-          cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-llmgoat:buildcache,mode=max
-
       # DVLA (ReversecLabs/damn-vulnerable-llm-agent, Apache 2.0): Day 3 comparison app.
       - name: Build & push dvla
         uses: docker/build-push-action@v7
@@ -418,7 +409,7 @@ jobs:
       - name: Promote immutable manifests
         run: |
           set -euo pipefail
-          for image in base-gpu vuln-rag vuln-agent llmgoat dvla portal common; do
+          for image in base-gpu vuln-rag vuln-agent dvla portal common; do
             source="${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/owasp-llm-${image}:${SHA_TAG}"
             target="${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/owasp-llm-${image}:latest"
             docker buildx imagetools create --tag "$target" "$source"

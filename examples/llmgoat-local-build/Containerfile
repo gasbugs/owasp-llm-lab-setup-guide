@@ -3,8 +3,8 @@
 # Installation source fork: https://github.com/gasbugs/LLMGoat/tree/v0.1.0
 # Upstream license: GPL-3.0
 
-# gasbugs GHCR에 복제한 image를 태그와 확인한 manifest digest로 함께 고정한다.
-FROM ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
+# 기본 경로는 게시자가 제공한 image를 게시자 registry에서 직접 받는다.
+FROM ghcr.io/secforce/llmgoat-gpu:v0.1.0@sha256:b17ac2038813de509a5cabe4f284b1119c7d0c025b9f63166854688f52698611
 
 LABEL org.opencontainers.image.title="LLMGoat local training image" \
       org.opencontainers.image.description="SECFORCE LLMGoat v0.1.0 with its corresponding source and GPL license" \

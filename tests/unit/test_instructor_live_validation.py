@@ -118,7 +118,7 @@ class DigestResolverTest(unittest.TestCase):
         self.assertEqual(client.urls[0].split("/v2/", 1)[0], "https://ghcr.io")
         self.assertTrue(any(url.startswith("https://ghcr.io/token?") for url in client.urls))
 
-    def test_resolved_document_has_tag_and_platform_digests_for_five_images(self) -> None:
+    def test_resolved_document_has_tag_and_platform_digests_for_four_images(self) -> None:
         tag_digest = "sha256:" + "1" * 64
         child_digest = "sha256:" + "2" * 64
 
@@ -153,7 +153,7 @@ class DigestResolverTest(unittest.TestCase):
         result = resolver.resolve_images(
             "ghcr.io", "gasbugs", "sha-" + "a" * 40, FakeClient()
         )
-        self.assertEqual(len(result["images"]), 5)
+        self.assertEqual(len(result["images"]), 4)
         self.assertTrue(
             all(item["tag_digest"] == tag_digest for item in result["images"])
         )

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 
-IMAGES = ("base-gpu", "vuln-rag", "vuln-agent", "llmgoat", "dvla")
+IMAGES = ("base-gpu", "vuln-rag", "vuln-agent", "dvla")
 ACCEPT = ", ".join(
     (
         "application/vnd.oci.image.index.v1+json",

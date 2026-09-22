@@ -5,10 +5,12 @@
 - Upstream commit: `9388bd2c1a629f3bd56be56140d3aae97d01e6cf`
 - Installation source fork: <https://github.com/gasbugs/LLMGoat/tree/v0.1.0>
 - Original source: <https://github.com/SECFORCE/LLMGoat/tree/v0.1.0>
-- Mirrored GPU image: `ghcr.io/gasbugs/llmgoat-gpu:v0.1.0-gasbugs.3`
+- Normal runtime image: `ghcr.io/secforce/llmgoat-gpu:v0.1.0`
+- Source-build fallback base: `nvidia/cuda:12.2.2-devel-ubuntu22.04`
 - License: GNU General Public License v3.0
 
 이 로컬 Build는 LLMGoat 애플리케이션 코드를 수정하지 않는다. 확인한 upstream
-GPU image를 digest로 고정하고, 대응하는 전체 소스와 GPL 원문을 같은 image 안에
-추가한다. 실행 중 별도로 내려받는 Gemma model에는 Google의 Gemma 이용 조건이
-적용되므로 LLMGoat의 GPL과 구분해 확인해야 한다.
+GPU image를 게시자 registry에서 직접 받고, 대응하는 전체 소스와 GPL 원문을 같은
+image 안에 추가한다. 게시자 image를 받을 수 없을 때는 NVIDIA CUDA image와 공개
+포크 소스로 로컬에서 다시 만든다. 실행 중 별도로 내려받는 Gemma model에는
+Google의 Gemma 이용 조건이 적용되므로 LLMGoat의 GPL과 구분해 확인해야 한다.

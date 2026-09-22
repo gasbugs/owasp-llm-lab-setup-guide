@@ -29,7 +29,7 @@ LLM08 환경은 다음 구성요소를 함께 사용합니다.
 로컬 워킹트리에 코드가 있는 것과 수강생이 설치할 수 있는 것은 다릅니다. 다음 세 조건이 모두 참이어야 합니다.
 
 1. LLM08 소스와 scaffold가 공개 `main`의 한 commit에 존재한다.
-2. `Test, Build & Push Runtime Images`가 그 commit의 이미지 다섯 개를 공개 GHCR에 publish했다.
+2. `Test, Build & Push Runtime Images`가 그 commit의 프로젝트 runtime 이미지 네 개를 공개 GHCR에 publish했다.
 3. 설치 스크립트 commit과 이미지의 `sha-<commit>` tag가 같다.
 
 아래 명령은 **강사·콘텐츠 배포자**가 한 번 실행하는 release gate입니다. 수강생은 로컬에 Docker을 추가 설치하지 않고, 강사가 `PUBLISH_GATE=PASS`와 함께 공지한 40자리 `SETUP_COMMIT`을 사용합니다. gate가 실패하면 **EC2를 생성하거나 시작하지 말고** commit push와 이미지 workflow 완료를 기다립니다. `latest`가 우연히 존재하는 것만으로는 새 LLM08 기능의 배포를 증명하지 못합니다.
@@ -70,7 +70,7 @@ command -v docker >/dev/null || {
   exit 1
 }
 IMAGE_TAG="sha-$SETUP_COMMIT"
-for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+for image in base-gpu vuln-rag vuln-agent dvla; do
   ref="ghcr.io/gasbugs/owasp-llm-${image}:${IMAGE_TAG}"
   docker manifest inspect "$ref" >/dev/null || {
     echo "ERROR: image is not published or public: $ref" >&2

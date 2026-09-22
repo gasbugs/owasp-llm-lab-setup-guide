@@ -243,7 +243,7 @@ services:
     build:
       # 저장소에서는 docker/llmgoat, 설치된 EC2에서는 내려받은 context를 사용한다.
       context: ${LLMGOAT_BUILD_CONTEXT:-../../docker/llmgoat}
-      dockerfile: Dockerfile
+      dockerfile: ${LLMGOAT_DOCKERFILE:-Dockerfile}
       args:
         VCS_REF: ${LLMGOAT_SOURCE_REVISION:-unknown}
         APP_VERSION: ${COMPOSE_IMAGE_TAG:-local}

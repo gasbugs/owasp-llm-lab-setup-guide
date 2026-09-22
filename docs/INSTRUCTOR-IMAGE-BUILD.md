@@ -9,7 +9,6 @@
 | `owasp-llm-base-gpu` | `docker/base-gpu/Dockerfile` |
 | `owasp-llm-vuln-rag` | `docker/vuln-rag/Dockerfile` |
 | `owasp-llm-vuln-agent` | `docker/vuln-agent/Dockerfile` |
-| `owasp-llm-llmgoat` | `docker/llmgoat/Dockerfile` |
 | `owasp-llm-dvla` | `docker/dvla/Dockerfile` |
 
 ## GitHub Actions release
@@ -17,7 +16,7 @@
 `.github/workflows/build-and-push.yaml`은 다음 순서를 강제합니다.
 
 1. unit·repository hygiene·Python compile·전체 shell syntax·Terraform·Packer·Docker build configuration 검증
-2. 다섯 이미지를 `sha-${{ github.sha }}` 태그로 빌드·push
+2. 프로젝트 소유 이미지들을 `sha-${{ github.sha }}` 태그로 빌드·push
 3. 전체 이미지가 성공한 뒤 SHA manifest를 `latest`로 승격
 
 중간 이미지가 실패하면 `latest` 승격 단계는 실행되지 않습니다. `vuln-rag`와 `vuln-agent`도 같은 커밋의 SHA-tagged `base-gpu`를 부모로 사용합니다.
@@ -25,11 +24,11 @@
 
 Workflow는 `github.actor`와 저장소에 자동 발급되는 `GITHUB_TOKEN`을 사용하므로 별도 registry 계정이나 외부 secret을 등록하지 않습니다. `build`와 `promote-latest` job에만 `packages: write`가 부여됩니다. 각 Dockerfile의 `org.opencontainers.image.source` label이 package를 이 공개 저장소와 연결합니다.
 
-최초 publish 뒤 다섯 package의 visibility를 GitHub package 설정에서 모두 `Public`으로 확인합니다. EC2와 Packer는 registry 자격증명을 받지 않으므로, 아래 anonymous manifest 조회가 다섯 이미지 모두에서 성공하기 전에는 라이브 검증을 시작하지 않습니다.
+LLMGoat는 이 게시 묶음에 포함하지 않는다. 수강생 EC2가 SECFORCE image를 직접 받고, 사라졌을 때만 공개 포크 소스로 로컬 Build한다. 최초 publish 뒤 프로젝트 package의 visibility를 GitHub package 설정에서 모두 `Public`으로 확인합니다. EC2와 Packer는 registry 자격증명을 받지 않으므로, 아래 anonymous manifest 조회가 모든 게시 이미지에서 성공하기 전에는 라이브 검증을 시작하지 않습니다.
 
 ```bash
 SETUP_COMMIT=$(git rev-parse HEAD)
-for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+for image in base-gpu vuln-rag vuln-agent dvla; do
   docker manifest inspect \
     "ghcr.io/gasbugs/owasp-llm-${image}:sha-${SETUP_COMMIT}" >/dev/null
 done
@@ -60,7 +59,7 @@ TAG="sha-$SETUP_COMMIT" \
 ```bash
 git fetch origin main
 SETUP_COMMIT=$(git rev-parse origin/main)
-for image in base-gpu vuln-rag vuln-agent llmgoat dvla; do
+for image in base-gpu vuln-rag vuln-agent dvla; do
   sudo -u ubuntu docker pull \
     "ghcr.io/gasbugs/owasp-llm-${image}:sha-${SETUP_COMMIT}"
 done

@@ -8,7 +8,7 @@ services:
   llmgoat:
     build:
       context: .
-      dockerfile: Containerfile
+      dockerfile: ${LLMGOAT_DOCKERFILE:-Containerfile}
     image: localhost/llmgoat-local-build:v0.1.0
     # docker compose build로 만든 로컬 image만 사용한다.
     pull_policy: never
