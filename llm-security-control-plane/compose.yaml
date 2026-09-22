@@ -143,6 +143,63 @@ services:
     environment:
       APPLICATION_URL: http://llm-security-application-gateway:8000
       RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
+      NEMO_OFFICIAL_UI_BROWSER_URL: http://127.0.0.1:${NEMO_OFFICIAL_UI_HOST_PORT:-18192}
+      PROMPTFOO_UI_BROWSER_URL: http://127.0.0.1:${PROMPTFOO_UI_HOST_PORT:-15500}
+      PYRIT_UI_BROWSER_URL: http://127.0.0.1:${PYRIT_UI_HOST_PORT:-18098}
+
+  nemo-official-ui:
+    profiles: [guided]
+    container_name: llm-security-nemo-official-ui
+    build:
+      context: .
+      dockerfile: official-uis/nemo/Containerfile
+    image: localhost/llm-security-nemo-official-ui:${DIALOG_IMAGE_VERSION:-0.22.0}
+    restart: always
+    depends_on:
+      - bedrock-gateway
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/rails/configs', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+    ports:
+      - "127.0.0.1:${NEMO_OFFICIAL_UI_HOST_PORT:-18192}:8000"
+    environment:
+      BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?Set BEDROCK_GATEWAY_TOKEN in the selected Compose env file}
+
+  promptfoo-official-ui:
+    profiles: [guided]
+    container_name: llm-security-promptfoo-official-ui
+    build:
+      context: .
+      dockerfile: official-uis/promptfoo/Containerfile
+    image: localhost/llm-security-promptfoo-official-ui:${PROMPTFOO_VERSION:-0.121.20}
+    restart: always
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:15500/').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+    ports:
+      - "127.0.0.1:${PROMPTFOO_UI_HOST_PORT:-15500}:15500"
+    volumes:
+      - "promptfoo-data:/work/.promptfoo:rw"
+
+  pyrit-official-ui:
+    profiles: [guided]
+    container_name: llm-security-pyrit-official-ui
+    build:
+      context: .
+      dockerfile: official-uis/pyrit/Containerfile
+    image: localhost/llm-security-pyrit-official-ui:${PYRIT_VERSION:-1.0.1}
+    restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+    ports:
+      - "127.0.0.1:${PYRIT_UI_HOST_PORT:-18098}:8000"
 
   dialog:
     profiles: [dialog]
@@ -168,3 +225,6 @@ services:
 networks:
   default:
     name: ${CONTROL_PLANE_NETWORK_NAME:-llm-security-control-plane}
+
+volumes:
+  promptfoo-data:

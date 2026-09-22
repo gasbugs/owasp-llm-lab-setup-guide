@@ -1,0 +1,13 @@
+FROM docker.io/library/python:3.12.14-slim
+
+ARG PYRIT_VERSION=1.0.1
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HOME=/tmp
+
+RUN python -m pip install "pyrit==${PYRIT_VERSION}"
+COPY --chown=65532:65532 official-uis/pyrit/pyrit-conf.yaml /app/pyrit-conf.yaml
+
+USER 65532:65532
+EXPOSE 8000
+CMD ["pyrit_backend", "--host", "0.0.0.0", "--port", "8000", "--config-file", "/app/pyrit-conf.yaml"]

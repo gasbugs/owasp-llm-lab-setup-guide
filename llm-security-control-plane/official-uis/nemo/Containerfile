@@ -1,0 +1,21 @@
+FROM docker.io/library/python:3.12.14-slim
+
+ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    XDG_CACHE_HOME=/opt/nemo-cache
+
+COPY official-uis/nemo/requirements.txt /tmp/requirements.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc g++ python3-dev \
+    && python -m pip install --requirement /tmp/requirements.txt \
+    && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2', cache_dir='/opt/nemo-cache').embed(['한국어 cache 준비']))" \
+    && chmod -R a+rwX /opt/nemo-cache \
+    && apt-get purge -y --auto-remove gcc g++ python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --chmod=0555 official-uis/nemo/config /app/config
+WORKDIR /tmp
+USER 65532:65532
+EXPOSE 8000
+CMD ["nemoguardrails", "server", "--config", "/app/config", "--default-config-id", "dialog", "--port", "8000"]

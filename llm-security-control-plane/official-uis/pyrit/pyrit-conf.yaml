@@ -1,0 +1,6 @@
+# CUSTOM FILE
+# Format reference: PyRIT configuration, https://azure.github.io/PyRIT/
+# Upstream license: MIT
+
+# 수강생 Browser가 만든 대화는 컨테이너가 끝나면 함께 사라진다.
+memory_db_type: in_memory

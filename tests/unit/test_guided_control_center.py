@@ -35,6 +35,7 @@ class FakeResponse:
 
 class FakeAsyncClient:
     calls: list[dict] = []
+    gets: list[str] = []
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -49,6 +50,10 @@ class FakeAsyncClient:
         self.calls.append({"url": url, "json": json, "headers": headers})
         return FakeResponse()
 
+    async def get(self, url):
+        self.gets.append(url)
+        return FakeResponse()
+
 
 class GuidedControlCenterTests(unittest.TestCase):
     @classmethod
@@ -58,6 +63,7 @@ class GuidedControlCenterTests(unittest.TestCase):
 
     def setUp(self):
         FakeAsyncClient.calls.clear()
+        FakeAsyncClient.gets.clear()
 
     def test_page_contains_exactly_22_lessons_and_mobile_layout(self):
         response = self.client.get("/")
@@ -68,7 +74,19 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn(".panel { min-width:0", response.text)
         self.assertIn("실제 요청", response.text)
         self.assertIn("고정 학습 기록", response.text)
+        self.assertIn("제품 공식 UI", response.text)
         self.assertNotIn("__APP_VERSION__", response.text)
+
+    def test_official_ui_catalog_reports_local_health_without_internal_urls(self):
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.get("/api/official-uis")
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["items"]
+        self.assertEqual(len(items), 6)
+        self.assertEqual({item["status"] for item in items[:4]}, {"ready"})
+        self.assertEqual({item["status"] for item in items[4:]}, {"external"})
+        self.assertTrue(all("health_url" not in item for item in items))
+        self.assertTrue(all(url.startswith("http://llm-") for url in FakeAsyncClient.gets))
 
     def test_chat_is_proxied_to_application_with_bearer_token(self):
         with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
@@ -85,12 +103,49 @@ class GuidedControlCenterTests(unittest.TestCase):
 
     def test_compose_keeps_guided_service_opt_in(self):
         compose = (CONTROL / "compose.yaml").read_text(encoding="utf-8")
-        guided = compose.split("  guided-control-center:", 1)[1].split("\n  dialog:", 1)[0]
+        guided = compose.split("  guided-control-center:", 1)[1].split(
+            "\n  nemo-official-ui:", 1
+        )[0]
         self.assertIn("profiles: [guided]", guided)
         self.assertIn('127.0.0.1:${GUIDED_HOST_PORT:-18097}:8000', guided)
         self.assertIn("APPLICATION_URL: http://llm-security-application-gateway:8000", guided)
         self.assertNotIn("BEDROCK_GATEWAY_TOKEN", guided)
         self.assertNotIn("APPLICATION_INTERNAL_TOKEN", guided)
+
+    def test_compose_builds_official_uis_with_loopback_ports(self):
+        compose = (CONTROL / "compose.yaml").read_text(encoding="utf-8")
+        expectations = {
+            "nemo-official-ui": (
+                "promptfoo-official-ui",
+                "${NEMO_OFFICIAL_UI_HOST_PORT:-18192}:8000",
+            ),
+            "promptfoo-official-ui": (
+                "pyrit-official-ui",
+                "${PROMPTFOO_UI_HOST_PORT:-15500}:15500",
+            ),
+            "pyrit-official-ui": ("dialog", "${PYRIT_UI_HOST_PORT:-18098}:8000"),
+        }
+        for service, (next_service, port) in expectations.items():
+            section = compose.split(f"  {service}:", 1)[1].split(
+                f"\n  {next_service}:", 1
+            )[0]
+            self.assertIn("profiles: [guided]", section)
+            self.assertIn(f'127.0.0.1:{port}', section)
+            self.assertIn("healthcheck:", section)
+        self.assertIn("promptfoo-data:/work/.promptfoo:rw", compose)
+
+        requirements = (
+            CONTROL / "official-uis/nemo/requirements.txt"
+        ).read_text(encoding="utf-8")
+        promptfoo = (
+            CONTROL / "official-uis/promptfoo/Containerfile"
+        ).read_text(encoding="utf-8")
+        pyrit = (CONTROL / "official-uis/pyrit/Containerfile").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("nemoguardrails[chat-ui,server]==0.22.0", requirements)
+        self.assertIn("PROMPTFOO_VERSION=0.121.20", promptfoo)
+        self.assertIn("PYRIT_VERSION=1.0.1", pyrit)
 
 
 if __name__ == "__main__":

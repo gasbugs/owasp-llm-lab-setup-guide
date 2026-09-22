@@ -78,6 +78,24 @@ bash llm-security-control-plane/deploy/start-stack.sh
 bash llm-security-control-plane/deploy/stop-stack.sh
 ```
 
+## 03 UI 후보와 제품 공식 UI
+
+기본 `docker compose up -d`는 기존 02 실행을 바꾸지 않는다. `guided` profile을 선택하면 Python Guided Control Center와 NeMo Chat UI, Promptfoo Viewer, CoPyRIT를 setup checkout에서 직접 Build한다.
+
+```bash
+cd llm-security-control-plane
+docker compose --profile guided up -d --build
+```
+
+| 서비스 | Host 주소 | 역할 |
+|---|---|---|
+| Guided Control Center | `http://127.0.0.1:18097` | 차시 안내·Application 전체 stage·최종 판정 |
+| NeMo Chat UI | `http://127.0.0.1:18192` | 공식 Dialog Rail 채팅 화면 |
+| Promptfoo Viewer | `http://127.0.0.1:15500` | 공식 평가 결과 화면 |
+| CoPyRIT | `http://127.0.0.1:18098` | 공식 PyRIT 웹 화면 |
+
+세 제품 UI도 `guided` profile 뒤에 있으므로 02 기본 실행에는 추가되지 않는다. 모든 Host port는 loopback에만 bind한다. 특히 CoPyRIT backend 자체에는 인증이 없으므로 이 제한은 같은 PC 밖의 접속을 막지만, 애플리케이션 인증·인가를 대신하지는 않는다. Guided Control Center는 내부 health 주소만 조회하고 Browser에는 공개 주소와 상태만 반환한다.
+
 `standard`와 `high-assurance`는 NeMo 공식 profile이 아니라
 `policies/control-plane-policy.yaml`이 정의한 프로젝트 Rail 조합이다. `standard`는
 Presidio와 Nova 일반 위해 Rail을 사용하고 `high-assurance`는 애플리케이션 Self-check를

@@ -38,6 +38,20 @@
     .course-meter span { color:var(--muted); font-size:12px; }
     .meter { height:7px; margin-top:10px; overflow:hidden; border:1px solid var(--line); background:var(--canvas); }
     .meter > i { display:block; width:4.55%; height:100%; background:var(--blue); transition:width .2s ease; }
+    .official-rack { margin-top:14px; padding:14px 16px; border:1px solid var(--line); background:var(--paper); box-shadow:var(--shadow); }
+    .official-rack-head { display:flex; justify-content:space-between; gap:16px; align-items:end; margin-bottom:10px; }
+    .official-rack-head h2 { margin:3px 0 0; font:850 19px/1.2 var(--display); }
+    .official-rack-head p { margin:0; max-width:680px; color:var(--muted); font-size:12px; text-align:right; }
+    .official-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; }
+    .official-card { min-width:0; padding:10px 11px; border:1px solid var(--line); background:#fff; color:var(--ink); text-decoration:none; }
+    .official-card:hover { border-color:var(--blue); }
+    .official-card strong,.official-card small { display:block; overflow-wrap:anywhere; }
+    .official-card strong { font:820 13px/1.35 var(--display); }
+    .official-card small { margin-top:3px; color:var(--muted); font-size:10px; }
+    .official-status { display:inline-block; margin-bottom:6px; padding:3px 5px; color:var(--muted); border:1px solid var(--line); font:750 9px/1 var(--mono); }
+    .official-status.ready { color:var(--green); border-color:var(--green); background:var(--green-soft); }
+    .official-status.unavailable { color:var(--orange); border-color:var(--orange); background:var(--orange-soft); }
+    .official-status.external { color:var(--blue); border-color:var(--blue); background:var(--blue-soft); }
     .layout { display:grid; grid-template-columns:300px minmax(500px,1fr) 320px; gap:14px; margin-top:14px; align-items:start; min-width:0; }
     .panel { min-width:0; border:1px solid var(--line); background:var(--paper); box-shadow:var(--shadow); }
     .panel-head { display:flex; justify-content:space-between; gap:16px; padding:16px 18px; border-bottom:1px solid var(--line); }
@@ -129,6 +143,7 @@
     }
     @media (max-width:760px) {
       .app { padding:8px; }.masthead { grid-template-columns:1fr; padding:18px; }.course-meter { text-align:left; }
+      .official-rack-head { display:block; }.official-rack-head p { margin-top:6px; text-align:left; }
       .layout { grid-template-columns:minmax(0,1fr); }.lesson-list { display:flex; min-width:0; max-height:none; overflow:auto; }
       .chapter-group { display:contents; }.chapter-title { display:none; }.lesson-button { min-width:210px; }
       .lesson-thesis,.scenario-grid,.receipt-body { grid-template-columns:1fr; }.mode-chip { justify-self:start; }
@@ -147,6 +162,16 @@
     </div>
     <div class="course-meter"><strong id="meter-title">1 / 22</strong><span id="meter-copy">요청·가드레일</span><div class="meter"><i id="meter-bar"></i></div></div>
   </header>
+
+  <section class="official-rack" aria-labelledby="official-title">
+    <div class="official-rack-head">
+      <div><div class="label">Product workspaces</div><h2 id="official-title">제품 공식 UI</h2></div>
+      <p>각 제품의 고유 기능은 공식 화면에서 실행하고, 제품을 가로지르는 요청 경로와 최종 판정은 아래 Control Center에서 연결합니다.</p>
+    </div>
+    <nav id="official-grid" class="official-grid" aria-label="제품 공식 UI">
+      <div class="empty">공식 UI 실행 상태를 확인하는 중입니다.</div>
+    </nav>
+  </section>
 
   <div class="layout">
     <aside class="panel" aria-label="22개 차시">
@@ -206,7 +231,7 @@
           </dl>
           <div id="why" class="why">결과에서 무엇을 봐야 하는지 여기에 표시합니다.</div>
           <p id="next-check" class="next-check">다음 확인: 차시를 선택한 뒤 실행합니다.</p>
-          <nav class="links" aria-label="연결 화면"><a href="/" target="_blank" rel="noopener">전체 Control Center 열기</a><a href="http://127.0.0.1:3001" target="_blank" rel="noopener">Grafana 열기</a><a href="http://127.0.0.1:8014" target="_blank" rel="noopener">Security Events 열기</a></nav>
+          <nav class="links" aria-label="연결 화면"><a href="#official-title">제품 공식 UI로 이동</a><a href="http://127.0.0.1:8014" target="_blank" rel="noopener">Security Events 열기</a></nav>
         </div>
       </div>
     </aside>
@@ -253,6 +278,25 @@ const LESSONS=[
 ];
 let current=0, lastResult=null, quota={reserved:0,committed:0}, approval={state:'requested',effects:0};
 
+let officialRefreshes=0;
+function officialStatusCopy(status){return status==='ready'?'실행 중':status==='external'?'AWS 로그인':'실행 확인 필요'}
+async function loadOfficialUIs(){
+  const grid=$('official-grid');
+  try{
+    const response=await fetch('/api/official-uis');
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();grid.replaceChildren();
+    for(const item of data.items){
+      const link=document.createElement('a');link.className='official-card';link.href=item.browser_url;link.target='_blank';link.rel='noopener';link.title=item.boundary;
+      const status=document.createElement('span');status.className=`official-status ${item.status}`;status.textContent=officialStatusCopy(item.status);
+      const name=document.createElement('strong');name.textContent=item.name;
+      const purpose=document.createElement('small');purpose.textContent=item.purpose;
+      link.append(status,name,purpose);grid.appendChild(link);
+    }
+    if(data.items.some(item=>item.status==='unavailable')&&officialRefreshes<12){officialRefreshes+=1;setTimeout(loadOfficialUIs,3000)}
+  }catch(error){grid.innerHTML='<div class="empty">공식 UI 상태를 불러오지 못했습니다. Control Center의 health 상태를 먼저 확인하세요.</div>'}
+}
+
 function renderLessons(){
   $('lesson-list').replaceChildren();
   for(const chapter of Object.keys(CHAPTERS)){
@@ -273,7 +317,7 @@ function verdictFor(data){const lesson=LESSONS[current];if(data.assessment)retur
 function renderResult(data){lastResult=data;const names=stageNames(data);const decision=data.application_decision||data.decision||data.status||'-';const stop=data.blocking_reason||data.reason||data.stop||data.missing_span||'-';document.querySelectorAll('.gate').forEach(g=>g.className='gate skip');let stoppedGate='';for(const stage of names){const gate=mapGate(stage);if(!gate)continue;const node=document.querySelector(`[data-gate="${gate}"]`);node.className='gate pass';if((data.guardrail?.stages||[]).find(s=>s.stage===stage&&['block','infra'].includes(s.decision))){node.className='gate stop';stoppedGate=gate}}if(!names.length&&decision==='block'){const node=document.querySelector('[data-gate="application"]');node.className='gate stop';stoppedGate='application'}if(decision==='allow'&&data.upstream_called===true)document.querySelector('[data-gate="model"]').className='gate pass';const verdict=verdictFor(data);$('verdict').className=`verdict ${verdict.toLowerCase()}`;$('verdict').innerHTML=`<strong>${verdict}</strong><span>${verdict==='PASS'?'기대 경로와 일치':verdict==='HIT'?'공격 영향 확인':'환경 또는 증거 확인 필요'}</span>`;$('decision').textContent=String(decision);$('stopped-at').textContent=String(stop);$('model-called').textContent=String(data.upstream_called===true);$('request-id').textContent=data.request_id||'-';$('trace-id').textContent=data.trace_id||'-';$('request-state').textContent=data.record_source||data.stage||'실행 완료';$('why').textContent=decision==='infra'?'보호 서비스 장애로 요청이 닫혔습니다. 방어 성공이 아니라 ERR입니다.':data.upstream_called===false?'뒤의 Main Model·검색·Tool은 호출되지 않았습니다. 중단 이유와 정상 대조군을 함께 확인합니다.':'Main Model까지 호출됐습니다. 정상 응답 유지와 출력 검사 단계를 함께 확인합니다.';$('next-check').textContent=`다음 확인: ${stoppedGate||'마지막 통과 단계'} 뒤의 검사대가 실제 원본에도 없는지 확인합니다.`;$('raw').textContent=JSON.stringify(data,null,2)}
 async function runLive(lesson){const username=$('username').value;const login=await fetch('/.well-known/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password:`${username}-demo`})});const auth=await login.json();if(!login.ok)throw new Error(auth.detail||'교육 계정 로그인 실패');const body={message:$('message').value,classification:$('classification').value,purpose:$('purpose').value};if(lesson.mode==='live-spoof')body.roles=['support_agent'];const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${auth.access_token}`},body:JSON.stringify(body)});const data=await response.json();if(!response.ok)data.http_status=response.status;return data}
 $('run').onclick=async()=>{const lesson=LESSONS[current];$('run').disabled=true;$('request-state').textContent='처리 중';document.querySelectorAll('.gate').forEach((g,i)=>g.className=i===0?'gate run':'gate skip');try{const data=lesson.mode.startsWith('live')?await runLive(lesson):structuredClone(lesson.record);renderResult(data)}catch(error){renderResult({application_decision:'infra',blocking_reason:String(error),upstream_called:false,error:String(error)})}finally{$('run').disabled=false}};
-renderLessons();selectLesson(0);
+renderLessons();selectLesson(0);loadOfficialUIs();
 </script>
 </body>
 </html>

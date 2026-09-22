@@ -46,6 +46,13 @@ def main() -> int:
         page.on("request", lambda request: requests.append(request.url))
         page.goto(origin, wait_until="domcontentloaded", timeout=timeout_ms)
         lesson_count = page.locator(".lesson-button").count()
+        page.wait_for_function(
+            "() => document.querySelectorAll('.official-card .official-status.ready').length >= 3",
+            timeout=timeout_ms,
+        )
+        official_cards = page.locator(".official-card").count()
+        official_ready = page.locator(".official-card .official-status.ready").count()
+        official_external = page.locator(".official-card .official-status.external").count()
 
         normal = run_lesson(page, 1, timeout_ms)
         normal_verdict = page.locator("#verdict strong").inner_text()
@@ -69,6 +76,9 @@ def main() -> int:
     )
     checks = {
         "lessons": lesson_count == 22,
+        "official_uis": official_cards == 6
+        and official_ready >= 3
+        and official_external == 2,
         "normal": normal.get("application_decision") == "allow"
         and normal.get("upstream_called") is True
         and normal_verdict == "PASS"
@@ -81,7 +91,9 @@ def main() -> int:
         "mobile": mobile_overflow is False,
     }
     print(
-        f"lessons={lesson_count} normal={normal_verdict} attack={attack_verdict} "
+        f"lessons={lesson_count} official_cards={official_cards} "
+        f"official_ready={official_ready} official_external={official_external} "
+        f"normal={normal_verdict} attack={attack_verdict} "
         f"same_origin_chat={same_origin_requests} internal_requests={internal_requests} "
         f"mobile_overflow={str(mobile_overflow).lower()}"
     )

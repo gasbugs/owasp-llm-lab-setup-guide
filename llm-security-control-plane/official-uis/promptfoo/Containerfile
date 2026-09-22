@@ -1,0 +1,15 @@
+FROM docker.io/library/node:24-bookworm-slim
+
+ARG PROMPTFOO_VERSION=0.121.20
+RUN npm install --global "promptfoo@${PROMPTFOO_VERSION}" --omit=optional \
+    && npm cache clean --force
+
+ENV PROMPTFOO_DISABLE_TELEMETRY=1 \
+    PROMPTFOO_DISABLE_UPDATE=1 \
+    PROMPTFOO_CONFIG_DIR=/work/.promptfoo
+WORKDIR /work
+RUN mkdir -p /work/.promptfoo && chown -R node:node /work
+
+USER node
+EXPOSE 15500
+CMD ["promptfoo", "view", "/work", "--port", "15500", "--no"]
