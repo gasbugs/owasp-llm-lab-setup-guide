@@ -126,6 +126,19 @@ jobs:
           --url http://127.0.0.1:28095
           --browser-channel chromium
 
+      - name: Start and validate the opt-in guided course UI
+        run: |
+          docker run --detach --name llm-security-guided-control-center \
+            --network llm-security-control-plane \
+            --publish 127.0.0.1:28097:8000 \
+            --env APPLICATION_URL=http://llm-security-application-gateway:8000 \
+            localhost/llm-security-guided-control-center:1.0.0
+          curl --fail --retry 30 --retry-delay 1 --retry-all-errors \
+            http://127.0.0.1:28097/healthz
+          python tests/browser/run_guided_control_center_ui.py \
+            --url http://127.0.0.1:28097 \
+            --browser-channel chromium
+
       - name: Preserve Docker diagnostics on failure
         if: failure()
         run: |
@@ -139,5 +152,6 @@ jobs:
         if: always()
         run: |
           docker rm --force module08-bedrock-contract \
+            llm-security-guided-control-center \
             llm-security-application-gateway llm-security-nemo-hub \
             llm-security-presidio-spoke 2>/dev/null || true

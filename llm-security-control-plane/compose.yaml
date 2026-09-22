@@ -120,6 +120,30 @@ services:
       - "./application-gateway/policy.py:/app/policy.py:ro"
       - "./application-gateway/server.py:/app/server.py:ro"
 
+  guided-control-center:
+    profiles: [guided]
+    container_name: llm-security-guided-control-center
+    build:
+      context: .
+      dockerfile: guided-control-center/Containerfile
+      args:
+        APP_VERSION: ${IMAGE_VERSION:-1.0.0}
+    image: localhost/llm-security-guided-control-center:${IMAGE_VERSION:-1.0.0}
+    restart: always
+    depends_on:
+      application:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    ports:
+      - "127.0.0.1:${GUIDED_HOST_PORT:-18097}:8000"
+    environment:
+      APPLICATION_URL: http://llm-security-application-gateway:8000
+      RELEASE_VERSION: ${IMAGE_VERSION:-1.0.0}
+
   dialog:
     profiles: [dialog]
     container_name: llm-security-nemo-dialog-rails
