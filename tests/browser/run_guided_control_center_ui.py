@@ -55,6 +55,23 @@ def main() -> int:
         official_links = page.locator(".official-link").count()
         csp = response.headers.get("content-security-policy", "")
         browser_cookie_visible = page.evaluate("() => document.cookie")
+        light_canvas = page.evaluate("() => getComputedStyle(document.body).backgroundColor")
+        page.emulate_media(color_scheme="dark")
+        page.locator("html[data-theme=dark]").wait_for()
+        dark_canvas = page.evaluate("() => getComputedStyle(document.body).backgroundColor")
+        system_mode = page.evaluate("() => document.documentElement.dataset.themeMode === 'system'")
+        page.locator("#theme-toggle").click()
+        manual_light = page.evaluate(
+            "() => document.documentElement.dataset.themeMode === 'light' && document.documentElement.dataset.theme === 'light'"
+        )
+        page.locator("#theme-toggle").click()
+        manual_dark = page.evaluate(
+            "() => document.documentElement.dataset.themeMode === 'dark' && document.documentElement.dataset.theme === 'dark'"
+        )
+        page.reload(wait_until="networkidle", timeout=timeout_ms)
+        persisted_dark = page.evaluate(
+            "() => document.documentElement.dataset.themeMode === 'dark' && document.documentElement.dataset.theme === 'dark'"
+        )
 
         page.locator("#preflight").click()
         preflight = wait_for_result(page, timeout_ms)
@@ -89,6 +106,8 @@ def main() -> int:
         "official_links": official_links == 2,
         "csp": "object-src 'none'" in csp and "frame-ancestors 'none'" in csp,
         "session": browser_cookie_visible == "",
+        "system_theme": light_canvas != dark_canvas and system_mode,
+        "theme_button": manual_light and manual_dark and persisted_dark,
         "preflight": preflight.get("course_verdict") == "PASS"
         and preflight.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 2,
         "hands_on": hands_on_verdict == "HIT"
@@ -103,6 +122,8 @@ def main() -> int:
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
         f"preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"system_theme={str(light_canvas != dark_canvas and system_mode).lower()} "
+        f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
         f"answer_controls={answer_controls} raw_nodes={raw_nodes} "
         f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )

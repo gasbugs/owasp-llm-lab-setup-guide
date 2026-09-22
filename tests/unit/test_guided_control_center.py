@@ -165,11 +165,17 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("return min(requested_max_tokens, 128)", html)
         self.assertIn("강사와 함께 진행하는 본 실습", html)
         self.assertIn("--env-file llm-security-control-plane/.state/guided-course.env", html)
+        self.assertIn('id="theme-toggle"', html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
         self.assertNotIn("innerHTML", javascript)
+        self.assertIn('matchMedia("(prefers-color-scheme: dark)")', javascript)
+        self.assertIn('localStorage.setItem("guided-theme-mode", mode)', javascript)
         stylesheet = (CONTROL / "guided-control-center/app.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 760px)", stylesheet)
+        self.assertIn("color-scheme: light dark", stylesheet)
+        self.assertIn(':root[data-theme="dark"]', stylesheet)
+        self.assertIn("@media (prefers-color-scheme: dark)", stylesheet)
         self.assertIn("prefers-reduced-motion", stylesheet)
 
     def test_front_proxy_is_the_only_host_port_owner(self):

@@ -6,8 +6,46 @@ const tabNames = [
   "Garak·PyRIT", "정책 승격", "원시 관측", "사고·경보", "Gateway·Agent"
 ];
 let csrfToken = "";
+const themePreference = window.matchMedia("(prefers-color-scheme: dark)");
+const themeModes = ["system", "light", "dark"];
 
 const byId = (id) => document.getElementById(id);
+
+function readThemeMode() {
+  try {
+    const saved = localStorage.getItem("guided-theme-mode");
+    return themeModes.includes(saved) ? saved : "system";
+  } catch {
+    return "system";
+  }
+}
+
+function applyTheme(mode) {
+  const resolved = mode === "system" ? (themePreference.matches ? "dark" : "light") : mode;
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.themeMode = mode;
+  const labels = { system: "시스템", light: "밝게", dark: "어둡게" };
+  const nextMode = themeModes[(themeModes.indexOf(mode) + 1) % themeModes.length];
+  const toggle = byId("theme-toggle");
+  toggle.textContent = `테마 · ${labels[mode]}`;
+  toggle.setAttribute("aria-label", `현재 ${labels[mode]} 모드. 눌러 ${labels[nextMode]} 모드로 변경`);
+}
+
+function saveThemeMode(mode) {
+  try {
+    if (mode === "system") localStorage.removeItem("guided-theme-mode");
+    else localStorage.setItem("guided-theme-mode", mode);
+  } catch {
+    // 저장할 수 없는 브라우저에서도 현재 탭의 테마 전환은 유지한다.
+  }
+}
+
+function cycleTheme() {
+  const current = document.documentElement.dataset.themeMode || "system";
+  const next = themeModes[(themeModes.indexOf(current) + 1) % themeModes.length];
+  saveThemeMode(next);
+  applyTheme(next);
+}
 
 function setText(id, value) {
   byId(id).textContent = value === undefined || value === null ? "—" : String(value);
@@ -141,5 +179,10 @@ async function bootstrap() {
 
 byId("preflight").addEventListener("click", () => execute("/api/provider-preflight"));
 byId("verify").addEventListener("click", () => execute("/api/hands-on/H01/verify"));
+byId("theme-toggle").addEventListener("click", cycleTheme);
+themePreference.addEventListener("change", () => {
+  if (document.documentElement.dataset.themeMode === "system") applyTheme("system");
+});
 
+applyTheme(readThemeMode());
 bootstrap().catch(renderError);

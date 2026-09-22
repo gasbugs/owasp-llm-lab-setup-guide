@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>LLM 보안 검사대</title>
   <link rel="stylesheet" href="/app.css">
   <script src="/app.js" defer></script>
@@ -15,7 +16,10 @@
       <h1>앱을 고치고<br>증거로 검증한다</h1>
       <p class="lede">Hands-on H01에서는 강사와 함께 Python 출력 정책을 구현하고, 정상·위험 요청이 Provider에 어떤 상한으로 전달됐는지 한 장의 영수증으로 맞춥니다.</p>
     </div>
-    <div class="shift-card"><span>현재 검사대</span><strong>01 / 13</strong><small>Nova Lite 요청 경로</small></div>
+    <div class="shift-card">
+      <span>현재 검사대</span><strong>01 / 13</strong><small>Nova Lite 요청 경로</small>
+      <button id="theme-toggle" class="theme-toggle" type="button">테마 · 시스템</button>
+    </div>
   </header>
 
   <section class="tool-rack" aria-labelledby="tool-title">
