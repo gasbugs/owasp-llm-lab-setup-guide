@@ -75,6 +75,18 @@ def main() -> int:
         panel_boundary = page.evaluate(
             "() => { const nav = document.querySelector('.route-panel').getBoundingClientRect(); const work = document.querySelector('.workbench').getBoundingClientRect(); return work.left - nav.right >= 16; }"
         )
+        tooltip_count = page.locator('[role="tooltip"].action-tooltip').count()
+        page.locator("#preflight").focus()
+        page.locator("#preflight-help").wait_for(state="visible")
+        preflight_focus_visible = page.locator("#preflight-help").is_visible()
+        page.locator('[aria-controls="preflight-help"]').click()
+        preflight_tip = page.locator("#preflight-help")
+        preflight_tip.wait_for(state="visible")
+        preflight_tip_visible = preflight_tip.is_visible()
+        preflight_tip_text = preflight_tip.inner_text()
+        page.locator('[aria-controls="preflight-help"]').press("Escape")
+        preflight_tip_collapsed = page.locator('[aria-controls="preflight-help"]').get_attribute("aria-expanded") == "false"
+        h02_tip_text = page.locator("#h02-provision-help").inner_text()
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
         # H21과 H22도 앞 문제와 무관한 전용 source·container·상태로 실행된다.
@@ -137,6 +149,14 @@ def main() -> int:
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
         "panel_boundary": panel_boundary,
+        "action_tooltips": tooltip_count == 7
+        and preflight_focus_visible
+        and preflight_tip_visible
+        and preflight_tip_collapsed
+        and "2 Token" in preflight_tip_text
+        and "과제 통과가 아닙니다" in preflight_tip_text
+        and "S3 Vector Index" in h02_tip_text
+        and "AWS 자원과 비용" in h02_tip_text,
         "chat": bool(chat_text.strip())
         and chat_text != "모델 응답을 받지 못했습니다."
         and "requested 512" in chat_meta
@@ -183,6 +203,7 @@ def main() -> int:
         f"system_theme={str(light_canvas != dark_canvas and system_mode).lower()} "
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
         f"panel_boundary={str(panel_boundary).lower()} chat={str(checks['chat']).lower()} "
+        f"action_tooltips={str(checks['action_tooltips']).lower()} "
         f"answer_controls={answer_controls} raw_nodes={raw_nodes} "
         f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )

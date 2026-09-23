@@ -91,6 +91,13 @@ h1 { margin: 8px 0 12px; font: 900 clamp(32px, 5vw, 64px)/.92 var(--display); le
 textarea, select { width: 100%; padding: 10px 11px; border: 1px solid var(--line-strong); color: var(--ink); background: var(--control); }
 textarea { min-height: 112px; resize: vertical; }
 .actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 12px; }
+.actions.single { grid-template-columns: minmax(0, 1fr); }
+.action-control { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 38px; min-width: 0; }
+.action-control > .primary, .action-control > .secondary { width: 100%; min-width: 0; }
+.help-trigger { display: grid; place-items: center; min-width: 38px; padding: 0; color: var(--blue); border-color: var(--blue); border-left: 0; background: var(--control); font: 900 13px/1 var(--mono); }
+.action-tooltip { position: absolute; z-index: 30; left: 0; bottom: calc(100% + 9px); width: min(420px, calc(100vw - 44px)); padding: 11px 12px; color: var(--ink); border: 1px solid var(--line-strong); background: var(--paper); box-shadow: var(--shadow); font-size: 12px; line-height: 1.55; opacity: 0; visibility: hidden; transform: translateY(5px); transition: opacity .14s ease, transform .14s ease, visibility .14s ease; pointer-events: none; }
+.action-tooltip::after { content: ""; position: absolute; right: 12px; top: 100%; border: 7px solid transparent; border-top-color: var(--line-strong); }
+.action-control:hover .action-tooltip, .action-control:focus-within .action-tooltip, .action-control.tip-open .action-tooltip { opacity: 1; visibility: visible; transform: translateY(0); }
 .primary { color: var(--on-accent); border-color: var(--blue-action); background: var(--blue-action); }
 .secondary { color: var(--blue); border-color: var(--blue); }
 .hands-on { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; margin-top: 20px; padding: 15px; border: 1px solid var(--line-strong); background: var(--control); }
@@ -113,7 +120,8 @@ textarea { min-height: 112px; resize: vertical; }
 .chat-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 10px; }
 .chat-compose label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .chat-compose textarea { min-height: 82px; }
-.chat-compose button { align-self: stretch; min-width: 150px; }
+.chat-compose > .action-control { align-self: stretch; min-width: 190px; }
+.chat-compose > .action-control > button { align-self: stretch; }
 .chat-meta { margin: 9px 0 0; color: var(--muted); font: 10px/1.5 var(--mono); }
 
 .inspection { margin-top: 20px; }
@@ -228,6 +236,7 @@ pre { margin: 0; max-height: 360px; overflow: auto; padding: 14px; white-space: 
   .belt { grid-template-columns: repeat(3, 118px); }
   .field.wide { grid-column: auto; }
   .chat-compose { grid-template-columns: minmax(0, 1fr); }
+  .chat-compose > .action-control { min-width: 0; }
   .chat-compose button { min-height: 44px; }
 }
 

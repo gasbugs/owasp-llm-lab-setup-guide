@@ -43,6 +43,37 @@ function setText(id, value) {
   byId(id).textContent = value === undefined || value === null ? "—" : String(value);
 }
 
+function closeActionTips(except = null) {
+  document.querySelectorAll(".action-control.tip-open").forEach((control) => {
+    if (control !== except) {
+      control.classList.remove("tip-open");
+      control.querySelector(".help-trigger")?.setAttribute("aria-expanded", "false");
+    }
+  });
+}
+
+function bindActionTips() {
+  document.querySelectorAll(".help-trigger").forEach((trigger) => {
+    trigger.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const control = trigger.closest(".action-control");
+      const open = !control.classList.contains("tip-open");
+      closeActionTips(control);
+      control.classList.toggle("tip-open", open);
+      trigger.setAttribute("aria-expanded", String(open));
+    });
+    trigger.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeActionTips();
+        trigger.focus();
+      }
+    });
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".action-control")) closeActionTips();
+  });
+}
+
 function renderTabs() {
   const tabs = byId("tabs");
   tabNames.forEach((name, index) => {
@@ -67,6 +98,7 @@ function renderTabs() {
 }
 
 function selectTab(index) {
+  closeActionTips();
   activeTab = index;
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.classList.toggle("active", Number(tab.dataset.tabIndex) === index);
@@ -229,6 +261,7 @@ async function execute(path, body) {
 
 async function bootstrap() {
   renderTabs();
+  bindActionTips();
   const response = await fetch("/api/bootstrap");
   if (!response.ok) throw new Error("세션을 시작하지 못했습니다.");
   const payload = await response.json();

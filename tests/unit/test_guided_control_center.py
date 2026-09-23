@@ -295,18 +295,38 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn('data-theme-choice="light"', html)
         self.assertIn('data-theme-choice="dark"', html)
         self.assertIn('id="chat-form"', html)
+        action_help = {
+            "chat-send": "chat-send-help",
+            "preflight": "preflight-help",
+            "verify": "verify-help",
+            "h02-provision": "h02-provision-help",
+            "h02-verify": "h02-verify-help",
+            "h21-verify": "h21-verify-help",
+            "h22-verify": "h22-verify-help",
+        }
+        for button_id, tooltip_id in action_help.items():
+            self.assertIn(f'id="{button_id}"', html)
+            self.assertIn(f'aria-describedby="{tooltip_id}"', html)
+            self.assertIn(f'id="{tooltip_id}" class="action-tooltip" role="tooltip"', html)
+        self.assertIn("2 Token 상한", html)
+        self.assertIn("S3 Vector Index", html)
+        self.assertIn("과제 통과가 아닙니다", html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
         self.assertNotIn("innerHTML", javascript)
         self.assertIn('matchMedia("(prefers-color-scheme: dark)")', javascript)
         self.assertIn('localStorage.setItem("guided-theme-mode", mode)', javascript)
         self.assertIn('/api/hands-on/H01/chat', javascript)
+        self.assertIn('querySelectorAll(".help-trigger")', javascript)
+        self.assertIn('setAttribute("aria-expanded", String(open))', javascript)
+        self.assertIn('event.key === "Escape"', javascript)
         stylesheet = (CONTROL / "guided-control-center/app.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 760px)", stylesheet)
         self.assertIn("color-scheme: light dark", stylesheet)
         self.assertIn(':root[data-theme="dark"]', stylesheet)
         self.assertIn("@media (prefers-color-scheme: dark)", stylesheet)
         self.assertIn("prefers-reduced-motion", stylesheet)
+        self.assertIn(".action-control.tip-open .action-tooltip", stylesheet)
 
     def test_containerfile_makes_source_readable_to_non_root_runtime(self):
         containerfile = (CONTROL / "guided-control-center/Containerfile").read_text(
