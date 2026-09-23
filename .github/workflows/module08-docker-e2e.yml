@@ -170,21 +170,25 @@ jobs:
           --url http://127.0.0.1:28095
           --browser-channel chromium
 
-      - name: Build and validate independent tenant 03 H22, H02, then H01
+      - name: Build and validate independent tenant 03 H21, H22, H02, then H01
         env:
           AWS_CREDENTIALS_DIR: /tmp/guided-aws
           GUIDED_SESSION_SECRET: ci-guided-session-secret
           GUIDED_CONTROL_LAB01_TOKEN: ci-control-lab
           GUIDED_CONTROL_LAB02_TOKEN: ci-control-lab02
+          GUIDED_CONTROL_H21_TOKEN: ci-control-h21
           GUIDED_CONTROL_H22_TOKEN: ci-control-h22
           GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
           GUIDED_LAB01_GATEWAY_TOKEN: ci-lab-gateway
           GUIDED_H02_GATEWAY_TOKEN: ci-h02-gateway
           GUIDED_LAB02_PROVISION_TOKEN: ci-lab02-provision
           GUIDED_NEMO_GATEWAY_TOKEN: ci-nemo-gateway
+          GUIDED_H21_PROVIDER_TOKEN: ci-h21-provider
+          GUIDED_H21_OAUTH_SECRET: ci-h21-oauth-secret
           GUIDED_H22_APPROVAL_SECRET: ci-h22-approval-secret
           GUIDED_VERIFIER_LAB01_TOKEN: ci-verifier-lab
           GUIDED_VERIFIER_LAB02_TOKEN: ci-verifier-lab02
+          GUIDED_VERIFIER_H21_TOKEN: ci-verifier-h21
           GUIDED_VERIFIER_H22_TOKEN: ci-verifier-h22
           GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
           GUIDED_PROVIDER_MODE: contract
@@ -232,15 +236,19 @@ jobs:
           GUIDED_SESSION_SECRET: ci-guided-session-secret
           GUIDED_CONTROL_LAB01_TOKEN: ci-control-lab
           GUIDED_CONTROL_LAB02_TOKEN: ci-control-lab02
+          GUIDED_CONTROL_H21_TOKEN: ci-control-h21
           GUIDED_CONTROL_H22_TOKEN: ci-control-h22
           GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
           GUIDED_LAB01_GATEWAY_TOKEN: ci-lab-gateway
           GUIDED_H02_GATEWAY_TOKEN: ci-h02-gateway
           GUIDED_LAB02_PROVISION_TOKEN: ci-lab02-provision
           GUIDED_NEMO_GATEWAY_TOKEN: ci-nemo-gateway
+          GUIDED_H21_PROVIDER_TOKEN: ci-h21-provider
+          GUIDED_H21_OAUTH_SECRET: ci-h21-oauth-secret
           GUIDED_H22_APPROVAL_SECRET: ci-h22-approval-secret
           GUIDED_VERIFIER_LAB01_TOKEN: ci-verifier-lab
           GUIDED_VERIFIER_LAB02_TOKEN: ci-verifier-lab02
+          GUIDED_VERIFIER_H21_TOKEN: ci-verifier-h21
           GUIDED_VERIFIER_H22_TOKEN: ci-verifier-h22
           GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
           GUIDED_PROVIDER_MODE: contract

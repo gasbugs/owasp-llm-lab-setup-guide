@@ -164,6 +164,40 @@ docker compose \
           </div>
         </div>
 
+        <div id="h21-work" class="lab-workspace" hidden>
+          <p>Agent가 고른 모델·MCP Server·Tool은 실행 후보일 뿐 권한이 아닙니다. H21에서는 인증된 주체의 서버 정책으로 허용목록과 Tool 횟수·결과 크기·상태 소유자를 제한합니다.</p>
+          <div class="cost-note"><strong>독립 실행</strong><span>H21은 H01·H02·H22의 source, 상태와 AWS 자원을 사용하지 않습니다. 결정적 Provider fixture와 H21 전용 MCP Server 두 개로 downstream 호출 여부를 검증합니다.</span></div>
+
+          <section class="hands-on" aria-labelledby="h21-code-title">
+            <div>
+              <p class="label">LEARNER-OWNED AGENT POLICY</p>
+              <h3 id="h21-code-title">Agent의 연결 대상과 실행 예산 제한하기</h3>
+              <p><code>guided-labs/h21-agent-policy/policy.py</code>의 Starter는 요청이 제시한 model·server·Tool·한도를 그대로 사용합니다. 허용목록과 state owner를 검사하고 서버가 정한 두 상한만 반환하도록 <code>authorize()</code>를 완성합니다.</p>
+              <pre>if model not in configured["models"]:
+    raise PolicyDenied("model-not-allowed")
+if server_id not in configured["servers"]:
+    raise PolicyDenied("mcp-server-not-allowed")
+if tool not in configured["tools"]:
+    raise PolicyDenied("tool-not-allowed")
+if state_owner != principal:
+    raise PolicyDenied("state-owner-mismatch")</pre>
+              <p>반환값의 <code>max_tool_calls</code>, <code>max_result_bytes</code>, <code>tool_timeout_ms</code>도 요청값이 아니라 정책값을 사용합니다. OAuth audience·scope는 MCP Server가 한 번 더 검사합니다.</p>
+              <pre>docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-h21-host guided-h21-provider guided-h21-trusted-mcp guided-h21-untrusted-mcp
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-h21-provider guided-h21-trusted-mcp guided-h21-untrusted-mcp guided-h21-host</pre>
+            </div>
+          </section>
+
+          <div class="actions">
+            <button id="h21-verify" class="primary">H21 현재 구현 검증</button>
+          </div>
+        </div>
+
         <div id="h22-work" class="lab-workspace" hidden>
           <p>외부 문서의 문장이 모델에게 <code>publish_notice</code> Tool을 제안하게 했다고 가정합니다. 제안은 실행 허가가 아니므로 MCP Server가 requester·reviewer·Tool·인자·만료·nonce를 다시 검사하도록 만듭니다.</p>
           <div class="cost-note"><strong>격리 안내</strong><span>실제 메일·삭제·결제 API는 호출하지 않습니다. 승인된 부작용은 H22 전용 SQLite에 훈련 공지 한 건만 기록합니다.</span></div>
@@ -177,10 +211,11 @@ docker compose \
     approval_token,
     suite_id,
     call_id,
+    trace_id,
     requester,
     notice,
 )</pre>
-              <p>검사 뒤 SQLite transaction이 nonce 소비와 훈련 공지 기록을 함께 처리합니다. 그래서 다른 인자, 만료 Token과 같은 nonce 재사용은 공지를 만들기 전에 멈춥니다.</p>
+              <p>검사 뒤 SQLite transaction이 nonce 소비와 훈련 공지 기록을 함께 처리합니다. 그래서 다른 인자, 만료 Token과 같은 nonce 재사용은 공지를 만들기 전에 멈춥니다. Host의 승인과 실제 공지는 같은 <code>trace_id</code>에 묶입니다.</p>
               <pre>docker compose \
   --env-file llm-security-control-plane/.state/guided-course.env \
   --file examples/security-monitoring/compose.guided.yaml \
@@ -193,7 +228,7 @@ docker compose \
           </section>
 
           <div class="actions">
-            <button id="h22-verify" class="primary">현재 구현 검증</button>
+            <button id="h22-verify" class="primary">H22 현재 구현 검증</button>
           </div>
         </div>
 

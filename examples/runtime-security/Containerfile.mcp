@@ -6,6 +6,8 @@ RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
 COPY --chmod=0444 mcp_approval_demo.py /app/mcp_approval_demo.py
+COPY --chmod=0444 mcp_access_demo.py /app/mcp_access_demo.py
+COPY --chmod=0444 mcp_budget_demo.py /app/mcp_budget_demo.py
 
 USER 65532:65532
 CMD ["python", "/app/mcp_approval_demo.py"]

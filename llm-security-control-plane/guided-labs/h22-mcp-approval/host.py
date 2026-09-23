@@ -57,7 +57,7 @@ def require_verifier(authorization: str | None = Header(default=None)) -> None:
 
 
 def canonical_digest(
-    suite_id: str, call_id: str, requester: str, notice: str
+    suite_id: str, call_id: str, trace_id: str, requester: str, notice: str
 ) -> str:
     payload = json.dumps(
         {
@@ -65,6 +65,7 @@ def canonical_digest(
             "notice": notice,
             "requester": requester,
             "suite_id": suite_id,
+            "trace_id": trace_id,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -76,9 +77,11 @@ def canonical_digest(
 def approve(
     suite_id: str,
     call_id: str,
+    trace_id: str,
     requester: str,
     reviewer: str,
     notice: str,
+    expires_at: int | None = None,
 ) -> str:
     if requester == reviewer:
         raise ValueError("self-approval-denied")
@@ -88,8 +91,8 @@ def approve(
         "reviewer": reviewer,
         "server_id": SERVER_ID,
         "tool": "publish_notice",
-        "args_sha256": canonical_digest(suite_id, call_id, requester, notice),
-        "expires_at": int(time.time()) + 300,
+        "args_sha256": canonical_digest(suite_id, call_id, trace_id, requester, notice),
+        "expires_at": expires_at if expires_at is not None else int(time.time()) + 300,
         "nonce": secrets.token_hex(16),
     }
     encoded = base64.urlsafe_b64encode(
@@ -147,6 +150,7 @@ def readyz() -> dict[str, str]:
 @app.post("/v1/run-suite")
 async def run_suite(_authorized: None = Depends(require_control)) -> dict:
     suite_id = str(uuid.uuid4())
+    trace_id = secrets.token_hex(16)
     started_at = datetime.now(timezone.utc).isoformat()
     requester = "course-requester"
     reviewer = "course-reviewer"
@@ -164,6 +168,7 @@ async def run_suite(_authorized: None = Depends(require_control)) -> dict:
             {
                 "suite_id": suite_id,
                 "call_id": str(uuid.uuid4()),
+                "trace_id": trace_id,
                 "requester": requester,
                 "notice": notice,
                 "approval_token": "",
@@ -172,31 +177,55 @@ async def run_suite(_authorized: None = Depends(require_control)) -> dict:
         after_no_approval = await effect_count(client, suite_id)
 
         try:
-            approve(suite_id, str(uuid.uuid4()), requester, requester, notice)
+            approve(suite_id, str(uuid.uuid4()), trace_id, requester, requester, notice)
             self_approval = {"denied": False, "reason": None}
         except ValueError as exc:
             self_approval = {"denied": True, "reason": str(exc)}
 
         approved_call_id = str(uuid.uuid4())
         approval_token = approve(
-            suite_id, approved_call_id, requester, reviewer, notice
+            suite_id, approved_call_id, trace_id, requester, reviewer, notice
         )
         changed = await client.call_tool(
             "publish_notice",
             {
                 "suite_id": suite_id,
                 "call_id": str(uuid.uuid4()),
+                "trace_id": trace_id,
                 "requester": requester,
                 "notice": changed_notice,
                 "approval_token": approval_token,
             },
         )
         after_changed = await effect_count(client, suite_id)
+        expired_call_id = str(uuid.uuid4())
+        expired_token = approve(
+            suite_id,
+            expired_call_id,
+            trace_id,
+            requester,
+            reviewer,
+            notice,
+            expires_at=int(time.time()) - 1,
+        )
+        expired = await client.call_tool(
+            "publish_notice",
+            {
+                "suite_id": suite_id,
+                "call_id": expired_call_id,
+                "trace_id": trace_id,
+                "requester": requester,
+                "notice": notice,
+                "approval_token": expired_token,
+            },
+        )
+        after_expired = await effect_count(client, suite_id)
         approved = await client.call_tool(
             "publish_notice",
             {
                 "suite_id": suite_id,
                 "call_id": approved_call_id,
+                "trace_id": trace_id,
                 "requester": requester,
                 "notice": notice,
                 "approval_token": approval_token,
@@ -208,6 +237,7 @@ async def run_suite(_authorized: None = Depends(require_control)) -> dict:
             {
                 "suite_id": suite_id,
                 "call_id": approved_call_id,
+                "trace_id": trace_id,
                 "requester": requester,
                 "notice": notice,
                 "approval_token": approval_token,
@@ -218,6 +248,7 @@ async def run_suite(_authorized: None = Depends(require_control)) -> dict:
 
         receipt = {
             "suite_id": suite_id,
+            "trace_id": trace_id,
             "started_at": started_at,
             "observed_at": datetime.now(timezone.utc).isoformat(),
             "protocol_version": client.protocol_version,
@@ -228,12 +259,14 @@ async def run_suite(_authorized: None = Depends(require_control)) -> dict:
             "no_approval": result_summary(no_approval),
             "self_approval": self_approval,
             "changed_args": result_summary(changed),
+            "expired": result_summary(expired),
             "approved": result_summary(approved),
             "approved_call_id": approved_call_id,
             "reuse": result_summary(reused),
             "effect_counts": [
                 after_no_approval,
                 after_changed,
+                after_expired,
                 after_approved,
                 after_reuse,
             ],

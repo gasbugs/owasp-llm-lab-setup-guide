@@ -19,6 +19,7 @@ COMPOSE = ROOT / "examples/security-monitoring/compose.guided.yaml"
 os.environ.setdefault("GUIDED_SESSION_SECRET", "unit-session-secret")
 os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
 os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
+os.environ.setdefault("GUIDED_CONTROL_H21_TOKEN", "unit-control-h21")
 os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
 os.environ.setdefault("GUIDED_LAB02_PROVISION_TOKEN", "unit-provision-lab02")
@@ -90,7 +91,7 @@ class FakeAsyncClient:
             if not json["body"]:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H02" if "lab-02" in url else "H01"
+        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -139,7 +140,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H22"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H21", "H22"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
@@ -257,6 +258,23 @@ class GuidedControlCenterTests(unittest.TestCase):
         )
         self.assertNotIn("course_verdict", verifier_call["json"])
 
+    def test_h21_suite_is_server_owned_and_uses_verifier(self):
+        rejected = self.client.post(
+            "/api/hands-on/H21/verify",
+            json={"model": "attacker-selected-model", "course_verdict": "PASS"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H21/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H21")
+        run_call, verifier_call = FakeAsyncClient.calls
+        self.assertIsNone(run_call["json"])
+        self.assertNotIn("course_verdict", verifier_call["json"])
+
     def test_unknown_host_is_rejected(self):
         response = self.client.get("/", headers={"Host": "attacker.example"})
         self.assertEqual(response.status_code, 421)
@@ -315,6 +333,10 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("docker.sock", serialized)
         self.assertIn("guided-h01-gateway", compose["services"])
         self.assertIn("guided-h02-document-app", compose["services"])
+        self.assertIn("guided-h21-host", compose["services"])
+        self.assertIn("guided-h21-provider", compose["services"])
+        self.assertIn("guided-h21-trusted-mcp", compose["services"])
+        self.assertIn("guided-h21-untrusted-mcp", compose["services"])
         self.assertIn("guided-h22-mcp-server", compose["services"])
         self.assertIn("guided-h22-host", compose["services"])
         self.assertIn("guided-bedrock-gateway", compose["services"])
@@ -359,8 +381,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][1]["hands_on_status"], "partial")
         self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02"])
         self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][2:12]))
-        self.assertEqual(manifest["tabs"][12]["hands_on_status"], "partial")
-        self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H22"])
+        self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
+        self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])
         self.assertTrue(
             all(tab["practice_status"] == "planned" for tab in manifest["tabs"])
         )

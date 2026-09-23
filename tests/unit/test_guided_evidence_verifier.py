@@ -87,6 +87,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"] = "control-verifier"
         os.environ["GUIDED_VERIFIER_LAB01_TOKEN"] = "verifier-lab"
         os.environ["GUIDED_VERIFIER_LAB02_TOKEN"] = "verifier-lab02"
+        os.environ["GUIDED_VERIFIER_H21_TOKEN"] = "verifier-h21"
         os.environ["GUIDED_VERIFIER_H22_TOKEN"] = "verifier-h22"
         os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"] = "verifier-gateway"
         os.environ["GUIDED_VERIFIER_DATABASE"] = str(Path(cls.temp.name) / "verifier.sqlite3")
@@ -244,6 +245,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         ]
         return {
             "suite_id": "99999999-9999-9999-9999-999999999999",
+            "trace_id": "a" * 32,
             "started_at": "2026-09-22T10:00:00+00:00",
             "observed_at": "2026-09-22T10:00:01+00:00",
             "protocol_version": "2026-07-28",
@@ -255,18 +257,25 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             "no_approval": {"is_error": True},
             "self_approval": {"denied": True},
             "changed_args": {"is_error": True},
+            "expired": {"is_error": True},
             "approved": {"is_error": False},
             "approved_call_id": "approved-call",
             "reuse": {"is_error": True},
-            "effect_counts": [0, 0, 1, 1],
+            "effect_counts": [0, 0, 0, 1, 1],
             "external_action_called": False,
         }
 
-    def verify_h22(self, receipt: dict):
-        effects = {
+    def verify_h22(self, receipt: dict, effects: dict | None = None):
+        effects = effects or {
             "suite_id": receipt["suite_id"],
             "effects": 1,
-            "calls": [{"call_id": "approved-call", "notice": "H22 훈련 공지"}],
+            "calls": [
+                {
+                    "call_id": "approved-call",
+                    "trace_id": receipt["trace_id"],
+                    "notice": "H22 훈련 공지",
+                }
+            ],
             "external_action_called": False,
         }
         fake_http = FakeAsyncHttpClient(FakeResponse(receipt))
@@ -297,6 +306,42 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         receipt = self.h22_receipt()
         receipt["tool_inventory_digest"] = "f" * 64
         response = self.verify_h22(receipt)
+        self.assertEqual(response.json()["course_verdict"], "ERR")
+
+    def test_h22_expired_approval_effect_is_hit(self):
+        receipt = self.h22_receipt()
+        receipt["expired"] = {"is_error": False}
+        receipt["effect_counts"] = [0, 0, 1, 1, 1]
+        effects = {
+            "suite_id": receipt["suite_id"],
+            "effects": 1,
+            "calls": [
+                {
+                    "call_id": "expired-call",
+                    "trace_id": receipt["trace_id"],
+                    "notice": "H22 훈련 공지",
+                }
+            ],
+            "external_action_called": False,
+        }
+        response = self.verify_h22(receipt, effects)
+        self.assertEqual(response.json()["course_verdict"], "HIT")
+
+    def test_h22_mismatched_effect_trace_is_err(self):
+        receipt = self.h22_receipt()
+        effects = {
+            "suite_id": receipt["suite_id"],
+            "effects": 1,
+            "calls": [
+                {
+                    "call_id": "approved-call",
+                    "trace_id": "b" * 32,
+                    "notice": "H22 훈련 공지",
+                }
+            ],
+            "external_action_called": False,
+        }
+        response = self.verify_h22(receipt, effects)
         self.assertEqual(response.json()["course_verdict"], "ERR")
 
     def h02_body(self, risk_status: int) -> dict:

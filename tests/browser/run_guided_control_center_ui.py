@@ -77,10 +77,13 @@ def main() -> int:
         )
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
-        # H22도 앞 문제와 무관한 전용 MCP source·container·상태로 실행된다.
+        # H21과 H22도 앞 문제와 무관한 전용 source·container·상태로 실행된다.
         page.locator('.tab[data-tab-index="12"]').click()
+        page.locator("#h21-verify").click()
+        h21_hands_on = wait_for_result(page, timeout_ms)
+        h21_verdict = page.locator("#verdict strong").inner_text()
         page.locator("#h22-verify").click()
-        h22_hands_on = wait_for_result(page, timeout_ms)
+        h22_hands_on = wait_for_result(page, timeout_ms, h21_hands_on.get("execution_id"))
         h22_verdict = page.locator("#verdict strong").inner_text()
 
         # H02를 먼저 실행해 H01의 chat·preflight·검증 결과가 선행 조건이 아님을 증명한다.
@@ -159,9 +162,15 @@ def main() -> int:
         "h22_hands_on": h22_verdict == "HIT"
         and h22_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h22_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
-        and h22_hands_on.get("result", {}).get("effect_counts") == [1, 2, 3, 4]
-        and h22_hands_on.get("result", {}).get("verified_effects", {}).get("effects") == 4
+        and h22_hands_on.get("result", {}).get("effect_counts") == [1, 2, 3, 4, 5]
+        and h22_hands_on.get("result", {}).get("verified_effects", {}).get("effects") == 5
         and h22_hands_on.get("result", {}).get("external_action_called") is False,
+        "h21_hands_on": h21_verdict == "HIT"
+        and h21_hands_on.get("verified_by") == "guided-evidence-verifier"
+        and h21_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
+        and h21_hands_on.get("result", {}).get("impacts", {}).get("forbidden_model_provider") is True
+        and h21_hands_on.get("result", {}).get("impacts", {}).get("untrusted_server_contact") is True
+        and h21_hands_on.get("result", {}).get("external_action_called") is False,
         "learner_work": answer_controls == 0,
         "safe_rendering": raw_nodes == 0,
         "same_origin": internal_requests == 0,
@@ -169,7 +178,7 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"execution_order=H22->H02->H01 h22={h22_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H21->H22->H02->H01 h21={h21_verdict} h22={h22_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"system_theme={str(light_canvas != dark_canvas and system_mode).lower()} "
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "

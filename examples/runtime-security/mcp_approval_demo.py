@@ -23,12 +23,18 @@ CONSUMED: set[str] = set()
 mcp = MCPServer(SERVER_ID)
 
 
-def digest(notice: str) -> str:
-    raw = json.dumps({"notice": notice}, ensure_ascii=False, sort_keys=True)
+def digest(trace_id: str, notice: str) -> str:
+    raw = json.dumps({"notice": notice, "trace_id": trace_id}, ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def approve(requester: str, reviewer: str, notice: str) -> str:
+def approve(
+    requester: str,
+    reviewer: str,
+    trace_id: str,
+    notice: str,
+    expires_at: int | None = None,
+) -> str:
     if requester == reviewer:
         raise ValueError("self-approval-denied")
     claims = {
@@ -36,15 +42,15 @@ def approve(requester: str, reviewer: str, notice: str) -> str:
         "reviewer": reviewer,
         "server_id": SERVER_ID,
         "tool": "publish_notice",
-        "args_sha256": digest(notice),
-        "expires_at": int(time.time()) + 300,
+        "args_sha256": digest(trace_id, notice),
+        "expires_at": expires_at if expires_at is not None else int(time.time()) + 300,
         "nonce": secrets.token_hex(16),
     }
     encoded = base64.urlsafe_b64encode(json.dumps(claims, sort_keys=True).encode()).decode()
     return encoded + "." + hmac.new(SECRET, encoded.encode(), hashlib.sha256).hexdigest()
 
 
-def verify(token: str, requester: str, notice: str) -> str:
+def verify(token: str, requester: str, trace_id: str, notice: str) -> str:
     encoded, separator, signature = token.partition(".")
     expected = hmac.new(SECRET, encoded.encode(), hashlib.sha256).hexdigest()
     if not separator or not hmac.compare_digest(signature, expected):
@@ -55,7 +61,7 @@ def verify(token: str, requester: str, notice: str) -> str:
         and claims.get("reviewer") == "reviewer"
         and claims.get("server_id") == SERVER_ID
         and claims.get("tool") == "publish_notice"
-        and claims.get("args_sha256") == digest(notice)
+        and claims.get("args_sha256") == digest(trace_id, notice)
         and claims.get("expires_at", 0) > int(time.time())
     )
     if not exact or claims.get("nonce") in CONSUMED:
@@ -70,12 +76,12 @@ def lookup_notice() -> dict:
 
 
 @mcp.tool()
-def publish_notice(requester: str, notice: str, approval_token: str = "") -> dict:
+def publish_notice(requester: str, trace_id: str, notice: str, approval_token: str = "") -> dict:
     """Create one local notice after exact-call approval."""
-    nonce = verify(approval_token, requester, notice)
+    nonce = verify(approval_token, requester, trace_id, notice)
     CONSUMED.add(nonce)
     EFFECTS.append(notice)
-    return {"effects": len(EFFECTS), "external_action_called": False}
+    return {"effects": len(EFFECTS), "trace_id": trace_id, "external_action_called": False}
 
 
 def summary(result) -> dict:
@@ -84,27 +90,41 @@ def summary(result) -> dict:
 
 async def main() -> None:
     requester, reviewer, notice = "requester", "reviewer", "점검 완료"
+    trace_id = secrets.token_hex(16)
     async with Client(mcp, mode=PROTOCOL) as client:
         tools = await client.list_tools()
         normal = await client.call_tool("lookup_notice", {})
         missing = await client.call_tool(
-            "publish_notice", {"requester": requester, "notice": notice}
+            "publish_notice", {"requester": requester, "trace_id": trace_id, "notice": notice}
         )
         missing_summary = summary(missing)
-        token = approve(requester, reviewer, notice)
+        token = approve(requester, reviewer, trace_id, notice)
         changed = await client.call_tool(
             "publish_notice",
-            {"requester": requester, "notice": "변경된 공지", "approval_token": token},
+            {"requester": requester, "trace_id": trace_id, "notice": "변경된 공지", "approval_token": token},
         )
         changed_summary = summary(changed)
+        expired_token = approve(
+            requester, reviewer, trace_id, notice, expires_at=int(time.time()) - 1
+        )
+        expired = await client.call_tool(
+            "publish_notice",
+            {
+                "requester": requester,
+                "trace_id": trace_id,
+                "notice": notice,
+                "approval_token": expired_token,
+            },
+        )
+        expired_summary = summary(expired)
         allowed = await client.call_tool(
             "publish_notice",
-            {"requester": requester, "notice": notice, "approval_token": token},
+            {"requester": requester, "trace_id": trace_id, "notice": notice, "approval_token": token},
         )
         allowed_summary = summary(allowed)
         reused = await client.call_tool(
             "publish_notice",
-            {"requester": requester, "notice": notice, "approval_token": token},
+            {"requester": requester, "trace_id": trace_id, "notice": notice, "approval_token": token},
         )
         reused_summary = summary(reused)
         print(
@@ -112,15 +132,18 @@ async def main() -> None:
                 {
                     "protocol_version": client.protocol_version,
                     "server_id": SERVER_ID,
+                    "trace_id": trace_id,
                     "tools": sorted(tool.name for tool in tools.tools),
                     "normal": {"is_error": bool(normal.is_error), "effects": 0},
                     "no_approval": missing_summary,
                     "changed_args": changed_summary,
+                    "expired": expired_summary,
                     "approved": allowed_summary,
                     "reuse": reused_summary,
                     "effect_counts": [
                         missing_summary["effects"],
                         changed_summary["effects"],
+                        expired_summary["effects"],
                         allowed_summary["effects"],
                         reused_summary["effects"],
                     ],

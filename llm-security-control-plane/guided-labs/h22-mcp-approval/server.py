@@ -39,12 +39,12 @@ with connect() as database:
     database.execute(
         "CREATE TABLE IF NOT EXISTS effects "
         "(effect_id INTEGER PRIMARY KEY AUTOINCREMENT, call_id TEXT NOT NULL, "
-        "suite_id TEXT NOT NULL, notice TEXT NOT NULL)"
+        "suite_id TEXT NOT NULL, notice TEXT NOT NULL, trace_id TEXT NOT NULL)"
     )
 
 
 def canonical_digest(
-    suite_id: str, call_id: str, requester: str, notice: str
+    suite_id: str, call_id: str, trace_id: str, requester: str, notice: str
 ) -> str:
     payload = json.dumps(
         {
@@ -52,6 +52,7 @@ def canonical_digest(
             "notice": notice,
             "requester": requester,
             "suite_id": suite_id,
+            "trace_id": trace_id,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -75,6 +76,7 @@ def verify_approval(
     approval_token: str,
     suite_id: str,
     call_id: str,
+    trace_id: str,
     requester: str,
     notice: str,
 ) -> str:
@@ -85,7 +87,7 @@ def verify_approval(
         "reviewer": "course-reviewer",
         "server_id": SERVER_ID,
         "tool": "publish_notice",
-        "args_sha256": canonical_digest(suite_id, call_id, requester, notice),
+        "args_sha256": canonical_digest(suite_id, call_id, trace_id, requester, notice),
     }
     if any(claims.get(key) != value for key, value in expected.items()):
         raise ToolError("approval-exact-call-mismatch")
@@ -117,6 +119,7 @@ def lookup_notice(suite_id: str) -> dict:
 def publish_notice(
     suite_id: str,
     call_id: str,
+    trace_id: str,
     requester: str,
     notice: str,
     approval_token: str = "",
@@ -132,8 +135,8 @@ def publish_notice(
                 "INSERT INTO consumed VALUES(?,?)", (nonce, suite_id)
             )
             database.execute(
-                "INSERT INTO effects(call_id,suite_id,notice) VALUES(?,?,?)",
-                (call_id, suite_id, notice),
+                "INSERT INTO effects(call_id,suite_id,notice,trace_id) VALUES(?,?,?,?)",
+                (call_id, suite_id, notice, trace_id),
             )
             effects = database.execute(
                 "SELECT COUNT(*) FROM effects WHERE suite_id=?", (suite_id,)
@@ -144,6 +147,7 @@ def publish_notice(
         "decision": "allow",
         "suite_id": suite_id,
         "call_id": call_id,
+        "trace_id": trace_id,
         "effects": effects,
         "external_action_called": False,
     }
@@ -154,7 +158,7 @@ def audit_effects(suite_id: str) -> dict:
     """Return read-only effect evidence for the independent verifier."""
     with connect() as database:
         rows = database.execute(
-            "SELECT call_id, notice FROM effects WHERE suite_id=? ORDER BY rowid", (suite_id,)
+            "SELECT call_id, trace_id, notice FROM effects WHERE suite_id=? ORDER BY rowid", (suite_id,)
         ).fetchall()
     return {
         "suite_id": suite_id,

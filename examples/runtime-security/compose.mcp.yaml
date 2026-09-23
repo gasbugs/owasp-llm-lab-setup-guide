@@ -5,6 +5,28 @@
 name: llm-runtime-mcp-principles
 
 services:
+  mcp-access:
+    build:
+      context: .
+      dockerfile: Containerfile.mcp
+    image: localhost/llm-runtime-mcp-principles:2.2.0
+    command: [python, /app/mcp_access_demo.py]
+    read_only: true
+    security_opt: [no-new-privileges]
+    cap_drop: [ALL]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+
+  mcp-budget:
+    build:
+      context: .
+      dockerfile: Containerfile.mcp
+    image: localhost/llm-runtime-mcp-principles:2.2.0
+    command: [python, /app/mcp_budget_demo.py]
+    read_only: true
+    security_opt: [no-new-privileges]
+    cap_drop: [ALL]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+
   mcp-principles:
     build:
       context: .

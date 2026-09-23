@@ -18,7 +18,7 @@ tabs:
   - {id: 10-policy-promotion, hands_on: [H16], hands_on_status: planned, practice: P10, practice_status: planned}
   - {id: 11-raw-observability, hands_on: [H17, H18], hands_on_status: planned, practice: P11, practice_status: planned}
   - {id: 12-incident-alert, hands_on: [H19, H20], hands_on_status: planned, practice: P12, practice_status: planned}
-  - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: partial, implemented_hands_on: [H22], practice: P13, practice_status: planned}
+  - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: implemented, implemented_hands_on: [H21, H22], practice: P13, practice_status: planned}
 
 hands_on_H01:
   executor: guided-h01-gateway
@@ -62,6 +62,25 @@ hands_on_H22:
     - no-approval
     - self-approval
     - changed-args
+    - expired-approval
     - exact-approved-call
     - approval-reuse
-    - effect_counts: [0, 0, 1, 1]
+    - effect_counts: [0, 0, 0, 1, 1]
+
+hands_on_H21:
+  executor: guided-h21-host
+  provider: guided-h21-provider
+  mcp_servers: [guided-h21-trusted-mcp, guided-h21-untrusted-mcp]
+  verifier: guided-evidence-verifier
+  protocol_version: 2026-07-28
+  required_evidence:
+    - source_digest
+    - tool_inventory_digest
+    - model-not-allowed
+    - mcp-server-not-allowed
+    - tool-not-allowed
+    - tool-call-budget
+    - tool-result-byte-limit
+    - state-owner-mismatch
+    - oauth-audience-invalid
+    - shared-trace-id

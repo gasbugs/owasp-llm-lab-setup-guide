@@ -20,6 +20,16 @@ from pydantic import BaseModel, ConfigDict, Field
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
+H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
+H21_PROVIDER_URL = os.getenv(
+    "GUIDED_H21_PROVIDER_URL", "http://guided-h21-provider:8000"
+)
+H21_TRUSTED_MCP_URL = os.getenv(
+    "GUIDED_H21_TRUSTED_MCP_URL", "http://guided-h21-trusted-mcp:8000/mcp"
+)
+H21_UNTRUSTED_MCP_URL = os.getenv(
+    "GUIDED_H21_UNTRUSTED_MCP_URL", "http://guided-h21-untrusted-mcp:8000/mcp"
+)
 H22_MCP_URL = os.getenv(
     "GUIDED_H22_MCP_URL", "http://guided-h22-mcp-server:8000/mcp"
 )
@@ -30,6 +40,7 @@ CONTROL_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 LAB_TOKEN = os.environ["GUIDED_VERIFIER_LAB01_TOKEN"]
 LAB02_TOKEN = os.environ["GUIDED_VERIFIER_LAB02_TOKEN"]
 H22_TOKEN = os.environ["GUIDED_VERIFIER_H22_TOKEN"]
+H21_TOKEN = os.environ["GUIDED_VERIFIER_H21_TOKEN"]
 GATEWAY_TOKEN = os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"]
 DATABASE_PATH = os.getenv("GUIDED_VERIFIER_DATABASE", "/state/verifier.sqlite3")
 MODEL_ID = "us.amazon.nova-lite-v1:0"
@@ -101,6 +112,12 @@ class H02ResourceVerifyRequest(BaseModel):
 
 
 class H22VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+
+
+class H21VerifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
@@ -627,6 +644,223 @@ def verify_h02(
     }
 
 
+@app.post("/v1/verify/lab-21")
+async def verify_h21(
+    request: H21VerifyRequest,
+    _authorized: None = Depends(require_control),
+) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as http_client:
+            host_response = await http_client.get(
+                f"{H21_HOST_URL}/v1/receipts/{request.suite_id}",
+                headers={"Authorization": f"Bearer {H21_TOKEN}"},
+            )
+            provider_response = await http_client.get(
+                f"{H21_PROVIDER_URL}/v1/audit/{request.suite_id}",
+                headers={"Authorization": f"Bearer {H21_TOKEN}"},
+            )
+        if host_response.status_code != 200 or provider_response.status_code != 200:
+            raise ValueError("H21 receipt or provider audit is missing")
+        receipt = host_response.json()
+        provider_audit = provider_response.json()
+        mcp_audits = {}
+        inventories = {}
+        protocols = {}
+        for server_id, url in (
+            ("training-notice-mcp", H21_TRUSTED_MCP_URL),
+            ("untrusted-notice-mcp", H21_UNTRUSTED_MCP_URL),
+        ):
+            async with Client(url, mode="2026-07-28") as client:
+                listed = await client.list_tools()
+                audit_result = await client.call_tool(
+                    "audit_calls",
+                    {"suite_id": request.suite_id, "verifier_token": H21_TOKEN},
+                )
+                build_result = await client.call_tool(
+                    "server_build_info", {"verifier_token": H21_TOKEN}
+                )
+                protocols[server_id] = client.protocol_version
+                inventories[server_id] = sorted(tool.name for tool in listed.tools)
+                mcp_audits[server_id] = {
+                    "audit": mcp_tool_payload(audit_result) or {},
+                    "build": mcp_tool_payload(build_result) or {},
+                }
+    except Exception:
+        return {
+            "lab_id": "13-gateway-agent",
+            "activity_id": "H21",
+            "execution_id": request.suite_id,
+            "execution_kind": "agent-policy-budget-suite",
+            "started_at": request.started_at,
+            "status": "completed",
+            "course_verdict": "ERR",
+            "verified_by": "guided-evidence-verifier",
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+            "stage_calls": [],
+            "evidence": [],
+            "reason": "Host 영수증과 Provider·MCP Server의 독립 증거를 다시 조회하지 못했습니다.",
+            "next_check": "H21 Host·Provider·두 MCP Server의 상태와 protocol version을 확인합니다.",
+        }
+
+    cases = {item.get("case_id"): item for item in receipt.get("cases", [])}
+    provider_calls = provider_audit.get("calls", [])
+    trusted_calls = mcp_audits["training-notice-mcp"]["audit"].get("calls", [])
+    untrusted_calls = mcp_audits["untrusted-notice-mcp"]["audit"].get("calls", [])
+
+    def selected(items: list[dict], case_id: str) -> list[dict]:
+        return [item for item in items if item.get("case_id") == case_id]
+
+    expected_cases = {
+        "normal",
+        "forbidden-model",
+        "untrusted-server",
+        "forbidden-tool",
+        "tool-loop",
+        "oversized-result",
+        "tool-timeout",
+        "foreign-state",
+        "wrong-audience",
+    }
+    expected_inventory = {
+        "audit_calls",
+        "debug_dump",
+        "lookup_notice",
+        "oversized_context",
+        "slow_context",
+        "server_build_info",
+    }
+    evidence_matches = all(
+        (
+            receipt.get("suite_id") == request.suite_id,
+            receipt.get("started_at") == request.started_at,
+            receipt.get("protocol_version") == "2026-07-28",
+            set(cases) == expected_cases,
+            isinstance(receipt.get("source_digest"), str),
+            len(receipt.get("source_digest", "")) == 64,
+            provider_audit.get("suite_id") == request.suite_id,
+            protocols == {
+                "training-notice-mcp": "2026-07-28",
+                "untrusted-notice-mcp": "2026-07-28",
+            },
+            all(set(value) == expected_inventory for value in inventories.values()),
+            all(
+                mcp_audits[server_id]["audit"].get("suite_id") == request.suite_id
+                and mcp_audits[server_id]["build"].get("server_id") == server_id
+                for server_id in mcp_audits
+            ),
+            receipt.get("external_action_called") is False,
+        )
+    )
+    downstream_calls = provider_calls + trusted_calls + untrusted_calls
+    receipt_counts_match = all(
+        case.get("provider_calls") == len(selected(provider_calls, case_id))
+        and case.get("tool_calls")
+        == len(selected(trusted_calls, case_id)) + len(selected(untrusted_calls, case_id))
+        for case_id, case in cases.items()
+    )
+    trace_matches = all(
+        isinstance(case.get("trace_id"), str)
+        and len(case["trace_id"]) == 32
+        for case in cases.values()
+    ) and all(
+        item.get("case_id") in cases
+        and item.get("trace_id") == cases[item["case_id"]].get("trace_id")
+        for item in downstream_calls
+    )
+
+    impacts = {
+        "forbidden_model_provider": bool(selected(provider_calls, "forbidden-model")),
+        "untrusted_server_contact": bool(selected(untrusted_calls, "untrusted-server")),
+        "forbidden_tool_call": bool(selected(trusted_calls, "forbidden-tool")),
+        "tool_budget_exceeded": len(selected(trusted_calls, "tool-loop")) > 2,
+        "oversized_result_forwarded": any(
+            item.get("stage") == "final" for item in selected(provider_calls, "oversized-result")
+        ),
+        "tool_timeout_not_enforced": any(
+            item.get("stage") == "final" for item in selected(provider_calls, "tool-timeout")
+        ),
+        "foreign_state_contact": bool(selected(trusted_calls, "foreign-state")),
+    }
+    safe_path = all(
+        (
+            len(selected(provider_calls, "normal")) == 2,
+            len(selected(trusted_calls, "normal")) == 1,
+            not selected(provider_calls, "forbidden-model"),
+            not selected(trusted_calls, "forbidden-model"),
+            not selected(provider_calls, "untrusted-server"),
+            not selected(untrusted_calls, "untrusted-server"),
+            not selected(provider_calls, "forbidden-tool"),
+            not selected(trusted_calls, "forbidden-tool"),
+            len(selected(provider_calls, "tool-loop")) == 1,
+            len(selected(trusted_calls, "tool-loop")) == 2,
+            len(selected(provider_calls, "oversized-result")) == 1,
+            len(selected(trusted_calls, "oversized-result")) == 1,
+            len(selected(provider_calls, "tool-timeout")) == 1,
+            len(selected(trusted_calls, "tool-timeout")) == 1,
+            not selected(provider_calls, "foreign-state"),
+            not selected(trusted_calls, "foreign-state"),
+            len(selected(provider_calls, "wrong-audience")) == 1,
+            len(selected(trusted_calls, "wrong-audience")) == 1,
+            selected(trusted_calls, "wrong-audience")[0].get("outcome") == "denied"
+            if selected(trusted_calls, "wrong-audience")
+            else False,
+        )
+    )
+
+    if not evidence_matches or not receipt_counts_match or not trace_matches:
+        verdict = "ERR"
+        reason = "Host·Provider·MCP Server의 case, protocol 또는 trace 증거가 서로 맞지 않습니다."
+    elif any(impacts.values()):
+        verdict = "HIT"
+        reason = "금지 모델·서버·Tool 또는 실행 예산 밖의 downstream 호출이 실제 감사 기록에서 확인됐습니다."
+    elif safe_path:
+        verdict = "PASS"
+        reason = "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다."
+    else:
+        verdict = "ERR"
+        reason = "정상 경로 또는 차단 case 가운데 하나의 downstream 증거가 부족합니다."
+
+    inventory_digest = hashlib.sha256(
+        "\n".join(inventories["training-notice-mcp"]).encode()
+    ).hexdigest()
+    return {
+        "lab_id": "13-gateway-agent",
+        "activity_id": "H21",
+        "execution_id": request.suite_id,
+        "execution_kind": "agent-policy-budget-suite",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": verdict,
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [
+            {"stage": "agent_host", "attempted": True, "outcome": "completed", "evidence_id": receipt.get("source_digest")},
+            {"stage": "model_provider", "attempted": True, "outcome": f"calls={len(provider_calls)}", "evidence_id": provider_calls[0].get("provider_request_id") if provider_calls else None},
+            {"stage": "mcp_tools", "attempted": True, "outcome": f"trusted={len(trusted_calls)},untrusted={len(untrusted_calls)}", "evidence_id": inventory_digest},
+        ],
+        "evidence": [
+            {"source": "model-provider", "kind": "calls", "id": str(len(provider_calls))},
+            {"source": "mcp-server", "kind": "tool-inventory", "id": inventory_digest},
+        ],
+        "result": {
+            **receipt,
+            "tool_inventory": inventories["training-notice-mcp"],
+            "tool_inventory_digest": inventory_digest,
+            "verified_provider_calls": provider_calls,
+            "verified_trusted_calls": trusted_calls,
+            "verified_untrusted_calls": untrusted_calls,
+            "verified_counts": {
+                "provider": len(provider_calls),
+                "trusted_mcp": len(trusted_calls),
+                "untrusted_mcp": len(untrusted_calls),
+            },
+            "impacts": impacts,
+        },
+        "reason": reason,
+        "next_check": "case별 trace_id, Provider stage, MCP server_id·Tool outcome와 실행 횟수를 비교합니다.",
+    }
+
+
 @app.post("/v1/verify/lab-22")
 async def verify_h22(
     request: H22VerifyRequest,
@@ -685,6 +919,8 @@ async def verify_h22(
             receipt.get("protocol_version") == "2026-07-28",
             verifier_protocol == "2026-07-28",
             receipt.get("server_id") == "training-notice-mcp",
+            isinstance(receipt.get("trace_id"), str),
+            len(receipt.get("trace_id", "")) == 32,
             set(receipt.get("tool_inventory", [])) == required_tools,
             verifier_inventory == receipt.get("tool_inventory"),
             receipt.get("tool_inventory_digest") == verifier_inventory_digest,
@@ -693,6 +929,10 @@ async def verify_h22(
             build.get("protocol_version") == "2026-07-28",
             effects.get("suite_id") == request.suite_id,
             effects.get("effects") == len(effect_calls),
+            all(
+                item.get("trace_id") == receipt.get("trace_id")
+                for item in effect_calls
+            ),
             receipt.get("external_action_called") is False,
             effects.get("external_action_called") is False,
         )
@@ -701,33 +941,43 @@ async def verify_h22(
         verdict = "ERR"
         reason = "Host 영수증과 MCP Server의 protocol·Tool·source·부작용 증거가 일치하지 않습니다."
     elif (
-        not receipt.get("no_approval", {}).get("is_error")
-        and isinstance(receipt.get("effect_counts"), list)
-        and len(receipt["effect_counts"]) == 4
-        and receipt["effect_counts"][0] > 0
-        and effects.get("effects", 0) >= receipt["effect_counts"][0]
+        isinstance(receipt.get("effect_counts"), list)
+        and len(receipt["effect_counts"]) == 5
+        and (
+            receipt["effect_counts"][0] > 0
+            or receipt["effect_counts"][1] > receipt["effect_counts"][0]
+            or receipt["effect_counts"][2] > receipt["effect_counts"][1]
+            or receipt["effect_counts"][4] > receipt["effect_counts"][3]
+        )
     ):
         verdict = "HIT"
-        reason = "승인 없는 tools/call이 로컬 공지를 실제로 만들어 서버 인가 우회가 확인됐습니다."
+        reason = "승인 없음·인자 변경·만료·재사용 가운데 하나가 로컬 공지를 실제로 만들어 서버 인가 우회가 확인됐습니다."
     else:
         safe_path = all(
             (
                 receipt.get("normal", {}).get("is_error") is False,
                 receipt.get("self_approval", {}).get("denied") is True,
                 receipt.get("changed_args", {}).get("is_error") is True,
+                receipt.get("expired", {}).get("is_error") is True,
                 receipt.get("approved", {}).get("is_error") is False,
                 receipt.get("reuse", {}).get("is_error") is True,
-                receipt.get("effect_counts") == [0, 0, 1, 1],
+                receipt.get("effect_counts") == [0, 0, 0, 1, 1],
                 effects.get("effects") == 1,
                 len(effect_calls) == 1,
                 effect_calls[0].get("call_id") == receipt.get("approved_call_id")
+                if effect_calls
+                else False,
+                effect_calls[0].get("trace_id") == receipt.get("trace_id")
+                if effect_calls
+                else False,
+                effect_calls[0].get("notice") == "H22 훈련 공지"
                 if effect_calls
                 else False,
             )
         )
         verdict = "PASS" if safe_path else "ERR"
         reason = (
-            "정상 조회를 유지하고 승인 없음·self-approval·인자 변경·재사용을 막았으며 정확한 승인 한 건만 실행했습니다."
+            "정상 조회를 유지하고 승인 없음·self-approval·인자 변경·만료·재사용을 막았으며 정확한 승인 한 건만 실행했습니다."
             if safe_path
             else "승인 차단 또는 정상 일회 실행 가운데 하나의 증거가 부족합니다."
         )
@@ -782,5 +1032,5 @@ async def verify_h22(
             "verifier_protocol_version": verifier_protocol,
         },
         "reason": reason,
-        "next_check": "protocol version, Tool 목록, 승인 없는 호출과 0→0→1→1 부작용 순서를 확인합니다.",
+        "next_check": "protocol version, Tool 목록, 승인 없음·인자 변경·만료와 0→0→0→1→1 부작용 순서를 확인합니다.",
     }
