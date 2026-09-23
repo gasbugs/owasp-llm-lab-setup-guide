@@ -164,6 +164,39 @@ docker compose \
           </div>
         </div>
 
+        <div id="h22-work" class="lab-workspace" hidden>
+          <p>외부 문서의 문장이 모델에게 <code>publish_notice</code> Tool을 제안하게 했다고 가정합니다. 제안은 실행 허가가 아니므로 MCP Server가 requester·reviewer·Tool·인자·만료·nonce를 다시 검사하도록 만듭니다.</p>
+          <div class="cost-note"><strong>격리 안내</strong><span>실제 메일·삭제·결제 API는 호출하지 않습니다. 승인된 부작용은 H22 전용 SQLite에 훈련 공지 한 건만 기록합니다.</span></div>
+
+          <section class="hands-on" aria-labelledby="h22-code-title">
+            <div>
+              <p class="label">LEARNER-OWNED MCP SERVER</p>
+              <h3 id="h22-code-title">Tool 제안과 실행 권한 분리하기</h3>
+              <p><code>guided-labs/h22-mcp-approval/server.py</code>는 공식 SDK의 Streamable HTTP Server입니다. Starter는 요청마다 임의 nonce를 새로 만들어 승인 없는 호출도 실행합니다. <code>publish_notice()</code>에서 아래처럼 서버 검사를 연결합니다.</p>
+              <pre>nonce = verify_approval(
+    approval_token,
+    suite_id,
+    call_id,
+    requester,
+    notice,
+)</pre>
+              <p>검사 뒤 SQLite transaction이 nonce 소비와 훈련 공지 기록을 함께 처리합니다. 그래서 다른 인자, 만료 Token과 같은 nonce 재사용은 공지를 만들기 전에 멈춥니다.</p>
+              <pre>docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-h22-mcp-server guided-h22-host
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-h22-mcp-server guided-h22-host</pre>
+            </div>
+          </section>
+
+          <div class="actions">
+            <button id="h22-verify" class="primary">현재 구현 검증</button>
+          </div>
+        </div>
+
         <section class="inspection" aria-labelledby="inspection-title">
           <div class="inspection-head"><div><p class="label">STAGE CALLS</p><h3 id="inspection-title">요청 검사 컨베이어</h3></div><span id="execution-state">아직 실행하지 않음</span></div>
           <div id="belt" class="belt">

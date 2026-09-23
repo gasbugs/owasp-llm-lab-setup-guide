@@ -47,10 +47,12 @@ services:
       GUIDED_SESSION_SECRET: ${GUIDED_SESSION_SECRET:?Set GUIDED_SESSION_SECRET}
       GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
       GUIDED_CONTROL_LAB02_TOKEN: ${GUIDED_CONTROL_LAB02_TOKEN:?Set GUIDED_CONTROL_LAB02_TOKEN}
+      GUIDED_CONTROL_H22_TOKEN: ${GUIDED_CONTROL_H22_TOKEN:?Set GUIDED_CONTROL_H22_TOKEN}
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
       GUIDED_LAB02_PROVISION_TOKEN: ${GUIDED_LAB02_PROVISION_TOKEN:?Set GUIDED_LAB02_PROVISION_TOKEN}
       GUIDED_LAB01_URL: http://guided-h01-gateway:8000
       GUIDED_LAB02_URL: http://guided-h02-document-app:8000
+      GUIDED_H22_HOST_URL: http://guided-h22-host:8000
       GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
       GUIDED_VERIFIER_URL: http://guided-evidence-verifier:8000
       GUIDED_ALLOWED_HOSTS: 127.0.0.1:${GUIDED_HOST_PORT:-18097},localhost:${GUIDED_HOST_PORT:-18097}
@@ -59,6 +61,7 @@ services:
     depends_on:
       guided-h01-gateway: {condition: service_healthy}
       guided-h02-document-app: {condition: service_healthy}
+      guided-h22-host: {condition: service_healthy}
       guided-evidence-verifier: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host':'127.0.0.1:${GUIDED_HOST_PORT:-18097}'}); urllib.request.urlopen(r, timeout=2)"]
@@ -102,14 +105,19 @@ services:
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
       GUIDED_VERIFIER_LAB01_TOKEN: ${GUIDED_VERIFIER_LAB01_TOKEN:?Set GUIDED_VERIFIER_LAB01_TOKEN}
       GUIDED_VERIFIER_LAB02_TOKEN: ${GUIDED_VERIFIER_LAB02_TOKEN:?Set GUIDED_VERIFIER_LAB02_TOKEN}
+      GUIDED_VERIFIER_H22_TOKEN: ${GUIDED_VERIFIER_H22_TOKEN:?Set GUIDED_VERIFIER_H22_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
       GUIDED_LAB01_URL: http://guided-h01-gateway:8000
       GUIDED_LAB02_URL: http://guided-h02-document-app:8000
+      GUIDED_H22_HOST_URL: http://guided-h22-host:8000
+      GUIDED_H22_MCP_URL: http://guided-h22-mcp-server:8000/mcp
       GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
     volumes: [guided-verifier-state:/state:rw]
     depends_on:
       guided-h01-gateway: {condition: service_healthy}
       guided-h02-document-app: {condition: service_healthy}
+      guided-h22-host: {condition: service_healthy}
+      guided-h22-mcp-server: {condition: service_healthy}
       guided-bedrock-gateway: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
@@ -163,6 +171,49 @@ services:
       GUIDED_VERIFIER_LAB02_TOKEN: ${GUIDED_VERIFIER_LAB02_TOKEN:?Set GUIDED_VERIFIER_LAB02_TOKEN}
     depends_on:
       guided-bedrock-gateway: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-h22-mcp-server:
+    <<: *guided-service
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /state:rw,noexec,nosuid,size=16m,uid=65532,gid=65532,mode=0700
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h22-mcp-approval/Containerfile
+    image: localhost/llm-security-guided-h22-mcp:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h22-mcp-server
+    command: [python, /app/server.py]
+    environment:
+      GUIDED_H22_APPROVAL_SECRET: ${GUIDED_H22_APPROVAL_SECRET:?Set GUIDED_H22_APPROVAL_SECRET}
+    healthcheck:
+      test: [CMD, python, -c, "import socket; s=socket.create_connection(('127.0.0.1',8000),2); s.close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-h22-host:
+    <<: *guided-service
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /state:rw,noexec,nosuid,size=16m,uid=65532,gid=65532,mode=0700
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h22-mcp-approval/Containerfile
+    image: localhost/llm-security-guided-h22-mcp:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h22-host
+    command: [uvicorn, host:app, --host, 0.0.0.0, --port, "8000", --log-level, warning]
+    environment:
+      GUIDED_H22_MCP_URL: http://guided-h22-mcp-server:8000/mcp
+      GUIDED_H22_APPROVAL_SECRET: ${GUIDED_H22_APPROVAL_SECRET:?Set GUIDED_H22_APPROVAL_SECRET}
+      GUIDED_CONTROL_H22_TOKEN: ${GUIDED_CONTROL_H22_TOKEN:?Set GUIDED_CONTROL_H22_TOKEN}
+      GUIDED_VERIFIER_H22_TOKEN: ${GUIDED_VERIFIER_H22_TOKEN:?Set GUIDED_VERIFIER_H22_TOKEN}
+    depends_on:
+      guided-h22-mcp-server: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 2s

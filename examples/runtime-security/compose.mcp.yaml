@@ -1,0 +1,16 @@
+# CUSTOM FILE
+# Format reference: Docker Compose Specification, https://compose-spec.io/
+# Upstream license: Apache-2.0
+
+name: llm-runtime-mcp-principles
+
+services:
+  mcp-principles:
+    build:
+      context: .
+      dockerfile: Containerfile.mcp
+    image: localhost/llm-runtime-mcp-principles:2.2.0
+    read_only: true
+    security_opt: [no-new-privileges]
+    cap_drop: [ALL]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]

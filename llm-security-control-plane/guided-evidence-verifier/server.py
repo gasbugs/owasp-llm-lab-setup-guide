@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
+import json
 import os
 import sqlite3
 from datetime import datetime, timezone
@@ -11,17 +13,23 @@ from typing import Literal
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
+from mcp import Client
 from pydantic import BaseModel, ConfigDict, Field
 
 
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
+H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
+H22_MCP_URL = os.getenv(
+    "GUIDED_H22_MCP_URL", "http://guided-h22-mcp-server:8000/mcp"
+)
 GATEWAY_URL = os.getenv(
     "GUIDED_BEDROCK_GATEWAY_URL", "http://guided-bedrock-gateway:8080"
 )
 CONTROL_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 LAB_TOKEN = os.environ["GUIDED_VERIFIER_LAB01_TOKEN"]
 LAB02_TOKEN = os.environ["GUIDED_VERIFIER_LAB02_TOKEN"]
+H22_TOKEN = os.environ["GUIDED_VERIFIER_H22_TOKEN"]
 GATEWAY_TOKEN = os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"]
 DATABASE_PATH = os.getenv("GUIDED_VERIFIER_DATABASE", "/state/verifier.sqlite3")
 MODEL_ID = "us.amazon.nova-lite-v1:0"
@@ -92,6 +100,12 @@ class H02ResourceVerifyRequest(BaseModel):
     started_at: str
 
 
+class H22VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+
+
 def require_control(authorization: str | None = Header(default=None)) -> None:
     scheme, _, token = (authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not hmac.compare_digest(token, CONTROL_TOKEN):
@@ -103,6 +117,21 @@ def parse_time(value: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError("timezone is required")
     return parsed.astimezone(timezone.utc)
+
+
+def mcp_tool_payload(result) -> dict | None:
+    if isinstance(result.structured_content, dict):
+        return result.structured_content
+    for block in result.content:
+        text = getattr(block, "text", None)
+        if isinstance(text, str):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+    return None
 
 
 def err_envelope(request: VerifyRequest, reason: str) -> dict:
@@ -595,4 +624,163 @@ def verify_h02(
         "result": {**normal, "cases": verified_cases},
         "reason": reason,
         "next_check": "세 case의 HTTP 상태, object_key, 1024차원과 AWS 미호출 여부를 비교합니다.",
+    }
+
+
+@app.post("/v1/verify/lab-22")
+async def verify_h22(
+    request: H22VerifyRequest,
+    _authorized: None = Depends(require_control),
+) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as http_client:
+            host_response = await http_client.get(
+                f"{H22_HOST_URL}/v1/receipts/{request.suite_id}",
+                headers={"Authorization": f"Bearer {H22_TOKEN}"},
+            )
+        if host_response.status_code != 200:
+            raise ValueError("MCP Host receipt is missing")
+        receipt = host_response.json()
+        async with Client(H22_MCP_URL, mode="2026-07-28") as client:
+            tools_result = await client.list_tools()
+            build_result = await client.call_tool("server_build_info", {})
+            effects_result = await client.call_tool(
+                "audit_effects", {"suite_id": request.suite_id}
+            )
+            verifier_protocol = client.protocol_version
+    except Exception:
+        return {
+            "lab_id": "13-gateway-agent",
+            "activity_id": "H22",
+            "execution_id": request.suite_id,
+            "execution_kind": "mcp-exact-call-suite",
+            "started_at": request.started_at,
+            "status": "completed",
+            "course_verdict": "ERR",
+            "verified_by": "guided-evidence-verifier",
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+            "stage_calls": [],
+            "evidence": [],
+            "reason": "MCP Host 영수증 또는 Server 부작용을 다시 조회하지 못했습니다.",
+            "next_check": "H22 Host·MCP Server 상태와 protocol version을 확인합니다.",
+        }
+
+    build = mcp_tool_payload(build_result) or {}
+    effects = mcp_tool_payload(effects_result) or {}
+    effect_calls = effects.get("calls", [])
+    verifier_inventory = sorted(tool.name for tool in tools_result.tools)
+    verifier_inventory_digest = hashlib.sha256(
+        "\n".join(verifier_inventory).encode()
+    ).hexdigest()
+    required_tools = {
+        "lookup_notice",
+        "publish_notice",
+        "audit_effects",
+        "server_build_info",
+    }
+    fields_match = all(
+        (
+            receipt.get("suite_id") == request.suite_id,
+            receipt.get("started_at") == request.started_at,
+            receipt.get("protocol_version") == "2026-07-28",
+            verifier_protocol == "2026-07-28",
+            receipt.get("server_id") == "training-notice-mcp",
+            set(receipt.get("tool_inventory", [])) == required_tools,
+            verifier_inventory == receipt.get("tool_inventory"),
+            receipt.get("tool_inventory_digest") == verifier_inventory_digest,
+            receipt.get("source_digest") == build.get("source_digest"),
+            build.get("server_id") == "training-notice-mcp",
+            build.get("protocol_version") == "2026-07-28",
+            effects.get("suite_id") == request.suite_id,
+            effects.get("effects") == len(effect_calls),
+            receipt.get("external_action_called") is False,
+            effects.get("external_action_called") is False,
+        )
+    )
+    if not fields_match:
+        verdict = "ERR"
+        reason = "Host 영수증과 MCP Server의 protocol·Tool·source·부작용 증거가 일치하지 않습니다."
+    elif (
+        not receipt.get("no_approval", {}).get("is_error")
+        and isinstance(receipt.get("effect_counts"), list)
+        and len(receipt["effect_counts"]) == 4
+        and receipt["effect_counts"][0] > 0
+        and effects.get("effects", 0) >= receipt["effect_counts"][0]
+    ):
+        verdict = "HIT"
+        reason = "승인 없는 tools/call이 로컬 공지를 실제로 만들어 서버 인가 우회가 확인됐습니다."
+    else:
+        safe_path = all(
+            (
+                receipt.get("normal", {}).get("is_error") is False,
+                receipt.get("self_approval", {}).get("denied") is True,
+                receipt.get("changed_args", {}).get("is_error") is True,
+                receipt.get("approved", {}).get("is_error") is False,
+                receipt.get("reuse", {}).get("is_error") is True,
+                receipt.get("effect_counts") == [0, 0, 1, 1],
+                effects.get("effects") == 1,
+                len(effect_calls) == 1,
+                effect_calls[0].get("call_id") == receipt.get("approved_call_id")
+                if effect_calls
+                else False,
+            )
+        )
+        verdict = "PASS" if safe_path else "ERR"
+        reason = (
+            "정상 조회를 유지하고 승인 없음·self-approval·인자 변경·재사용을 막았으며 정확한 승인 한 건만 실행했습니다."
+            if safe_path
+            else "승인 차단 또는 정상 일회 실행 가운데 하나의 증거가 부족합니다."
+        )
+
+    return {
+        "lab_id": "13-gateway-agent",
+        "activity_id": "H22",
+        "execution_id": request.suite_id,
+        "execution_kind": "mcp-exact-call-suite",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": verdict,
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [
+            {
+                "stage": "mcp_host",
+                "attempted": True,
+                "outcome": "completed",
+                "evidence_id": receipt.get("tool_inventory_digest"),
+            },
+            {
+                "stage": "mcp_server",
+                "attempted": True,
+                "outcome": "completed",
+                "evidence_id": build.get("source_digest"),
+            },
+            {
+                "stage": "training_effect",
+                "attempted": True,
+                "outcome": f"effects={effects.get('effects')}",
+                "evidence_id": receipt.get("approved_call_id"),
+            },
+        ],
+        "evidence": [
+            {
+                "source": "mcp-server",
+                "kind": "tool-inventory",
+                "id": receipt.get("tool_inventory_digest"),
+                "observed_at": receipt.get("observed_at"),
+            },
+            {
+                "source": "mcp-server",
+                "kind": "source-build",
+                "id": build.get("source_digest"),
+                "observed_at": receipt.get("observed_at"),
+            },
+        ],
+        "result": {
+            **receipt,
+            "verified_effects": effects,
+            "verifier_protocol_version": verifier_protocol,
+        },
+        "reason": reason,
+        "next_check": "protocol version, Tool 목록, 승인 없는 호출과 0→0→1→1 부작용 순서를 확인합니다.",
     }

@@ -18,7 +18,7 @@ tabs:
   - {id: 10-policy-promotion, hands_on: [H16], hands_on_status: planned, practice: P10, practice_status: planned}
   - {id: 11-raw-observability, hands_on: [H17, H18], hands_on_status: planned, practice: P11, practice_status: planned}
   - {id: 12-incident-alert, hands_on: [H19, H20], hands_on_status: planned, practice: P12, practice_status: planned}
-  - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: planned, practice: P13, practice_status: planned}
+  - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: partial, implemented_hands_on: [H22], practice: P13, practice_status: planned}
 
 hands_on_H01:
   executor: guided-h01-gateway
@@ -50,3 +50,18 @@ hands_on_H02:
     - normal-document
     - client-key-override
     - invalid-empty-body
+
+hands_on_H22:
+  executor: guided-h22-host
+  provider: guided-h22-mcp-server
+  verifier: guided-evidence-verifier
+  protocol_version: 2026-07-28
+  required_evidence:
+    - tool_inventory_digest
+    - source_digest
+    - no-approval
+    - self-approval
+    - changed-args
+    - exact-approved-call
+    - approval-reuse
+    - effect_counts: [0, 0, 1, 1]

@@ -21,12 +21,14 @@ APP_VERSION = os.getenv("RELEASE_VERSION", os.getenv("APP_VERSION", "dev"))
 SESSION_SECRET = os.environ["GUIDED_SESSION_SECRET"].encode()
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
+H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 GATEWAY_URL = os.getenv(
     "GUIDED_BEDROCK_GATEWAY_URL", "http://guided-bedrock-gateway:8080"
 )
 VERIFIER_URL = os.getenv("GUIDED_VERIFIER_URL", "http://guided-evidence-verifier:8000")
 LAB_TOKEN = os.environ["GUIDED_CONTROL_LAB01_TOKEN"]
 LAB02_TOKEN = os.environ["GUIDED_CONTROL_LAB02_TOKEN"]
+H22_TOKEN = os.environ["GUIDED_CONTROL_H22_TOKEN"]
 H02_PROVISION_TOKEN = os.environ["GUIDED_LAB02_PROVISION_TOKEN"]
 VERIFIER_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 ALLOWED_HOSTS = set(
@@ -172,7 +174,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             "tabs": 13,
             "hands_on": 22,
             "practices": 13,
-            "implemented_hands_on": ["H01", "H02"],
+            "implemented_hands_on": ["H01", "H02", "H22"],
             "implemented_practices": [],
         },
         "official_uis": [
@@ -207,6 +209,11 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "hands_on_id": "H02",
                 "service": "guided-h02-document-app",
                 "source_path": "llm-security-control-plane/guided-labs/h02-document-ingestion/server.py",
+            },
+            {
+                "hands_on_id": "H22",
+                "service": "guided-h22-mcp-server",
+                "source_path": "llm-security-control-plane/guided-labs/h22-mcp-approval/server.py",
             },
         ],
     }
@@ -518,6 +525,52 @@ async def verify_h02_document_app(
                     "suite_id": suite_id,
                     "started_at": suite_started_at,
                     "cases": cases,
+                },
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verifier_response.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verifier_response.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H22/verify")
+async def verify_h22_mcp_server(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            run_response = await client.post(
+                f"{H22_HOST_URL}/v1/run-suite",
+                headers={"Authorization": f"Bearer {H22_TOKEN}"},
+            )
+            if run_response.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "mcp_host",
+                        "downstream_called": False,
+                        "course_verdict": "ERR",
+                        "next_check": "H22 Host와 MCP Server 컨테이너 상태를 확인합니다.",
+                    },
+                )
+            execution = run_response.json()
+            verifier_response = await client.post(
+                f"{VERIFIER_URL}/v1/verify/lab-22",
+                json={
+                    "suite_id": execution["suite_id"],
+                    "started_at": execution["started_at"],
                 },
                 headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
             )

@@ -19,6 +19,7 @@ COMPOSE = ROOT / "examples/security-monitoring/compose.guided.yaml"
 os.environ.setdefault("GUIDED_SESSION_SECRET", "unit-session-secret")
 os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
 os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
+os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
 os.environ.setdefault("GUIDED_LAB02_PROVISION_TOKEN", "unit-provision-lab02")
 
@@ -55,8 +56,15 @@ class FakeAsyncClient:
     async def __aexit__(self, *args):
         return None
 
-    async def post(self, url, *, json, headers):
+    async def post(self, url, *, json=None, headers):
         self.calls.append({"url": url, "json": json, "headers": headers})
+        if url.endswith("/v1/run-suite"):
+            return FakeResponse(
+                {
+                    "suite_id": "88888888-8888-8888-8888-888888888888",
+                    "started_at": "2026-09-23T10:00:00+00:00",
+                }
+            )
         if url.endswith("/v1/chat"):
             if not json["message"] or "model" in json:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
@@ -82,7 +90,7 @@ class FakeAsyncClient:
             if not json["body"]:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H02" if "lab-02" in url else "H01"
+        activity_id = "H22" if "lab-22" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -131,7 +139,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H22"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
@@ -228,6 +236,27 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["activity_id"], "H02")
 
+    def test_h22_suite_is_server_owned_and_uses_verifier(self):
+        rejected = self.client.post(
+            "/api/hands-on/H22/verify",
+            json={"course_verdict": "PASS", "approval": True},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H22/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H22")
+        run_call, verifier_call = FakeAsyncClient.calls
+        self.assertIsNone(run_call["json"])
+        self.assertEqual(
+            verifier_call["json"]["suite_id"],
+            "88888888-8888-8888-8888-888888888888",
+        )
+        self.assertNotIn("course_verdict", verifier_call["json"])
+
     def test_unknown_host_is_rejected(self):
         response = self.client.get("/", headers={"Host": "attacker.example"})
         self.assertEqual(response.status_code, 421)
@@ -286,6 +315,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("docker.sock", serialized)
         self.assertIn("guided-h01-gateway", compose["services"])
         self.assertIn("guided-h02-document-app", compose["services"])
+        self.assertIn("guided-h22-mcp-server", compose["services"])
+        self.assertIn("guided-h22-host", compose["services"])
         self.assertIn("guided-bedrock-gateway", compose["services"])
         proxy = (CONTROL / "guided-front-proxy/nginx.conf").read_text(encoding="utf-8")
         self.assertIn("proxy_set_header Upgrade $http_upgrade", proxy)
@@ -327,7 +358,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][0]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][1]["hands_on_status"], "partial")
         self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02"])
-        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][2:]))
+        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][2:12]))
+        self.assertEqual(manifest["tabs"][12]["hands_on_status"], "partial")
+        self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H22"])
         self.assertTrue(
             all(tab["practice_status"] == "planned" for tab in manifest["tabs"])
         )

@@ -1,0 +1,12 @@
+FROM docker.io/library/python:3.12.14-slim
+
+ENV PIP_NO_CACHE_DIR=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY guided-labs/h22-mcp-approval/requirements.txt /tmp/requirements.txt
+RUN python -m pip install --requirement /tmp/requirements.txt
+
+WORKDIR /app
+COPY --chmod=0444 guided-labs/h22-mcp-approval/server.py /app/server.py
+COPY --chmod=0444 guided-labs/h22-mcp-approval/host.py /app/host.py
+
+USER 65532:65532
+EXPOSE 8000

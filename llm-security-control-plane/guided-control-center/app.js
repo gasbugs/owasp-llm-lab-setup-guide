@@ -48,7 +48,7 @@ function renderTabs() {
   tabNames.forEach((name, index) => {
     const button = document.createElement("button");
     button.type = "button";
-    const implemented = index <= 1;
+    const implemented = index <= 1 || index === 12;
     button.className = index === 0 ? "tab active" : implemented ? "tab" : "tab locked";
     button.disabled = !implemented;
     button.dataset.tabIndex = String(index);
@@ -58,7 +58,7 @@ function renderTabs() {
     const strong = document.createElement("strong");
     strong.textContent = name;
     const small = document.createElement("small");
-    small.textContent = index === 0 ? "H01 · 강사와 함께" : index === 1 ? "H02 · 강사와 함께" : "다음 구현 단계";
+    small.textContent = index === 0 ? "H01 · 강사와 함께" : index === 1 ? "H02 · 강사와 함께" : index === 12 ? "H22 · 강사와 함께" : "다음 구현 단계";
     copy.append(strong, small);
     button.append(number, copy);
     if (implemented) button.addEventListener("click", () => selectTab(index));
@@ -73,15 +73,17 @@ function selectTab(index) {
   });
   byId("h01-work").hidden = index !== 0;
   byId("h02-work").hidden = index !== 1;
+  byId("h22-work").hidden = index !== 12;
+  const h22 = index === 12;
   setText("current-station", `${String(index + 1).padStart(2, "0")} / 13`);
-  setText("current-station-name", index === 0 ? "Nova Lite 요청 경로" : "Embedding·Knowledge Base");
-  setText("activity-label", `HANDS-ON · ${index === 0 ? "H01" : "H02"}`);
-  setText("activity-title", index === 0 ? "Bedrock Gateway 만들기" : "원문과 Knowledge Base 연결하기");
-  setText("provider-label", index === 0 ? "PROVIDER" : "TITAN REQUEST");
-  setText("model-label", index === 0 ? "MODEL" : "EMBED MODEL");
-  setText("requested-label", index === 0 ? "REQUESTED" : "OBJECT KEY");
-  setText("effective-label", index === 0 ? "EFFECTIVE" : "DIMENSION");
-  setText("output-label", index === 0 ? "OUTPUT TOKENS" : "DATA SOURCE");
+  setText("current-station-name", index === 0 ? "Nova Lite 요청 경로" : index === 1 ? "Embedding·Knowledge Base" : "MCP Tool 승인 경계");
+  setText("activity-label", `HANDS-ON · ${index === 0 ? "H01" : index === 1 ? "H02" : "H22"}`);
+  setText("activity-title", index === 0 ? "Bedrock Gateway 만들기" : index === 1 ? "원문과 Knowledge Base 연결하기" : "MCP Tool exact-call 승인 만들기");
+  setText("provider-label", index === 0 ? "PROVIDER" : index === 1 ? "TITAN REQUEST" : "TOOL CATALOG");
+  setText("model-label", index === 0 ? "MODEL" : index === 1 ? "EMBED MODEL" : "PROTOCOL");
+  setText("requested-label", h22 ? "EFFECT ORDER" : index === 0 ? "REQUESTED" : "OBJECT KEY");
+  setText("effective-label", h22 ? "SERVER" : index === 0 ? "EFFECTIVE" : "DIMENSION");
+  setText("output-label", h22 ? "EFFECTS" : index === 0 ? "OUTPUT TOKENS" : "DATA SOURCE");
 }
 
 function renderOfficialUis(items) {
@@ -118,7 +120,7 @@ async function request(path, body = undefined) {
 }
 
 function setBusy(busy) {
-  ["preflight", "verify", "chat-send", "h02-provision", "h02-verify"].forEach((id) => {
+  ["preflight", "verify", "chat-send", "h02-provision", "h02-verify", "h22-verify"].forEach((id) => {
     if (byId(id)) byId(id).disabled = busy;
   });
   if (busy) {
@@ -168,11 +170,12 @@ function renderEnvelope(payload) {
   setText("raw", JSON.stringify(payload, null, 2));
   setText("execution-id", payload.execution_id);
   const h02 = payload.activity_id === "H02";
-  setText("provider-id", payload.result?.provider_request_id || payload.result?.aws_request_ids?.[0]);
-  setText("model-id", payload.result?.model_id || payload.result?.embedding_model_id);
-  setText("requested-max", h02 ? payload.result?.object_key || payload.result?.source_prefix : payload.result?.requested_max_output_tokens);
-  setText("forwarded-max", h02 ? payload.result?.embedding_dimension || payload.result?.dimensions : payload.result?.forwarded_parameters?.maxTokens);
-  setText("output-tokens", h02 ? payload.result?.data_source_id : payload.result?.usage?.outputTokens);
+  const h22 = payload.activity_id === "H22";
+  setText("provider-id", h22 ? payload.result?.tool_inventory_digest : payload.result?.provider_request_id || payload.result?.aws_request_ids?.[0]);
+  setText("model-id", h22 ? payload.result?.protocol_version : payload.result?.model_id || payload.result?.embedding_model_id);
+  setText("requested-max", h22 ? payload.result?.effect_counts?.join("→") : h02 ? payload.result?.object_key || payload.result?.source_prefix : payload.result?.requested_max_output_tokens);
+  setText("forwarded-max", h22 ? payload.result?.server_id : h02 ? payload.result?.embedding_dimension || payload.result?.dimensions : payload.result?.forwarded_parameters?.maxTokens);
+  setText("output-tokens", h22 ? payload.result?.verified_effects?.effects : h02 ? payload.result?.data_source_id : payload.result?.usage?.outputTokens);
   setText("source-digest", payload.result?.source_digest?.slice(0, 12));
   setText("verified-by", payload.verified_by);
   setText("reason", payload.reason);
@@ -189,6 +192,7 @@ function renderEnvelope(payload) {
     control_center: "Control Center", learner_gateway: "Learner Gateway", bedrock_main: "Bedrock Main",
     learner_document_app: "Learner Document App", bedrock_titan: "Titan Embeddings",
     s3_source: "S3 Source", s3_vector_index: "S3 Vector Index", knowledge_base: "Knowledge Base",
+    mcp_host: "MCP Host", mcp_server: "MCP Server", training_effect: "Training Effect",
   };
   const belt = byId("belt");
   belt.replaceChildren();
@@ -234,6 +238,7 @@ byId("preflight").addEventListener("click", () => execute("/api/provider-preflig
 byId("verify").addEventListener("click", () => execute("/api/hands-on/H01/verify"));
 byId("h02-provision").addEventListener("click", () => execute("/api/hands-on/H02/provision"));
 byId("h02-verify").addEventListener("click", () => execute("/api/hands-on/H02/verify"));
+byId("h22-verify").addEventListener("click", () => execute("/api/hands-on/H22/verify"));
 byId("chat-form").addEventListener("submit", sendChat);
 document.querySelectorAll(".theme-choice").forEach((choice) => {
   choice.addEventListener("click", () => {

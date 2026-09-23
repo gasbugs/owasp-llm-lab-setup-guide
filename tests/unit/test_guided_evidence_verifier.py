@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import os
 import sys
 import tempfile
@@ -26,6 +27,59 @@ class FakeResponse:
         return self.payload
 
 
+class FakeAsyncHttpClient:
+    def __init__(self, response: FakeResponse):
+        self.response = response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    async def get(self, *_args, **_kwargs):
+        return self.response
+
+
+class FakeMcpResult:
+    def __init__(self, payload: dict):
+        self.structured_content = payload
+        self.content = []
+
+
+class FakeMcpClient:
+    protocol_version = "2026-07-28"
+
+    def __init__(self, effects: dict):
+        self.effects = effects
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    async def list_tools(self):
+        names = [
+            "audit_effects",
+            "lookup_notice",
+            "publish_notice",
+            "server_build_info",
+        ]
+        return type("Tools", (), {"tools": [type("Tool", (), {"name": name}) for name in names]})()
+
+    async def call_tool(self, name: str, _arguments: dict):
+        if name == "server_build_info":
+            return FakeMcpResult(
+                {
+                    "server_id": "training-notice-mcp",
+                    "protocol_version": "2026-07-28",
+                    "source_digest": "e" * 64,
+                }
+            )
+        return FakeMcpResult(self.effects)
+
+
 class GuidedEvidenceVerifierTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -33,6 +87,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"] = "control-verifier"
         os.environ["GUIDED_VERIFIER_LAB01_TOKEN"] = "verifier-lab"
         os.environ["GUIDED_VERIFIER_LAB02_TOKEN"] = "verifier-lab02"
+        os.environ["GUIDED_VERIFIER_H22_TOKEN"] = "verifier-h22"
         os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"] = "verifier-gateway"
         os.environ["GUIDED_VERIFIER_DATABASE"] = str(Path(cls.temp.name) / "verifier.sqlite3")
         spec = importlib.util.spec_from_file_location(
@@ -179,6 +234,70 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
     def test_browser_or_executor_verdict_field_is_rejected(self):
         response = self.verify({**self.body(), "course_verdict": "PASS"})
         self.assertEqual(response.status_code, 422)
+
+    def h22_receipt(self) -> dict:
+        inventory = [
+            "audit_effects",
+            "lookup_notice",
+            "publish_notice",
+            "server_build_info",
+        ]
+        return {
+            "suite_id": "99999999-9999-9999-9999-999999999999",
+            "started_at": "2026-09-22T10:00:00+00:00",
+            "observed_at": "2026-09-22T10:00:01+00:00",
+            "protocol_version": "2026-07-28",
+            "server_id": "training-notice-mcp",
+            "tool_inventory": inventory,
+            "tool_inventory_digest": hashlib.sha256("\n".join(inventory).encode()).hexdigest(),
+            "source_digest": "e" * 64,
+            "normal": {"is_error": False},
+            "no_approval": {"is_error": True},
+            "self_approval": {"denied": True},
+            "changed_args": {"is_error": True},
+            "approved": {"is_error": False},
+            "approved_call_id": "approved-call",
+            "reuse": {"is_error": True},
+            "effect_counts": [0, 0, 1, 1],
+            "external_action_called": False,
+        }
+
+    def verify_h22(self, receipt: dict):
+        effects = {
+            "suite_id": receipt["suite_id"],
+            "effects": 1,
+            "calls": [{"call_id": "approved-call", "notice": "H22 훈련 공지"}],
+            "external_action_called": False,
+        }
+        fake_http = FakeAsyncHttpClient(FakeResponse(receipt))
+        with (
+            patch.object(self.server.httpx, "AsyncClient", return_value=fake_http),
+            patch.object(
+                self.server,
+                "Client",
+                side_effect=lambda *_args, **_kwargs: FakeMcpClient(effects),
+            ),
+        ):
+            return self.client.post(
+                "/v1/verify/lab-22",
+                json={
+                    "suite_id": receipt["suite_id"],
+                    "started_at": receipt["started_at"],
+                },
+                headers={"Authorization": "Bearer control-verifier"},
+            )
+
+    def test_h22_rechecks_tools_and_effects_for_pass(self):
+        response = self.verify_h22(self.h22_receipt())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "PASS")
+        self.assertEqual(response.json()["result"]["verified_effects"]["effects"], 1)
+
+    def test_h22_rejects_host_only_tool_inventory_claim(self):
+        receipt = self.h22_receipt()
+        receipt["tool_inventory_digest"] = "f" * 64
+        response = self.verify_h22(receipt)
+        self.assertEqual(response.json()["course_verdict"], "ERR")
 
     def h02_body(self, risk_status: int) -> dict:
         return {
