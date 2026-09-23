@@ -32,6 +32,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"] = "control-verifier"
         os.environ["GUIDED_VERIFIER_LAB01_TOKEN"] = "verifier-lab"
+        os.environ["GUIDED_VERIFIER_LAB02_TOKEN"] = "verifier-lab02"
         os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"] = "verifier-gateway"
         os.environ["GUIDED_VERIFIER_DATABASE"] = str(Path(cls.temp.name) / "verifier.sqlite3")
         spec = importlib.util.spec_from_file_location(
@@ -178,6 +179,122 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
     def test_browser_or_executor_verdict_field_is_rejected(self):
         response = self.verify({**self.body(), "course_verdict": "PASS"})
         self.assertEqual(response.status_code, 422)
+
+    def h02_body(self, risk_status: int) -> dict:
+        return {
+            "suite_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "started_at": "2026-09-22T10:00:00+00:00",
+            "cases": [
+                {
+                    "case_id": "normal-document",
+                    "scenario": "normal",
+                    "execution_id": "55555555-5555-5555-5555-555555555555",
+                    "started_at": "2026-09-22T10:00:00+00:00",
+                    "observed_status": 200,
+                },
+                {
+                    "case_id": "client-key-override",
+                    "scenario": "risk",
+                    "execution_id": "66666666-6666-6666-6666-666666666666",
+                    "started_at": "2026-09-22T10:00:00+00:00",
+                    "observed_status": risk_status,
+                },
+                {
+                    "case_id": "invalid-empty-body",
+                    "scenario": "normal",
+                    "execution_id": "77777777-7777-7777-7777-777777777777",
+                    "started_at": "2026-09-22T10:00:00+00:00",
+                    "observed_status": 422,
+                },
+            ],
+        }
+
+    def fake_h02_get(self, risk_status: int):
+        state = {
+            "status": "READY",
+            "provider_mode": "contract",
+            "observed_at": "2026-09-22T10:00:01+00:00",
+            "account_id": "000000000000",
+            "region": "us-east-1",
+            "template_digest": "c" * 64,
+            "source_bucket": "owasp-llm-03-000000000000-source",
+            "source_prefix": "h02/knowledge/",
+            "index_arn": "arn:aws:s3vectors:us-east-1:000000000000:bucket/test/index/course-knowledge",
+            "knowledge_base_id": "CONTRACTKB",
+            "data_source_id": "CONTRACTDS",
+            "embedding_model_id": "amazon.titan-embed-text-v2:0",
+            "dimensions": 1024,
+        }
+
+        def get(url, **_kwargs):
+            if url.endswith("/v1/h02/resources"):
+                return FakeResponse(state)
+            if url.endswith("/v1/build-info"):
+                return FakeResponse(
+                    {"component": "guided-h02-document-app", "source_digest": "d" * 64}
+                )
+            execution_id = url.rsplit("/", 1)[-1]
+            if execution_id == "77777777-7777-7777-7777-777777777777" or (
+                execution_id == "66666666-6666-6666-6666-666666666666"
+                and risk_status == 422
+            ):
+                return FakeResponse({"detail": "not found"}, status_code=404)
+            scenario = "normal" if execution_id.startswith("5555") else "risk"
+            prefix = "knowledge" if scenario == "normal" else "untrusted"
+            object_key = f"h02/{prefix}/{execution_id}.md"
+            if "guided-h02-document-app" in url:
+                return FakeResponse(
+                    {
+                        "execution_id": execution_id,
+                        "source_digest": "d" * 64,
+                        "gateway_evidence_id": execution_id,
+                        "object_key": object_key,
+                    }
+                )
+            return FakeResponse(
+                {
+                    "execution_id": execution_id,
+                    "scenario": scenario,
+                    "observed_at": "2026-09-22T10:00:01+00:00",
+                    "provider_mode": "contract",
+                    "provider_request_id": f"titan-{execution_id[:8]}",
+                    "s3_request_id": f"s3-{execution_id[:8]}",
+                    "model_id": "amazon.titan-embed-text-v2:0",
+                    "region": "us-east-1",
+                    "object_key": object_key,
+                    "object_uri": f"s3://bucket/{object_key}",
+                    "object_exists": True,
+                    "embedding_dimension": 1024,
+                    "embedding_norm": 1.0,
+                    "knowledge_base_id": "CONTRACTKB",
+                    "data_source_id": "CONTRACTDS",
+                    "template_digest": "c" * 64,
+                    "upstream_called": True,
+                }
+            )
+
+        return get
+
+    def test_h02_fixed_document_app_is_pass(self):
+        with patch.object(self.server.httpx, "get", self.fake_h02_get(422)):
+            response = self.client.post(
+                "/v1/verify/lab-02",
+                json=self.h02_body(422),
+                headers={"Authorization": "Bearer control-verifier"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "PASS")
+        self.assertEqual(response.json()["result"]["embedding_dimension"], 1024)
+
+    def test_h02_client_owned_path_starter_is_hit(self):
+        with patch.object(self.server.httpx, "get", self.fake_h02_get(200)):
+            response = self.client.post(
+                "/v1/verify/lab-02",
+                json=self.h02_body(200),
+                headers={"Authorization": "Bearer control-verifier"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "HIT")
 
 
 if __name__ == "__main__":

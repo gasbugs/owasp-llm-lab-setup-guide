@@ -20,8 +20,14 @@ ROOT = Path(__file__).parent
 APP_VERSION = os.getenv("RELEASE_VERSION", os.getenv("APP_VERSION", "dev"))
 SESSION_SECRET = os.environ["GUIDED_SESSION_SECRET"].encode()
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
+LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
+GATEWAY_URL = os.getenv(
+    "GUIDED_BEDROCK_GATEWAY_URL", "http://guided-bedrock-gateway:8080"
+)
 VERIFIER_URL = os.getenv("GUIDED_VERIFIER_URL", "http://guided-evidence-verifier:8000")
 LAB_TOKEN = os.environ["GUIDED_CONTROL_LAB01_TOKEN"]
+LAB02_TOKEN = os.environ["GUIDED_CONTROL_LAB02_TOKEN"]
+H02_PROVISION_TOKEN = os.environ["GUIDED_LAB02_PROVISION_TOKEN"]
 VERIFIER_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 ALLOWED_HOSTS = set(
     os.getenv(
@@ -35,6 +41,7 @@ ALLOWED_ORIGINS = set(
     ).split(",")
 )
 TIMEOUT = httpx.Timeout(130.0, connect=3.0)
+PROVISION_TIMEOUT = httpx.Timeout(360.0, connect=3.0)
 MODEL_ID = "us.amazon.nova-lite-v1:0"
 NEMO_BROWSER_URL = os.getenv("GUIDED_NEMO_BROWSER_URL", "http://127.0.0.1:18192")
 SESSIONS: dict[str, dict] = {}
@@ -165,7 +172,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             "tabs": 13,
             "hands_on": 22,
             "practices": 13,
-            "implemented_hands_on": ["H01"],
+            "implemented_hands_on": ["H01", "H02"],
             "implemented_practices": [],
         },
         "official_uis": [
@@ -190,6 +197,18 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             "source_path": "llm-security-control-plane/guided-labs/h01-bedrock-gateway/server.py",
             "compose_path": "examples/security-monitoring/compose.guided.yaml",
         },
+        "learner_apps": [
+            {
+                "hands_on_id": "H01",
+                "service": "guided-h01-gateway",
+                "source_path": "llm-security-control-plane/guided-labs/h01-bedrock-gateway/server.py",
+            },
+            {
+                "hands_on_id": "H02",
+                "service": "guided-h02-document-app",
+                "source_path": "llm-security-control-plane/guided-labs/h02-document-ingestion/server.py",
+            },
+        ],
     }
 
 
@@ -358,6 +377,153 @@ async def chat_with_learner_app(
             ],
             "result": result,
         }
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H02/provision")
+async def provision_h02_resources(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="provisioning inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+            provision_response = await client.post(
+                f"{GATEWAY_URL}/v1/h02/provision",
+                json={"execution_id": execution_id},
+                headers={"Authorization": f"Bearer {H02_PROVISION_TOKEN}"},
+            )
+            if provision_response.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "h02_aws_provisioning",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "Gateway 원시 오류와 현재 AWS 자원 상태를 확인합니다.",
+                    },
+                )
+            verifier_response = await client.post(
+                f"{VERIFIER_URL}/v1/verify/lab-02-resources",
+                json={"suite_id": execution_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verifier_response.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verifier_response.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H02/verify")
+async def verify_h02_document_app(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    suite_started_at = datetime.now(timezone.utc).isoformat()
+    definitions = [
+        {
+            "case_id": "normal-document",
+            "scenario": "normal",
+            "title": "모바일 송금 장애 절차",
+            "body": "모바일 송금 장애는 앱 재실행과 네트워크 상태를 먼저 확인하고 공식 고객센터에서 사건 번호를 발급받습니다.",
+        },
+        {
+            "case_id": "client-key-override",
+            "scenario": "risk",
+            "title": "경로 변경 시도",
+            "body": "클라이언트가 서버 소유 저장 경로를 바꾸려는 H02 보안 검증 문서입니다.",
+            "object_key_override": True,
+        },
+        {
+            "case_id": "invalid-empty-body",
+            "scenario": "normal",
+            "title": "빈 문서",
+            "body": "",
+        },
+    ]
+    cases = []
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            for definition in definitions:
+                execution_id = str(uuid.uuid4())
+                started_at = datetime.now(timezone.utc).isoformat()
+                payload = {
+                    "execution_id": execution_id,
+                    "started_at": started_at,
+                    "title": definition["title"],
+                    "body": definition["body"],
+                    "scenario": definition["scenario"],
+                }
+                if definition.get("object_key_override"):
+                    payload["object_key"] = f"h02/untrusted/{execution_id}.md"
+                response = await client.post(
+                    f"{LAB02_URL}/v1/documents",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {LAB02_TOKEN}"},
+                )
+                if definition["case_id"] == "normal-document" and response.status_code != 200:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={
+                            "successful_stage": "control_center",
+                            "stopped_stage": "guided_h02_document_app",
+                            "downstream_called": False,
+                            "course_verdict": "ERR",
+                            "next_check": "H02 자원 상태와 수강생 앱의 Gateway 요청을 확인합니다.",
+                        },
+                    )
+                if definition["case_id"] == "invalid-empty-body" and response.status_code != 422:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="invalid H02 body did not stop at the HTTP schema",
+                    )
+                if definition["case_id"] == "client-key-override" and response.status_code not in {200, 422}:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="H02 risk case returned an unexpected HTTP status",
+                    )
+                cases.append(
+                    {
+                        "case_id": definition["case_id"],
+                        "scenario": definition["scenario"],
+                        "execution_id": execution_id,
+                        "started_at": started_at,
+                        "observed_status": response.status_code,
+                    }
+                )
+            verifier_response = await client.post(
+                f"{VERIFIER_URL}/v1/verify/lab-02",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": suite_started_at,
+                    "cases": cases,
+                },
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verifier_response.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verifier_response.json()
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
     finally:

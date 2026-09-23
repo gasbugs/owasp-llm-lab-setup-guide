@@ -14,10 +14,10 @@
     <div>
       <p class="kicker">TENANT 03 · SECURITY INSPECTION LINE</p>
       <h1>앱을 고치고<br>증거로 검증한다</h1>
-      <p class="lede">Hands-on H01에서는 강사와 함께 HTTP 요청을 검증하고 Boto3로 Nova Lite를 호출하는 작은 Bedrock Gateway를 구현한 뒤, 서버 테스트로 동작을 확인합니다.</p>
+      <p class="lede">Hands-on에서는 작은 LLM 보안 앱을 직접 작성하고 Build한 뒤, Browser가 정할 수 없는 서버 Testcase와 실제 AWS 증거로 동작을 확인합니다.</p>
     </div>
     <div class="shift-card">
-      <span>현재 검사대</span><strong>01 / 13</strong><small>Nova Lite 요청 경로</small>
+      <span>현재 검사대</span><strong id="current-station">01 / 13</strong><small id="current-station-name">Nova Lite 요청 경로</small>
       <div class="theme-picker" role="group" aria-label="화면 테마">
         <button class="theme-choice" type="button" data-theme-choice="system" aria-label="시스템 테마 사용" title="System theme">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.5"></rect><path d="M8 21h8M12 17v4"></path></svg>
@@ -44,8 +44,9 @@
     </aside>
 
     <section class="panel workbench">
-      <div class="panel-head split"><div><p class="label">HANDS-ON · H01</p><h2>Bedrock Gateway 만들기</h2></div><span class="live-chip">INSTRUCTOR-LED</span></div>
+      <div class="panel-head split"><div><p id="activity-label" class="label">HANDS-ON · H01</p><h2 id="activity-title">Bedrock Gateway 만들기</h2></div><span class="live-chip">INSTRUCTOR-LED</span></div>
       <div class="work-body">
+        <div id="h01-work" class="lab-workspace">
         <p>강사와 함께 진행하는 본 실습입니다. Starter는 동작하는 HTTP 서버지만 512 Token 요청을 그대로 Nova Lite에 전달합니다. 요청 계약, 서버 고정 모델, 출력 상한과 Boto3 호출을 코드로 연결하고 서버가 가진 네 가지 Testcase로 확인합니다.</p>
         <div class="cost-note"><strong>비용 안내</strong><span>연결 확인은 1회, 현재 구현 검증은 정상·큰 요청 2회만 Nova Lite를 호출합니다. 잘못된 요청 2개는 Provider 전에 끝납니다.</span></div>
 
@@ -93,13 +94,82 @@ docker compose \
           <button id="preflight" class="secondary">Provider 연결 확인</button>
           <button id="verify" class="primary">현재 구현 검증</button>
         </div>
+        </div>
+
+        <div id="h02-work" class="lab-workspace" hidden>
+          <p>고객지원 문서를 검색에 연결하는 앱을 만듭니다. AWS 자원은 제공 Gateway가 서버 고정 이름과 정책으로 준비하고, 수강생 앱은 문서 입력을 검증해 승인된 S3 경로와 Titan Text Embeddings V2 호출로 전달합니다.</p>
+          <div class="cost-note"><strong>비용 안내</strong><span>AWS 자원 준비는 S3 원문 Bucket, S3 Vector Index, IAM 역할과 Knowledge Base·Data Source를 만듭니다. 현재 구현 검증은 정상 문서 한 건과 Starter의 위험 문서 한 건에서 Titan을 호출합니다.</span></div>
+
+          <section class="hands-on" aria-labelledby="h02-resource-title">
+            <div>
+              <p class="label">SERVER-OWNED AWS TEMPLATE</p>
+              <h3 id="h02-resource-title">연결할 AWS 자원 원문 확인</h3>
+              <p>Browser는 Bucket·Role·Knowledge Base 이름을 보내지 않습니다. 제공 Gateway가 현재 계정 번호를 붙인 고정 이름, <code>h02/knowledge/</code> 포함 경로와 1024차원 cosine Index만 생성합니다.</p>
+              <pre>{
+  "embeddingModelId": "amazon.titan-embed-text-v2:0",
+  "dimensions": 1024,
+  "dataType": "float32",
+  "distanceMetric": "cosine",
+  "sourcePrefix": "h02/knowledge/",
+  "knowledgeBaseStorage": "S3_VECTORS"
+}</pre>
+              <p>IAM 역할은 이 Titan 모델 호출, 고정 S3 원문 조회와 고정 S3 Vector Index 작업만 허용합니다. 이 정책은 수강생 앱의 문서 경로 검증이나 사용자 인가를 대신하지 않습니다.</p>
+            </div>
+          </section>
+
+          <section class="hands-on" aria-labelledby="h02-code-title">
+            <div>
+              <p class="label">LEARNER-OWNED DOCUMENT APP</p>
+              <h3 id="h02-code-title">클라이언트 경로를 버리고 서버 경로 만들기</h3>
+              <p><code>llm-security-control-plane/guided-labs/h02-document-ingestion/server.py</code>의 요청 계약과 <code>prepare_document()</code>를 작성합니다. HTTP body에 없는 경로를 서버가 실행 ID로 만들고 제공 Gateway에 전달합니다.</p>
+              <pre>class DocumentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=10, max_length=4000)
+    scenario: Literal["normal", "risk"]
+
+def prepare_document(request: DocumentRequest) -&gt; dict:
+    object_key = f"h02/knowledge/{request.execution_id}.md"
+    response = httpx.post(
+        f"{GATEWAY_URL}/v1/h02/documents",
+        json={
+            "execution_id": request.execution_id,
+            "started_at": request.started_at,
+            "title": request.title,
+            "body": request.body,
+            "object_key": object_key,
+            "scenario": request.scenario,
+        },
+        headers={"Authorization": f"Bearer {SERVICE_AUTH_TOKEN}"},
+        timeout=30.0,
+    )
+    response.raise_for_status()</pre>
+              <p>저장한 source를 image에 넣고 H02 앱만 다시 연결합니다.</p>
+              <pre>docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-h02-document-app
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-h02-document-app</pre>
+            </div>
+          </section>
+
+          <div class="actions">
+            <button id="h02-provision" class="secondary">AWS 자원 준비</button>
+            <button id="h02-verify" class="primary">현재 구현 검증</button>
+          </div>
+        </div>
 
         <section class="inspection" aria-labelledby="inspection-title">
           <div class="inspection-head"><div><p class="label">STAGE CALLS</p><h3 id="inspection-title">요청 검사 컨베이어</h3></div><span id="execution-state">아직 실행하지 않음</span></div>
           <div id="belt" class="belt">
             <div class="gate waiting"><b>Control Center</b><small>대기</small></div>
-            <div class="gate waiting"><b>Learner Gateway</b><small>대기</small></div>
-            <div class="gate waiting"><b>Bedrock Main</b><small>대기</small></div>
+            <div class="gate waiting"><b>Learner App</b><small>대기</small></div>
+            <div class="gate waiting"><b>AWS Provider</b><small>대기</small></div>
           </div>
         </section>
 
@@ -113,11 +183,11 @@ docker compose \
         <div id="verdict" class="verdict empty"><strong>—</strong><span>검사 전</span></div>
         <dl>
           <dt>SUITE</dt><dd id="execution-id">—</dd>
-          <dt>PROVIDER</dt><dd id="provider-id">—</dd>
-          <dt>MODEL</dt><dd id="model-id">—</dd>
-          <dt>REQUESTED</dt><dd id="requested-max">—</dd>
-          <dt>EFFECTIVE</dt><dd id="forwarded-max">—</dd>
-          <dt>OUTPUT TOKENS</dt><dd id="output-tokens">—</dd>
+          <dt id="provider-label">PROVIDER</dt><dd id="provider-id">—</dd>
+          <dt id="model-label">MODEL</dt><dd id="model-id">—</dd>
+          <dt id="requested-label">REQUESTED</dt><dd id="requested-max">—</dd>
+          <dt id="effective-label">EFFECTIVE</dt><dd id="forwarded-max">—</dd>
+          <dt id="output-label">OUTPUT TOKENS</dt><dd id="output-tokens">—</dd>
           <dt>SOURCE DIGEST</dt><dd id="source-digest">—</dd>
           <dt>VERIFIED BY</dt><dd id="verified-by">—</dd>
         </dl>

@@ -175,10 +175,14 @@ jobs:
           AWS_CREDENTIALS_DIR: /tmp/guided-aws
           GUIDED_SESSION_SECRET: ci-guided-session-secret
           GUIDED_CONTROL_LAB01_TOKEN: ci-control-lab
+          GUIDED_CONTROL_LAB02_TOKEN: ci-control-lab02
           GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
           GUIDED_LAB01_GATEWAY_TOKEN: ci-lab-gateway
+          GUIDED_H02_GATEWAY_TOKEN: ci-h02-gateway
+          GUIDED_LAB02_PROVISION_TOKEN: ci-lab02-provision
           GUIDED_NEMO_GATEWAY_TOKEN: ci-nemo-gateway
           GUIDED_VERIFIER_LAB01_TOKEN: ci-verifier-lab
+          GUIDED_VERIFIER_LAB02_TOKEN: ci-verifier-lab02
           GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
           GUIDED_PROVIDER_MODE: contract
           GUIDED_HOST_PORT: "28097"
@@ -224,10 +228,14 @@ jobs:
           AWS_CREDENTIALS_DIR: /tmp/guided-aws
           GUIDED_SESSION_SECRET: ci-guided-session-secret
           GUIDED_CONTROL_LAB01_TOKEN: ci-control-lab
+          GUIDED_CONTROL_LAB02_TOKEN: ci-control-lab02
           GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
           GUIDED_LAB01_GATEWAY_TOKEN: ci-lab-gateway
+          GUIDED_H02_GATEWAY_TOKEN: ci-h02-gateway
+          GUIDED_LAB02_PROVISION_TOKEN: ci-lab02-provision
           GUIDED_NEMO_GATEWAY_TOKEN: ci-nemo-gateway
           GUIDED_VERIFIER_LAB01_TOKEN: ci-verifier-lab
+          GUIDED_VERIFIER_LAB02_TOKEN: ci-verifier-lab02
           GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
           GUIDED_PROVIDER_MODE: contract
           GUIDED_HOST_PORT: "28097"

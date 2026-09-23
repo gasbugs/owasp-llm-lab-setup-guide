@@ -7,7 +7,7 @@ course_id: tenant-03-guided-llm-security
 duration_minutes: 1320
 tabs:
   - {id: 01-nova, hands_on: [H01], hands_on_status: implemented, practice: P01, practice_status: planned}
-  - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: planned, practice: P02, practice_status: planned}
+  - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: partial, implemented_hands_on: [H02], practice: P02, practice_status: planned}
   - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: planned, practice: P03, practice_status: planned}
   - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: planned, practice: P04, practice_status: planned}
   - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: planned, practice: P05, practice_status: planned}
@@ -34,3 +34,19 @@ hands_on_H01:
     - risk-512
     - invalid-empty-message
     - reject-model-override
+
+hands_on_H02:
+  executor: guided-h02-document-app
+  provider: guided-bedrock-gateway
+  verifier: guided-evidence-verifier
+  embedding_model_id: amazon.titan-embed-text-v2:0
+  required_evidence:
+    - provider_request_id
+    - s3_request_id
+    - embedding_dimension: 1024
+    - knowledge_base_id
+    - data_source_id
+    - source_digest
+    - normal-document
+    - client-key-override
+    - invalid-empty-body

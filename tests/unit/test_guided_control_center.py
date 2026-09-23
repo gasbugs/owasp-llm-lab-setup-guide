@@ -18,7 +18,9 @@ CONTROL = ROOT / "llm-security-control-plane"
 COMPOSE = ROOT / "examples/security-monitoring/compose.guided.yaml"
 os.environ.setdefault("GUIDED_SESSION_SECRET", "unit-session-secret")
 os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
+os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
+os.environ.setdefault("GUIDED_LAB02_PROVISION_TOKEN", "unit-provision-lab02")
 
 
 def load_server():
@@ -74,9 +76,17 @@ class FakeAsyncClient:
                     "response_text": "실제 모델 응답",
                 }
             )
+        if url.endswith("/v1/h02/provision"):
+            return FakeResponse({"status": "READY", "knowledge_base_id": "TESTKB1234"})
+        if url.endswith("/v1/documents"):
+            if not json["body"]:
+                return FakeResponse({"detail": "invalid request"}, status_code=422)
+            return FakeResponse({"execution_id": json["execution_id"]})
+        activity_id = "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
-                "lab_id": "01-nova",
+                "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
+                "activity_id": activity_id,
                 "execution_id": json["suite_id"],
                 "course_verdict": "PASS",
                 "verified_by": "guided-evidence-verifier",
@@ -121,7 +131,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
@@ -188,6 +198,36 @@ class GuidedControlCenterTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 422)
 
+    def test_h02_suite_uses_server_owned_document_cases(self):
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H02/verify",
+                headers=self.headers,
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H02")
+        self.assertEqual(len(FakeAsyncClient.calls), 4)
+        normal, risk, invalid, verifier = FakeAsyncClient.calls
+        self.assertNotIn("object_key", normal["json"])
+        self.assertTrue(risk["json"]["object_key"].startswith("h02/untrusted/"))
+        self.assertEqual(invalid["json"]["body"], "")
+        self.assertEqual(len(verifier["json"]["cases"]), 3)
+        self.assertNotIn("course_verdict", verifier["json"])
+
+    def test_h02_provisioning_body_is_server_owned(self):
+        rejected = self.client.post(
+            "/api/hands-on/H02/provision",
+            json={"bucket": "attacker-bucket"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H02/provision", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H02")
+
     def test_unknown_host_is_rejected(self):
         response = self.client.get("/", headers={"Host": "attacker.example"})
         self.assertEqual(response.status_code, 421)
@@ -245,6 +285,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("/tmp/.aws", serialized)
         self.assertNotIn("docker.sock", serialized)
         self.assertIn("guided-h01-gateway", compose["services"])
+        self.assertIn("guided-h02-document-app", compose["services"])
         self.assertIn("guided-bedrock-gateway", compose["services"])
         proxy = (CONTROL / "guided-front-proxy/nginx.conf").read_text(encoding="utf-8")
         self.assertIn("proxy_set_header Upgrade $http_upgrade", proxy)
@@ -284,9 +325,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(hands_on[0], "H01")
         self.assertEqual(practices[0], "P01")
         self.assertEqual(manifest["tabs"][0]["hands_on_status"], "implemented")
-        self.assertTrue(
-            all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][1:])
-        )
+        self.assertEqual(manifest["tabs"][1]["hands_on_status"], "partial")
+        self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02"])
+        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][2:]))
         self.assertTrue(
             all(tab["practice_status"] == "planned" for tab in manifest["tabs"])
         )

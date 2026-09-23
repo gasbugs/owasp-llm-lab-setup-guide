@@ -46,14 +46,19 @@ services:
       RELEASE_VERSION: ${GUIDED_IMAGE_VERSION:-0.1.0}
       GUIDED_SESSION_SECRET: ${GUIDED_SESSION_SECRET:?Set GUIDED_SESSION_SECRET}
       GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
+      GUIDED_CONTROL_LAB02_TOKEN: ${GUIDED_CONTROL_LAB02_TOKEN:?Set GUIDED_CONTROL_LAB02_TOKEN}
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
+      GUIDED_LAB02_PROVISION_TOKEN: ${GUIDED_LAB02_PROVISION_TOKEN:?Set GUIDED_LAB02_PROVISION_TOKEN}
       GUIDED_LAB01_URL: http://guided-h01-gateway:8000
+      GUIDED_LAB02_URL: http://guided-h02-document-app:8000
+      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
       GUIDED_VERIFIER_URL: http://guided-evidence-verifier:8000
       GUIDED_ALLOWED_HOSTS: 127.0.0.1:${GUIDED_HOST_PORT:-18097},localhost:${GUIDED_HOST_PORT:-18097}
       GUIDED_ALLOWED_ORIGINS: http://127.0.0.1:${GUIDED_HOST_PORT:-18097},http://localhost:${GUIDED_HOST_PORT:-18097}
       GUIDED_NEMO_BROWSER_URL: http://127.0.0.1:${GUIDED_NEMO_HOST_PORT:-18192}
     depends_on:
       guided-h01-gateway: {condition: service_healthy}
+      guided-h02-document-app: {condition: service_healthy}
       guided-evidence-verifier: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host':'127.0.0.1:${GUIDED_HOST_PORT:-18097}'}); urllib.request.urlopen(r, timeout=2)"]
@@ -96,11 +101,16 @@ services:
     environment:
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
       GUIDED_VERIFIER_LAB01_TOKEN: ${GUIDED_VERIFIER_LAB01_TOKEN:?Set GUIDED_VERIFIER_LAB01_TOKEN}
+      GUIDED_VERIFIER_LAB02_TOKEN: ${GUIDED_VERIFIER_LAB02_TOKEN:?Set GUIDED_VERIFIER_LAB02_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
       GUIDED_LAB01_URL: http://guided-h01-gateway:8000
+      GUIDED_LAB02_URL: http://guided-h02-document-app:8000
+      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
     volumes: [guided-verifier-state:/state:rw]
     depends_on:
       guided-h01-gateway: {condition: service_healthy}
+      guided-h02-document-app: {condition: service_healthy}
+      guided-bedrock-gateway: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 2s
@@ -125,6 +135,8 @@ services:
       GUIDED_LAB01_GATEWAY_TOKEN: ${GUIDED_LAB01_GATEWAY_TOKEN:?Set GUIDED_LAB01_GATEWAY_TOKEN}
       GUIDED_NEMO_GATEWAY_TOKEN: ${GUIDED_NEMO_GATEWAY_TOKEN:?Set GUIDED_NEMO_GATEWAY_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
+      GUIDED_H02_GATEWAY_TOKEN: ${GUIDED_H02_GATEWAY_TOKEN:?Set GUIDED_H02_GATEWAY_TOKEN}
+      GUIDED_LAB02_PROVISION_TOKEN: ${GUIDED_LAB02_PROVISION_TOKEN:?Set GUIDED_LAB02_PROVISION_TOKEN}
     volumes:
       - ${AWS_CREDENTIALS_DIR:-${HOME}/.aws}:/tmp/.aws:ro
       - ../../llm-security-control-plane/.state/guided-gateway:/state:rw
@@ -133,6 +145,26 @@ services:
         aliases: [llm-security-bedrock-gateway]
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-h02-document-app:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h02-document-ingestion/Containerfile
+    image: localhost/llm-security-guided-h02-document-app:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h02-document-app
+    environment:
+      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
+      GUIDED_H02_GATEWAY_TOKEN: ${GUIDED_H02_GATEWAY_TOKEN:?Set GUIDED_H02_GATEWAY_TOKEN}
+      GUIDED_CONTROL_LAB02_TOKEN: ${GUIDED_CONTROL_LAB02_TOKEN:?Set GUIDED_CONTROL_LAB02_TOKEN}
+      GUIDED_VERIFIER_LAB02_TOKEN: ${GUIDED_VERIFIER_LAB02_TOKEN:?Set GUIDED_VERIFIER_LAB02_TOKEN}
+    depends_on:
+      guided-bedrock-gateway: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 2s
       timeout: 3s
       retries: 30

@@ -89,6 +89,13 @@ def main() -> int:
         page.locator("#verify").click()
         hands_on = wait_for_result(page, timeout_ms, preflight.get("execution_id"))
         hands_on_verdict = page.locator("#verdict strong").inner_text()
+
+        page.locator('.tab[data-tab-index="1"]').click()
+        page.locator("#h02-provision").click()
+        h02_resources = wait_for_result(page, timeout_ms, hands_on.get("execution_id"))
+        page.locator("#h02-verify").click()
+        h02_hands_on = wait_for_result(page, timeout_ms, h02_resources.get("execution_id"))
+        h02_verdict = page.locator("#verdict strong").inner_text()
         raw_nodes = page.locator("#raw img, #raw script").count()
 
         if args.screenshot:
@@ -111,7 +118,7 @@ def main() -> int:
         for url in requests
     )
     checks = {
-        "tabs": tab_count == 13 and locked_tabs == 12,
+        "tabs": tab_count == 13 and locked_tabs == 11,
         "official_links": official_links == 2,
         "csp": "object-src 'none'" in csp and "frame-ancestors 'none'" in csp,
         "session": browser_cookie_visible == "",
@@ -131,6 +138,15 @@ def main() -> int:
         and len(hands_on.get("result", {}).get("cases", [])) == 4
         and hands_on.get("result", {}).get("cases", [])[2].get("upstream_called") is False
         and hands_on.get("result", {}).get("cases", [])[3].get("upstream_called") is False,
+        "h02_resources": h02_resources.get("course_verdict") == "PASS"
+        and h02_resources.get("result", {}).get("dimensions") == 1024
+        and bool(h02_resources.get("result", {}).get("knowledge_base_id")),
+        "h02_hands_on": h02_verdict == "HIT"
+        and h02_hands_on.get("verified_by") == "guided-evidence-verifier"
+        and h02_hands_on.get("result", {}).get("embedding_dimension") == 1024
+        and len(h02_hands_on.get("result", {}).get("cases", [])) == 3
+        and h02_hands_on.get("result", {}).get("cases", [])[1].get("object_key", "").startswith("h02/untrusted/")
+        and h02_hands_on.get("result", {}).get("cases", [])[2].get("upstream_called") is False,
         "learner_work": answer_controls == 0,
         "safe_rendering": raw_nodes == 0,
         "same_origin": internal_requests == 0,
@@ -139,6 +155,7 @@ def main() -> int:
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
         f"preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"system_theme={str(light_canvas != dark_canvas and system_mode).lower()} "
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
         f"panel_boundary={str(panel_boundary).lower()} chat={str(checks['chat']).lower()} "
