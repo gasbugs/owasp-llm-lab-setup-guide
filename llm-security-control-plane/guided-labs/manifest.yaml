@@ -8,7 +8,7 @@ duration_minutes: 1320
 tabs:
   - {id: 01-nova, hands_on: [H01], hands_on_status: implemented, practice: P01, practice_status: planned}
   - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: implemented, implemented_hands_on: [H02, H03], practice: P02, practice_status: planned}
-  - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: planned, practice: P03, practice_status: planned}
+  - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: implemented, implemented_hands_on: [H04], practice: P03, practice_status: planned}
   - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: planned, practice: P04, practice_status: planned}
   - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: planned, practice: P05, practice_status: planned}
   - {id: 06-privacy-output, hands_on: [H09, H10], hands_on_status: planned, practice: P06, practice_status: planned}
@@ -64,6 +64,25 @@ hands_on_H03:
     - document_ids
     - source_uris
     - revoked-source-absent
+
+hands_on_H04:
+  executor: guided-h04-guardrail-app
+  provider: guided-bedrock-gateway
+  verifier: guided-evidence-verifier
+  model_id: us.amazon.nova-lite-v1:0
+  guardrail_version: DRAFT
+  required_evidence:
+    - source_digest
+    - guardrail_id
+    - apply-normal
+    - apply-risk
+    - converse-normal
+    - converse-risk
+    - provider_request_id
+    - action
+    - stop_reason
+    - usage.outputTokens
+    - pii_action: ANONYMIZED
 
 hands_on_H22:
   executor: guided-h22-host

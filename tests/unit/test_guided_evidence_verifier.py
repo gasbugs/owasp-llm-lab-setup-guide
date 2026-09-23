@@ -88,6 +88,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         os.environ["GUIDED_VERIFIER_LAB01_TOKEN"] = "verifier-lab"
         os.environ["GUIDED_VERIFIER_LAB02_TOKEN"] = "verifier-lab02"
         os.environ["GUIDED_VERIFIER_LAB03_TOKEN"] = "verifier-lab03"
+        os.environ["GUIDED_VERIFIER_LAB04_TOKEN"] = "verifier-lab04"
         os.environ["GUIDED_VERIFIER_H21_TOKEN"] = "verifier-h21"
         os.environ["GUIDED_VERIFIER_H22_TOKEN"] = "verifier-h22"
         os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"] = "verifier-gateway"
@@ -615,6 +616,195 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "ERR")
+
+    def h04_body(self, suite_id: str) -> dict:
+        case_ids = ["apply-normal", "apply-risk", "converse-normal", "converse-risk"]
+        return {
+            "suite_id": suite_id,
+            "started_at": "2026-09-23T10:00:00+00:00",
+            "cases": [
+                {
+                    "case_id": case_id,
+                    "execution_id": f"04000000-0000-0000-0000-{index:012d}",
+                    "started_at": "2026-09-23T10:00:00+00:00",
+                }
+                for index, case_id in enumerate(case_ids, 1)
+            ],
+        }
+
+    def fake_h04_get(
+        self,
+        *,
+        protected: bool,
+        include_trace: bool = True,
+        normal_connected: bool | None = None,
+        risk_model_called: bool = True,
+    ):
+        digest = "4" * 64
+        state = {
+            "status": "READY",
+            "provider_mode": "contract",
+            "observed_at": "2026-09-23T10:00:01+00:00",
+            "account_id": "000000000000",
+            "region": "us-east-1",
+            "guardrail_id": "CONTRACTH04GR",
+            "guardrail_version": "DRAFT",
+            "guardrail_name": "owasp-llm-03-h04-000000000000",
+            "template_digest": "a" * 64,
+            "pii_type": "EMAIL",
+            "input_enabled": False,
+            "output_enabled": True,
+            "output_action": "ANONYMIZE",
+        }
+        case_ids = ["apply-normal", "apply-risk", "converse-normal", "converse-risk"]
+        execution_to_case = {
+            f"04000000-0000-0000-0000-{index:012d}": case_id
+            for index, case_id in enumerate(case_ids, 1)
+        }
+
+        def provider(case_id: str, execution_id: str) -> dict:
+            common = {
+                "execution_id": execution_id,
+                "case_id": case_id,
+                "provider_mode": "contract",
+                "provider_request_id": f"h04-{case_id}",
+                "observed_at": "2026-09-23T10:00:01+00:00",
+                "template_digest": "a" * 64,
+            }
+            if case_id == "apply-normal":
+                return {**common, "operation": "apply_guardrail", "guardrail_id": "CONTRACTH04GR", "guardrail_version": "DRAFT", "action": "NONE", "outputs": [], "pii_actions": [], "model_called": False}
+            if case_id == "apply-risk":
+                return {
+                    **common,
+                    "operation": "apply_guardrail",
+                    "guardrail_id": "CONTRACTH04GR",
+                    "guardrail_version": "DRAFT",
+                    "action": "GUARDRAIL_INTERVENED",
+                    "outputs": [{"text": "담당자 이메일은 {EMAIL} 입니다."}],
+                    "pii_actions": [{"type": "EMAIL", "action": "ANONYMIZED"}],
+                    "model_called": False,
+                }
+            if case_id == "converse-normal":
+                return {
+                    **common,
+                    "operation": "converse",
+                    "model_id": "us.amazon.nova-lite-v1:0",
+                    "model_called": True,
+                    "output_text": "고객지원 운영 시간 안내",
+                    "usage": {"outputTokens": 12},
+                    "guardrail_config": {"guardrailIdentifier": "CONTRACTH04GR", "guardrailVersion": "DRAFT"} if (protected if normal_connected is None else normal_connected) else None,
+                    "pii_actions": [],
+                    "stop_reason": "end_turn",
+                }
+            return {
+                **common,
+                "operation": "converse",
+                "model_id": "us.amazon.nova-lite-v1:0",
+                "model_called": risk_model_called,
+                "output_text": "담당자 이메일은 {EMAIL} 입니다." if protected else "담당자 이메일은 learner@example.com 입니다.",
+                "usage": {"outputTokens": 12},
+                "guardrail_config": {"guardrailIdentifier": "CONTRACTH04GR", "guardrailVersion": "DRAFT"} if protected else None,
+                "pii_actions": ([{"type": "EMAIL", "action": "ANONYMIZED"}] if protected and include_trace else []),
+                "stop_reason": "end_turn",
+            }
+
+        def get(url, **_kwargs):
+            if url.endswith("/v1/h04/resources"):
+                return FakeResponse(state)
+            if url.endswith("/v1/build-info"):
+                return FakeResponse({"component": "guided-h04-guardrail-app", "source_digest": digest})
+            execution_id = url.rsplit("/", 1)[-1]
+            case_id = execution_to_case[execution_id]
+            record = provider(case_id, execution_id)
+            if "/v1/receipts/" in url:
+                return FakeResponse(
+                    {
+                        "execution_id": execution_id,
+                        "case_id": case_id,
+                        "source_digest": digest,
+                        "gateway_evidence_id": execution_id,
+                        "provider_request_id": record["provider_request_id"],
+                    }
+                )
+            return FakeResponse(record)
+
+        return get
+
+    def verify_h04(
+        self,
+        suite_id: str,
+        *,
+        protected: bool,
+        include_trace: bool = True,
+        normal_connected: bool | None = None,
+        risk_model_called: bool = True,
+    ):
+        with patch.object(
+            self.server.httpx,
+            "get",
+            self.fake_h04_get(
+                protected=protected,
+                include_trace=include_trace,
+                normal_connected=normal_connected,
+                risk_model_called=risk_model_called,
+            ),
+        ):
+            return self.client.post(
+                "/v1/verify/lab-04",
+                json=self.h04_body(suite_id),
+                headers={"Authorization": "Bearer control-verifier"},
+            )
+
+    def test_h04_starter_raw_email_is_hit(self):
+        response = self.verify_h04(
+            "04000000-0000-0000-0001-000000000001", protected=False
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "HIT")
+        self.assertEqual(response.json()["stage_calls"][2]["outcome"], "raw-email-exposed")
+
+    def test_h04_connected_guardrail_is_pass(self):
+        response = self.verify_h04(
+            "04000000-0000-0000-0001-000000000002", protected=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "PASS")
+        self.assertIn("{EMAIL}", response.json()["result"]["output_text"])
+
+    def test_h04_missing_guardrail_trace_is_err(self):
+        response = self.verify_h04(
+            "04000000-0000-0000-0001-000000000003",
+            protected=True,
+            include_trace=False,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "ERR")
+
+    def test_h04_risk_only_connection_is_err(self):
+        response = self.verify_h04(
+            "04000000-0000-0000-0001-000000000005",
+            protected=True,
+            normal_connected=False,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "ERR")
+
+    def test_h04_fake_model_call_is_not_hit(self):
+        response = self.verify_h04(
+            "04000000-0000-0000-0001-000000000006",
+            protected=False,
+            risk_model_called=False,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "ERR")
+
+    def test_h04_browser_verdict_field_is_rejected(self):
+        response = self.client.post(
+            "/v1/verify/lab-04",
+            json={**self.h04_body("04000000-0000-0000-0001-000000000004"), "course_verdict": "PASS"},
+            headers={"Authorization": "Bearer control-verifier"},
+        )
+        self.assertEqual(response.status_code, 422)
 
 
 if __name__ == "__main__":

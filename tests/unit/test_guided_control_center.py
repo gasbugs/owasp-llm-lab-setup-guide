@@ -21,11 +21,13 @@ os.environ.setdefault("GUIDED_SESSION_SECRET", "unit-session-secret")
 os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
 os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
 os.environ.setdefault("GUIDED_CONTROL_LAB03_TOKEN", "unit-control-lab03")
+os.environ.setdefault("GUIDED_CONTROL_LAB04_TOKEN", "unit-control-lab04")
 os.environ.setdefault("GUIDED_CONTROL_H21_TOKEN", "unit-control-h21")
 os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
 os.environ.setdefault("GUIDED_LAB02_PROVISION_TOKEN", "unit-provision-lab02")
 os.environ.setdefault("GUIDED_LAB03_PROVISION_TOKEN", "unit-provision-lab03")
+os.environ.setdefault("GUIDED_LAB04_PROVISION_TOKEN", "unit-provision-lab04")
 
 
 def load_server():
@@ -98,6 +100,8 @@ class FakeAsyncClient:
             return FakeResponse({"status": "READY", "knowledge_base_id": "TESTKB1234"})
         if url.endswith("/v1/h03/provision"):
             return FakeResponse({"status": "READY_FOR_SYNC", "knowledge_base_id": "TESTH03KB"})
+        if url.endswith("/v1/h04/provision"):
+            return FakeResponse({"status": "READY", "guardrail_id": "TESTH04GR"})
         if url.endswith("/v1/sync"):
             return FakeResponse({"ingestion_job_id": "H03JOB", "status": "STARTING"})
         if url.endswith("/v1/search"):
@@ -106,7 +110,9 @@ class FakeAsyncClient:
             if not json["body"]:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
+        if url.endswith("/v1/run"):
+            return FakeResponse({"execution_id": json["execution_id"]})
+        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -155,7 +161,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H21", "H22"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H21", "H22"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
@@ -283,6 +289,42 @@ class GuidedControlCenterTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["activity_id"], "H03")
+
+    def test_h04_suite_and_provisioning_inputs_are_server_owned(self):
+        rejected = self.client.post(
+            "/api/hands-on/H04/verify",
+            json={"guardrail_id": "attacker", "course_verdict": "PASS"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H04/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H04")
+        run_calls = [item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/run")]
+        self.assertEqual(
+            [item["json"]["case_id"] for item in run_calls],
+            ["apply-normal", "apply-risk", "converse-normal", "converse-risk"],
+        )
+        self.assertTrue(all("guardrail_id" not in item["json"] for item in run_calls))
+        verifier_call = next(item for item in FakeAsyncClient.calls if "lab-04" in item["url"])
+        self.assertNotIn("course_verdict", verifier_call["json"])
+
+        FakeAsyncClient.calls.clear()
+        rejected = self.client.post(
+            "/api/hands-on/H04/provision",
+            json={"policy": {"outputEnabled": False}},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            provisioned = self.client.post(
+                "/api/hands-on/H04/provision", headers=self.headers
+            )
+        self.assertEqual(provisioned.status_code, 200)
+        self.assertEqual(provisioned.json()["activity_id"], "H04")
 
     def test_h22_suite_is_server_owned_and_uses_verifier(self):
         rejected = self.client.post(
@@ -462,7 +504,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][0]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][1]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02", "H03"])
-        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][2:12]))
+        self.assertEqual(manifest["tabs"][2]["hands_on_status"], "implemented")
+        self.assertEqual(manifest["tabs"][2]["implemented_hands_on"], ["H04"])
+        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][3:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])
         self.assertTrue(

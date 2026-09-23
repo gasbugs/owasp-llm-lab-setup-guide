@@ -30,6 +30,8 @@ class GuidedH03GatewayTests(unittest.TestCase):
             "GUIDED_LAB02_PROVISION_TOKEN": "h02-provision",
             "GUIDED_H03_GATEWAY_TOKEN": "h03",
             "GUIDED_LAB03_PROVISION_TOKEN": "h03-provision",
+            "GUIDED_H04_GATEWAY_TOKEN": "h04",
+            "GUIDED_LAB04_PROVISION_TOKEN": "h04-provision",
         }
         os.environ.update(values)
         sys.path.insert(0, str(GATEWAY))
@@ -112,6 +114,70 @@ class GuidedH03GatewayTests(unittest.TestCase):
             headers={"Authorization": "Bearer wrong"},
         )
         self.assertEqual(denied.status_code, 401)
+
+    def test_h04_contract_separates_apply_and_connected_converse(self):
+        provision = self.client.post(
+            "/v1/h04/provision",
+            json={"execution_id": "04000000-0000-0000-0000-000000000001"},
+            headers={"Authorization": "Bearer h04-provision"},
+        )
+        self.assertEqual(provision.status_code, 200)
+        self.assertEqual(provision.json()["guardrail_version"], "DRAFT")
+
+        applied = self.client.post(
+            "/v1/h04/apply",
+            json={
+                "execution_id": "04000000-0000-0000-0000-000000000002",
+                "started_at": "2026-09-23T10:00:00+00:00",
+                "case_id": "apply-risk",
+            },
+            headers={"Authorization": "Bearer h04"},
+        )
+        self.assertEqual(applied.status_code, 200)
+        self.assertEqual(applied.json()["action"], "GUARDRAIL_INTERVENED")
+        self.assertIn("{EMAIL}", applied.text)
+        self.assertFalse(applied.json()["model_called"])
+
+        vulnerable = self.client.post(
+            "/v1/h04/converse",
+            json={
+                "execution_id": "04000000-0000-0000-0000-000000000003",
+                "started_at": "2026-09-23T10:00:00+00:00",
+                "case_id": "converse-risk",
+                "attach_guardrail": False,
+            },
+            headers={"Authorization": "Bearer h04"},
+        )
+        self.assertIn("learner@example.com", vulnerable.json()["output_text"])
+        self.assertIsNone(vulnerable.json()["guardrail_config"])
+
+        protected = self.client.post(
+            "/v1/h04/converse",
+            json={
+                "execution_id": "04000000-0000-0000-0000-000000000004",
+                "started_at": "2026-09-23T10:00:00+00:00",
+                "case_id": "converse-risk",
+                "attach_guardrail": True,
+            },
+            headers={"Authorization": "Bearer h04"},
+        )
+        self.assertNotIn("learner@example.com", protected.json()["output_text"])
+        self.assertIn("{EMAIL}", protected.json()["output_text"])
+        self.assertEqual(
+            protected.json()["guardrail_config"]["guardrailVersion"], "DRAFT"
+        )
+
+    def test_h04_provision_rejects_browser_policy(self):
+        rejected = self.client.post(
+            "/v1/h04/provision",
+            json={
+                "execution_id": "04000000-0000-0000-0000-000000000005",
+                "name": "attacker-guardrail",
+                "outputEnabled": False,
+            },
+            headers={"Authorization": "Bearer h04-provision"},
+        )
+        self.assertEqual(rejected.status_code, 422)
 
 
 if __name__ == "__main__":

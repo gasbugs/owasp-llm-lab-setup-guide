@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Browser E2E proving H02 and H03 can run before H01 in tenant 03."""
+"""Browser E2E proving H04, H02, and H03 can run before H01 in tenant 03."""
 
 from __future__ import annotations
 
@@ -91,6 +91,7 @@ def main() -> int:
         page.locator('[aria-controls="preflight-help"]').press("Escape")
         preflight_tip_collapsed = page.locator('[aria-controls="preflight-help"]').get_attribute("aria-expanded") == "false"
         h02_tip_text = page.locator("#h02-provision-help").inner_text()
+        h04_tip_text = page.locator("#h04-provision-help").inner_text()
         page.set_viewport_size({"width": 1181, "height": 900})
         page.locator('[aria-controls="verify-help"]').click()
         page.locator("#verify-help").wait_for(state="visible")
@@ -114,11 +115,21 @@ def main() -> int:
         h22_hands_on = wait_for_result(page, timeout_ms, h21_hands_on.get("execution_id"))
         h22_verdict = page.locator("#verdict strong").inner_text()
 
+        # H04는 앞 활동의 Guardrail ID를 받지 않고 전용 정책과 source로 실행된다.
+        page.locator('.tab[data-tab-index="2"]').click()
+        page.locator("#h04-provision").click()
+        h04_resources = wait_for_result(
+            page, timeout_ms, h22_hands_on.get("execution_id")
+        )
+        page.locator("#h04-verify").click()
+        h04_hands_on = wait_for_result(page, timeout_ms, h04_resources.get("execution_id"))
+        h04_verdict = page.locator("#verdict strong").inner_text()
+
         # H02를 먼저 실행해 H01의 chat·preflight·검증 결과가 선행 조건이 아님을 증명한다.
         page.locator('.tab[data-tab-index="1"]').click()
         page.locator("#h02-provision").click()
         h02_resources = wait_for_result(
-            page, timeout_ms, h22_hands_on.get("execution_id")
+            page, timeout_ms, h04_hands_on.get("execution_id")
         )
         page.locator("#h02-verify").click()
         h02_hands_on = wait_for_result(page, timeout_ms, h02_resources.get("execution_id"))
@@ -172,14 +183,14 @@ def main() -> int:
         for url in requests
     )
     checks = {
-        "tabs": tab_count == 13 and locked_tabs == 10,
+        "tabs": tab_count == 13 and locked_tabs == 9,
         "official_links": official_links == 2,
         "csp": "object-src 'none'" in csp and "frame-ancestors 'none'" in csp,
         "session": browser_cookie_visible == "",
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
         "panel_boundary": panel_boundary,
-        "action_tooltips": tooltip_count == 9
+        "action_tooltips": tooltip_count == 11
         and preflight_focus_visible
         and preflight_tip_visible
         and preflight_tip_collapsed
@@ -187,6 +198,8 @@ def main() -> int:
         and "Token 제한 코드가 맞다는 뜻은 아닙니다" in preflight_tip_text
         and "S3 Vector Index" in h02_tip_text
         and "문서 검색까지 끝났다는 뜻은 아닙니다" in h02_tip_text
+        and "H04 전용 Guardrail" in h04_tip_text
+        and "수강생 앱이 Nova Lite에 연결했다는 뜻은 아닙니다" in h04_tip_text
         and desktop_tip_inside
         and mobile_tip_inside,
         "chat": bool(chat_text.strip())
@@ -220,6 +233,14 @@ def main() -> int:
         and h03_hands_on.get("result", {}).get("job_status") == "COMPLETE"
         and h03_hands_on.get("result", {}).get("early", {}).get("retrieval_called") is True
         and h03_hands_on.get("result", {}).get("final", {}).get("job_status_at_retrieval") == "COMPLETE",
+        "h04_resources": h04_resources.get("course_verdict") == "PASS"
+        and h04_resources.get("result", {}).get("guardrail_version") == "DRAFT"
+        and h04_resources.get("result", {}).get("output_action") == "ANONYMIZE",
+        "h04_hands_on": h04_verdict == "HIT"
+        and h04_hands_on.get("verified_by") == "guided-evidence-verifier"
+        and h04_hands_on.get("result", {}).get("action") == "GUARDRAIL_INTERVENED"
+        and "learner@example.com" in h04_hands_on.get("result", {}).get("output_text", "")
+        and len(h04_hands_on.get("result", {}).get("cases", [])) == 4,
         "h22_hands_on": h22_verdict == "HIT"
         and h22_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h22_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
@@ -239,9 +260,10 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"execution_order=H21->H22->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H21->H22->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"h03_resources={h03_resources.get('course_verdict')} h03_hands_on={h03_verdict} "
+        f"h04_resources={h04_resources.get('course_verdict')} h04_hands_on={h04_verdict} "
         f"system_theme={str(light_canvas != dark_canvas and system_mode).lower()} "
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
         f"panel_boundary={str(panel_boundary).lower()} chat={str(checks['chat']).lower()} "

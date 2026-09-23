@@ -215,6 +215,58 @@ docker compose \
           </div>
         </div>
 
+        <div id="h04-work" class="lab-workspace" hidden>
+          <p>관리형 Guardrail을 “따로 시험한 것”과 “실제 모델 요청에 연결한 것”은 다릅니다. H04에서는 같은 출력 이메일 정책을 먼저 단독 검사하고, Nova Lite 호출에도 연결해 모델이 만든 이메일이 Browser에 나오기 전에 바뀌는지 확인합니다.</p>
+
+          <section class="hands-on" aria-labelledby="h04-resource-title">
+            <div>
+              <p class="label">SERVER-OWNED GUARDRAIL TEMPLATE</p>
+              <h3 id="h04-resource-title">H04 전용 출력 검사 정책 확인</h3>
+              <p>제공 Gateway는 현재 AWS 계정에 H04 전용 Guardrail을 준비합니다. <code>DRAFT</code>는 일반적인 “초안” 표시가 아니라 AWS에서 지금 편집 중인 Guardrail 설정을 가리키는 예약값입니다. 이 정책은 입력은 건드리지 않고 출력의 <code>EMAIL</code>만 <code>{EMAIL}</code>로 바꿉니다.</p>
+              <pre>{
+  "piiType": "EMAIL",
+  "inputEnabled": false,
+  "outputEnabled": true,
+  "outputAction": "ANONYMIZE",
+  "guardrailVersion": "DRAFT"
+}</pre>
+              <p>정책이 준비됐다는 사실만으로 실제 Nova Lite 요청이 보호되지는 않습니다. 앱이 <code>Converse</code> 호출에 같은 Guardrail ID와 설정을 전달해야 합니다.</p>
+            </div>
+          </section>
+
+          <section class="hands-on" aria-labelledby="h04-code-title">
+            <div>
+              <p class="label">LEARNER-OWNED GUARDRAIL APP</p>
+              <h3 id="h04-code-title">단독 검사에 사용한 Guardrail을 모델 호출에도 연결하기</h3>
+              <p><code>llm-security-control-plane/guided-labs/h04-bedrock-guardrail/server.py</code>의 Starter는 <code>ApplyGuardrail</code>만 실행하고 실제 <code>Converse</code>에는 정책을 붙이지 않습니다. 아래 값을 바꾸면 앱이 제공 Gateway에 연결 여부를 명시하고, Gateway는 Browser가 고를 수 없는 H04 ID만 실제 AWS 요청에 사용합니다.</p>
+              <pre># 단독 검사에서 확인한 같은 H04 Guardrail을 Nova Lite에도 연결합니다.
+USE_GUARDRAIL_FOR_CONVERSE = True</pre>
+              <p>저장한 source를 image에 넣고 H04 앱만 다시 연결합니다. Control Center는 이 Build를 대신하지 않습니다.</p>
+              <pre>docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-h04-guardrail-app
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-h04-guardrail-app</pre>
+            </div>
+          </section>
+
+          <div class="actions">
+            <span class="action-control">
+              <button id="h04-provision" class="secondary" aria-describedby="h04-provision-help">H04 Guardrail 준비</button>
+              <button class="help-trigger" type="button" aria-label="H04 Guardrail 준비 작업 설명" aria-expanded="false" aria-controls="h04-provision-help">i</button>
+              <span id="h04-provision-help" class="action-tooltip" role="tooltip">제공 Gateway가 현재 AWS 계정에서 H04 전용 Guardrail을 찾거나 만들고, 출력 EMAIL 비식별화 설정과 READY 상태를 다시 확인합니다. PASS는 정책 자원이 준비됐다는 뜻이며 수강생 앱이 Nova Lite에 연결했다는 뜻은 아닙니다.</span>
+            </span>
+            <span class="action-control">
+              <button id="h04-verify" class="primary" aria-describedby="h04-verify-help">H04 현재 구현 검증</button>
+              <button class="help-trigger" type="button" aria-label="H04 현재 구현 검증 작업 설명" aria-expanded="false" aria-controls="h04-verify-help">i</button>
+              <span id="h04-verify-help" class="action-tooltip" role="tooltip">서버가 이메일 없는 출력과 합성 이메일 출력을 단독 검사한 뒤, 정상 안내와 이메일 생성을 Nova Lite에 보냅니다. 검증기가 서로 다른 AWS request ID, 실제 Guardrail 연결값, 모델 Token 사용량과 원문 이메일 공개 여부를 대조해 HIT·PASS·ERR로 보여 줍니다.</span>
+            </span>
+          </div>
+        </div>
+
         <div id="h21-work" class="lab-workspace" hidden>
           <p>Agent가 고른 모델·MCP Server·Tool은 실행 후보일 뿐 권한이 아닙니다. H21에서는 인증된 주체의 서버 정책으로 허용목록과 Tool 횟수·결과 크기·상태 소유자를 제한합니다.</p>
           <div class="cost-note"><strong>독립 실행</strong><span>H21은 H01·H02·H22의 source, 상태와 AWS 자원을 사용하지 않습니다. 결정적 Provider fixture와 H21 전용 MCP Server 두 개로 downstream 호출 여부를 검증합니다.</span></div>

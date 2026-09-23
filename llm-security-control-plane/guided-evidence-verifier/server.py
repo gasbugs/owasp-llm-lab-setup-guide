@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
 LAB03_URL = os.getenv("GUIDED_LAB03_URL", "http://guided-h03-sync-app:8000")
+LAB04_URL = os.getenv("GUIDED_LAB04_URL", "http://guided-h04-guardrail-app:8000")
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
 H21_PROVIDER_URL = os.getenv(
@@ -41,6 +42,7 @@ CONTROL_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 LAB_TOKEN = os.environ["GUIDED_VERIFIER_LAB01_TOKEN"]
 LAB02_TOKEN = os.environ["GUIDED_VERIFIER_LAB02_TOKEN"]
 LAB03_TOKEN = os.environ["GUIDED_VERIFIER_LAB03_TOKEN"]
+LAB04_TOKEN = os.environ["GUIDED_VERIFIER_LAB04_TOKEN"]
 H22_TOKEN = os.environ["GUIDED_VERIFIER_H22_TOKEN"]
 H21_TOKEN = os.environ["GUIDED_VERIFIER_H21_TOKEN"]
 GATEWAY_TOKEN = os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"]
@@ -121,6 +123,28 @@ class H03VerifyRequest(BaseModel):
 
 
 class H03ResourceVerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+
+
+class H04ExpectedCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    case_id: Literal[
+        "apply-normal", "apply-risk", "converse-normal", "converse-risk"
+    ]
+    execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+
+
+class H04VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+    cases: list[H04ExpectedCase] = Field(min_length=4, max_length=4)
+
+
+class H04ResourceVerifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
@@ -268,6 +292,51 @@ def fetch_h03_resources() -> dict | None:
         bool(state.get("data_source_id")),
         bool(state.get("old_source_uri")),
         bool(state.get("current_source_uri")),
+    )
+    return state if all(required) else None
+
+
+def h04_err_envelope(
+    request: H04VerifyRequest | H04ResourceVerifyRequest, reason: str
+) -> dict:
+    return {
+        "lab_id": "03-bedrock-guardrail",
+        "activity_id": "H04",
+        "execution_id": request.suite_id,
+        "execution_kind": "h04-managed-guardrail-suite",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": "ERR",
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [],
+        "evidence": [],
+        "reason": reason,
+        "next_check": "H04 Guardrail ID, learner source와 ApplyGuardrail·Converse 영수증을 확인합니다.",
+    }
+
+
+def fetch_h04_resources() -> dict | None:
+    response = httpx.get(
+        f"{GATEWAY_URL}/v1/h04/resources",
+        headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
+        timeout=15.0,
+    )
+    if response.status_code != 200:
+        return None
+    state = response.json()
+    required = (
+        state.get("status") == "READY",
+        state.get("region") == "us-east-1",
+        state.get("guardrail_version") == "DRAFT",
+        state.get("pii_type") == "EMAIL",
+        state.get("input_enabled") is False,
+        state.get("output_enabled") is True,
+        state.get("output_action") == "ANONYMIZE",
+        isinstance(state.get("guardrail_id"), str),
+        bool(state.get("guardrail_id")),
+        isinstance(state.get("template_digest"), str),
+        len(state.get("template_digest", "")) == 64,
     )
     return state if all(required) else None
 
@@ -1368,4 +1437,267 @@ async def verify_h22(
         },
         "reason": reason,
         "next_check": "protocol version, Tool 목록, 승인 없음·인자 변경·만료와 0→0→0→1→1 부작용 순서를 확인합니다.",
+    }
+
+
+@app.post("/v1/verify/lab-04-resources")
+def verify_h04_resources(
+    request: H04ResourceVerifyRequest,
+    _authorized: None = Depends(require_control),
+) -> dict:
+    try:
+        state = fetch_h04_resources()
+    except httpx.RequestError:
+        state = None
+    if state is None:
+        return h04_err_envelope(request, "H04 전용 DRAFT Guardrail을 확인할 수 없습니다.")
+    return {
+        "lab_id": "03-bedrock-guardrail",
+        "activity_id": "H04",
+        "execution_id": request.suite_id,
+        "execution_kind": "aws-resource-provisioning",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": "PASS",
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [
+            {
+                "stage": "bedrock_guardrail",
+                "attempted": True,
+                "outcome": "ready",
+                "evidence_id": state["guardrail_id"],
+            }
+        ],
+        "evidence": [
+            {
+                "source": "amazon-bedrock"
+                if state["provider_mode"] == "aws"
+                else "contract-provider",
+                "kind": "guardrail-draft",
+                "id": state["guardrail_id"],
+                "observed_at": state["observed_at"],
+            }
+        ],
+        "result": state,
+        "reason": "H04 전용 DRAFT에서 출력 EMAIL 비식별화 설정을 확인했습니다.",
+        "next_check": "이 PASS는 정책 자원이 준비됐다는 뜻이며 수강생 앱의 Converse 연결은 아직 검증하지 않았습니다.",
+    }
+
+
+@app.post("/v1/verify/lab-04")
+def verify_h04(
+    request: H04VerifyRequest,
+    _authorized: None = Depends(require_control),
+) -> dict:
+    expected_ids = {
+        "apply-normal",
+        "apply-risk",
+        "converse-normal",
+        "converse-risk",
+    }
+    if {item.case_id for item in request.cases} != expected_ids:
+        return h04_err_envelope(request, "H04 서버 고정 Testcase가 완전하지 않습니다.")
+    try:
+        state = fetch_h04_resources()
+        if state is None:
+            return h04_err_envelope(request, "H04 Guardrail 상태가 준비되지 않았습니다.")
+        build = httpx.get(
+            f"{LAB04_URL}/v1/build-info",
+            headers={"Authorization": f"Bearer {LAB04_TOKEN}"},
+            timeout=5.0,
+        )
+        if build.status_code != 200:
+            return h04_err_envelope(request, "H04 learner source digest가 없습니다.")
+        source_digest = build.json().get("source_digest")
+        if not isinstance(source_digest, str) or len(source_digest) != 64:
+            return h04_err_envelope(request, "H04 learner source digest가 올바르지 않습니다.")
+
+        verified: dict[str, dict] = {}
+        evidence = []
+        for expected in request.cases:
+            learner = httpx.get(
+                f"{LAB04_URL}/v1/receipts/{expected.execution_id}",
+                headers={"Authorization": f"Bearer {LAB04_TOKEN}"},
+                timeout=5.0,
+            )
+            gateway = httpx.get(
+                f"{GATEWAY_URL}/v1/h04/evidence/{expected.execution_id}",
+                headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
+                timeout=10.0,
+            )
+            if learner.status_code != 200 or gateway.status_code != 200:
+                return h04_err_envelope(request, f"{expected.case_id} 영수증이 없습니다.")
+            app_receipt = learner.json()
+            provider = gateway.json()
+            try:
+                started_at = parse_time(expected.started_at)
+                observed_at = parse_time(provider["observed_at"])
+            except (KeyError, TypeError, ValueError):
+                return h04_err_envelope(request, f"{expected.case_id} 시각 증거가 잘못됐습니다.")
+            fields_match = all(
+                (
+                    app_receipt.get("execution_id") == expected.execution_id,
+                    app_receipt.get("case_id") == expected.case_id,
+                    app_receipt.get("source_digest") == source_digest,
+                    app_receipt.get("gateway_evidence_id") == expected.execution_id,
+                    app_receipt.get("provider_request_id")
+                    == provider.get("provider_request_id"),
+                    provider.get("execution_id") == expected.execution_id,
+                    provider.get("case_id") == expected.case_id,
+                    provider.get("template_digest") == state["template_digest"],
+                    observed_at >= started_at,
+                    isinstance(provider.get("provider_request_id"), str),
+                    bool(provider.get("provider_request_id")),
+                )
+            )
+            if not fields_match:
+                return h04_err_envelope(request, f"{expected.case_id} 실행 증거가 서로 다릅니다.")
+            if not reserve_provider_evidence(
+                provider["provider_request_id"], expected.execution_id
+            ):
+                return h04_err_envelope(request, f"{expected.case_id}가 예전 AWS 증거를 재사용했습니다.")
+            verified[expected.case_id] = {**provider, "source_digest": source_digest}
+            evidence.append(
+                {
+                    "source": "amazon-bedrock"
+                    if provider.get("provider_mode") == "aws"
+                    else "contract-provider",
+                    "kind": expected.case_id,
+                    "id": provider["provider_request_id"],
+                    "observed_at": provider["observed_at"],
+                }
+            )
+    except httpx.RequestError:
+        return h04_err_envelope(request, "H04 read-only evidence endpoint에 연결할 수 없습니다.")
+
+    apply_normal = verified["apply-normal"]
+    apply_risk = verified["apply-risk"]
+    converse_normal = verified["converse-normal"]
+    converse_risk = verified["converse-risk"]
+    standalone_ok = all(
+        (
+            apply_normal.get("operation") == "apply_guardrail",
+            apply_normal.get("guardrail_id") == state["guardrail_id"],
+            apply_normal.get("guardrail_version") == "DRAFT",
+            apply_normal.get("action") == "NONE",
+            apply_normal.get("outputs") == [],
+            apply_normal.get("model_called") is False,
+            apply_risk.get("operation") == "apply_guardrail",
+            apply_risk.get("guardrail_id") == state["guardrail_id"],
+            apply_risk.get("guardrail_version") == "DRAFT",
+            apply_risk.get("action") == "GUARDRAIL_INTERVENED",
+            "{EMAIL}"
+            in " ".join(item.get("text", "") for item in apply_risk.get("outputs", [])),
+            any(
+                item.get("type") == "EMAIL" and item.get("action") == "ANONYMIZED"
+                for item in apply_risk.get("pii_actions", [])
+            ),
+            apply_risk.get("model_called") is False,
+        )
+    )
+    normal_usage = converse_normal.get("usage", {})
+    normal_ok = all(
+        (
+            converse_normal.get("operation") == "converse",
+            converse_normal.get("model_id") == MODEL_ID,
+            converse_normal.get("model_called") is True,
+            type(normal_usage.get("outputTokens")) is int,
+            normal_usage.get("outputTokens", 0) > 0,
+            bool(converse_normal.get("output_text")),
+            "learner@example.com" not in converse_normal.get("output_text", ""),
+        )
+    )
+    if not standalone_ok or not normal_ok:
+        return h04_err_envelope(request, "단독 Guardrail 또는 정상 Nova Lite 대조군 증거가 부족합니다.")
+
+    risk_usage = converse_risk.get("usage", {})
+    config = converse_risk.get("guardrail_config")
+    exposed = "learner@example.com" in converse_risk.get("output_text", "")
+    expected_config = {
+        "guardrailIdentifier": state["guardrail_id"],
+        "guardrailVersion": "DRAFT",
+    }
+    risk_model_ok = all(
+        (
+            converse_risk.get("operation") == "converse",
+            converse_risk.get("model_id") == MODEL_ID,
+            converse_risk.get("model_called") is True,
+            type(risk_usage.get("outputTokens")) is int,
+            risk_usage.get("outputTokens", 0) > 0,
+            bool(converse_risk.get("stop_reason")),
+        )
+    )
+    if exposed and config is None and risk_model_ok:
+        verdict = "HIT"
+        reason = "단독 검사는 이메일을 찾았지만 실제 Nova Lite 요청에는 Guardrail이 연결되지 않아 원문 이메일이 공개됐습니다."
+        outcome = "raw-email-exposed"
+    else:
+        protected = all(
+            (
+                converse_normal.get("guardrail_config") == expected_config,
+                config == expected_config,
+                risk_model_ok,
+                not exposed,
+                "{EMAIL}" in converse_risk.get("output_text", ""),
+                any(
+                    item.get("type") == "EMAIL"
+                    and item.get("action") == "ANONYMIZED"
+                    for item in converse_risk.get("pii_actions", [])
+                ),
+            )
+        )
+        verdict = "PASS" if protected else "ERR"
+        reason = (
+            "단독 검사와 같은 DRAFT를 Nova Lite에 연결해 정상 응답은 유지하고 합성 이메일은 Browser 공개 전에 비식별화했습니다."
+            if protected
+            else "Guardrail 연결·trace·Token 사용량 또는 비식별화 출력 가운데 하나가 부족합니다."
+        )
+        outcome = "email-anonymized" if protected else "evidence-incomplete"
+
+    return {
+        "lab_id": "03-bedrock-guardrail",
+        "activity_id": "H04",
+        "execution_id": request.suite_id,
+        "execution_kind": "h04-managed-guardrail-suite",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": verdict,
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [
+            {
+                "stage": "learner_guardrail_app",
+                "attempted": True,
+                "outcome": "completed",
+                "evidence_id": source_digest,
+            },
+            {
+                "stage": "apply_guardrail",
+                "attempted": True,
+                "outcome": "email-detected",
+                "evidence_id": apply_risk["provider_request_id"],
+            },
+            {
+                "stage": "bedrock_main_with_guardrail",
+                "attempted": True,
+                "outcome": outcome,
+                "evidence_id": converse_risk["provider_request_id"],
+            },
+        ],
+        "evidence": evidence,
+        "result": {
+            "source_digest": source_digest,
+            "guardrail_id": state["guardrail_id"],
+            "guardrail_version": state["guardrail_version"],
+            "model_id": MODEL_ID,
+            "provider_request_id": converse_risk["provider_request_id"],
+            "action": apply_risk["action"],
+            "stop_reason": converse_risk.get("stop_reason"),
+            "usage": converse_risk.get("usage"),
+            "output_text": converse_risk.get("output_text"),
+            "cases": list(verified.values()),
+        },
+        "reason": reason,
+        "next_check": "ApplyGuardrail action과 Converse의 guardrailConfig·출력·Token usage를 같은 suite에서 비교합니다.",
     }
