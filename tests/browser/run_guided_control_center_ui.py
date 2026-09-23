@@ -20,7 +20,11 @@ def wait_for_result(page, timeout_ms: int, previous_id: str | None = None) -> di
             if payload.get("execution_id") != previous_id:
                 return payload
         page.wait_for_timeout(100)
-    raise TimeoutError("a new guided execution did not finish")
+    execution_state = (page.locator("#execution-state").text_content() or "").strip()
+    raise TimeoutError(
+        "a new guided execution did not finish; "
+        f"execution_state={execution_state!r}; raw={raw[:1000]!r}"
+    )
 
 
 def main() -> int:

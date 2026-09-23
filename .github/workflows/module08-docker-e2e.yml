@@ -170,7 +170,7 @@ jobs:
           --url http://127.0.0.1:28095
           --browser-channel chromium
 
-      - name: Build and validate independent tenant 03 H21, H22, H02, then H01
+      - name: Build and validate independent tenant 03 H21, H22, H02, H03, then H01
         env:
           AWS_CREDENTIALS_DIR: /tmp/guided-aws
           GUIDED_SESSION_SECRET: ci-guided-session-secret
@@ -231,7 +231,12 @@ jobs:
           docker logs nemo-official-ui || true
           docker logs promptfoo-official-ui || true
           docker logs pyrit-official-ui || true
-          docker compose --file examples/security-monitoring/compose.guided.yaml logs || true
+          docker logs llm-security-guided-front-proxy || true
+          docker logs llm-security-guided-control-center || true
+          docker logs llm-security-guided-evidence-verifier || true
+          docker logs llm-security-guided-h02-document-app || true
+          docker logs llm-security-guided-h03-sync-app || true
+          docker logs llm-security-guided-bedrock-gateway || true
 
       - name: Remove test resources
         if: always()
