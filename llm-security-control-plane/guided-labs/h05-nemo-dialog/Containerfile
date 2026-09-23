@@ -1,0 +1,32 @@
+FROM docker.io/library/python:3.12.14-slim
+
+ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    XDG_CACHE_HOME=/opt/nemo-cache \
+    HF_HOME=/opt/nemo-cache/huggingface
+
+# NeMo는 Dialog 실행에 FastEmbed, 공식 Topical 평가에 sentence-transformers를 쓴다.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc g++ python3-dev \
+    && python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 \
+    && python -m pip install \
+      fastapi==0.116.1 \
+      fastembed==0.7.3 \
+      nemoguardrails==0.22.0 \
+      sentence-transformers==5.1.2 \
+      uvicorn==0.52.0 \
+    && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2', cache_dir='/opt/nemo-cache').embed(['한국어 cache 준비']))" \
+    && chmod -R a+rX /opt/nemo-cache \
+    && apt-get purge -y --auto-remove gcc g++ python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --chmod=0444 guided-labs/h05-nemo-dialog/Containerfile /app/learner/Containerfile
+COPY --chmod=0555 guided-labs/h05-nemo-dialog/config /app/learner/config
+COPY --chmod=0555 guided-labs/h05-nemo-dialog/server.py /app/learner/server.py
+RUN chmod 0555 /app/learner /app/learner/config
+
+USER 65532:65532
+EXPOSE 8000
+CMD ["uvicorn", "server:app", "--app-dir", "/app/learner", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

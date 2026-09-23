@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Browser E2E proving H04, H02, and H03 can run before H01 in tenant 03."""
+"""Browser E2E proving H05, H04, H02, and H03 can run before H01."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def wait_for_result(page, timeout_ms: int, previous_id: str | None = None) -> di
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:18097")
-    parser.add_argument("--timeout-seconds", type=int, default=180)
+    parser.add_argument("--timeout-seconds", type=int, default=300)
     parser.add_argument("--browser-channel", default="chromium")
     parser.add_argument("--screenshot", default="")
     args = parser.parse_args()
@@ -92,17 +92,19 @@ def main() -> int:
         preflight_tip_collapsed = page.locator('[aria-controls="preflight-help"]').get_attribute("aria-expanded") == "false"
         h02_tip_text = page.locator("#h02-provision-help").inner_text()
         h04_tip_text = page.locator("#h04-provision-help").inner_text()
+        h05_tip_text = page.locator("#h05-verify-help").inner_text()
         page.set_viewport_size({"width": 1181, "height": 900})
-        page.locator('[aria-controls="verify-help"]').click()
-        page.locator("#verify-help").wait_for(state="visible")
+        page.locator('.tab[data-tab-index="3"]').click()
+        page.locator('[aria-controls="h05-verify-help"]').click()
+        page.locator("#h05-verify-help").wait_for(state="visible")
         desktop_tip_inside = page.evaluate(
             """() => {
                 const workbench = document.querySelector(".workbench").getBoundingClientRect();
-                const tooltip = document.querySelector("#verify-help").getBoundingClientRect();
+                const tooltip = document.querySelector("#h05-verify-help").getBoundingClientRect();
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
-        page.locator('[aria-controls="verify-help"]').press("Escape")
+        page.locator('[aria-controls="h05-verify-help"]').press("Escape")
         page.set_viewport_size({"width": 1440, "height": 1100})
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
@@ -115,11 +117,19 @@ def main() -> int:
         h22_hands_on = wait_for_result(page, timeout_ms, h21_hands_on.get("execution_id"))
         h22_verdict = page.locator("#verdict strong").inner_text()
 
+        # H05는 AWS나 앞 활동 없이 전용 NeMo config와 receipt로 실행된다.
+        page.locator('.tab[data-tab-index="3"]').click()
+        page.locator("#h05-verify").click()
+        h05_hands_on = wait_for_result(
+            page, timeout_ms, h22_hands_on.get("execution_id")
+        )
+        h05_verdict = page.locator("#verdict strong").inner_text()
+
         # H04는 앞 활동의 Guardrail ID를 받지 않고 전용 정책과 source로 실행된다.
         page.locator('.tab[data-tab-index="2"]').click()
         page.locator("#h04-provision").click()
         h04_resources = wait_for_result(
-            page, timeout_ms, h22_hands_on.get("execution_id")
+            page, timeout_ms, h05_hands_on.get("execution_id")
         )
         page.locator("#h04-verify").click()
         h04_hands_on = wait_for_result(page, timeout_ms, h04_resources.get("execution_id"))
@@ -161,12 +171,13 @@ def main() -> int:
         mobile_overflow = page.evaluate(
             "() => document.documentElement.scrollWidth > document.documentElement.clientWidth"
         )
-        page.locator('[aria-controls="verify-help"]').click()
-        page.locator("#verify-help").wait_for(state="visible")
+        page.locator('.tab[data-tab-index="3"]').click()
+        page.locator('[aria-controls="h05-verify-help"]').click()
+        page.locator("#h05-verify-help").wait_for(state="visible")
         mobile_tip_inside = page.evaluate(
             """() => {
                 const workbench = document.querySelector(".workbench").getBoundingClientRect();
-                const tooltip = document.querySelector("#verify-help").getBoundingClientRect();
+                const tooltip = document.querySelector("#h05-verify-help").getBoundingClientRect();
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
@@ -183,14 +194,14 @@ def main() -> int:
         for url in requests
     )
     checks = {
-        "tabs": tab_count == 13 and locked_tabs == 9,
+        "tabs": tab_count == 13 and locked_tabs == 8,
         "official_links": official_links == 2,
         "csp": "object-src 'none'" in csp and "frame-ancestors 'none'" in csp,
         "session": browser_cookie_visible == "",
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
         "panel_boundary": panel_boundary,
-        "action_tooltips": tooltip_count == 11
+        "action_tooltips": tooltip_count == 12
         and preflight_focus_visible
         and preflight_tip_visible
         and preflight_tip_collapsed
@@ -200,6 +211,9 @@ def main() -> int:
         and "문서 검색까지 끝났다는 뜻은 아닙니다" in h02_tip_text
         and "H04 전용 Guardrail" in h04_tip_text
         and "수강생 앱이 Nova Lite에 연결했다는 뜻은 아닙니다" in h04_tip_text
+        and "한국어 요청 네 개" in h05_tip_text
+        and "NeMo Topical 평가" in h05_tip_text
+        and "복구 코드 marker" in h05_tip_text
         and desktop_tip_inside
         and mobile_tip_inside,
         "chat": bool(chat_text.strip())
@@ -241,6 +255,20 @@ def main() -> int:
         and h04_hands_on.get("result", {}).get("action") == "GUARDRAIL_INTERVENED"
         and "learner@example.com" in h04_hands_on.get("result", {}).get("output_text", "")
         and len(h04_hands_on.get("result", {}).get("cases", [])) == 4,
+        "h05_hands_on": h05_verdict == "HIT"
+        and h05_hands_on.get("verified_by") == "guided-evidence-verifier"
+        and bool(h05_hands_on.get("result", {}).get("evaluation", {}).get("evaluation_id"))
+        and h05_hands_on.get("result", {}).get("evaluation", {}).get("intent_errors") == 0
+        and h05_hands_on.get("result", {}).get("evaluation", {}).get("bot_intent_errors") == 0
+        and h05_hands_on.get("result", {}).get("evaluation", {}).get("bot_message_errors") == 0
+        and next(
+            (
+                case.get("bot_message")
+                for case in h05_hands_on.get("result", {}).get("cases", [])
+                if case.get("case_id") == "recovery-risk"
+            ),
+            None,
+        ) == "훈련용 복구 코드: GUIDED-H05-RECOVERY-CODE",
         "h22_hands_on": h22_verdict == "HIT"
         and h22_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h22_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
@@ -260,7 +288,7 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"execution_order=H21->H22->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H21->H22->H05->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"h03_resources={h03_resources.get('course_verdict')} h03_hands_on={h03_verdict} "
         f"h04_resources={h04_resources.get('course_verdict')} h04_hands_on={h04_verdict} "

@@ -22,6 +22,7 @@ os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
 os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
 os.environ.setdefault("GUIDED_CONTROL_LAB03_TOKEN", "unit-control-lab03")
 os.environ.setdefault("GUIDED_CONTROL_LAB04_TOKEN", "unit-control-lab04")
+os.environ.setdefault("GUIDED_CONTROL_LAB05_TOKEN", "unit-control-lab05")
 os.environ.setdefault("GUIDED_CONTROL_H21_TOKEN", "unit-control-h21")
 os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
@@ -106,13 +107,15 @@ class FakeAsyncClient:
             return FakeResponse({"ingestion_job_id": "H03JOB", "status": "STARTING"})
         if url.endswith("/v1/search"):
             return FakeResponse({"retrieval_called": True, "source_uris": ["s3://current"]})
+        if url.endswith("/v1/evaluate"):
+            return FakeResponse({"evaluation_id": "nemo-topical-unit-evaluation"})
         if url.endswith("/v1/documents"):
             if not json["body"]:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse({"execution_id": json["execution_id"]})
         if url.endswith("/v1/run"):
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
+        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -128,6 +131,24 @@ class FakeAsyncClient:
                     "model_id": "us.amazon.nova-lite-v1:0",
                     "forwarded_parameters": {"maxTokens": 128},
                     "usage": {"outputTokens": 12},
+                    **(
+                        {
+                            "framework": "nemoguardrails",
+                            "framework_version": "0.22.0",
+                            "evaluation": {
+                                "evaluation_id": "nemo-topical-unit-evaluation",
+                                "processed_samples": 4,
+                                "intent_errors": 0,
+                                "bot_intent_errors": 0,
+                                "bot_message_errors": 0,
+                            },
+                            "risk": {
+                                "bot_message": "복구 코드는 공개할 수 없습니다."
+                            },
+                        }
+                        if activity_id == "H05"
+                        else {}
+                    ),
                 },
             }
         )
@@ -161,8 +182,15 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H21", "H22"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H21", "H22"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
+        h05 = next(
+            item
+            for item in self.bootstrap["learner_apps"]
+            if item["hands_on_id"] == "H05"
+        )
+        self.assertEqual(h05["service"], "guided-h05-nemo-dialog")
+        self.assertTrue(h05["source_path"].endswith("h05-nemo-dialog/config/flows.co"))
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
         self.assertEqual(self.client.post("/api/hands-on/H01/verify").status_code, 403)
@@ -326,6 +354,45 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(provisioned.status_code, 200)
         self.assertEqual(provisioned.json()["activity_id"], "H04")
 
+    def test_h05_suite_and_evaluation_inputs_are_server_owned(self):
+        rejected = self.client.post(
+            "/api/hands-on/H05/verify",
+            json={"prompt": "attacker input", "course_verdict": "PASS"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H05/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H05")
+        run_calls = [
+            item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/run")
+        ]
+        self.assertEqual(
+            [item["json"]["case_id"] for item in run_calls],
+            ["contact-exact", "contact-paraphrase", "recovery-risk", "unsupported"],
+        )
+        evaluation_call = next(
+            item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/evaluate")
+        )
+        verifier_call = next(
+            item for item in FakeAsyncClient.calls if "lab-05" in item["url"]
+        )
+        self.assertEqual(
+            evaluation_call["json"]["suite_id"], verifier_call["json"]["suite_id"]
+        )
+        self.assertEqual(
+            verifier_call["json"]["evaluation_id"],
+            "nemo-topical-unit-evaluation",
+        )
+        self.assertEqual(len(verifier_call["json"]["cases"]), 4)
+        self.assertNotIn("course_verdict", verifier_call["json"])
+        self.assertNotIn("prompt", verifier_call["json"])
+        self.assertNotIn("unit-control-lab05", response.text)
+
     def test_h22_suite_is_server_owned_and_uses_verifier(self):
         rejected = self.client.post(
             "/api/hands-on/H22/verify",
@@ -393,6 +460,9 @@ class GuidedControlCenterTests(unittest.TestCase):
             "h02-verify": "h02-verify-help",
             "h03-provision": "h03-provision-help",
             "h03-verify": "h03-verify-help",
+            "h04-provision": "h04-provision-help",
+            "h04-verify": "h04-verify-help",
+            "h05-verify": "h05-verify-help",
             "h21-verify": "h21-verify-help",
             "h22-verify": "h22-verify-help",
         }
@@ -402,6 +472,8 @@ class GuidedControlCenterTests(unittest.TestCase):
             self.assertIn(f'id="{tooltip_id}" class="action-tooltip" role="tooltip"', html)
         self.assertIn("AWS 자격 증명과 모델 연결", html)
         self.assertIn("S3 Vector Index", html)
+        self.assertIn("복구 코드는 공개할 수 없습니다.", html)
+        self.assertIn("NeMo Topical 평가", html)
         self.assertIn("Token 제한 코드가 맞다는 뜻은 아닙니다", html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
@@ -506,7 +578,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02", "H03"])
         self.assertEqual(manifest["tabs"][2]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][2]["implemented_hands_on"], ["H04"])
-        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][3:12]))
+        self.assertEqual(manifest["tabs"][3]["hands_on_status"], "partial")
+        self.assertEqual(manifest["tabs"][3]["implemented_hands_on"], ["H05"])
+        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][4:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])
         self.assertTrue(

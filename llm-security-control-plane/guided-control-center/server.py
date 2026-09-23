@@ -24,6 +24,7 @@ LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
 LAB03_URL = os.getenv("GUIDED_LAB03_URL", "http://guided-h03-sync-app:8000")
 LAB04_URL = os.getenv("GUIDED_LAB04_URL", "http://guided-h04-guardrail-app:8000")
+LAB05_URL = os.getenv("GUIDED_LAB05_URL", "http://guided-h05-nemo-dialog:8000")
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
 GATEWAY_URL = os.getenv(
@@ -34,6 +35,7 @@ LAB_TOKEN = os.environ["GUIDED_CONTROL_LAB01_TOKEN"]
 LAB02_TOKEN = os.environ["GUIDED_CONTROL_LAB02_TOKEN"]
 LAB03_TOKEN = os.environ["GUIDED_CONTROL_LAB03_TOKEN"]
 LAB04_TOKEN = os.environ["GUIDED_CONTROL_LAB04_TOKEN"]
+LAB05_TOKEN = os.environ["GUIDED_CONTROL_LAB05_TOKEN"]
 H22_TOKEN = os.environ["GUIDED_CONTROL_H22_TOKEN"]
 H21_TOKEN = os.environ["GUIDED_CONTROL_H21_TOKEN"]
 H02_PROVISION_TOKEN = os.environ["GUIDED_LAB02_PROVISION_TOKEN"]
@@ -183,7 +185,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             "tabs": 13,
             "hands_on": 22,
             "practices": 13,
-            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H21", "H22"],
+            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H21", "H22"],
             "implemented_practices": [],
         },
         "official_uis": [
@@ -228,6 +230,11 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "hands_on_id": "H04",
                 "service": "guided-h04-guardrail-app",
                 "source_path": "llm-security-control-plane/guided-labs/h04-bedrock-guardrail/server.py",
+            },
+            {
+                "hands_on_id": "H05",
+                "service": "guided-h05-nemo-dialog",
+                "source_path": "llm-security-control-plane/guided-labs/h05-nemo-dialog/config/flows.co",
             },
             {
                 "hands_on_id": "H21",
@@ -778,6 +785,97 @@ async def verify_h04_guardrail_app(
             verified = await client.post(
                 f"{VERIFIER_URL}/v1/verify/lab-04",
                 json={"suite_id": suite_id, "started_at": started_at, "cases": cases},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H05/verify")
+async def verify_h05_dialog_rail(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    cases = []
+    try:
+        async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+            for case_id in (
+                "contact-exact",
+                "contact-paraphrase",
+                "recovery-risk",
+                "unsupported",
+            ):
+                execution_id = str(uuid.uuid4())
+                case_started_at = datetime.now(timezone.utc).isoformat()
+                response = await client.post(
+                    f"{LAB05_URL}/v1/run",
+                    json={
+                        "execution_id": execution_id,
+                        "started_at": case_started_at,
+                        "case_id": case_id,
+                    },
+                    headers={"Authorization": f"Bearer {LAB05_TOKEN}"},
+                )
+                if response.status_code != 200:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={
+                            "successful_stage": "control_center",
+                            "stopped_stage": "guided_h05_nemo_dialog",
+                            "downstream_called": False,
+                            "course_verdict": "ERR",
+                            "next_check": "H05 image와 flows.co의 Colang 문법을 확인합니다.",
+                        },
+                    )
+                cases.append(
+                    {
+                        "case_id": case_id,
+                        "execution_id": execution_id,
+                        "started_at": case_started_at,
+                    }
+                )
+
+            evaluation = await client.post(
+                f"{LAB05_URL}/v1/evaluate",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {LAB05_TOKEN}"},
+            )
+            if evaluation.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "guided_h05_nemo_dialog",
+                        "stopped_stage": "nemo_topical_evaluation",
+                        "downstream_called": False,
+                        "course_verdict": "ERR",
+                        "next_check": "NeMo Topical 평가 출력과 config 경로를 확인합니다.",
+                    },
+                )
+            evaluation_id = evaluation.json().get("evaluation_id")
+            if not evaluation_id:
+                raise HTTPException(status_code=502, detail="H05 evaluation ID is missing")
+
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/lab-05",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": started_at,
+                    "cases": cases,
+                    "evaluation_id": evaluation_id,
+                },
                 headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
             )
         if verified.status_code != 200:
