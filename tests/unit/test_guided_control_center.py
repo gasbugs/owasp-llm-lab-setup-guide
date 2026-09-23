@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -380,6 +381,13 @@ class GuidedControlCenterTests(unittest.TestCase):
             ".actions:not(.single) > .action-control:last-child .action-tooltip",
             stylesheet,
         )
+
+    def test_rendering_only_updates_existing_dom_ids(self):
+        html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
+        javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
+        html_ids = set(re.findall(r'\bid="([^"]+)"', html))
+        updated_ids = set(re.findall(r'setText\("([^"]+)"', javascript))
+        self.assertFalse(updated_ids - html_ids, updated_ids - html_ids)
 
     def test_containerfile_makes_source_readable_to_non_root_runtime(self):
         containerfile = (CONTROL / "guided-control-center/Containerfile").read_text(

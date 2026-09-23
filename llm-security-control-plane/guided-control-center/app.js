@@ -210,13 +210,13 @@ function renderEnvelope(payload) {
     setText("provider-label", "PROVIDER REQUEST");
     setText("model-label", "CURRENT JOB");
     setText("requested-label", "EARLY STATUS");
-    setText("forwarded-label", "FINAL STATUS");
+    setText("effective-label", "FINAL STATUS");
     setText("output-label", "CURRENT SOURCE");
   } else if (h02) {
     setText("provider-label", "TITAN REQUEST");
     setText("model-label", "EMBED MODEL");
     setText("requested-label", "OBJECT KEY");
-    setText("forwarded-label", "DIMENSIONS");
+    setText("effective-label", "DIMENSIONS");
     setText("output-label", "DATA SOURCE");
   }
   setText("provider-id", h21 || h22 ? payload.result?.tool_inventory_digest : h03 ? payload.result?.final?.provider_request_id || payload.result?.aws_request_ids?.[0] : payload.result?.provider_request_id || payload.result?.aws_request_ids?.[0]);
