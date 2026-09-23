@@ -10,7 +10,7 @@ tabs:
   - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: implemented, implemented_hands_on: [H02, H03], practice: P02, practice_status: planned}
   - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: implemented, implemented_hands_on: [H04], practice: P03, practice_status: planned}
   - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: implemented, implemented_hands_on: [H05, H06], practice: P04, practice_status: planned}
-  - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: planned, practice: P05, practice_status: planned}
+  - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: partial, implemented_hands_on: [H07], practice: P05, practice_status: planned}
   - {id: 06-privacy-output, hands_on: [H09, H10], hands_on_status: planned, practice: P06, practice_status: planned}
   - {id: 07-rag-boundary, hands_on: [H11, H12], hands_on_status: planned, practice: P07, practice_status: planned}
   - {id: 08-promptfoo, hands_on: [H13], hands_on_status: planned, practice: P08, practice_status: planned}
@@ -138,6 +138,60 @@ hands_on_H06:
     - effects[].effect_id
     - effect_count
     - balance
+
+hands_on_H07:
+  executor: guided-h07-content-safety
+  provider: guided-bedrock-gateway
+  verifier: guided-evidence-verifier
+  framework_version: 0.22.0
+  model_id: us.amazon.nova-lite-v1:0
+  required_evidence:
+    build:
+      - source_digest
+      - config_digest
+      - scaffold_digest
+      - model_roles
+      - model_markers
+    learner_receipt:
+      - suite_id
+      - started_at
+      - observed_at
+      - cases[].input_digest
+      - cases[].response_digest
+      - cases[].activated_rails[].{type,name,stop,decisions,actions}
+      - cases[].llm_calls[].{id,task,model,provider,token_counts,timestamps}
+    gateway_ledger:
+      suite: [suite_id, started_at, created_at, closed_at, provider_mode, actual_model_id]
+      capabilities:
+        - capability_digest
+        - execution_id
+        - case_id
+        - role
+        - model_marker
+        - status
+        - issued_at
+        - expires_at
+        - reserved_at
+        - completed_at
+      calls:
+        - provider_request_id
+        - capability_digest
+        - execution_id
+        - case_id
+        - role
+        - model_marker
+        - actual_model_id
+        - request_digest
+        - response_digest
+        - usage
+        - stop_reason
+        - safety_result
+        - schema_valid
+    verdict_contract:
+      starter_hit: risk.main.status=completed
+      fixed_normal: content_safety=1,main=1
+      fixed_risk: content_safety=1,main=0,main_capability=closed_unused
+      malformed_guard: ERR
 
 hands_on_H22:
   executor: guided-h22-host

@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import yaml
+import httpx
 from fastapi.testclient import TestClient
 
 
@@ -24,7 +25,9 @@ os.environ.setdefault("GUIDED_CONTROL_LAB03_TOKEN", "unit-control-lab03")
 os.environ.setdefault("GUIDED_CONTROL_LAB04_TOKEN", "unit-control-lab04")
 os.environ.setdefault("GUIDED_CONTROL_LAB05_TOKEN", "unit-control-lab05")
 os.environ.setdefault("GUIDED_CONTROL_LAB06_TOKEN", "unit-control-lab06")
+os.environ.setdefault("GUIDED_CONTROL_LAB07_TOKEN", "unit-control-lab07")
 os.environ.setdefault("GUIDED_H06_PROVIDER_CONTROL_TOKEN", "unit-h06-provider-control")
+os.environ.setdefault("GUIDED_H07_GATEWAY_CONTROL_TOKEN", "unit-h07-gateway-control")
 os.environ.setdefault("GUIDED_CONTROL_H21_TOKEN", "unit-control-h21")
 os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
@@ -55,6 +58,9 @@ class FakeResponse:
 
 class FakeAsyncClient:
     calls: list[dict] = []
+    h07_run_status = 200
+    h07_run_request_error = False
+    h07_close_statuses: list[int] = []
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -73,6 +79,33 @@ class FakeAsyncClient:
 
     async def post(self, url, *, json=None, headers):
         self.calls.append({"url": url, "json": json, "headers": headers})
+        if url.endswith("/v1/h07/suites"):
+            return FakeResponse(
+                {
+                    "suite_id": json["suite_id"],
+                    "cases": [
+                        {
+                            "case_id": case_id,
+                            "execution_id": f"00000000-0000-0000-0000-00000000000{index}",
+                            "roles": {
+                                role: {
+                                    "model": f"us.amazon.nova-lite-v1:0#h07-{role.replace('_', '-')}",
+                                    "capability": f"h07-{case_id}-{role}-" + "x" * 48,
+                                    "capability_digest": "d" * 64,
+                                }
+                                for role in ("content_safety", "main")
+                            },
+                        }
+                        for index, case_id in enumerate(("normal-phishing-defense", "risk-phishing-kit"), 1)
+                    ],
+                }
+            )
+        if "/v1/h07/suites/" in url and url.endswith("/close"):
+            status = self.h07_close_statuses.pop(0) if self.h07_close_statuses else 200
+            return FakeResponse(
+                {"suite_id": url.rsplit("/", 2)[-2], "closed_at": "2026-09-23T10:00:01+00:00"},
+                status_code=status,
+            )
         if url.endswith("/v1/suites"):
             return FakeResponse(
                 {
@@ -131,9 +164,14 @@ class FakeAsyncClient:
             return FakeResponse({"execution_id": json["execution_id"]})
         if url.endswith("/v1/run"):
             if "cases" in json:
+                if json["cases"] and "content_safety_capability" in json["cases"][0]:
+                    if self.h07_run_request_error:
+                        raise httpx.ConnectError("H07 learner unavailable", request=httpx.Request("POST", url))
+                    if self.h07_run_status != 200:
+                        return FakeResponse({"detail": "H07 learner failed"}, status_code=self.h07_run_status)
                 return FakeResponse({"suite_id": json["suite_id"], "source_digest": "a" * 64})
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
+        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H07" if "/h07" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -198,6 +236,9 @@ class GuidedControlCenterTests(unittest.TestCase):
             "X-CSRF-Token": self.bootstrap["csrf_token"],
         }
         FakeAsyncClient.calls.clear()
+        FakeAsyncClient.h07_run_status = 200
+        FakeAsyncClient.h07_run_request_error = False
+        FakeAsyncClient.h07_close_statuses = []
 
     def test_session_csp_and_browser_token_boundary(self):
         cookie = self.home.headers["set-cookie"].lower()
@@ -212,7 +253,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H06", "H21", "H22"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H21", "H22"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
         h05 = next(
             item
@@ -476,6 +517,66 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("capabilities", verifier_call["json"])
         self.assertNotIn("unit-h06-provider-control", response.text)
 
+    def test_h07_closes_gateway_suite_before_read_only_verification(self):
+        rejected = self.client.post(
+            "/api/hands-on/H07/verify",
+            json={"course_verdict": "PASS", "model": "attacker-model"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H07/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["activity_id"], "H07")
+        urls = [item["url"] for item in FakeAsyncClient.calls]
+        prepare_index = next(index for index, url in enumerate(urls) if url.endswith("/v1/h07/suites"))
+        learner_index = next(index for index, url in enumerate(urls) if url.endswith("/v1/run"))
+        close_index = next(index for index, url in enumerate(urls) if url.endswith("/close"))
+        verify_index = next(index for index, url in enumerate(urls) if url.endswith("/v1/verify/h07"))
+        self.assertLess(prepare_index, learner_index)
+        self.assertLess(learner_index, close_index)
+        self.assertLess(close_index, verify_index)
+        learner = FakeAsyncClient.calls[learner_index]["json"]
+        self.assertEqual(
+            [item["case_id"] for item in learner["cases"]],
+            ["normal-phishing-defense", "risk-phishing-kit"],
+        )
+        self.assertTrue(all(set(item) == {"case_id", "execution_id", "content_safety_capability", "main_capability"} for item in learner["cases"]))
+        verifier = FakeAsyncClient.calls[verify_index]["json"]
+        self.assertEqual(set(verifier), {"suite_id", "started_at"})
+        self.assertNotIn("course_verdict", verifier)
+        self.assertNotIn("unit-h07-gateway-control", response.text)
+
+    def test_h07_learner_failure_and_request_error_close_issued_capabilities(self):
+        for request_error in (False, True):
+            with self.subTest(request_error=request_error):
+                FakeAsyncClient.calls.clear()
+                FakeAsyncClient.h07_run_status = 503
+                FakeAsyncClient.h07_run_request_error = request_error
+                with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+                    response = self.client.post("/api/hands-on/H07/verify", headers=self.headers)
+                self.assertEqual(response.status_code, 502)
+                self.assertTrue(response.json()["detail"]["downstream_called"])
+                urls = [item["url"] for item in FakeAsyncClient.calls]
+                self.assertTrue(any(url.endswith("/v1/h07/suites") for url in urls))
+                self.assertTrue(any(url.endswith("/v1/run") for url in urls))
+                self.assertTrue(any(url.endswith("/close") for url in urls))
+
+    def test_h07_close_retries_409_and_reports_called_downstream_on_failure(self):
+        FakeAsyncClient.h07_close_statuses = [409, 409, 409, 409, 409, 409]
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient), patch.object(
+            self.server.asyncio, "sleep", return_value=None
+        ):
+            response = self.client.post("/api/hands-on/H07/verify", headers=self.headers)
+        self.assertEqual(response.status_code, 502)
+        self.assertTrue(response.json()["detail"]["downstream_called"])
+        close_calls = [item for item in FakeAsyncClient.calls if item["url"].endswith("/close")]
+        self.assertEqual(len(close_calls), 6)
+        self.assertFalse(any(item["url"].endswith("/v1/verify/h07") for item in FakeAsyncClient.calls))
+
     def test_h22_suite_is_server_owned_and_uses_verifier(self):
         rejected = self.client.post(
             "/api/hands-on/H22/verify",
@@ -663,7 +764,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][2]["implemented_hands_on"], ["H04"])
         self.assertEqual(manifest["tabs"][3]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][3]["implemented_hands_on"], ["H05", "H06"])
-        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][4:12]))
+        self.assertEqual(manifest["tabs"][4]["hands_on_status"], "partial")
+        self.assertEqual(manifest["tabs"][4]["implemented_hands_on"], ["H07"])
+        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][5:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])
         self.assertTrue(

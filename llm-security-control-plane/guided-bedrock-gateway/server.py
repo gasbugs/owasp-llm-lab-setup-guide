@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from h03_backend import router as h03_router
 from h04_backend import router as h04_router
+from h07_backend import router as h07_router
 
 
 MODEL_ID = "us.amazon.nova-lite-v1:0"
@@ -728,6 +729,7 @@ def invoke_once(request: InvokeRequest) -> dict:
 app = FastAPI(title="Tenant 03 Bedrock Gateway", docs_url=None, redoc_url=None)
 app.include_router(h03_router)
 app.include_router(h04_router)
+app.include_router(h07_router)
 
 
 @app.get("/livez")

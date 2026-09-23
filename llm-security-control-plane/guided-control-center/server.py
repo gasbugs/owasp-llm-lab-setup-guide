@@ -26,6 +26,7 @@ LAB03_URL = os.getenv("GUIDED_LAB03_URL", "http://guided-h03-sync-app:8000")
 LAB04_URL = os.getenv("GUIDED_LAB04_URL", "http://guided-h04-guardrail-app:8000")
 LAB05_URL = os.getenv("GUIDED_LAB05_URL", "http://guided-h05-nemo-dialog:8000")
 LAB06_URL = os.getenv("GUIDED_LAB06_URL", "http://guided-h06-nemo-action:8000")
+LAB07_URL = os.getenv("GUIDED_LAB07_URL", "http://guided-h07-content-safety:8000")
 H06_PROVIDER_URL = os.getenv(
     "GUIDED_H06_PROVIDER_URL", "http://guided-h06-action-provider:8000"
 )
@@ -41,7 +42,9 @@ LAB03_TOKEN = os.environ["GUIDED_CONTROL_LAB03_TOKEN"]
 LAB04_TOKEN = os.environ["GUIDED_CONTROL_LAB04_TOKEN"]
 LAB05_TOKEN = os.environ["GUIDED_CONTROL_LAB05_TOKEN"]
 LAB06_TOKEN = os.environ["GUIDED_CONTROL_LAB06_TOKEN"]
+LAB07_TOKEN = os.environ["GUIDED_CONTROL_LAB07_TOKEN"]
 H06_PROVIDER_CONTROL_TOKEN = os.environ["GUIDED_H06_PROVIDER_CONTROL_TOKEN"]
+H07_GATEWAY_CONTROL_TOKEN = os.environ["GUIDED_H07_GATEWAY_CONTROL_TOKEN"]
 H22_TOKEN = os.environ["GUIDED_CONTROL_H22_TOKEN"]
 H21_TOKEN = os.environ["GUIDED_CONTROL_H21_TOKEN"]
 H02_PROVISION_TOKEN = os.environ["GUIDED_LAB02_PROVISION_TOKEN"]
@@ -61,6 +64,7 @@ ALLOWED_ORIGINS = set(
 )
 TIMEOUT = httpx.Timeout(130.0, connect=3.0)
 PROVISION_TIMEOUT = httpx.Timeout(360.0, connect=3.0)
+H07_CLOSE_TIMEOUT = httpx.Timeout(3.0, connect=1.0)
 MODEL_ID = "us.amazon.nova-lite-v1:0"
 NEMO_BROWSER_URL = os.getenv("GUIDED_NEMO_BROWSER_URL", "http://127.0.0.1:18192")
 SESSIONS: dict[str, dict] = {}
@@ -191,7 +195,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             "tabs": 13,
             "hands_on": 22,
             "practices": 13,
-            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H06", "H21", "H22"],
+            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H21", "H22"],
             "implemented_practices": [],
         },
         "official_uis": [
@@ -246,6 +250,11 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "hands_on_id": "H06",
                 "service": "guided-h06-nemo-action",
                 "source_path": "llm-security-control-plane/guided-labs/h06-nemo-action/actions.py",
+            },
+            {
+                "hands_on_id": "H07",
+                "service": "guided-h07-content-safety",
+                "source_path": "llm-security-control-plane/guided-labs/h07-content-safety/config/config.yml",
             },
             {
                 "hands_on_id": "H21",
@@ -992,6 +1001,168 @@ async def verify_h06_python_action(
         return verified.json()
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+async def close_h07_gateway_suite(suite_id: str) -> bool:
+    """Close unused one-time grants even when the learner path fails."""
+    try:
+        async with httpx.AsyncClient(timeout=H07_CLOSE_TIMEOUT) as client:
+            for attempt in range(3):
+                response = await client.post(
+                    f"{GATEWAY_URL}/v1/h07/suites/{suite_id}/close",
+                    headers={"Authorization": f"Bearer {H07_GATEWAY_CONTROL_TOKEN}"},
+                )
+                if response.status_code == 200:
+                    return response.json().get("suite_id") == suite_id
+                if response.status_code != 409:
+                    return False
+                await asyncio.sleep(0.2 * (attempt + 1))
+        return False
+    except (httpx.RequestError, ValueError):
+        return False
+
+
+@app.post("/api/hands-on/H07/verify")
+async def verify_h07_content_safety(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    prepare_attempted = False
+    suite_closed = False
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            prepare_attempted = True
+            prepared = await client.post(
+                f"{GATEWAY_URL}/v1/h07/suites",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {H07_GATEWAY_CONTROL_TOKEN}"},
+            )
+            if prepared.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "h07_gateway_prepare",
+                        "downstream_called": False,
+                        "course_verdict": "ERR",
+                        "next_check": "H07 Gateway가 두 요청과 역할별 일회 capability를 만들었는지 확인합니다.",
+                    },
+                )
+            provider_cases = prepared.json().get("cases")
+            expected_order = ["normal-phishing-defense", "risk-phishing-kit"]
+            if not isinstance(provider_cases, list) or [
+                item.get("case_id") for item in provider_cases
+            ] != expected_order:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "h07_gateway_prepare",
+                        "stopped_stage": "h07_capability_contract",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H07 Gateway가 고정 순서의 두 Testcase를 만들었는지 확인합니다.",
+                    },
+                )
+            learner_cases = []
+            for item in provider_cases:
+                roles = item.get("roles")
+                if not isinstance(roles, dict) or set(roles) != {"content_safety", "main"}:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={
+                            "successful_stage": "h07_gateway_prepare",
+                            "stopped_stage": "h07_capability_contract",
+                            "downstream_called": True,
+                            "course_verdict": "ERR",
+                            "next_check": "각 H07 Testcase에 Content Safety와 Main 역할 capability가 있는지 확인합니다.",
+                        },
+                    )
+                learner_cases.append(
+                    {
+                        "case_id": item["case_id"],
+                        "execution_id": item["execution_id"],
+                        "content_safety_capability": roles["content_safety"]["capability"],
+                        "main_capability": roles["main"]["capability"],
+                    }
+                )
+            executed = await client.post(
+                f"{LAB07_URL}/v1/run",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": started_at,
+                    "cases": learner_cases,
+                },
+                headers={"Authorization": f"Bearer {LAB07_TOKEN}"},
+            )
+            if executed.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "h07_gateway_prepare",
+                        "stopped_stage": "guided_h07_content_safety",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H07 image, NeMo 0.22.0 설정과 입력 Rail 문법을 확인합니다.",
+                    },
+                )
+            if executed.json().get("suite_id") != suite_id:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "guided_h07_content_safety",
+                        "stopped_stage": "h07_learner_receipt",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H07 learner가 현재 suite ID의 실행 영수증을 저장했는지 확인합니다.",
+                    },
+                )
+            suite_closed = await close_h07_gateway_suite(suite_id)
+            if not suite_closed:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "guided_h07_content_safety",
+                        "stopped_stage": "h07_gateway_close",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "실행 중인 H07 역할 호출이 끝났고 사용하지 않은 capability가 닫혔는지 확인합니다.",
+                    },
+                )
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/h07",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except HTTPException:
+        if prepare_attempted and not suite_closed:
+            await close_h07_gateway_suite(suite_id)
+        raise
+    except httpx.RequestError as exc:
+        if prepare_attempted and not suite_closed:
+            await close_h07_gateway_suite(suite_id)
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "successful_stage": "control_center",
+                "stopped_stage": "h07_internal_service",
+                "downstream_called": prepare_attempted,
+                "course_verdict": "ERR",
+                "next_check": "H07 Gateway·learner 상태와 suite가 닫혔는지 확인합니다.",
+            },
+        ) from exc
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 

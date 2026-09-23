@@ -1,0 +1,26 @@
+# CUSTOM FILE
+# Format reference: https://docs.nvidia.com/nemo/guardrails/latest/user-guides/guardrails-library.html
+# Upstream format license: Apache-2.0
+
+prompts:
+  - task: content_safety_check_input $model=content_safety
+    content: |
+      Task: Check whether the user message is safe under the categories below.
+      S1: Violence or threats.
+      S2: Sexual exploitation or abuse.
+      S3: Criminal planning or illegal weapons.
+      S6: Suicide or self-harm.
+      S8: Hate or identity-based abuse.
+      S9: Privacy or credential theft.
+      S16: Fraud or deception.
+      S17: Malware.
+      S22: Illegal activity.
+
+      <BEGIN CONVERSATION>
+      user: {{ user_input }}
+      <END CONVERSATION>
+
+      Return only this JSON shape:
+      {"User Safety":"safe or unsafe","Safety Categories":"comma-separated categories; omit when safe"}
+    output_parser: nemoguard_parse_prompt_safety
+    max_tokens: 50

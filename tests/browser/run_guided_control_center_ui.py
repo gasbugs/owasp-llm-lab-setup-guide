@@ -94,6 +94,7 @@ def main() -> int:
         h04_tip_text = page.locator("#h04-provision-help").inner_text()
         h05_tip_text = page.locator("#h05-verify-help").inner_text()
         h06_tip_text = page.locator("#h06-verify-help").inner_text()
+        h07_tip_text = page.locator("#h07-verify-help").inner_text()
         page.set_viewport_size({"width": 1181, "height": 900})
         page.locator('.tab[data-tab-index="3"]').click()
         page.locator('[aria-controls="h05-verify-help"]').click()
@@ -106,6 +107,17 @@ def main() -> int:
             }"""
         )
         page.locator('[aria-controls="h05-verify-help"]').press("Escape")
+        page.locator('.tab[data-tab-index="4"]').click()
+        page.locator('[aria-controls="h07-verify-help"]').click()
+        page.locator("#h07-verify-help").wait_for(state="visible")
+        h07_desktop_tip_inside = page.evaluate(
+            """() => {
+                const workbench = document.querySelector(".workbench").getBoundingClientRect();
+                const tooltip = document.querySelector("#h07-verify-help").getBoundingClientRect();
+                return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
+            }"""
+        )
+        page.locator('[aria-controls="h07-verify-help"]').press("Escape")
         page.set_viewport_size({"width": 1440, "height": 1100})
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
@@ -118,11 +130,24 @@ def main() -> int:
         h22_hands_on = wait_for_result(page, timeout_ms, h21_hands_on.get("execution_id"))
         h22_verdict = page.locator("#verdict strong").inner_text()
 
+        # H07은 H05·H06 상태 없이 전용 NeMo config와 역할별 Gateway 원장을 사용한다.
+        page.locator('.tab[data-tab-index="4"]').click()
+        h08_planned_visible = page.locator("#h08-planned-title").is_visible()
+        h08_locked = page.locator("#h08-verify").count() == 0 and "H08 준비 중" in (
+            page.locator('.tab[data-tab-index="4"] small').inner_text()
+        )
+        page.locator("#h07-verify").click()
+        h07_hands_on = wait_for_result(
+            page, timeout_ms, h22_hands_on.get("execution_id")
+        )
+        h07_verdict = page.locator("#verdict strong").inner_text()
+        h07_raw_text = page.locator("#raw").inner_text()
+
         # H06은 H05가 중지돼도 전용 NeMo runtime과 합성 Provider만 사용한다.
         page.locator('.tab[data-tab-index="3"]').click()
         page.locator("#h06-verify").click()
         h06_hands_on = wait_for_result(
-            page, timeout_ms, h22_hands_on.get("execution_id")
+            page, timeout_ms, h07_hands_on.get("execution_id")
         )
         h06_verdict = page.locator("#verdict strong").inner_text()
 
@@ -179,13 +204,13 @@ def main() -> int:
         mobile_overflow = page.evaluate(
             "() => document.documentElement.scrollWidth > document.documentElement.clientWidth"
         )
-        page.locator('.tab[data-tab-index="3"]').click()
-        page.locator('[aria-controls="h05-verify-help"]').click()
-        page.locator("#h05-verify-help").wait_for(state="visible")
+        page.locator('.tab[data-tab-index="4"]').click()
+        page.locator('[aria-controls="h07-verify-help"]').click()
+        page.locator("#h07-verify-help").wait_for(state="visible")
         mobile_tip_inside = page.evaluate(
             """() => {
                 const workbench = document.querySelector(".workbench").getBoundingClientRect();
-                const tooltip = document.querySelector("#h05-verify-help").getBoundingClientRect();
+                const tooltip = document.querySelector("#h07-verify-help").getBoundingClientRect();
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
@@ -202,14 +227,14 @@ def main() -> int:
         for url in requests
     )
     checks = {
-        "tabs": tab_count == 13 and locked_tabs == 8,
+        "tabs": tab_count == 13 and locked_tabs == 7,
         "official_links": official_links == 2,
         "csp": "object-src 'none'" in csp and "frame-ancestors 'none'" in csp,
         "session": browser_cookie_visible == "",
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
         "panel_boundary": panel_boundary,
-        "action_tooltips": tooltip_count == 13
+        "action_tooltips": tooltip_count == 14
         and preflight_focus_visible
         and preflight_tip_visible
         and preflight_tip_collapsed
@@ -225,7 +250,11 @@ def main() -> int:
         and "합성 Provider" in h06_tip_text
         and "호출·부작용 원장" in h06_tip_text
         and "거부 문구만으로는" in h06_tip_text
+        and "현재 H07 NeMo 서비스" in h07_tip_text
+        and "닫힌 일회 capability 원장" in h07_tip_text
+        and "Main Model 호출 0회" in h07_tip_text
         and desktop_tip_inside
+        and h07_desktop_tip_inside
         and mobile_tip_inside,
         "chat": bool(chat_text.strip())
         and chat_text != "모델 응답을 받지 못했습니다."
@@ -291,6 +320,21 @@ def main() -> int:
         and len(h06_hands_on.get("result", {}).get("provider_calls", [])) == 3
         and h06_hands_on.get("result", {}).get("effect_count") == 2
         and h06_hands_on.get("result", {}).get("balance") == 9800,
+        "h07_hands_on": h07_verdict == "HIT"
+        and h07_hands_on.get("verified_by") == "guided-evidence-verifier"
+        and h07_hands_on.get("result", {}).get("model_roles") == ["main"]
+        and h07_hands_on.get("result", {}).get("content_safety_calls") == 0
+        and h07_hands_on.get("result", {}).get("main_calls") == 2
+        and h07_hands_on.get("result", {}).get("normal") == {"guard_calls": 0, "main_calls": 1}
+        and h07_hands_on.get("result", {}).get("risk", {}).get("guard_calls") == 0
+        and h07_hands_on.get("result", {}).get("risk", {}).get("main_calls") == 1
+        and h07_hands_on.get("result", {}).get("risk", {}).get("main_capability_status") == "completed"
+        and len(h07_hands_on.get("result", {}).get("cases", [])) == 2
+        and len(h07_hands_on.get("result", {}).get("provider_calls", [])) == 2
+        and '"content_safety_capability"' not in h07_raw_text
+        and '"main_capability"' not in h07_raw_text
+        and "피싱 메일을 식별하는 방법" not in h07_raw_text,
+        "h08_locked": h08_planned_visible and h08_locked,
         "h22_hands_on": h22_verdict == "HIT"
         and h22_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h22_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
@@ -310,7 +354,7 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"execution_order=H21->H22->H06->H05->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h06={h06_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H21->H22->H07->H06->H05->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h07={h07_verdict} h06={h06_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"h03_resources={h03_resources.get('course_verdict')} h03_hands_on={h03_verdict} "
         f"h04_resources={h04_resources.get('course_verdict')} h04_hands_on={h04_verdict} "
@@ -318,7 +362,8 @@ def main() -> int:
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
         f"panel_boundary={str(panel_boundary).lower()} chat={str(checks['chat']).lower()} "
         f"action_tooltips={str(checks['action_tooltips']).lower()} "
-        f"desktop_tip_inside={str(desktop_tip_inside).lower()} mobile_tip_inside={str(mobile_tip_inside).lower()} "
+        f"desktop_tip_inside={str(desktop_tip_inside).lower()} h07_desktop_tip_inside={str(h07_desktop_tip_inside).lower()} mobile_tip_inside={str(mobile_tip_inside).lower()} "
+        f"h08_locked={str(checks['h08_locked']).lower()} "
         f"answer_controls={answer_controls} raw_nodes={raw_nodes} "
         f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )

@@ -1,0 +1,16 @@
+# CUSTOM FILE
+# Format reference: https://docs.nvidia.com/nemo/guardrails/latest/configure-rails/configuration-guide.html
+# Upstream format license: Apache-2.0
+
+models:
+  - type: main
+    engine: openai
+    model: us.amazon.nova-lite-v1:0#h07-main
+    parameters:
+      temperature: 0.0
+      max_tokens: 120
+
+# TODO(H07): content_safety 모델과 정확한 input flow를 연결한다.
+rails:
+  input:
+    flows: []
