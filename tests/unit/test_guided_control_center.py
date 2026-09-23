@@ -290,7 +290,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         self.assertIn("effective_max_tokens = min(request.max_output_tokens, 128)", html)
         self.assertIn('boto3.client("bedrock-runtime"', html)
-        self.assertIn("강사와 함께 진행하는 본 실습", html)
+        self.assertNotIn("강사와 함께", html)
+        self.assertNotIn("비용 안내", html)
         self.assertIn("--env-file llm-security-control-plane/.state/guided-course.env", html)
         self.assertIn('data-theme-choice="light"', html)
         self.assertIn('data-theme-choice="dark"', html)
@@ -308,9 +309,9 @@ class GuidedControlCenterTests(unittest.TestCase):
             self.assertIn(f'id="{button_id}"', html)
             self.assertIn(f'aria-describedby="{tooltip_id}"', html)
             self.assertIn(f'id="{tooltip_id}" class="action-tooltip" role="tooltip"', html)
-        self.assertIn("2 Token 상한", html)
+        self.assertIn("AWS 자격 증명과 모델 연결", html)
         self.assertIn("S3 Vector Index", html)
-        self.assertIn("과제 통과가 아닙니다", html)
+        self.assertIn("Token 제한 코드가 맞다는 뜻은 아닙니다", html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
         self.assertNotIn("innerHTML", javascript)
@@ -327,6 +328,10 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("@media (prefers-color-scheme: dark)", stylesheet)
         self.assertIn("prefers-reduced-motion", stylesheet)
         self.assertIn(".action-control.tip-open .action-tooltip", stylesheet)
+        self.assertIn(
+            ".actions:not(.single) > .action-control:last-child .action-tooltip",
+            stylesheet,
+        )
 
     def test_containerfile_makes_source_readable_to_non_root_runtime(self):
         containerfile = (CONTROL / "guided-control-center/Containerfile").read_text(

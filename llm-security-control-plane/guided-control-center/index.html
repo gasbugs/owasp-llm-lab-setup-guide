@@ -44,11 +44,10 @@
     </aside>
 
     <section class="panel workbench">
-      <div class="panel-head split"><div><p id="activity-label" class="label">HANDS-ON · H01</p><h2 id="activity-title">Bedrock Gateway 만들기</h2></div><span class="live-chip">INSTRUCTOR-LED</span></div>
+      <div class="panel-head split"><div><p id="activity-label" class="label">HANDS-ON · H01</p><h2 id="activity-title">Bedrock Gateway 만들기</h2></div><span class="live-chip">직접 작성</span></div>
       <div class="work-body">
         <div id="h01-work" class="lab-workspace">
-        <p>강사와 함께 진행하는 본 실습입니다. Starter는 동작하는 HTTP 서버지만 512 Token 요청을 그대로 Nova Lite에 전달합니다. 요청 계약, 서버 고정 모델, 출력 상한과 Boto3 호출을 코드로 연결하고 서버가 가진 네 가지 Testcase로 확인합니다.</p>
-        <div class="cost-note"><strong>비용 안내</strong><span>연결 확인은 1회, 현재 구현 검증은 정상·큰 요청 2회만 Nova Lite를 호출합니다. 잘못된 요청 2개는 Provider 전에 끝납니다.</span></div>
+        <p>작은 Bedrock Gateway를 직접 완성합니다. Starter는 HTTP 요청은 받지만, 사용자가 요청한 512 Token을 그대로 Nova Lite에 보냅니다. 요청 형식을 검사하고 모델을 서버에서 고정한 뒤, 출력을 최대 128 Token으로 줄이도록 코드를 완성합니다. 마지막에 서버가 미리 준비한 네 가지 요청으로 정상 요청은 통과하고 잘못된 요청은 Nova Lite에 닿기 전에 멈추는지 확인합니다.</p>
 
         <section class="hands-on" aria-labelledby="hands-on-title">
           <div>
@@ -88,7 +87,7 @@ docker compose \
             <span class="action-control">
               <button id="chat-send" class="secondary" type="submit" aria-describedby="chat-send-help">Nova Lite로 보내기</button>
               <button class="help-trigger" type="button" aria-label="Nova Lite로 보내기 작업 설명" aria-expanded="false" aria-controls="chat-send-help">i</button>
-              <span id="chat-send-help" class="action-tooltip" role="tooltip">입력한 문장과 서버가 정한 512 Token 상한을 현재 H01 Gateway에 보냅니다. Gateway가 Nova Lite를 한 번 호출하므로 Bedrock 사용량이 발생합니다. 응답을 관찰하는 기능이며 과제 판정에는 사용하지 않습니다.</span>
+              <span id="chat-send-help" class="action-tooltip" role="tooltip">입력한 질문을 현재 H01 Gateway가 Nova Lite에 보냅니다. 화면에는 모델 답변과 Gateway가 실제로 전달한 Token 상한이 나옵니다. 자유롭게 동작을 살펴보는 기능이며 실습 통과 판정에는 사용하지 않습니다.</span>
             </span>
           </form>
           <p id="chat-meta" class="chat-meta">아직 모델을 호출하지 않았습니다.</p>
@@ -98,19 +97,18 @@ docker compose \
           <span class="action-control">
             <button id="preflight" class="secondary" aria-describedby="preflight-help">Provider 연결 확인</button>
             <button class="help-trigger" type="button" aria-label="Provider 연결 확인 작업 설명" aria-expanded="false" aria-controls="preflight-help">i</button>
-            <span id="preflight-help" class="action-tooltip" role="tooltip">고정 문장 <code>Reply only OK</code>와 2 Token 상한을 H01 Gateway를 거쳐 Nova Lite에 한 번 보냅니다. 검증기가 실제 Provider 요청 ID와 사용량을 다시 확인합니다. AWS 자원은 만들지 않으며 이 PASS는 연결 정상이라는 뜻이지 과제 통과가 아닙니다.</span>
+            <span id="preflight-help" class="action-tooltip" role="tooltip">H01 Gateway가 “OK라고만 답하기” 요청을 Nova Lite에 보냅니다. PASS가 나오면 AWS 자격 증명과 모델 연결이 정상이라는 뜻입니다. 아직 내가 작성한 Token 제한 코드가 맞다는 뜻은 아닙니다.</span>
           </span>
           <span class="action-control">
             <button id="verify" class="primary" aria-describedby="verify-help">현재 구현 검증</button>
             <button class="help-trigger" type="button" aria-label="H01 현재 구현 검증 작업 설명" aria-expanded="false" aria-controls="verify-help">i</button>
-            <span id="verify-help" class="action-tooltip" role="tooltip">서버 고정 4개 Testcase를 H01 Gateway에 보냅니다. 정상 64 Token과 위험 512 Token은 Nova Lite를 호출하고, 빈 문장과 모델 바꾸기는 Provider 전에 멈춰야 합니다. 검증기가 실제 전달 상한과 호출 수를 대조해 HIT·PASS·ERR를 정합니다.</span>
+            <span id="verify-help" class="action-tooltip" role="tooltip">서버가 미리 준비한 네 가지 요청을 H01 Gateway에 보냅니다. 정상 요청은 Nova Lite까지 가야 하고, 빈 문장과 모델을 바꾸려는 요청은 Gateway에서 멈춰야 합니다. 검증기가 실제 Token 상한과 모델 호출 횟수를 대조해 HIT·PASS·ERR로 보여 줍니다.</span>
           </span>
         </div>
         </div>
 
         <div id="h02-work" class="lab-workspace" hidden>
           <p>고객지원 문서를 검색에 연결하는 앱을 만듭니다. AWS 자원은 제공 Gateway가 서버 고정 이름과 정책으로 준비하고, 수강생 앱은 문서 입력을 검증해 승인된 S3 경로와 Titan Text Embeddings V2 호출로 전달합니다.</p>
-          <div class="cost-note"><strong>비용 안내</strong><span>AWS 자원 준비는 S3 원문 Bucket, S3 Vector Index, IAM 역할과 Knowledge Base·Data Source를 만듭니다. 현재 구현 검증은 정상 문서 한 건과 Starter의 위험 문서 한 건에서 Titan을 호출합니다.</span></div>
 
           <section class="hands-on" aria-labelledby="h02-resource-title">
             <div>
@@ -174,12 +172,12 @@ docker compose \
             <span class="action-control">
               <button id="h02-provision" class="secondary" aria-describedby="h02-provision-help">AWS 자원 준비</button>
               <button class="help-trigger" type="button" aria-label="AWS 자원 준비 작업 설명" aria-expanded="false" aria-controls="h02-provision-help">i</button>
-              <span id="h02-provision-help" class="action-tooltip" role="tooltip">제공 Gateway가 서버 고정 이름과 정책으로 S3 원문 Bucket, S3 Vector Index, IAM 역할, Knowledge Base와 Data Source를 만들거나 기존 동일 자원을 확인합니다. Browser가 AWS 이름이나 권한을 정하지 않습니다. AWS 자원과 비용이 생기며 검증기가 account·region·정책 digest를 다시 확인합니다.</span>
+              <span id="h02-provision-help" class="action-tooltip" role="tooltip">제공 Gateway가 교재에 정해 둔 이름과 권한으로 S3 원문 Bucket, S3 Vector Index, IAM 역할, Knowledge Base와 Data Source를 만듭니다. 같은 자원이 이미 있으면 설정이 맞는지 확인하고 재사용합니다. PASS는 연결할 자원이 준비됐다는 뜻이며, 문서 검색까지 끝났다는 뜻은 아닙니다.</span>
             </span>
             <span class="action-control">
               <button id="h02-verify" class="primary" aria-describedby="h02-verify-help">현재 구현 검증</button>
               <button class="help-trigger" type="button" aria-label="H02 현재 구현 검증 작업 설명" aria-expanded="false" aria-controls="h02-verify-help">i</button>
-              <span id="h02-verify-help" class="action-tooltip" role="tooltip">서버 고정 정상·위험·잘못된 문서 3건을 현재 H02 앱에 보냅니다. 정상과 위험 사례는 S3 저장과 Titan Embeddings 호출을 시도하고, 잘못된 입력은 AWS 전에 멈춰야 합니다. 검증기가 실제 object key·1024차원 요청·retrieval 증거로 판정합니다.</span>
+              <span id="h02-verify-help" class="action-tooltip" role="tooltip">서버가 미리 준비한 문서 세 개를 현재 H02 앱에 보냅니다. 올바른 문서는 서버가 정한 S3 경로에 저장되고 1024차원 Titan Embeddings 요청으로 이어져야 합니다. 빈 문서는 AWS에 닿기 전에 멈춰야 하며, 검증기가 실제 저장 경로와 Titan 요청을 대조합니다.</span>
             </span>
           </div>
         </div>
@@ -217,7 +215,7 @@ docker compose \
             <span class="action-control">
               <button id="h21-verify" class="primary" aria-describedby="h21-verify-help">H21 현재 구현 검증</button>
               <button class="help-trigger" type="button" aria-label="H21 현재 구현 검증 작업 설명" aria-expanded="false" aria-controls="h21-verify-help">i</button>
-              <span id="h21-verify-help" class="action-tooltip" role="tooltip">서버 고정 9개 사례로 허용 모델·MCP Server·Tool, state owner, 호출 횟수·결과 byte·timeout과 OAuth audience를 검사합니다. H21 전용 결정적 Provider와 신뢰·비신뢰 MCP Server만 사용하며 AWS와 외부 부작용은 호출하지 않습니다. 검증기는 case별 trace와 downstream 횟수를 다시 맞춥니다.</span>
+              <span id="h21-verify-help" class="action-tooltip" role="tooltip">서버가 미리 준비한 아홉 가지 요청을 H21 Agent Host에 보냅니다. 허용하지 않은 모델·MCP Server·Tool과 한도를 넘는 요청은 뒤쪽 서비스에 닿기 전에 멈춰야 합니다. 실제 외부 작업은 하지 않고, 검증기가 각 요청의 흐름과 호출 횟수를 다시 대조합니다.</span>
             </span>
           </div>
         </div>
@@ -255,7 +253,7 @@ docker compose \
             <span class="action-control">
               <button id="h22-verify" class="primary" aria-describedby="h22-verify-help">H22 현재 구현 검증</button>
               <button class="help-trigger" type="button" aria-label="H22 현재 구현 검증 작업 설명" aria-expanded="false" aria-controls="h22-verify-help">i</button>
-              <span id="h22-verify-help" class="action-tooltip" role="tooltip">승인 없음·자기 승인·인자 변경·만료·정확한 승인·nonce 재사용 6개 사례를 실제 MCP Host와 Server에 보냅니다. 외부 메일·삭제·결제는 호출하지 않고 H22 전용 SQLite 공지만 기록합니다. 검증기는 effect 수와 trace가 <code>0→0→0→1→1</code>인지 확인합니다.</span>
+              <span id="h22-verify-help" class="action-tooltip" role="tooltip">서버가 승인이 없거나, 자신을 스스로 승인하거나, 승인 후 내용을 바꾸는 경우 등 여섯 가지 요청을 MCP Host와 Server에 보냅니다. 올바른 승인 한 번만 공지를 만들어야 하며, 외부 메일·삭제·결제는 실행하지 않습니다. 검증기가 전용 SQLite에 기록된 건수와 각 요청의 흐름을 대조합니다.</span>
             </span>
           </div>
         </div>

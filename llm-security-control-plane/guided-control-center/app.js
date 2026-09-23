@@ -89,7 +89,7 @@ function renderTabs() {
     const strong = document.createElement("strong");
     strong.textContent = name;
     const small = document.createElement("small");
-    small.textContent = index === 0 ? "H01 · 강사와 함께" : index === 1 ? "H02 · 강사와 함께" : index === 12 ? "H21·H22 · 강사와 함께" : "다음 구현 단계";
+    small.textContent = index === 0 ? "H01 · 직접 작성" : index === 1 ? "H02 · 직접 작성" : index === 12 ? "H21·H22 · 직접 작성" : "다음 구현 단계";
     copy.append(strong, small);
     button.append(number, copy);
     if (implemented) button.addEventListener("click", () => selectTab(index));

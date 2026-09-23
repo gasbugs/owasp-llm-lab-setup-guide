@@ -87,6 +87,18 @@ def main() -> int:
         page.locator('[aria-controls="preflight-help"]').press("Escape")
         preflight_tip_collapsed = page.locator('[aria-controls="preflight-help"]').get_attribute("aria-expanded") == "false"
         h02_tip_text = page.locator("#h02-provision-help").inner_text()
+        page.set_viewport_size({"width": 1181, "height": 900})
+        page.locator('[aria-controls="verify-help"]').click()
+        page.locator("#verify-help").wait_for(state="visible")
+        desktop_tip_inside = page.evaluate(
+            """() => {
+                const workbench = document.querySelector(".workbench").getBoundingClientRect();
+                const tooltip = document.querySelector("#verify-help").getBoundingClientRect();
+                return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
+            }"""
+        )
+        page.locator('[aria-controls="verify-help"]').press("Escape")
+        page.set_viewport_size({"width": 1440, "height": 1100})
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
         # H21과 H22도 앞 문제와 무관한 전용 source·container·상태로 실행된다.
@@ -129,6 +141,15 @@ def main() -> int:
         mobile_overflow = page.evaluate(
             "() => document.documentElement.scrollWidth > document.documentElement.clientWidth"
         )
+        page.locator('[aria-controls="verify-help"]').click()
+        page.locator("#verify-help").wait_for(state="visible")
+        mobile_tip_inside = page.evaluate(
+            """() => {
+                const workbench = document.querySelector(".workbench").getBoundingClientRect();
+                const tooltip = document.querySelector("#verify-help").getBoundingClientRect();
+                return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
+            }"""
+        )
         browser.close()
 
     internal_requests = sum(
@@ -153,10 +174,12 @@ def main() -> int:
         and preflight_focus_visible
         and preflight_tip_visible
         and preflight_tip_collapsed
-        and "2 Token" in preflight_tip_text
-        and "과제 통과가 아닙니다" in preflight_tip_text
+        and "AWS 자격 증명과 모델 연결" in preflight_tip_text
+        and "Token 제한 코드가 맞다는 뜻은 아닙니다" in preflight_tip_text
         and "S3 Vector Index" in h02_tip_text
-        and "AWS 자원과 비용" in h02_tip_text,
+        and "문서 검색까지 끝났다는 뜻은 아닙니다" in h02_tip_text
+        and desktop_tip_inside
+        and mobile_tip_inside,
         "chat": bool(chat_text.strip())
         and chat_text != "모델 응답을 받지 못했습니다."
         and "requested 512" in chat_meta
@@ -204,6 +227,7 @@ def main() -> int:
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
         f"panel_boundary={str(panel_boundary).lower()} chat={str(checks['chat']).lower()} "
         f"action_tooltips={str(checks['action_tooltips']).lower()} "
+        f"desktop_tip_inside={str(desktop_tip_inside).lower()} mobile_tip_inside={str(mobile_tip_inside).lower()} "
         f"answer_controls={answer_controls} raw_nodes={raw_nodes} "
         f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )
