@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Browser E2E for the tenant 03 activity 01 vertical slice."""
+"""Browser E2E proving H02 can run before H01 in the tenant 03 platform."""
 
 from __future__ import annotations
 
@@ -76,6 +76,16 @@ def main() -> int:
             "() => { const nav = document.querySelector('.route-panel').getBoundingClientRect(); const work = document.querySelector('.workbench').getBoundingClientRect(); return work.left - nav.right >= 16; }"
         )
 
+        answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
+        # H02를 먼저 실행해 H01의 chat·preflight·검증 결과가 선행 조건이 아님을 증명한다.
+        page.locator('.tab[data-tab-index="1"]').click()
+        page.locator("#h02-provision").click()
+        h02_resources = wait_for_result(page, timeout_ms)
+        page.locator("#h02-verify").click()
+        h02_hands_on = wait_for_result(page, timeout_ms, h02_resources.get("execution_id"))
+        h02_verdict = page.locator("#verdict strong").inner_text()
+
+        page.locator('.tab[data-tab-index="0"]').click()
         page.locator("#chat-input").fill("현재 수강생 앱을 거쳐 실제 답변을 보여 주세요.")
         page.locator("#chat-send").click()
         page.locator(".chat-message.assistant").nth(1).wait_for(timeout=timeout_ms)
@@ -83,19 +93,10 @@ def main() -> int:
         chat_meta = page.locator("#chat-meta").inner_text()
 
         page.locator("#preflight").click()
-        preflight = wait_for_result(page, timeout_ms)
-
-        answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
+        preflight = wait_for_result(page, timeout_ms, h02_hands_on.get("execution_id"))
         page.locator("#verify").click()
         hands_on = wait_for_result(page, timeout_ms, preflight.get("execution_id"))
         hands_on_verdict = page.locator("#verdict strong").inner_text()
-
-        page.locator('.tab[data-tab-index="1"]').click()
-        page.locator("#h02-provision").click()
-        h02_resources = wait_for_result(page, timeout_ms, hands_on.get("execution_id"))
-        page.locator("#h02-verify").click()
-        h02_hands_on = wait_for_result(page, timeout_ms, h02_resources.get("execution_id"))
-        h02_verdict = page.locator("#verdict strong").inner_text()
         raw_nodes = page.locator("#raw img, #raw script").count()
 
         if args.screenshot:
@@ -154,7 +155,7 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H02->H01 preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"system_theme={str(light_canvas != dark_canvas and system_mode).lower()} "
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "

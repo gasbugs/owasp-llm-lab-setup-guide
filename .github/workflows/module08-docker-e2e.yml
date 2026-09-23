@@ -170,7 +170,7 @@ jobs:
           --url http://127.0.0.1:28095
           --browser-channel chromium
 
-      - name: Build and validate the tenant 03 activity 01 vertical slice
+      - name: Build and validate independent tenant 03 H02 then H01
         env:
           AWS_CREDENTIALS_DIR: /tmp/guided-aws
           GUIDED_SESSION_SECRET: ci-guided-session-secret
