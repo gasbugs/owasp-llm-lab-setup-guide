@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Browser E2E proving H02 can run before H01 in the tenant 03 platform."""
+"""Browser E2E proving H02 and H03 can run before H01 in tenant 03."""
 
 from __future__ import annotations
 
@@ -119,6 +119,11 @@ def main() -> int:
         page.locator("#h02-verify").click()
         h02_hands_on = wait_for_result(page, timeout_ms, h02_resources.get("execution_id"))
         h02_verdict = page.locator("#verdict strong").inner_text()
+        page.locator("#h03-provision").click()
+        h03_resources = wait_for_result(page, timeout_ms, h02_hands_on.get("execution_id"))
+        page.locator("#h03-verify").click()
+        h03_hands_on = wait_for_result(page, timeout_ms, h03_resources.get("execution_id"))
+        h03_verdict = page.locator("#verdict strong").inner_text()
 
         page.locator('.tab[data-tab-index="0"]').click()
         page.locator("#chat-input").fill("현재 수강생 앱을 거쳐 실제 답변을 보여 주세요.")
@@ -128,7 +133,7 @@ def main() -> int:
         chat_meta = page.locator("#chat-meta").inner_text()
 
         page.locator("#preflight").click()
-        preflight = wait_for_result(page, timeout_ms, h02_hands_on.get("execution_id"))
+        preflight = wait_for_result(page, timeout_ms, h03_hands_on.get("execution_id"))
         page.locator("#verify").click()
         hands_on = wait_for_result(page, timeout_ms, preflight.get("execution_id"))
         hands_on_verdict = page.locator("#verdict strong").inner_text()
@@ -170,7 +175,7 @@ def main() -> int:
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
         "panel_boundary": panel_boundary,
-        "action_tooltips": tooltip_count == 7
+        "action_tooltips": tooltip_count == 9
         and preflight_focus_visible
         and preflight_tip_visible
         and preflight_tip_collapsed
@@ -202,6 +207,15 @@ def main() -> int:
         and len(h02_hands_on.get("result", {}).get("cases", [])) == 3
         and h02_hands_on.get("result", {}).get("cases", [])[1].get("object_key", "").startswith("h02/untrusted/")
         and h02_hands_on.get("result", {}).get("cases", [])[2].get("upstream_called") is False,
+        "h03_resources": h03_resources.get("course_verdict") == "PASS"
+        and h03_resources.get("result", {}).get("status") == "READY_FOR_SYNC"
+        and h03_resources.get("result", {}).get("old_source_exists") is False
+        and h03_resources.get("result", {}).get("current_source_exists") is True,
+        "h03_hands_on": h03_verdict == "HIT"
+        and h03_hands_on.get("verified_by") == "guided-evidence-verifier"
+        and h03_hands_on.get("result", {}).get("job_status") == "COMPLETE"
+        and h03_hands_on.get("result", {}).get("early", {}).get("retrieval_called") is True
+        and h03_hands_on.get("result", {}).get("final", {}).get("job_status_at_retrieval") == "COMPLETE",
         "h22_hands_on": h22_verdict == "HIT"
         and h22_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h22_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
@@ -221,8 +235,9 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"execution_order=H21->H22->H02->H01 h21={h21_verdict} h22={h22_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H21->H22->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
+        f"h03_resources={h03_resources.get('course_verdict')} h03_hands_on={h03_verdict} "
         f"system_theme={str(light_canvas != dark_canvas and system_mode).lower()} "
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
         f"panel_boundary={str(panel_boundary).lower()} chat={str(checks['chat']).lower()} "

@@ -80,7 +80,7 @@ bash llm-security-control-plane/deploy/stop-stack.sh
 
 ## 03 UI 후보의 독립 Hands-on 실행 환경
 
-기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 H01 Bedrock Gateway, H02 S3·Titan·Knowledge Base, H21 Agent Gateway 정책, H22 MCP 고위험 Tool 승인을 각각 독립된 source·container·상태로 구현한다. 화면에는 전체 13개 탭이 보이며 아직 구현하지 않은 Hands-on은 잠겨 있다. 구현된 Hands-on은 입력할 정확한 코드를 화면에 보여 주고, 수강생이 해당 learner-owned source를 수정한 뒤 그 서비스만 다시 Build·생성해야 검증 결과가 바뀐다. 독립 연습문제 P01은 아직 구현하지 않았다.
+기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 H01 Bedrock Gateway, H02 S3·Titan·Knowledge Base 연결, H03 ingestion 완료 전 검색 차단, H21 Agent Gateway 정책, H22 MCP 고위험 Tool 승인을 각각 독립된 source·container·상태로 구현한다. 화면에는 전체 13개 탭이 보이며 아직 구현하지 않은 Hands-on은 잠겨 있다. 구현된 Hands-on은 입력할 정확한 코드를 화면에 보여 주고, 수강생이 해당 learner-owned source를 수정한 뒤 그 서비스만 다시 Build·생성해야 검증 결과가 바뀐다. 독립 연습문제 P01은 아직 구현하지 않았다.
 
 처음 실행할 때만 경계별 Token을 따로 만든다. Browser에는 이 값이 전달되지 않고 Control Center의 HttpOnly session cookie만 전달된다.
 
@@ -96,6 +96,7 @@ GUIDED_PROVIDER_MODE=aws
 GUIDED_SESSION_SECRET=$(openssl rand -hex 32)
 GUIDED_CONTROL_LAB01_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_LAB02_TOKEN=$(openssl rand -hex 32)
+GUIDED_CONTROL_LAB03_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_H21_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_H22_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_VERIFIER_TOKEN=$(openssl rand -hex 32)
@@ -103,11 +104,14 @@ GUIDED_LAB01_GATEWAY_TOKEN=$(openssl rand -hex 32)
 GUIDED_NEMO_GATEWAY_TOKEN=$(openssl rand -hex 32)
 GUIDED_H02_GATEWAY_TOKEN=$(openssl rand -hex 32)
 GUIDED_LAB02_PROVISION_TOKEN=$(openssl rand -hex 32)
+GUIDED_H03_GATEWAY_TOKEN=$(openssl rand -hex 32)
+GUIDED_LAB03_PROVISION_TOKEN=$(openssl rand -hex 32)
 GUIDED_H21_PROVIDER_TOKEN=$(openssl rand -hex 32)
 GUIDED_H21_OAUTH_SECRET=$(openssl rand -hex 32)
 GUIDED_H22_APPROVAL_SECRET=$(openssl rand -hex 32)
 GUIDED_VERIFIER_LAB01_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_LAB02_TOKEN=$(openssl rand -hex 32)
+GUIDED_VERIFIER_LAB03_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_H21_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_H22_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_GATEWAY_TOKEN=$(openssl rand -hex 32)

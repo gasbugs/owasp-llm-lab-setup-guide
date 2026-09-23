@@ -87,6 +87,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"] = "control-verifier"
         os.environ["GUIDED_VERIFIER_LAB01_TOKEN"] = "verifier-lab"
         os.environ["GUIDED_VERIFIER_LAB02_TOKEN"] = "verifier-lab02"
+        os.environ["GUIDED_VERIFIER_LAB03_TOKEN"] = "verifier-lab03"
         os.environ["GUIDED_VERIFIER_H21_TOKEN"] = "verifier-h21"
         os.environ["GUIDED_VERIFIER_H22_TOKEN"] = "verifier-h22"
         os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"] = "verifier-gateway"
@@ -459,6 +460,161 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "HIT")
+
+    def h03_body(self, suite_id: str) -> dict:
+        return {
+            "suite_id": suite_id,
+            "execution_id": "88888888-8888-8888-8888-888888888888",
+            "started_at": "2026-09-22T10:00:00+00:00",
+        }
+
+    def fake_h03_get(self, *, early_called: bool, mismatched_job: bool = False):
+        execution_id = "88888888-8888-8888-8888-888888888888"
+        job_id = "H03CURRENTJOB"
+        old_uri = "s3://owasp-llm-03-h03-000000000000-source/h03/knowledge/revoked-policy.md"
+        current_uri = "s3://owasp-llm-03-h03-000000000000-source/h03/knowledge/current-policy.md"
+        digest = "3" * 64
+        state = {
+            "status": "CURRENT",
+            "provider_mode": "contract",
+            "observed_at": "2026-09-22T10:00:05+00:00",
+            "account_id": "000000000000",
+            "region": "us-east-1",
+            "source_prefix": "h03/knowledge/",
+            "template_digest": "4" * 64,
+            "knowledge_base_id": "CONTRACTH03KB",
+            "data_source_id": "CONTRACTH03DS",
+            "old_source_uri": old_uri,
+            "current_source_uri": current_uri,
+            "old_source_exists": False,
+            "current_source_exists": True,
+            "indexed_documents": [
+                {"status": "INDEXED", "source_uri": current_uri}
+            ],
+        }
+        receipts = {
+            "start": {
+                "execution_id": execution_id,
+                "observed_at": "2026-09-22T10:00:01+00:00",
+                "source_digest": digest,
+                "ingestion_job_id": job_id,
+            },
+            "early": {
+                "execution_id": execution_id,
+                "observed_at": "2026-09-22T10:00:02+00:00",
+                "source_digest": digest,
+                "ingestion_job_id": job_id,
+                "observed_job_id": "ANOTHERJOB" if mismatched_job else job_id,
+                "job_status": "IN_PROGRESS",
+                "decision": "retrieve" if early_called else "wait",
+                "retrieval_called": early_called,
+                "retrieval_request_id": "h03-early-provider" if early_called else None,
+            },
+            "final": {
+                "execution_id": execution_id,
+                "observed_at": "2026-09-22T10:00:04+00:00",
+                "source_digest": digest,
+                "ingestion_job_id": job_id,
+                "observed_job_id": job_id,
+                "job_status": "COMPLETE",
+                "decision": "retrieve",
+                "retrieval_called": True,
+                "retrieval_request_id": "h03-final-provider",
+            },
+        }
+        final = {
+            "execution_id": execution_id,
+            "phase": "final",
+            "provider_mode": "contract",
+            "provider_request_id": "h03-final-provider",
+            "observed_at": "2026-09-22T10:00:04+00:00",
+            "ingestion_job_id": job_id,
+            "job_status_at_retrieval": "COMPLETE",
+            "knowledge_base_id": "CONTRACTH03KB",
+            "data_source_id": "CONTRACTH03DS",
+            "template_digest": "4" * 64,
+            "source_uris": [current_uri],
+            "document_ids": ["current-document"],
+        }
+        early = {
+            "execution_id": execution_id,
+            "phase": "early",
+            "provider_mode": "contract",
+            "provider_request_id": "h03-early-provider",
+            "observed_at": "2026-09-22T10:00:02+00:00",
+            "ingestion_job_id": job_id,
+            "job_status_at_retrieval": "IN_PROGRESS",
+            "knowledge_base_id": "CONTRACTH03KB",
+            "data_source_id": "CONTRACTH03DS",
+            "template_digest": "4" * 64,
+            "source_uris": [old_uri],
+            "document_ids": ["revoked-document"],
+        }
+
+        def get(url, **_kwargs):
+            if url.endswith("/v1/build-info"):
+                return FakeResponse(
+                    {"component": "guided-h03-sync-app", "source_digest": digest}
+                )
+            if url.endswith("/v1/h03/resources"):
+                return FakeResponse(state)
+            if "/v1/receipts/" in url:
+                return FakeResponse(receipts[url.rsplit("/", 1)[-1]])
+            if url.endswith(f"/v1/h03/jobs/{job_id}"):
+                return FakeResponse(
+                    {"ingestion_job_id": job_id, "status": "COMPLETE"}
+                )
+            if url.endswith(f"/v1/h03/retrievals/{execution_id}/final"):
+                return FakeResponse(final)
+            if url.endswith(f"/v1/h03/retrievals/{execution_id}/early"):
+                return FakeResponse(early) if early_called else FakeResponse({}, 404)
+            raise AssertionError(f"unexpected H03 URL: {url}")
+
+        return get
+
+    def verify_h03(self, suite_id: str, *, early_called: bool, mismatched_job: bool = False):
+        with patch.object(
+            self.server.httpx,
+            "get",
+            self.fake_h03_get(
+                early_called=early_called, mismatched_job=mismatched_job
+            ),
+        ):
+            return self.client.post(
+                "/v1/verify/lab-03",
+                json=self.h03_body(suite_id),
+                headers={"Authorization": "Bearer control-verifier"},
+            )
+
+    def test_h03_starter_retrieves_revoked_document_as_hit(self):
+        response = self.verify_h03(
+            "03000000-0000-0000-0000-000000000001", early_called=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "HIT")
+        self.assertEqual(
+            response.json()["stage_calls"][2]["outcome"], "revoked-source-hit"
+        )
+
+    def test_h03_current_job_complete_gate_is_pass(self):
+        response = self.verify_h03(
+            "03000000-0000-0000-0000-000000000002", early_called=False
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "PASS")
+        self.assertEqual(
+            response.json()["stage_calls"][2]["outcome"],
+            "blocked-before-retrieval",
+        )
+
+    def test_h03_mismatched_observed_job_is_err(self):
+        response = self.verify_h03(
+            "03000000-0000-0000-0000-000000000003",
+            early_called=False,
+            mismatched_job=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "ERR")
 
 
 if __name__ == "__main__":

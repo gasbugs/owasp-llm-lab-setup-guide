@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import os
@@ -21,6 +22,7 @@ APP_VERSION = os.getenv("RELEASE_VERSION", os.getenv("APP_VERSION", "dev"))
 SESSION_SECRET = os.environ["GUIDED_SESSION_SECRET"].encode()
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
+LAB03_URL = os.getenv("GUIDED_LAB03_URL", "http://guided-h03-sync-app:8000")
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
 GATEWAY_URL = os.getenv(
@@ -29,9 +31,11 @@ GATEWAY_URL = os.getenv(
 VERIFIER_URL = os.getenv("GUIDED_VERIFIER_URL", "http://guided-evidence-verifier:8000")
 LAB_TOKEN = os.environ["GUIDED_CONTROL_LAB01_TOKEN"]
 LAB02_TOKEN = os.environ["GUIDED_CONTROL_LAB02_TOKEN"]
+LAB03_TOKEN = os.environ["GUIDED_CONTROL_LAB03_TOKEN"]
 H22_TOKEN = os.environ["GUIDED_CONTROL_H22_TOKEN"]
 H21_TOKEN = os.environ["GUIDED_CONTROL_H21_TOKEN"]
 H02_PROVISION_TOKEN = os.environ["GUIDED_LAB02_PROVISION_TOKEN"]
+H03_PROVISION_TOKEN = os.environ["GUIDED_LAB03_PROVISION_TOKEN"]
 VERIFIER_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 ALLOWED_HOSTS = set(
     os.getenv(
@@ -176,7 +180,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             "tabs": 13,
             "hands_on": 22,
             "practices": 13,
-            "implemented_hands_on": ["H01", "H02", "H21", "H22"],
+            "implemented_hands_on": ["H01", "H02", "H03", "H21", "H22"],
             "implemented_practices": [],
         },
         "official_uis": [
@@ -211,6 +215,11 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "hands_on_id": "H02",
                 "service": "guided-h02-document-app",
                 "source_path": "llm-security-control-plane/guided-labs/h02-document-ingestion/server.py",
+            },
+            {
+                "hands_on_id": "H03",
+                "service": "guided-h03-sync-app",
+                "source_path": "llm-security-control-plane/guided-labs/h03-ingestion-search/server.py",
             },
             {
                 "hands_on_id": "H21",
@@ -538,6 +547,124 @@ async def verify_h02_document_app(
         if verifier_response.status_code != 200:
             raise HTTPException(status_code=502, detail="evidence verifier unavailable")
         return verifier_response.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H03/provision")
+async def provision_h03_baseline(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="provisioning inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+            response = await client.post(
+                f"{GATEWAY_URL}/v1/h03/provision",
+                json={"execution_id": execution_id},
+                headers={"Authorization": f"Bearer {H03_PROVISION_TOKEN}"},
+            )
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "h03_baseline_provisioning",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H03 Gateway 원시 오류와 전용 AWS 자원 상태를 확인합니다.",
+                    },
+                )
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/lab-03-resources",
+                json={"suite_id": execution_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H03/verify")
+async def verify_h03_sync_app(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+            started = await client.post(
+                f"{LAB03_URL}/v1/sync",
+                json={"execution_id": execution_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
+            )
+            if started.status_code != 200:
+                raise HTTPException(status_code=502, detail="H03 current ingestion did not start")
+            early = await client.post(
+                f"{LAB03_URL}/v1/search",
+                json={"execution_id": execution_id, "phase": "early"},
+                headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
+            )
+            if early.status_code not in {200, 409}:
+                raise HTTPException(status_code=502, detail="H03 early search returned an unexpected status")
+
+            job_status = "STARTING"
+            for _ in range(20):
+                status_response = await client.get(
+                    f"{LAB03_URL}/v1/status/{execution_id}",
+                    headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
+                )
+                if status_response.status_code != 200:
+                    raise HTTPException(status_code=502, detail="H03 current job status is unavailable")
+                job_status = status_response.json().get("status", "")
+                if job_status == "COMPLETE":
+                    break
+                if job_status in {"FAILED", "STOPPED"}:
+                    raise HTTPException(status_code=502, detail=f"H03 ingestion entered {job_status}")
+                await asyncio.sleep(2)
+            if job_status != "COMPLETE":
+                raise HTTPException(status_code=504, detail="H03 ingestion did not complete in 40 seconds")
+
+            final = await client.post(
+                f"{LAB03_URL}/v1/search",
+                json={"execution_id": execution_id, "phase": "final"},
+                headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
+            )
+            if final.status_code != 200:
+                raise HTTPException(status_code=502, detail="H03 final search did not preserve normal retrieval")
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/lab-03",
+                json={
+                    "suite_id": suite_id,
+                    "execution_id": execution_id,
+                    "started_at": started_at,
+                },
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
     finally:

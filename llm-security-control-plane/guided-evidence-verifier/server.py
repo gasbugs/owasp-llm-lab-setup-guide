@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
+LAB03_URL = os.getenv("GUIDED_LAB03_URL", "http://guided-h03-sync-app:8000")
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
 H21_PROVIDER_URL = os.getenv(
@@ -39,6 +40,7 @@ GATEWAY_URL = os.getenv(
 CONTROL_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 LAB_TOKEN = os.environ["GUIDED_VERIFIER_LAB01_TOKEN"]
 LAB02_TOKEN = os.environ["GUIDED_VERIFIER_LAB02_TOKEN"]
+LAB03_TOKEN = os.environ["GUIDED_VERIFIER_LAB03_TOKEN"]
 H22_TOKEN = os.environ["GUIDED_VERIFIER_H22_TOKEN"]
 H21_TOKEN = os.environ["GUIDED_VERIFIER_H21_TOKEN"]
 GATEWAY_TOKEN = os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"]
@@ -106,6 +108,19 @@ class H02VerifyRequest(BaseModel):
 
 
 class H02ResourceVerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+
+
+class H03VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+
+
+class H03ResourceVerifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
@@ -208,6 +223,51 @@ def fetch_h02_resources() -> dict | None:
         bool(state.get("knowledge_base_id")),
         bool(state.get("data_source_id")),
         state.get("source_prefix") == "h02/knowledge/",
+    )
+    return state if all(required) else None
+
+
+def h03_err_envelope(
+    request: H03VerifyRequest | H03ResourceVerifyRequest, reason: str
+) -> dict:
+    return {
+        "lab_id": "02-embedding-kb",
+        "activity_id": "H03",
+        "execution_id": request.suite_id,
+        "execution_kind": "h03-ingestion-retrieval-suite",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": "ERR",
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [],
+        "evidence": [],
+        "reason": reason,
+        "next_check": "현재 ingestion job ID·상태와 early·final retrieval source를 확인합니다.",
+    }
+
+
+def fetch_h03_resources() -> dict | None:
+    response = httpx.get(
+        f"{GATEWAY_URL}/v1/h03/resources",
+        headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
+        timeout=15.0,
+    )
+    if response.status_code != 200:
+        return None
+    state = response.json()
+    required = (
+        state.get("status") in {"READY_FOR_SYNC", "SYNCING", "CURRENT"},
+        state.get("region") == "us-east-1",
+        state.get("source_prefix") == "h03/knowledge/",
+        isinstance(state.get("account_id"), str),
+        len(state.get("account_id", "")) == 12,
+        isinstance(state.get("template_digest"), str),
+        len(state.get("template_digest", "")) == 64,
+        bool(state.get("knowledge_base_id")),
+        bool(state.get("data_source_id")),
+        bool(state.get("old_source_uri")),
+        bool(state.get("current_source_uri")),
     )
     return state if all(required) else None
 
@@ -641,6 +701,281 @@ def verify_h02(
         "result": {**normal, "cases": verified_cases},
         "reason": reason,
         "next_check": "세 case의 HTTP 상태, object_key, 1024차원과 AWS 미호출 여부를 비교합니다.",
+    }
+
+
+@app.post("/v1/verify/lab-03-resources")
+def verify_h03_resources(
+    request: H03ResourceVerifyRequest,
+    _authorized: None = Depends(require_control),
+) -> dict:
+    try:
+        state = fetch_h03_resources()
+    except httpx.RequestError:
+        state = None
+    if state is None:
+        return h03_err_envelope(request, "H03 전용 Knowledge Base 상태를 확인할 수 없습니다.")
+    old_indexed = any(
+        item.get("source_uri") == state["old_source_uri"]
+        and item.get("status") == "INDEXED"
+        for item in state.get("indexed_documents", [])
+    )
+    if any(
+        (
+            state.get("status") != "READY_FOR_SYNC",
+            state.get("old_source_exists") is not False,
+            state.get("current_source_exists") is not True,
+            not old_indexed,
+        )
+    ):
+        return h03_err_envelope(
+            request,
+            "폐기 문서는 검색 저장소에 남고 S3에는 현재 문서만 있는 H03 기준선이 아닙니다.",
+        )
+    return {
+        "lab_id": "02-embedding-kb",
+        "activity_id": "H03",
+        "execution_id": request.suite_id,
+        "execution_kind": "h03-baseline-provisioning",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": "PASS",
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [
+            {
+                "stage": "h03_s3_source",
+                "attempted": True,
+                "outcome": "current-source-ready",
+                "evidence_id": state["current_source_uri"],
+            },
+            {
+                "stage": "h03_knowledge_base",
+                "attempted": True,
+                "outcome": "revoked-source-indexed",
+                "evidence_id": state["old_source_uri"],
+            },
+        ],
+        "evidence": [
+            {
+                "source": "amazon-bedrock"
+                if state["provider_mode"] == "aws"
+                else "contract-provider",
+                "kind": "seed-ingestion-job",
+                "id": state["seed_job_id"],
+                "observed_at": state["observed_at"],
+            }
+        ],
+        "result": state,
+        "reason": "S3에는 현재 문서만 있고 검색 저장소에는 폐기 문서가 남은 H03 전용 시작 상태를 확인했습니다.",
+        "next_check": "Starter를 검증해 현재 ingestion 완료 전 폐기 문서가 검색되는지 확인합니다.",
+    }
+
+
+@app.post("/v1/verify/lab-03")
+def verify_h03(
+    request: H03VerifyRequest,
+    _authorized: None = Depends(require_control),
+) -> dict:
+    try:
+        build_response = httpx.get(
+            f"{LAB03_URL}/v1/build-info",
+            headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
+            timeout=5.0,
+        )
+        state = fetch_h03_resources()
+        if build_response.status_code != 200 or state is None:
+            return h03_err_envelope(request, "H03 앱 build 또는 AWS 상태 증거가 없습니다.")
+        source_digest = build_response.json().get("source_digest")
+        if not isinstance(source_digest, str) or len(source_digest) != 64:
+            return h03_err_envelope(request, "H03 learner source digest가 올바르지 않습니다.")
+
+        app_receipts: dict[str, dict] = {}
+        for phase in ("start", "early", "final"):
+            response = httpx.get(
+                f"{LAB03_URL}/v1/receipts/{request.execution_id}/{phase}",
+                headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
+                timeout=5.0,
+            )
+            if response.status_code != 200:
+                return h03_err_envelope(request, f"H03 {phase} learner receipt가 없습니다.")
+            app_receipts[phase] = response.json()
+
+        job_id = app_receipts["start"].get("ingestion_job_id")
+        job_response = httpx.get(
+            f"{GATEWAY_URL}/v1/h03/jobs/{job_id}",
+            headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
+            timeout=10.0,
+        )
+        final_response = httpx.get(
+            f"{GATEWAY_URL}/v1/h03/retrievals/{request.execution_id}/final",
+            headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
+            timeout=10.0,
+        )
+        early_response = httpx.get(
+            f"{GATEWAY_URL}/v1/h03/retrievals/{request.execution_id}/early",
+            headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
+            timeout=10.0,
+        )
+        if job_response.status_code != 200 or final_response.status_code != 200:
+            return h03_err_envelope(request, "현재 ingestion job 또는 final retrieval 증거가 없습니다.")
+        job = job_response.json()
+        final = final_response.json()
+        early = early_response.json() if early_response.status_code == 200 else None
+
+        try:
+            started_at = parse_time(request.started_at)
+            start_observed = parse_time(app_receipts["start"]["observed_at"])
+            early_observed = parse_time(app_receipts["early"]["observed_at"])
+            final_observed = parse_time(final["observed_at"])
+        except (KeyError, TypeError, ValueError):
+            return h03_err_envelope(request, "H03 증거 시각이 올바르지 않습니다.")
+
+        base_matches = all(
+            (
+                app_receipts["start"].get("execution_id") == request.execution_id,
+                app_receipts["start"].get("source_digest") == source_digest,
+                app_receipts["early"].get("source_digest") == source_digest,
+                app_receipts["final"].get("source_digest") == source_digest,
+                app_receipts["early"].get("ingestion_job_id") == job_id,
+                app_receipts["early"].get("observed_job_id") == job_id,
+                app_receipts["final"].get("ingestion_job_id") == job_id,
+                app_receipts["final"].get("observed_job_id") == job_id,
+                job.get("ingestion_job_id") == job_id,
+                job.get("status") == "COMPLETE",
+                state.get("status") == "CURRENT",
+                state.get("old_source_exists") is False,
+                state.get("current_source_exists") is True,
+                final.get("execution_id") == request.execution_id,
+                final.get("phase") == "final",
+                final.get("ingestion_job_id") == job_id,
+                final.get("job_status_at_retrieval") == "COMPLETE",
+                final.get("knowledge_base_id") == state.get("knowledge_base_id"),
+                final.get("data_source_id") == state.get("data_source_id"),
+                final.get("template_digest") == state.get("template_digest"),
+                state.get("current_source_uri") in final.get("source_uris", []),
+                state.get("old_source_uri") not in final.get("source_uris", []),
+                bool(final.get("document_ids")),
+                app_receipts["final"].get("retrieval_request_id")
+                == final.get("provider_request_id"),
+                started_at <= start_observed <= early_observed <= final_observed,
+            )
+        )
+        current_indexed = any(
+            item.get("source_uri") == state["current_source_uri"]
+            and item.get("status") == "INDEXED"
+            for item in state.get("indexed_documents", [])
+        )
+        if not base_matches or not current_indexed:
+            return h03_err_envelope(request, "H03 현재 job과 final 검색 증거가 같은 실행으로 연결되지 않습니다.")
+        final_id = final.get("provider_request_id")
+        if not isinstance(final_id, str) or not reserve_provider_evidence(
+            final_id, f"{request.execution_id}:final"
+        ):
+            return h03_err_envelope(request, "H03 final retrieval 증거가 stale 상태입니다.")
+
+        early_called = app_receipts["early"].get("retrieval_called") is True
+        early_blocked = all(
+            (
+                app_receipts["early"].get("decision") == "wait",
+                app_receipts["early"].get("retrieval_called") is False,
+                app_receipts["early"].get("job_status")
+                in {"QUEUED", "STARTING", "IN_PROGRESS"},
+                early_response.status_code == 404,
+            )
+        )
+        stale_hit = bool(
+            early_called
+            and early
+            and early.get("job_status_at_retrieval")
+            in {"QUEUED", "STARTING", "IN_PROGRESS"}
+            and state.get("old_source_uri") in early.get("source_uris", [])
+            and state.get("current_source_uri") not in early.get("source_uris", [])
+            and bool(early.get("document_ids"))
+        )
+        if stale_hit:
+            early_id = early.get("provider_request_id")
+            if not isinstance(early_id, str) or not reserve_provider_evidence(
+                early_id, f"{request.execution_id}:early"
+            ):
+                return h03_err_envelope(request, "H03 early retrieval 증거가 stale 상태입니다.")
+            verdict = "HIT"
+            reason = "현재 ingestion이 끝나기 전에 S3에서 삭제된 폐기 문서가 실제 retrieval hit로 공개됐습니다."
+        elif early_blocked:
+            verdict = "PASS"
+            reason = "현재 job이 끝나기 전 검색을 막고, COMPLETE 뒤 새 문서만 검색해 정상 기능도 유지했습니다."
+        else:
+            verdict = "ERR"
+            reason = "완료 전 검색 차단 또는 폐기 문서 hit 가운데 어느 결과도 충분히 확인하지 못했습니다."
+    except httpx.RequestError:
+        return h03_err_envelope(request, "H03 read-only evidence endpoint를 조회할 수 없습니다.")
+
+    early_outcome = "revoked-source-hit" if verdict == "HIT" else "blocked-before-retrieval" if verdict == "PASS" else "unknown"
+    return {
+        "lab_id": "02-embedding-kb",
+        "activity_id": "H03",
+        "execution_id": request.suite_id,
+        "execution_kind": "h03-ingestion-retrieval-suite",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": verdict,
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [
+            {
+                "stage": "learner_sync_app",
+                "attempted": True,
+                "outcome": "current-job-bound",
+                "evidence_id": source_digest,
+            },
+            {
+                "stage": "knowledge_base_ingestion",
+                "attempted": True,
+                "outcome": "COMPLETE",
+                "evidence_id": job_id,
+            },
+            {
+                "stage": "early_retrieval",
+                "attempted": early_called,
+                "outcome": early_outcome,
+                "evidence_id": early.get("provider_request_id") if early else None,
+            },
+            {
+                "stage": "current_retrieval",
+                "attempted": True,
+                "outcome": "current-source-hit",
+                "evidence_id": final_id,
+            },
+        ],
+        "evidence": [
+            {
+                "source": "amazon-bedrock"
+                if state["provider_mode"] == "aws"
+                else "contract-provider",
+                "kind": "ingestion-job",
+                "id": job_id,
+                "observed_at": final["observed_at"],
+            },
+            {
+                "source": "amazon-bedrock"
+                if state["provider_mode"] == "aws"
+                else "contract-provider",
+                "kind": "final-retrieval",
+                "id": final_id,
+                "observed_at": final["observed_at"],
+            },
+        ],
+        "result": {
+            "source_digest": source_digest,
+            "ingestion_job_id": job_id,
+            "job_status": job["status"],
+            "early": app_receipts["early"],
+            "early_provider": early,
+            "final": final,
+            "indexed_documents": state.get("indexed_documents", []),
+        },
+        "reason": reason,
+        "next_check": "early 단계의 job_status·retrieval 호출 여부와 final source URI를 비교합니다.",
     }
 
 

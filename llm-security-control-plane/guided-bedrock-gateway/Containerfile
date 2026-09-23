@@ -9,6 +9,7 @@ COPY guided-bedrock-gateway/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
+COPY --chmod=0444 guided-bedrock-gateway/h03_backend.py /app/h03_backend.py
 COPY --chmod=0444 guided-bedrock-gateway/server.py /app/server.py
 RUN install -d -o 65532 -g 65532 -m 0700 /state
 

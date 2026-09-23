@@ -19,6 +19,8 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from h03_backend import router as h03_router
+
 
 MODEL_ID = "us.amazon.nova-lite-v1:0"
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
@@ -723,6 +725,7 @@ def invoke_once(request: InvokeRequest) -> dict:
 
 
 app = FastAPI(title="Tenant 03 Bedrock Gateway", docs_url=None, redoc_url=None)
+app.include_router(h03_router)
 
 
 @app.get("/livez")

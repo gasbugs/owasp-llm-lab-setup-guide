@@ -7,7 +7,7 @@ course_id: tenant-03-guided-llm-security
 duration_minutes: 1320
 tabs:
   - {id: 01-nova, hands_on: [H01], hands_on_status: implemented, practice: P01, practice_status: planned}
-  - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: partial, implemented_hands_on: [H02], practice: P02, practice_status: planned}
+  - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: implemented, implemented_hands_on: [H02, H03], practice: P02, practice_status: planned}
   - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: planned, practice: P03, practice_status: planned}
   - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: planned, practice: P04, practice_status: planned}
   - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: planned, practice: P05, practice_status: planned}
@@ -50,6 +50,20 @@ hands_on_H02:
     - normal-document
     - client-key-override
     - invalid-empty-body
+
+hands_on_H03:
+  executor: guided-h03-sync-app
+  provider: guided-bedrock-gateway
+  verifier: guided-evidence-verifier
+  required_evidence:
+    - source_digest
+    - ingestion_job_id
+    - job_status: COMPLETE
+    - early-retrieval
+    - final-retrieval
+    - document_ids
+    - source_uris
+    - revoked-source-absent
 
 hands_on_H22:
   executor: guided-h22-host

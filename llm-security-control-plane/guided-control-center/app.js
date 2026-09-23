@@ -89,7 +89,7 @@ function renderTabs() {
     const strong = document.createElement("strong");
     strong.textContent = name;
     const small = document.createElement("small");
-    small.textContent = index === 0 ? "H01 · 직접 작성" : index === 1 ? "H02 · 직접 작성" : index === 12 ? "H21·H22 · 직접 작성" : "다음 구현 단계";
+    small.textContent = index === 0 ? "H01 · 직접 작성" : index === 1 ? "H02·H03 · 직접 작성" : index === 12 ? "H21·H22 · 직접 작성" : "다음 구현 단계";
     copy.append(strong, small);
     button.append(number, copy);
     if (implemented) button.addEventListener("click", () => selectTab(index));
@@ -110,8 +110,8 @@ function selectTab(index) {
   const h22 = index === 12;
   setText("current-station", `${String(index + 1).padStart(2, "0")} / 13`);
   setText("current-station-name", index === 0 ? "Nova Lite 요청 경로" : index === 1 ? "Embedding·Knowledge Base" : "Agent·MCP 실행 경계");
-  setText("activity-label", `HANDS-ON · ${index === 0 ? "H01" : index === 1 ? "H02" : "H21·H22"}`);
-  setText("activity-title", index === 0 ? "Bedrock Gateway 만들기" : index === 1 ? "원문과 Knowledge Base 연결하기" : "Agent 실행 정책과 MCP 승인 만들기");
+  setText("activity-label", `HANDS-ON · ${index === 0 ? "H01" : index === 1 ? "H02·H03" : "H21·H22"}`);
+  setText("activity-title", index === 0 ? "Bedrock Gateway 만들기" : index === 1 ? "원문 저장과 현재 검색 연결하기" : "Agent 실행 정책과 MCP 승인 만들기");
   setText("provider-label", index === 0 ? "PROVIDER" : index === 1 ? "TITAN REQUEST" : "TOOL CATALOG");
   setText("model-label", index === 0 ? "MODEL" : index === 1 ? "EMBED MODEL" : "PROTOCOL");
   setText("requested-label", h22 ? "EFFECT ORDER" : index === 0 ? "REQUESTED" : "OBJECT KEY");
@@ -153,7 +153,7 @@ async function request(path, body = undefined) {
 }
 
 function setBusy(busy) {
-  ["preflight", "verify", "chat-send", "h02-provision", "h02-verify", "h21-verify", "h22-verify"].forEach((id) => {
+  ["preflight", "verify", "chat-send", "h02-provision", "h02-verify", "h03-provision", "h03-verify", "h21-verify", "h22-verify"].forEach((id) => {
     if (byId(id)) byId(id).disabled = busy;
   });
   if (busy) {
@@ -203,13 +203,27 @@ function renderEnvelope(payload) {
   setText("raw", JSON.stringify(payload, null, 2));
   setText("execution-id", payload.execution_id);
   const h02 = payload.activity_id === "H02";
+  const h03 = payload.activity_id === "H03";
   const h21 = payload.activity_id === "H21";
   const h22 = payload.activity_id === "H22";
-  setText("provider-id", h21 || h22 ? payload.result?.tool_inventory_digest : payload.result?.provider_request_id || payload.result?.aws_request_ids?.[0]);
-  setText("model-id", h21 || h22 ? payload.result?.protocol_version : payload.result?.model_id || payload.result?.embedding_model_id);
-  setText("requested-max", h21 ? payload.result?.cases?.length : h22 ? payload.result?.effect_counts?.join("→") : h02 ? payload.result?.object_key || payload.result?.source_prefix : payload.result?.requested_max_output_tokens);
-  setText("forwarded-max", h21 ? payload.result?.verified_trusted_calls?.length : h22 ? payload.result?.server_id : h02 ? payload.result?.embedding_dimension || payload.result?.dimensions : payload.result?.forwarded_parameters?.maxTokens);
-  setText("output-tokens", h21 ? payload.result?.verified_provider_calls?.length : h22 ? payload.result?.verified_effects?.effects : h02 ? payload.result?.data_source_id : payload.result?.usage?.outputTokens);
+  if (h03) {
+    setText("provider-label", "PROVIDER REQUEST");
+    setText("model-label", "CURRENT JOB");
+    setText("requested-label", "EARLY STATUS");
+    setText("forwarded-label", "FINAL STATUS");
+    setText("output-label", "CURRENT SOURCE");
+  } else if (h02) {
+    setText("provider-label", "TITAN REQUEST");
+    setText("model-label", "EMBED MODEL");
+    setText("requested-label", "OBJECT KEY");
+    setText("forwarded-label", "DIMENSIONS");
+    setText("output-label", "DATA SOURCE");
+  }
+  setText("provider-id", h21 || h22 ? payload.result?.tool_inventory_digest : h03 ? payload.result?.final?.provider_request_id || payload.result?.aws_request_ids?.[0] : payload.result?.provider_request_id || payload.result?.aws_request_ids?.[0]);
+  setText("model-id", h21 || h22 ? payload.result?.protocol_version : h03 ? payload.result?.ingestion_job_id || payload.result?.seed_job_id : payload.result?.model_id || payload.result?.embedding_model_id);
+  setText("requested-max", h21 ? payload.result?.cases?.length : h22 ? payload.result?.effect_counts?.join("→") : h03 ? payload.result?.early?.job_status || payload.result?.old_source_uri : h02 ? payload.result?.object_key || payload.result?.source_prefix : payload.result?.requested_max_output_tokens);
+  setText("forwarded-max", h21 ? payload.result?.verified_trusted_calls?.length : h22 ? payload.result?.server_id : h03 ? payload.result?.job_status || payload.result?.status : h02 ? payload.result?.embedding_dimension || payload.result?.dimensions : payload.result?.forwarded_parameters?.maxTokens);
+  setText("output-tokens", h21 ? payload.result?.verified_provider_calls?.length : h22 ? payload.result?.verified_effects?.effects : h03 ? payload.result?.final?.source_uris?.[0] || payload.result?.current_source_uri : h02 ? payload.result?.data_source_id : payload.result?.usage?.outputTokens);
   setText("source-digest", payload.result?.source_digest?.slice(0, 12));
   setText("verified-by", payload.verified_by);
   setText("reason", payload.reason);
@@ -226,6 +240,9 @@ function renderEnvelope(payload) {
     control_center: "Control Center", learner_gateway: "Learner Gateway", bedrock_main: "Bedrock Main",
     learner_document_app: "Learner Document App", bedrock_titan: "Titan Embeddings",
     s3_source: "S3 Source", s3_vector_index: "S3 Vector Index", knowledge_base: "Knowledge Base",
+    h03_s3_source: "H03 S3 Source", h03_knowledge_base: "H03 Knowledge Base",
+    learner_sync_app: "Learner Sync App", knowledge_base_ingestion: "KB Ingestion",
+    early_retrieval: "Early Retrieval", current_retrieval: "Current Retrieval",
     agent_host: "Agent Host", model_provider: "Model Provider", mcp_tools: "MCP Tools",
     mcp_host: "MCP Host", mcp_server: "MCP Server", training_effect: "Training Effect",
   };
@@ -274,6 +291,8 @@ byId("preflight").addEventListener("click", () => execute("/api/provider-preflig
 byId("verify").addEventListener("click", () => execute("/api/hands-on/H01/verify"));
 byId("h02-provision").addEventListener("click", () => execute("/api/hands-on/H02/provision"));
 byId("h02-verify").addEventListener("click", () => execute("/api/hands-on/H02/verify"));
+byId("h03-provision").addEventListener("click", () => execute("/api/hands-on/H03/provision"));
+byId("h03-verify").addEventListener("click", () => execute("/api/hands-on/H03/verify"));
 byId("h21-verify").addEventListener("click", () => execute("/api/hands-on/H21/verify"));
 byId("h22-verify").addEventListener("click", () => execute("/api/hands-on/H22/verify"));
 byId("chat-form").addEventListener("submit", sendChat);

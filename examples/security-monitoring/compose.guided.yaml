@@ -47,12 +47,15 @@ services:
       GUIDED_SESSION_SECRET: ${GUIDED_SESSION_SECRET:?Set GUIDED_SESSION_SECRET}
       GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
       GUIDED_CONTROL_LAB02_TOKEN: ${GUIDED_CONTROL_LAB02_TOKEN:?Set GUIDED_CONTROL_LAB02_TOKEN}
+      GUIDED_CONTROL_LAB03_TOKEN: ${GUIDED_CONTROL_LAB03_TOKEN:?Set GUIDED_CONTROL_LAB03_TOKEN}
       GUIDED_CONTROL_H21_TOKEN: ${GUIDED_CONTROL_H21_TOKEN:?Set GUIDED_CONTROL_H21_TOKEN}
       GUIDED_CONTROL_H22_TOKEN: ${GUIDED_CONTROL_H22_TOKEN:?Set GUIDED_CONTROL_H22_TOKEN}
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
       GUIDED_LAB02_PROVISION_TOKEN: ${GUIDED_LAB02_PROVISION_TOKEN:?Set GUIDED_LAB02_PROVISION_TOKEN}
+      GUIDED_LAB03_PROVISION_TOKEN: ${GUIDED_LAB03_PROVISION_TOKEN:?Set GUIDED_LAB03_PROVISION_TOKEN}
       GUIDED_LAB01_URL: http://guided-h01-gateway:8000
       GUIDED_LAB02_URL: http://guided-h02-document-app:8000
+      GUIDED_LAB03_URL: http://guided-h03-sync-app:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H22_HOST_URL: http://guided-h22-host:8000
       GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
@@ -63,6 +66,7 @@ services:
     depends_on:
       guided-h01-gateway: {condition: service_healthy}
       guided-h02-document-app: {condition: service_healthy}
+      guided-h03-sync-app: {condition: service_healthy}
       guided-h21-host: {condition: service_healthy}
       guided-h22-host: {condition: service_healthy}
       guided-evidence-verifier: {condition: service_healthy}
@@ -108,11 +112,13 @@ services:
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
       GUIDED_VERIFIER_LAB01_TOKEN: ${GUIDED_VERIFIER_LAB01_TOKEN:?Set GUIDED_VERIFIER_LAB01_TOKEN}
       GUIDED_VERIFIER_LAB02_TOKEN: ${GUIDED_VERIFIER_LAB02_TOKEN:?Set GUIDED_VERIFIER_LAB02_TOKEN}
+      GUIDED_VERIFIER_LAB03_TOKEN: ${GUIDED_VERIFIER_LAB03_TOKEN:?Set GUIDED_VERIFIER_LAB03_TOKEN}
       GUIDED_VERIFIER_H21_TOKEN: ${GUIDED_VERIFIER_H21_TOKEN:?Set GUIDED_VERIFIER_H21_TOKEN}
       GUIDED_VERIFIER_H22_TOKEN: ${GUIDED_VERIFIER_H22_TOKEN:?Set GUIDED_VERIFIER_H22_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
       GUIDED_LAB01_URL: http://guided-h01-gateway:8000
       GUIDED_LAB02_URL: http://guided-h02-document-app:8000
+      GUIDED_LAB03_URL: http://guided-h03-sync-app:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H21_PROVIDER_URL: http://guided-h21-provider:8000
       GUIDED_H21_TRUSTED_MCP_URL: http://guided-h21-trusted-mcp:8000/mcp
@@ -124,6 +130,7 @@ services:
     depends_on:
       guided-h01-gateway: {condition: service_healthy}
       guided-h02-document-app: {condition: service_healthy}
+      guided-h03-sync-app: {condition: service_healthy}
       guided-h21-host: {condition: service_healthy}
       guided-h21-provider: {condition: service_healthy}
       guided-h21-trusted-mcp: {condition: service_healthy}
@@ -157,6 +164,8 @@ services:
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
       GUIDED_H02_GATEWAY_TOKEN: ${GUIDED_H02_GATEWAY_TOKEN:?Set GUIDED_H02_GATEWAY_TOKEN}
       GUIDED_LAB02_PROVISION_TOKEN: ${GUIDED_LAB02_PROVISION_TOKEN:?Set GUIDED_LAB02_PROVISION_TOKEN}
+      GUIDED_H03_GATEWAY_TOKEN: ${GUIDED_H03_GATEWAY_TOKEN:?Set GUIDED_H03_GATEWAY_TOKEN}
+      GUIDED_LAB03_PROVISION_TOKEN: ${GUIDED_LAB03_PROVISION_TOKEN:?Set GUIDED_LAB03_PROVISION_TOKEN}
     volumes:
       - ${AWS_CREDENTIALS_DIR:-${HOME}/.aws}:/tmp/.aws:ro
       - ../../llm-security-control-plane/.state/guided-gateway:/state:rw
@@ -181,6 +190,26 @@ services:
       GUIDED_H02_GATEWAY_TOKEN: ${GUIDED_H02_GATEWAY_TOKEN:?Set GUIDED_H02_GATEWAY_TOKEN}
       GUIDED_CONTROL_LAB02_TOKEN: ${GUIDED_CONTROL_LAB02_TOKEN:?Set GUIDED_CONTROL_LAB02_TOKEN}
       GUIDED_VERIFIER_LAB02_TOKEN: ${GUIDED_VERIFIER_LAB02_TOKEN:?Set GUIDED_VERIFIER_LAB02_TOKEN}
+    depends_on:
+      guided-bedrock-gateway: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-h03-sync-app:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h03-ingestion-search/Containerfile
+    image: localhost/llm-security-guided-h03-sync-app:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h03-sync-app
+    environment:
+      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
+      GUIDED_H03_GATEWAY_TOKEN: ${GUIDED_H03_GATEWAY_TOKEN:?Set GUIDED_H03_GATEWAY_TOKEN}
+      GUIDED_CONTROL_LAB03_TOKEN: ${GUIDED_CONTROL_LAB03_TOKEN:?Set GUIDED_CONTROL_LAB03_TOKEN}
+      GUIDED_VERIFIER_LAB03_TOKEN: ${GUIDED_VERIFIER_LAB03_TOKEN:?Set GUIDED_VERIFIER_LAB03_TOKEN}
     depends_on:
       guided-bedrock-gateway: {condition: service_healthy}
     healthcheck:

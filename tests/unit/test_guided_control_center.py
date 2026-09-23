@@ -19,10 +19,12 @@ COMPOSE = ROOT / "examples/security-monitoring/compose.guided.yaml"
 os.environ.setdefault("GUIDED_SESSION_SECRET", "unit-session-secret")
 os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
 os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
+os.environ.setdefault("GUIDED_CONTROL_LAB03_TOKEN", "unit-control-lab03")
 os.environ.setdefault("GUIDED_CONTROL_H21_TOKEN", "unit-control-h21")
 os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
 os.environ.setdefault("GUIDED_LAB02_PROVISION_TOKEN", "unit-provision-lab02")
+os.environ.setdefault("GUIDED_LAB03_PROVISION_TOKEN", "unit-provision-lab03")
 
 
 def load_server():
@@ -57,6 +59,12 @@ class FakeAsyncClient:
     async def __aexit__(self, *args):
         return None
 
+    async def get(self, url, *, headers):
+        self.calls.append({"url": url, "json": None, "headers": headers})
+        if "/v1/status/" in url:
+            return FakeResponse({"ingestion_job_id": "H03JOB", "status": "COMPLETE"})
+        return FakeResponse({"detail": "not found"}, status_code=404)
+
     async def post(self, url, *, json=None, headers):
         self.calls.append({"url": url, "json": json, "headers": headers})
         if url.endswith("/v1/run-suite"):
@@ -87,11 +95,17 @@ class FakeAsyncClient:
             )
         if url.endswith("/v1/h02/provision"):
             return FakeResponse({"status": "READY", "knowledge_base_id": "TESTKB1234"})
+        if url.endswith("/v1/h03/provision"):
+            return FakeResponse({"status": "READY_FOR_SYNC", "knowledge_base_id": "TESTH03KB"})
+        if url.endswith("/v1/sync"):
+            return FakeResponse({"ingestion_job_id": "H03JOB", "status": "STARTING"})
+        if url.endswith("/v1/search"):
+            return FakeResponse({"retrieval_called": True, "source_uris": ["s3://current"]})
         if url.endswith("/v1/documents"):
             if not json["body"]:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H02" if "lab-02" in url else "H01"
+        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -140,7 +154,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H21", "H22"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H21", "H22"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
@@ -237,6 +251,38 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["activity_id"], "H02")
 
+    def test_h03_suite_uses_current_server_owned_job(self):
+        rejected = self.client.post(
+            "/api/hands-on/H03/verify",
+            json={"job_id": "attacker-job", "course_verdict": "PASS"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H03/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H03")
+        sync_call = next(item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/sync"))
+        verifier_call = next(item for item in FakeAsyncClient.calls if "lab-03" in item["url"])
+        self.assertNotIn("ingestion_job_id", sync_call["json"])
+        self.assertNotIn("course_verdict", verifier_call["json"])
+
+    def test_h03_provisioning_body_is_server_owned(self):
+        rejected = self.client.post(
+            "/api/hands-on/H03/provision",
+            json={"knowledge_base_id": "attacker-kb"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H03/provision", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H03")
+
     def test_h22_suite_is_server_owned_and_uses_verifier(self):
         rejected = self.client.post(
             "/api/hands-on/H22/verify",
@@ -302,6 +348,8 @@ class GuidedControlCenterTests(unittest.TestCase):
             "verify": "verify-help",
             "h02-provision": "h02-provision-help",
             "h02-verify": "h02-verify-help",
+            "h03-provision": "h03-provision-help",
+            "h03-verify": "h03-verify-help",
             "h21-verify": "h21-verify-help",
             "h22-verify": "h22-verify-help",
         }
@@ -358,6 +406,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("docker.sock", serialized)
         self.assertIn("guided-h01-gateway", compose["services"])
         self.assertIn("guided-h02-document-app", compose["services"])
+        self.assertIn("guided-h03-sync-app", compose["services"])
         self.assertIn("guided-h21-host", compose["services"])
         self.assertIn("guided-h21-provider", compose["services"])
         self.assertIn("guided-h21-trusted-mcp", compose["services"])
@@ -403,8 +452,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(hands_on[0], "H01")
         self.assertEqual(practices[0], "P01")
         self.assertEqual(manifest["tabs"][0]["hands_on_status"], "implemented")
-        self.assertEqual(manifest["tabs"][1]["hands_on_status"], "partial")
-        self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02"])
+        self.assertEqual(manifest["tabs"][1]["hands_on_status"], "implemented")
+        self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02", "H03"])
         self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][2:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])

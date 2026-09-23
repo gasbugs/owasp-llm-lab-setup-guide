@@ -180,6 +180,39 @@ docker compose \
               <span id="h02-verify-help" class="action-tooltip" role="tooltip">서버가 미리 준비한 문서 세 개를 현재 H02 앱에 보냅니다. 올바른 문서는 서버가 정한 S3 경로에 저장되고 1024차원 Titan Embeddings 요청으로 이어져야 합니다. 빈 문서는 AWS에 닿기 전에 멈춰야 하며, 검증기가 실제 저장 경로와 Titan 요청을 대조합니다.</span>
             </span>
           </div>
+
+          <section class="hands-on" aria-labelledby="h03-code-title">
+            <div>
+              <p class="label">H03 · LEARNER-OWNED SYNC APP</p>
+              <h3 id="h03-code-title">현재 동기화가 끝난 뒤에만 검색하기</h3>
+              <p>동기화(ingestion)는 S3 원문을 Knowledge Base 검색 저장소에 반영하는 작업입니다. H03은 H02 자원을 이어 쓰지 않습니다. 전용 Knowledge Base에는 폐기 문서가 남아 있고 S3에는 현재 문서만 있는 상태에서 시작합니다. <code>guided-labs/h03-ingestion-search/server.py</code>의 <code>may_retrieve()</code>가 같은 현재 job과 <code>COMPLETE</code>를 모두 확인하도록 작성합니다.</p>
+              <pre>def may_retrieve(current_job_id: str, observed_job_id: str, status: str) -&gt; bool:
+    same_job = hmac.compare_digest(current_job_id, observed_job_id)
+    return same_job and status == "COMPLETE"</pre>
+              <p>job ID는 Browser가 보내지 않고 앱이 ingestion 시작 응답에서 저장합니다. 수정한 source를 image에 넣고 H03 앱만 다시 연결합니다.</p>
+              <pre>docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-h03-sync-app
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-h03-sync-app</pre>
+            </div>
+          </section>
+
+          <div class="actions">
+            <span class="action-control">
+              <button id="h03-provision" class="secondary" aria-describedby="h03-provision-help">H03 시작 상태 준비</button>
+              <button class="help-trigger" type="button" aria-label="H03 시작 상태 준비 작업 설명" aria-expanded="false" aria-controls="h03-provision-help">i</button>
+              <span id="h03-provision-help" class="action-tooltip" role="tooltip">제공 Gateway가 H03 전용 S3와 Knowledge Base를 확인합니다. 폐기 문서를 한 번 색인한 뒤 S3에서는 지우고 현재 문서를 올려, 검색 저장소와 원문이 아직 서로 다른 시작 상태를 만듭니다. PASS는 이 시작 상태가 준비됐다는 뜻이며 H03 앱 코드가 안전하다는 뜻은 아닙니다.</span>
+            </span>
+            <span class="action-control">
+              <button id="h03-verify" class="primary" aria-describedby="h03-verify-help">H03 현재 구현 검증</button>
+              <button class="help-trigger" type="button" aria-label="H03 현재 구현 검증 작업 설명" aria-expanded="false" aria-controls="h03-verify-help">i</button>
+              <span id="h03-verify-help" class="action-tooltip" role="tooltip">서버가 S3 원문을 검색 저장소에 반영하는 현재 동기화 작업을 시작하고, 완료 전 검색과 완료 후 검색을 차례로 실행합니다. 완료 전에는 검색 호출이 없어야 하고, 완료 후에는 현재 문서의 source만 나와야 합니다. 검증기가 실제 job ID·상태·검색 source를 다시 대조해 HIT·PASS·ERR로 보여 줍니다.</span>
+            </span>
+          </div>
         </div>
 
         <div id="h21-work" class="lab-workspace" hidden>
