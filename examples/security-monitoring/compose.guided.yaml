@@ -47,13 +47,13 @@ services:
       GUIDED_SESSION_SECRET: ${GUIDED_SESSION_SECRET:?Set GUIDED_SESSION_SECRET}
       GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
-      GUIDED_LAB01_URL: http://guided-student-app:8000
+      GUIDED_LAB01_URL: http://guided-h01-gateway:8000
       GUIDED_VERIFIER_URL: http://guided-evidence-verifier:8000
       GUIDED_ALLOWED_HOSTS: 127.0.0.1:${GUIDED_HOST_PORT:-18097},localhost:${GUIDED_HOST_PORT:-18097}
       GUIDED_ALLOWED_ORIGINS: http://127.0.0.1:${GUIDED_HOST_PORT:-18097},http://localhost:${GUIDED_HOST_PORT:-18097}
       GUIDED_NEMO_BROWSER_URL: http://127.0.0.1:${GUIDED_NEMO_HOST_PORT:-18192}
     depends_on:
-      guided-student-app: {condition: service_healthy}
+      guided-h01-gateway: {condition: service_healthy}
       guided-evidence-verifier: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host':'127.0.0.1:${GUIDED_HOST_PORT:-18097}'}); urllib.request.urlopen(r, timeout=2)"]
@@ -61,21 +61,25 @@ services:
       timeout: 3s
       retries: 30
 
-  guided-student-app:
+  guided-h01-gateway:
     <<: *guided-service
     build:
       context: ../../llm-security-control-plane
-      dockerfile: guided-labs/h01-nova-output-limit/Containerfile
-    image: localhost/llm-security-guided-student-app:${GUIDED_IMAGE_VERSION:-0.1.0}
-    container_name: llm-security-guided-student-app
+      dockerfile: guided-labs/h01-bedrock-gateway/Containerfile
+    image: localhost/llm-security-guided-h01-gateway:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h01-gateway
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     environment:
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_REGION: us-east-1
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SHARED_CREDENTIALS_FILE: /tmp/.aws/credentials
+      AWS_CONFIG_FILE: /tmp/.aws/config
+      GUIDED_PROVIDER_MODE: ${GUIDED_PROVIDER_MODE:-aws}
       GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
-      GUIDED_LAB01_GATEWAY_TOKEN: ${GUIDED_LAB01_GATEWAY_TOKEN:?Set GUIDED_LAB01_GATEWAY_TOKEN}
       GUIDED_VERIFIER_LAB01_TOKEN: ${GUIDED_VERIFIER_LAB01_TOKEN:?Set GUIDED_VERIFIER_LAB01_TOKEN}
-      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
-    volumes: [guided-lab-01-state:/state:rw]
-    depends_on:
-      guided-bedrock-gateway: {condition: service_healthy}
+    volumes:
+      - ${AWS_CREDENTIALS_DIR:-${HOME}/.aws}:/tmp/.aws:ro
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 2s
@@ -93,12 +97,10 @@ services:
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
       GUIDED_VERIFIER_LAB01_TOKEN: ${GUIDED_VERIFIER_LAB01_TOKEN:?Set GUIDED_VERIFIER_LAB01_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
-      GUIDED_LAB01_URL: http://guided-student-app:8000
-      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
+      GUIDED_LAB01_URL: http://guided-h01-gateway:8000
     volumes: [guided-verifier-state:/state:rw]
     depends_on:
-      guided-student-app: {condition: service_healthy}
-      guided-bedrock-gateway: {condition: service_healthy}
+      guided-h01-gateway: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 2s
@@ -156,5 +158,4 @@ networks:
   guided: {name: llm-security-guided}
 
 volumes:
-  guided-lab-01-state:
   guided-verifier-state:

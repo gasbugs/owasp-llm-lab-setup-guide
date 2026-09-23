@@ -1,10 +1,8 @@
-"""Read-only verifier for the learner application and Provider receipts."""
+"""Read-only verifier for H01 learner Gateway receipts."""
 
 from __future__ import annotations
 
-import hashlib
 import hmac
-import json
 import os
 import sqlite3
 from datetime import datetime, timezone
@@ -16,11 +14,9 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 
-LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-student-app:8000")
-GATEWAY_URL = os.getenv("GUIDED_BEDROCK_GATEWAY_URL", "http://guided-bedrock-gateway:8080")
+LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 CONTROL_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 LAB_TOKEN = os.environ["GUIDED_VERIFIER_LAB01_TOKEN"]
-GATEWAY_TOKEN = os.environ["GUIDED_VERIFIER_GATEWAY_TOKEN"]
 DATABASE_PATH = os.getenv("GUIDED_VERIFIER_DATABASE", "/state/verifier.sqlite3")
 MODEL_ID = "us.amazon.nova-lite-v1:0"
 
@@ -35,20 +31,26 @@ def connect() -> sqlite3.Connection:
 
 with connect() as database:
     database.execute(
-        """CREATE TABLE IF NOT EXISTS used_evidence (
-        provider_request_id TEXT PRIMARY KEY,
-        execution_id TEXT NOT NULL UNIQUE
-        )"""
+        "CREATE TABLE IF NOT EXISTS used_evidence "
+        "(provider_request_id TEXT PRIMARY KEY, execution_id TEXT NOT NULL UNIQUE)"
     )
 
 
 class ExpectedCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    case_id: Literal["provider-preflight", "normal-64", "risk-512"]
+    case_id: Literal[
+        "provider-preflight",
+        "normal-64",
+        "risk-512",
+        "invalid-empty-message",
+        "reject-model-override",
+    ]
     scenario: Literal["preflight", "normal", "risk"]
     execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
     requested_max_output_tokens: int = Field(ge=1, le=512)
+    expected_status: Literal[200, 422]
+    observed_status: int
 
 
 class VerifyRequest(BaseModel):
@@ -56,7 +58,7 @@ class VerifyRequest(BaseModel):
     suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
     suite_kind: Literal["preflight", "hands_on"]
-    cases: list[ExpectedCase] = Field(min_length=1, max_length=2)
+    cases: list[ExpectedCase] = Field(min_length=1, max_length=4)
 
 
 def require_control(authorization: str | None = Header(default=None)) -> None:
@@ -72,24 +74,12 @@ def parse_time(value: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
-def config_digest(max_output_tokens: int) -> str:
-    encoded = json.dumps(
-        {
-            "model_id": MODEL_ID,
-            "inference_config": {"maxTokens": max_output_tokens, "temperature": 0.0},
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
-    return hashlib.sha256(encoded).hexdigest()
-
-
 def err_envelope(request: VerifyRequest, reason: str) -> dict:
     return {
         "lab_id": "01-nova",
         "activity_id": "H01",
         "execution_id": request.suite_id,
-        "execution_kind": "learner-application-suite",
+        "execution_kind": "learner-gateway-suite",
         "started_at": request.started_at,
         "status": "completed",
         "course_verdict": "ERR",
@@ -98,7 +88,7 @@ def err_envelope(request: VerifyRequest, reason: str) -> dict:
         "stage_calls": [],
         "evidence": [],
         "reason": reason,
-        "next_check": "student app과 Gateway receipt의 실행 ID·시각·적용 상한을 확인합니다.",
+        "next_check": "Gateway 요청 schema, source digest와 Provider request ID를 확인합니다.",
     }
 
 
@@ -138,96 +128,111 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
     expected_ids = (
         {"provider-preflight"}
         if request.suite_kind == "preflight"
-        else {"normal-64", "risk-512"}
+        else {"normal-64", "risk-512", "invalid-empty-message", "reject-model-override"}
     )
     if {item.case_id for item in request.cases} != expected_ids:
         return err_envelope(request, "the server-owned test suite is incomplete")
 
-    verified_cases = []
-    evidence = []
     try:
+        build_response = httpx.get(
+            f"{LAB_URL}/v1/build-info",
+            headers={"Authorization": f"Bearer {LAB_TOKEN}"},
+            timeout=5.0,
+        )
+        if build_response.status_code != 200:
+            return err_envelope(request, "learner Gateway build information is missing")
+        source_digest = build_response.json().get("source_digest")
+        if not isinstance(source_digest, str) or len(source_digest) != 64:
+            return err_envelope(request, "learner Gateway source digest is invalid")
+
+        verified_cases = []
+        evidence = []
         for expected in request.cases:
-            lab_response = httpx.get(
+            if expected.observed_status != expected.expected_status:
+                return err_envelope(request, f"{expected.case_id} returned an unexpected HTTP status")
+            receipt_response = httpx.get(
                 f"{LAB_URL}/v1/receipts/{expected.execution_id}",
                 headers={"Authorization": f"Bearer {LAB_TOKEN}"},
                 timeout=5.0,
             )
-            gateway_response = httpx.get(
-                f"{GATEWAY_URL}/v1/evidence/{expected.execution_id}",
-                headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
-                timeout=5.0,
-            )
-            if lab_response.status_code != 200 or gateway_response.status_code != 200:
-                return err_envelope(request, "student app or provider evidence is missing")
-            lab = lab_response.json()
-            provider = gateway_response.json()
-            effective = lab.get("effective_max_output_tokens")
-            provider_id = provider.get("provider_request_id")
+            if expected.expected_status == 422:
+                if receipt_response.status_code != 404:
+                    return err_envelope(request, f"{expected.case_id} reached the Provider path")
+                verified_cases.append(
+                    {
+                        "case_id": expected.case_id,
+                        "execution_id": expected.execution_id,
+                        "http_status": 422,
+                        "upstream_called": False,
+                    }
+                )
+                continue
+            if receipt_response.status_code != 200:
+                return err_envelope(request, "learner Gateway receipt is missing")
+
+            receipt = receipt_response.json()
+            effective = receipt.get("effective_max_output_tokens")
+            usage = receipt.get("usage", {})
+            provider_id = receipt.get("provider_request_id")
             try:
                 started_at = parse_time(expected.started_at)
-                observed_at = parse_time(provider["observed_at"])
+                observed_at = parse_time(receipt["observed_at"])
             except (KeyError, TypeError, ValueError):
                 return err_envelope(request, "evidence timestamp is invalid")
-            if type(effective) is not int or not 1 <= effective <= 512:
-                return err_envelope(request, "student app returned an invalid effective limit")
-            digest = config_digest(effective)
-            usage = provider.get("usage", {})
             fields_match = all(
                 (
-                    lab.get("execution_id") == expected.execution_id,
-                    lab.get("scenario") == expected.scenario,
-                    lab.get("requested_max_output_tokens") == expected.requested_max_output_tokens,
-                    provider.get("execution_id") == expected.execution_id,
-                    lab.get("provider_request_id") == provider_id,
-                    lab.get("config_digest") == digest,
-                    provider.get("config_digest") == digest,
-                    provider.get("model_id") == MODEL_ID,
-                    provider.get("forwarded_parameters", {}).get("maxTokens") == effective,
+                    receipt.get("execution_id") == expected.execution_id,
+                    receipt.get("scenario") == expected.scenario,
+                    receipt.get("requested_max_output_tokens") == expected.requested_max_output_tokens,
+                    receipt.get("source_digest") == source_digest,
+                    receipt.get("model_id") == MODEL_ID,
+                    receipt.get("region") == "us-east-1",
+                    receipt.get("forwarded_parameters", {}).get("maxTokens") == effective,
+                    receipt.get("upstream_called") is True,
+                    type(effective) is int,
                     type(usage.get("outputTokens")) is int,
                     0 <= usage.get("outputTokens", -1) <= effective,
-                    isinstance(lab.get("policy_digest"), str),
-                    len(lab.get("policy_digest", "")) == 64,
                     isinstance(provider_id, str),
                     bool(provider_id),
                     observed_at >= started_at,
                 )
             )
             if not fields_match:
-                return err_envelope(request, "receipts do not match the requested execution")
+                return err_envelope(request, "Gateway receipt does not match the requested execution")
             if not reserve_provider_evidence(provider_id, expected.execution_id):
-                return err_envelope(request, "stale provider evidence was reused")
+                return err_envelope(request, "stale Provider evidence was reused")
             item = {
                 "case_id": expected.case_id,
                 "execution_id": expected.execution_id,
+                "http_status": 200,
                 "requested_max_output_tokens": expected.requested_max_output_tokens,
                 "effective_max_output_tokens": effective,
-                "policy_digest": lab["policy_digest"],
+                "source_digest": source_digest,
                 "provider_request_id": provider_id,
-                "model_id": provider["model_id"],
-                "region": provider["region"],
-                "forwarded_parameters": provider["forwarded_parameters"],
+                "model_id": receipt["model_id"],
+                "region": receipt["region"],
+                "forwarded_parameters": receipt["forwarded_parameters"],
                 "usage": usage,
-                "stop_reason": provider["stop_reason"],
-                "output_text": provider["output_text"],
-                "provider_mode": provider["provider_mode"],
+                "stop_reason": receipt["stop_reason"],
+                "output_text": receipt["response_text"],
+                "provider_mode": receipt["provider_mode"],
+                "upstream_called": True,
             }
             verified_cases.append(item)
             evidence.append(
                 {
-                    "source": "amazon-bedrock"
-                    if provider.get("provider_mode") == "aws"
-                    else "contract-provider",
+                    "source": "amazon-bedrock" if receipt["provider_mode"] == "aws" else "contract-provider",
                     "kind": expected.case_id,
                     "id": provider_id,
-                    "observed_at": provider["observed_at"],
+                    "observed_at": receipt["observed_at"],
                 }
             )
     except httpx.RequestError:
-        return err_envelope(request, "read-only evidence endpoint unavailable")
+        return err_envelope(request, "read-only Gateway evidence endpoint unavailable")
 
     by_id = {item["case_id"]: item for item in verified_cases}
     verdict = "PASS"
-    reason = "Provider 연결과 새 receipt를 확인했습니다."
+    reason = "Gateway와 Provider의 새 영수증을 확인했습니다."
     if request.suite_kind == "hands_on":
         normal = by_id["normal-64"]
         risk = by_id["risk-512"]
@@ -235,32 +240,31 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
             verdict = "ERR"
             reason = "정상 64 Token 요청까지 바꾸어 정상 기능 유지를 확인할 수 없습니다."
         elif risk["effective_max_output_tokens"] <= 128:
-            verdict = "PASS"
-            reason = "정상 요청은 유지하고 위험 요청의 실제 Provider 상한을 128 이하로 제한했습니다."
+            reason = "정상 요청은 유지하고 큰 요청은 제한했으며 잘못된 body와 모델 변경도 Provider 전에 거부했습니다."
         elif risk["usage"]["outputTokens"] > 128:
             verdict = "HIT"
-            reason = "위험 요청이 운영 상한 128을 넘어 실제 Provider 출력을 사용했습니다."
+            reason = "512 Token 요청이 제한 없이 실제 Provider 출력으로 이어졌습니다."
         else:
             verdict = "ERR"
-            reason = "전달 상한은 커지만 이번 응답이 짧어 실제 영향을 확정할 수 없습니다."
+            reason = "전달 상한은 크지만 이번 응답이 짧아 실제 영향을 확정할 수 없습니다."
 
-    focus = verified_cases[-1]
+    focus = next(item for item in reversed(verified_cases) if item.get("http_status") == 200)
     return {
         "lab_id": "01-nova",
         "activity_id": "H01",
         "execution_id": request.suite_id,
-        "execution_kind": "learner-application-suite",
+        "execution_kind": "learner-gateway-suite",
         "started_at": request.started_at,
         "status": "completed",
         "course_verdict": verdict,
         "verified_by": "guided-evidence-verifier",
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "stage_calls": [
-            {"stage": "student_output_policy", "attempted": True, "outcome": "completed", "evidence_id": focus["policy_digest"]},
+            {"stage": "learner_gateway", "attempted": True, "outcome": "completed", "evidence_id": source_digest},
             {"stage": "bedrock_main", "attempted": True, "outcome": "completed", "evidence_id": focus["provider_request_id"]},
         ],
         "evidence": evidence,
         "result": {**focus, "cases": verified_cases},
         "reason": reason,
-        "next_check": "정상·위험 case의 requested·effective·Provider maxTokens를 순서대로 비교합니다.",
+        "next_check": "네 case의 HTTP 상태, upstream_called와 Provider maxTokens를 순서대로 비교합니다.",
     }

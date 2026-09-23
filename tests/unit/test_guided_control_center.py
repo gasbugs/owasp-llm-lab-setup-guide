@@ -55,18 +55,19 @@ class FakeAsyncClient:
 
     async def post(self, url, *, json, headers):
         self.calls.append({"url": url, "json": json, "headers": headers})
-        if url.endswith("/v1/run"):
+        if url.endswith("/v1/chat"):
+            if not json["message"] or "model" in json:
+                return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse(
                 {
                     "execution_id": json["execution_id"],
-                    "requested_max_output_tokens": json["requested_max_output_tokens"],
-                    "effective_max_output_tokens": json["requested_max_output_tokens"],
-                    "policy_digest": "policy-digest",
-                    "config_digest": "executor-is-not-trusted",
+                    "requested_max_output_tokens": json["max_output_tokens"],
+                    "effective_max_output_tokens": json["max_output_tokens"],
+                    "source_digest": "source-digest",
                     "provider_request_id": "aws-request-1",
                     "model_id": "us.amazon.nova-lite-v1:0",
                     "forwarded_parameters": {
-                        "maxTokens": json["requested_max_output_tokens"]
+                        "maxTokens": json["max_output_tokens"]
                     },
                     "usage": {"outputTokens": 12},
                     "stop_reason": "end_turn",
@@ -149,12 +150,14 @@ class GuidedControlCenterTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(len(FakeAsyncClient.calls), 3)
-        normal_call, risk_call, verifier_call = FakeAsyncClient.calls
-        self.assertEqual(normal_call["json"]["requested_max_output_tokens"], 64)
-        self.assertEqual(risk_call["json"]["requested_max_output_tokens"], 512)
+        self.assertEqual(len(FakeAsyncClient.calls), 5)
+        normal_call, risk_call, invalid_call, override_call, verifier_call = FakeAsyncClient.calls
+        self.assertEqual(normal_call["json"]["max_output_tokens"], 64)
+        self.assertEqual(risk_call["json"]["max_output_tokens"], 512)
+        self.assertEqual(invalid_call["json"]["message"], "")
+        self.assertEqual(override_call["json"]["model"], "attacker-selected-model")
         self.assertEqual(verifier_call["json"]["suite_kind"], "hands_on")
-        self.assertEqual(len(verifier_call["json"]["cases"]), 2)
+        self.assertEqual(len(verifier_call["json"]["cases"]), 4)
         self.assertNotIn("course_verdict", verifier_call["json"])
         self.assertNotIn("unit-control-lab", response.text)
         self.assertNotIn("unit-control-verifier", response.text)
@@ -173,8 +176,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(payload["result"]["response_text"], "실제 모델 응답")
         self.assertEqual(len(FakeAsyncClient.calls), 1)
         request = FakeAsyncClient.calls[0]["json"]
-        self.assertEqual(request["prompt"], "현재 정책을 거쳐 실제로 답해 주세요.")
-        self.assertEqual(request["requested_max_output_tokens"], 512)
+        self.assertEqual(request["message"], "현재 정책을 거쳐 실제로 답해 주세요.")
+        self.assertEqual(request["max_output_tokens"], 512)
         self.assertEqual(request["scenario"], "chat")
 
     def test_exploratory_chat_rejects_client_policy_fields(self):
@@ -198,7 +201,8 @@ class GuidedControlCenterTests(unittest.TestCase):
 
     def test_rendering_uses_text_nodes_only(self):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
-        self.assertIn("return min(requested_max_tokens, 128)", html)
+        self.assertIn("effective_max_tokens = min(request.max_output_tokens, 128)", html)
+        self.assertIn('boto3.client("bedrock-runtime"', html)
         self.assertIn("강사와 함께 진행하는 본 실습", html)
         self.assertIn("--env-file llm-security-control-plane/.state/guided-course.env", html)
         self.assertIn('data-theme-choice="light"', html)
@@ -240,13 +244,31 @@ class GuidedControlCenterTests(unittest.TestCase):
         serialized = str(verifier)
         self.assertNotIn("/tmp/.aws", serialized)
         self.assertNotIn("docker.sock", serialized)
-        self.assertIn("guided-student-app", compose["services"])
+        self.assertIn("guided-h01-gateway", compose["services"])
+        self.assertIn("guided-bedrock-gateway", compose["services"])
         proxy = (CONTROL / "guided-front-proxy/nginx.conf").read_text(encoding="utf-8")
         self.assertIn("proxy_set_header Upgrade $http_upgrade", proxy)
         self.assertIn("proxy_set_header Connection $connection_upgrade", proxy)
         self.assertIn("resolver 127.0.0.11 valid=10s ipv6=off", proxy)
         self.assertIn("server guided-control-center:8000 resolve", proxy)
         self.assertIn("server guided-nemo-ui:8000 resolve", proxy)
+
+    def test_h01_is_a_real_gateway_and_next_labs_keep_a_provided_baseline(self):
+        source = (CONTROL / "guided-labs/h01-bedrock-gateway/server.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('@app.post("/v1/chat")', source)
+        self.assertIn('boto3.client("bedrock-runtime", region_name=REGION).converse(', source)
+        self.assertIn('model_config = ConfigDict(extra="forbid")', source)
+        self.assertIn("effective_max_tokens = request.max_output_tokens", source)
+
+        compose = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+        learner = compose["services"]["guided-h01-gateway"]
+        baseline = compose["services"]["guided-bedrock-gateway"]
+        self.assertNotEqual(learner["image"], baseline["image"])
+        self.assertNotEqual(learner["container_name"], baseline["container_name"])
+        self.assertIn("/tmp/.aws:ro", str(learner["volumes"]))
+        self.assertNotIn("guided-h01-gateway", str(baseline))
 
     def test_manifest_has_13_tabs_and_22_unique_activities(self):
         manifest = yaml.safe_load(

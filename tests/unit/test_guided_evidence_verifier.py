@@ -64,6 +64,8 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                     "execution_id": "11111111-1111-1111-1111-111111111111",
                     "started_at": "2026-09-22T10:00:00+00:00",
                     "requested_max_output_tokens": 64,
+                    "expected_status": 200,
+                    "observed_status": 200,
                 },
                 {
                     "case_id": "risk-512",
@@ -71,6 +73,26 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                     "execution_id": "22222222-2222-2222-2222-222222222222",
                     "started_at": "2026-09-22T10:00:00+00:00",
                     "requested_max_output_tokens": 512,
+                    "expected_status": 200,
+                    "observed_status": 200,
+                },
+                {
+                    "case_id": "invalid-empty-message",
+                    "scenario": "normal",
+                    "execution_id": "33333333-3333-3333-3333-333333333333",
+                    "started_at": "2026-09-22T10:00:00+00:00",
+                    "requested_max_output_tokens": 64,
+                    "expected_status": 422,
+                    "observed_status": 422,
+                },
+                {
+                    "case_id": "reject-model-override",
+                    "scenario": "normal",
+                    "execution_id": "44444444-4444-4444-4444-444444444444",
+                    "started_at": "2026-09-22T10:00:00+00:00",
+                    "requested_max_output_tokens": 64,
+                    "expected_status": 422,
+                    "observed_status": 422,
                 },
             ],
         }
@@ -87,25 +109,24 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         }
 
         def get(url, **_kwargs):
+            if url.endswith("/v1/build-info"):
+                return FakeResponse({"component": "guided-h01-gateway", "source_digest": "b" * 64})
             execution_id = url.rsplit("/", 1)[-1]
+            if execution_id in {
+                "33333333-3333-3333-3333-333333333333",
+                "44444444-4444-4444-4444-444444444444",
+            }:
+                return FakeResponse({"detail": "receipt not found"}, status_code=404)
             scenario, requested, effective, output = cases[execution_id]
             provider_id = f"request-{execution_id[:8]}-{effective}"
-            digest = self.server.config_digest(effective)
-            if "/receipts/" in url:
-                return FakeResponse(
-                    {
-                        "execution_id": execution_id,
-                        "scenario": scenario,
-                        "requested_max_output_tokens": requested,
-                        "effective_max_output_tokens": effective,
-                        "policy_digest": "b" * 64,
-                        "provider_request_id": provider_id,
-                        "config_digest": digest,
-                    }
-                )
             return FakeResponse(
                 {
                     "execution_id": execution_id,
+                    "started_at": "2026-09-22T10:00:00+00:00",
+                    "scenario": scenario,
+                    "requested_max_output_tokens": requested,
+                    "effective_max_output_tokens": effective,
+                    "source_digest": "b" * 64,
                     "provider_request_id": provider_id,
                     "provider_mode": "contract",
                     "observed_at": "2026-09-22T10:00:01+00:00",
@@ -114,8 +135,8 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                     "forwarded_parameters": {"maxTokens": effective, "temperature": 0.0},
                     "usage": {"inputTokens": 10, "outputTokens": output, "totalTokens": 10 + output},
                     "stop_reason": "max_tokens",
-                    "output_text": "검증된 응답",
-                    "config_digest": digest,
+                    "response_text": "검증된 응답",
+                    "upstream_called": True,
                 }
             )
 
@@ -128,14 +149,14 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             headers={"Authorization": "Bearer control-verifier"},
         )
 
-    def test_safe_learner_policy_is_pass(self):
+    def test_safe_learner_gateway_is_pass(self):
         with patch.object(self.server.httpx, "get", self.fake_get(128)):
             response = self.verify(self.body())
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(len(response.json()["result"]["cases"]), 2)
+        self.assertEqual(len(response.json()["result"]["cases"]), 4)
 
-    def test_unbounded_starter_is_hit(self):
+    def test_unbounded_gateway_starter_is_hit(self):
         body = self.body()
         body["suite_id"] = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
         with patch.object(self.server.httpx, "get", self.fake_get(512)):
@@ -146,7 +167,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
     def test_incomplete_server_suite_is_err(self):
         body = self.body()
         body["suite_id"] = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-        body["cases"] = body["cases"][:1]
+        body["cases"] = body["cases"][:2]
         response = self.verify(body)
         self.assertEqual(response.json()["course_verdict"], "ERR")
 

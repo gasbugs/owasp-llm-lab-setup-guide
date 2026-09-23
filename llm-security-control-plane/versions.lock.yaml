@@ -49,6 +49,6 @@ images:
   bedrock_gateway: localhost/llm-security-bedrock-gateway:1.0.0
   guided_front_proxy: localhost/llm-security-guided-front-proxy:0.1.0
   guided_control_center: localhost/llm-security-guided-control-center:0.1.0
-  guided_student_app: localhost/llm-security-guided-student-app:0.1.0
+  guided_h01_gateway: localhost/llm-security-guided-h01-gateway:0.1.0
   guided_evidence_verifier: localhost/llm-security-guided-evidence-verifier:0.1.0
   guided_bedrock_gateway: localhost/llm-security-guided-bedrock-gateway:0.1.0

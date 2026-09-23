@@ -14,7 +14,7 @@
     <div>
       <p class="kicker">TENANT 03 · SECURITY INSPECTION LINE</p>
       <h1>앱을 고치고<br>증거로 검증한다</h1>
-      <p class="lede">Hands-on H01에서는 강사와 함께 Python 출력 정책을 구현하고, 정상·위험 요청이 Provider에 어떤 상한으로 전달됐는지 한 장의 영수증으로 맞춥니다.</p>
+      <p class="lede">Hands-on H01에서는 강사와 함께 HTTP 요청을 검증하고 Boto3로 Nova Lite를 호출하는 작은 Bedrock Gateway를 구현한 뒤, 서버 테스트로 동작을 확인합니다.</p>
     </div>
     <div class="shift-card">
       <span>현재 검사대</span><strong>01 / 13</strong><small>Nova Lite 요청 경로</small>
@@ -44,27 +44,31 @@
     </aside>
 
     <section class="panel workbench">
-      <div class="panel-head split"><div><p class="label">HANDS-ON · H01</p><h2>Nova Lite 응답 길이 제한</h2></div><span class="live-chip">INSTRUCTOR-LED</span></div>
+      <div class="panel-head split"><div><p class="label">HANDS-ON · H01</p><h2>Bedrock Gateway 만들기</h2></div><span class="live-chip">INSTRUCTOR-LED</span></div>
       <div class="work-body">
-        <p>Starter는 512 Token 요청을 그대로 보내므로 첫 검증은 <code>HIT</code>가 정상입니다. 이 화면은 강사와 함께 진행하는 본 실습이므로 아래 코드를 그대로 작성해 작은 요청은 유지하고 큰 요청은 128 이하로 제한합니다.</p>
-        <div class="cost-note"><strong>비용 안내</strong><span>연결 확인은 1회, 현재 구현 검증은 정상·위험 2회의 Nova Lite 요청을 새로 만듭니다.</span></div>
+        <p>강사와 함께 진행하는 본 실습입니다. Starter는 동작하는 HTTP 서버지만 512 Token 요청을 그대로 Nova Lite에 전달합니다. 요청 계약, 서버 고정 모델, 출력 상한과 Boto3 호출을 코드로 연결하고 서버가 가진 네 가지 Testcase로 확인합니다.</p>
+        <div class="cost-note"><strong>비용 안내</strong><span>연결 확인은 1회, 현재 구현 검증은 정상·큰 요청 2회만 Nova Lite를 호출합니다. 잘못된 요청 2개는 Provider 전에 끝납니다.</span></div>
 
         <section class="hands-on" aria-labelledby="hands-on-title">
           <div>
-            <p class="label">LEARNER-OWNED APPLICATION</p>
-            <h3 id="hands-on-title">고객 상담 앱에 출력 상한 구현하기</h3>
-            <p><code>llm-security-control-plane/guided-labs/h01-nova-output-limit/policy.py</code>의 반환 줄을 다음과 같이 작성합니다. <code>min</code>은 요청값과 128 중 작은 값을 고르므로 64는 유지하고 512는 128로 줄입니다.</p>
-            <pre>def apply_output_limit(requested_max_tokens: int) -&gt; int:
-    return min(requested_max_tokens, 128)</pre>
-            <p>파일을 저장한 뒤 수강생 앱을 다시 Build하고 실행 서비스에 연결합니다.</p>
+            <p class="label">LEARNER-OWNED GATEWAY</p>
+            <h3 id="hands-on-title">HTTP 요청을 Nova Lite 호출로 연결하기</h3>
+            <p><code>llm-security-control-plane/guided-labs/h01-bedrock-gateway/server.py</code>에서 Pydantic 요청 계약과 Boto3 <code>converse()</code> 호출을 확인하고, 실제 전달 상한을 다음처럼 구현합니다. 이 줄은 Gateway의 요청 처리 코드 안에서 실행됩니다.</p>
+            <pre>effective_max_tokens = min(request.max_output_tokens, 128)
+result = boto3.client("bedrock-runtime", region_name="us-east-1").converse(
+    modelId="us.amazon.nova-lite-v1:0",
+    messages=[{"role": "user", "content": [{"text": request.message}]}],
+    inferenceConfig={"maxTokens": effective_max_tokens, "temperature": 0.0},
+)</pre>
+            <p>파일을 저장한 뒤 수강생 Gateway를 다시 Build하고 실행 서비스에 연결합니다.</p>
             <pre>docker compose \
   --env-file llm-security-control-plane/.state/guided-course.env \
   --file examples/security-monitoring/compose.guided.yaml \
-  build guided-student-app
+  build guided-h01-gateway
 docker compose \
   --env-file llm-security-control-plane/.state/guided-course.env \
   --file examples/security-monitoring/compose.guided.yaml \
-  up -d --no-deps --force-recreate guided-student-app</pre>
+  up -d --no-deps --force-recreate guided-h01-gateway</pre>
           </div>
         </section>
 
@@ -73,7 +77,7 @@ docker compose \
             <div><p class="label">LIVE MODEL TEST</p><h3 id="chat-title">현재 앱으로 Nova Lite에 질문하기</h3></div>
             <span>채점과 별개</span>
           </div>
-          <p>입력한 문장은 현재 <code>guided-student-app</code>의 출력 정책을 거쳐 실제 모델로 전달됩니다. 아래 응답과 <code>requested 512 → effective</code> 값을 함께 확인합니다.</p>
+          <p>입력한 문장은 현재 <code>guided-h01-gateway</code>가 직접 Boto3로 Nova Lite에 전달합니다. 아래 응답과 <code>requested 512 → effective</code> 값을 함께 확인합니다.</p>
           <div id="chat-transcript" class="chat-transcript" aria-live="polite">
             <div class="chat-message assistant"><b>MODEL</b><p>질문을 보내면 실제 모델 응답이 여기에 표시됩니다.</p></div>
           </div>
@@ -94,7 +98,7 @@ docker compose \
           <div class="inspection-head"><div><p class="label">STAGE CALLS</p><h3 id="inspection-title">요청 검사 컨베이어</h3></div><span id="execution-state">아직 실행하지 않음</span></div>
           <div id="belt" class="belt">
             <div class="gate waiting"><b>Control Center</b><small>대기</small></div>
-            <div class="gate waiting"><b>Student Policy</b><small>대기</small></div>
+            <div class="gate waiting"><b>Learner Gateway</b><small>대기</small></div>
             <div class="gate waiting"><b>Bedrock Main</b><small>대기</small></div>
           </div>
         </section>
@@ -114,7 +118,7 @@ docker compose \
           <dt>REQUESTED</dt><dd id="requested-max">—</dd>
           <dt>EFFECTIVE</dt><dd id="forwarded-max">—</dd>
           <dt>OUTPUT TOKENS</dt><dd id="output-tokens">—</dd>
-          <dt>POLICY DIGEST</dt><dd id="policy-digest">—</dd>
+          <dt>SOURCE DIGEST</dt><dd id="source-digest">—</dd>
           <dt>VERIFIED BY</dt><dd id="verified-by">—</dd>
         </dl>
         <p id="reason" class="reason">실행기 결과가 아니라 읽기 전용 검증기가 정상·위험 영수증을 맞춘 뒤 판정합니다.</p>

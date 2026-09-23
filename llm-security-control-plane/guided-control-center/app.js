@@ -150,7 +150,7 @@ function renderEnvelope(payload) {
   setText("requested-max", payload.result?.requested_max_output_tokens);
   setText("forwarded-max", payload.result?.forwarded_parameters?.maxTokens);
   setText("output-tokens", payload.result?.usage?.outputTokens);
-  setText("policy-digest", payload.result?.policy_digest?.slice(0, 12));
+  setText("source-digest", payload.result?.source_digest?.slice(0, 12));
   setText("verified-by", payload.verified_by);
   setText("reason", payload.reason);
   setText("next-check", `다음 확인: ${payload.next_check}`);
@@ -162,7 +162,7 @@ function renderEnvelope(payload) {
   verdict.querySelector("span").textContent = payload.verified_by || "검증 실패";
 
   const stages = [{ stage: "control_center", outcome: "completed" }, ...(payload.stage_calls || [])];
-  const labels = { control_center: "Control Center", student_output_policy: "Student Policy", bedrock_main: "Bedrock Main" };
+  const labels = { control_center: "Control Center", learner_gateway: "Learner Gateway", bedrock_main: "Bedrock Main" };
   const belt = byId("belt");
   belt.replaceChildren();
   stages.forEach((stage) => {

@@ -104,7 +104,7 @@ def main() -> int:
         urlsplit(url).hostname
         in {
             "guided-control-center",
-            "guided-student-app",
+            "guided-h01-gateway",
             "guided-evidence-verifier",
             "guided-bedrock-gateway",
         }
@@ -128,7 +128,9 @@ def main() -> int:
         "hands_on": hands_on_verdict == "HIT"
         and hands_on.get("verified_by") == "guided-evidence-verifier"
         and hands_on.get("result", {}).get("forwarded_parameters", {}).get("maxTokens") == 512
-        and len(hands_on.get("result", {}).get("cases", [])) == 2,
+        and len(hands_on.get("result", {}).get("cases", [])) == 4
+        and hands_on.get("result", {}).get("cases", [])[2].get("upstream_called") is False
+        and hands_on.get("result", {}).get("cases", [])[3].get("upstream_called") is False,
         "learner_work": answer_controls == 0,
         "safe_rendering": raw_nodes == 0,
         "same_origin": internal_requests == 0,

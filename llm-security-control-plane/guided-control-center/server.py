@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 ROOT = Path(__file__).parent
 APP_VERSION = os.getenv("RELEASE_VERSION", os.getenv("APP_VERSION", "dev"))
 SESSION_SECRET = os.environ["GUIDED_SESSION_SECRET"].encode()
-LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-student-app:8000")
+LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 VERIFIER_URL = os.getenv("GUIDED_VERIFIER_URL", "http://guided-evidence-verifier:8000")
 LAB_TOKEN = os.environ["GUIDED_CONTROL_LAB01_TOKEN"]
 VERIFIER_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
@@ -186,8 +186,8 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
         ],
         "learner_app": {
             "hands_on_id": "H01",
-            "service": "guided-student-app",
-            "policy_path": "llm-security-control-plane/guided-labs/h01-nova-output-limit/policy.py",
+            "service": "guided-h01-gateway",
+            "source_path": "llm-security-control-plane/guided-labs/h01-bedrock-gateway/server.py",
             "compose_path": "examples/security-monitoring/compose.guided.yaml",
         },
     }
@@ -205,7 +205,9 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                 "case_id": "provider-preflight",
                 "scenario": "preflight",
                 "prompt": "Reply only OK",
-                "requested_max_output_tokens": 2,
+                "message": "Reply only OK",
+                "max_output_tokens": 2,
+                "expected_status": 200,
             }
         ]
         if suite_kind == "preflight"
@@ -213,14 +215,31 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
             {
                 "case_id": "normal-64",
                 "scenario": "normal",
-                "prompt": "GUIDED-H01-NORMAL: TLS 인증서 교체 절차를 세 문장으로 요약하세요.",
-                "requested_max_output_tokens": 64,
+                "message": "GUIDED-H01-NORMAL: TLS 인증서 교체 절차를 세 문장으로 요약하세요.",
+                "max_output_tokens": 64,
+                "expected_status": 200,
             },
             {
                 "case_id": "risk-512",
                 "scenario": "risk",
-                "prompt": "GUIDED-H01-RISK: 상담 절차를 출력 한계까지 상세히 작성하세요.",
-                "requested_max_output_tokens": 512,
+                "message": "GUIDED-H01-RISK: 상담 절차를 출력 한계까지 상세히 작성하세요.",
+                "max_output_tokens": 512,
+                "expected_status": 200,
+            },
+            {
+                "case_id": "invalid-empty-message",
+                "scenario": "normal",
+                "message": "",
+                "max_output_tokens": 64,
+                "expected_status": 422,
+            },
+            {
+                "case_id": "reject-model-override",
+                "scenario": "normal",
+                "message": "임의 모델로 바꾸어 주세요.",
+                "max_output_tokens": 64,
+                "model": "attacker-selected-model",
+                "expected_status": 422,
             },
         ]
     )
@@ -231,27 +250,26 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                 execution_id = str(uuid.uuid4())
                 started_at = datetime.now(timezone.utc).isoformat()
                 lab_response = await client.post(
-                    f"{LAB_URL}/v1/run",
+                    f"{LAB_URL}/v1/chat",
                     json={
                         "execution_id": execution_id,
                         "started_at": started_at,
-                        "prompt": definition["prompt"],
-                        "requested_max_output_tokens": definition[
-                            "requested_max_output_tokens"
-                        ],
+                        "message": definition["message"],
+                        "max_output_tokens": definition["max_output_tokens"],
                         "scenario": definition["scenario"],
+                        **({"model": definition["model"]} if "model" in definition else {}),
                     },
                     headers={"Authorization": f"Bearer {LAB_TOKEN}"},
                 )
-                if lab_response.status_code != 200:
+                if lab_response.status_code != definition["expected_status"]:
                     raise HTTPException(
                         status_code=502,
                         detail={
                             "successful_stage": "control_center",
-                            "stopped_stage": "guided_student_app",
+                            "stopped_stage": "guided_h01_gateway",
                             "downstream_called": False,
                             "course_verdict": "ERR",
-                            "next_check": "guided-student-app과 Bedrock Gateway 상태를 확인합니다.",
+                            "next_check": "guided-h01-gateway의 요청 schema와 컨테이너 상태를 확인합니다.",
                         },
                     )
                 cases.append(
@@ -260,9 +278,9 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                         "scenario": definition["scenario"],
                         "execution_id": execution_id,
                         "started_at": started_at,
-                        "requested_max_output_tokens": definition[
-                            "requested_max_output_tokens"
-                        ],
+                        "requested_max_output_tokens": definition["max_output_tokens"],
+                        "expected_status": definition["expected_status"],
+                        "observed_status": lab_response.status_code,
                     }
                 )
             verifier_response = await client.post(
@@ -315,18 +333,18 @@ async def chat_with_learner_app(
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             response = await client.post(
-                f"{LAB_URL}/v1/run",
+                f"{LAB_URL}/v1/chat",
                 json={
                     "execution_id": execution_id,
                     "started_at": started_at,
-                    "prompt": chat.prompt,
-                    "requested_max_output_tokens": 512,
+                    "message": chat.prompt,
+                    "max_output_tokens": 512,
                     "scenario": "chat",
                 },
                 headers={"Authorization": f"Bearer {LAB_TOKEN}"},
             )
         if response.status_code != 200:
-            raise HTTPException(status_code=502, detail="guided student app chat failed")
+            raise HTTPException(status_code=502, detail="guided H01 Gateway chat failed")
         result = response.json()
         return {
             "activity_id": "H01",
@@ -335,7 +353,7 @@ async def chat_with_learner_app(
             "execution_id": execution_id,
             "started_at": started_at,
             "stage_calls": [
-                {"stage": "student_output_policy", "outcome": "completed"},
+                {"stage": "learner_gateway", "outcome": "completed"},
                 {"stage": "bedrock_main", "outcome": "completed"},
             ],
             "result": result,

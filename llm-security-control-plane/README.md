@@ -80,7 +80,7 @@ bash llm-security-control-plane/deploy/stop-stack.sh
 
 ## 03 UI 후보의 Hands-on H01 수직 시제품
 
-기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 강사와 함께 진행하는 Hands-on H01의 Nova Lite 출력 상한 실습만 처음부터 끝까지 구현한다. 화면에는 전체 13개 탭이 보이지만 02~13은 다음 구현 단계로 잠겨 있다. H01은 입력할 정확한 코드를 화면에 보여 주며, 수강생이 `guided-labs/h01-nova-output-limit/policy.py`를 직접 수정하고 `guided-student-app`을 다시 Build·생성해야 검증 결과가 바뀐다. 독립 연습문제 P01은 아직 구현하지 않았다.
+기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 강사와 함께 진행하는 Hands-on H01의 Bedrock Gateway 코딩 실습만 처음부터 끝까지 구현한다. 화면에는 전체 13개 탭이 보이지만 02~13은 다음 구현 단계로 잠겨 있다. H01은 입력할 정확한 코드를 화면에 보여 주며, 수강생이 `guided-labs/h01-bedrock-gateway/server.py`의 실제 HTTP·Boto3 처리 코드를 수정하고 `guided-h01-gateway`를 다시 Build·생성해야 검증 결과가 바뀐다. 독립 연습문제 P01은 아직 구현하지 않았다.
 
 처음 실행할 때만 경계별 Token을 따로 만든다. Browser에는 이 값이 전달되지 않고 Control Center의 HttpOnly session cookie만 전달된다.
 
@@ -117,22 +117,22 @@ docker compose \
 | `http://127.0.0.1:18097` | Guided Control Center | Hands-on H01 실행·단계·검증 영수증 |
 | `http://127.0.0.1:18192` | NeMo Chat UI | 공식 Dialog Rail 화면의 proxy 호환성 확인 |
 
-Host port를 소유하는 컨테이너는 Front Proxy 하나뿐이다. 수강생 앱은 AWS 자격 증명을 갖지 않고 Bedrock Gateway만 `~/.aws`를 읽기 전용으로 확인한다. 별도 evidence verifier는 AWS 자격 증명·상태 변경 Token·Docker socket 없이 수강생 앱과 Gateway의 읽기 전용 영수증을 다시 대조한다.
+Host port를 소유하는 컨테이너는 Front Proxy 하나뿐이다. H01 수강생 Gateway와 H02 이후 제공 Gateway만 `~/.aws`를 읽기 전용으로 확인한다. 별도 evidence verifier는 AWS 자격 증명·상태 변경 Token·Docker socket 없이 H01 Gateway의 읽기 전용 영수증을 다시 대조한다.
 
-Starter는 요청된 512 Token을 그대로 Provider에 전달해 `HIT`가 재현된다. `policy.py`를 완성한 뒤에는 다음 두 명령으로 수강생 앱만 다시 연결한다.
+Starter는 요청된 512 Token을 그대로 Provider에 전달한다. `server.py`의 요청 처리 코드를 완성한 뒤에는 다음 두 명령으로 수강생 Gateway만 다시 연결한다.
 
 ```bash
 docker compose \
   --env-file llm-security-control-plane/.state/guided-course.env \
   --file examples/security-monitoring/compose.guided.yaml \
-  build guided-student-app
+  build guided-h01-gateway
 docker compose \
   --env-file llm-security-control-plane/.state/guided-course.env \
   --file examples/security-monitoring/compose.guided.yaml \
-  up -d --no-deps --force-recreate guided-student-app
+  up -d --no-deps --force-recreate guided-h01-gateway
 ```
 
-Control Center의 `현재 구현 검증`은 Browser가 보내지 않는 정상 64 Token·위험 512 Token 요청을 새로 실행한다. verifier는 정상 64는 유지되고 위험 512는 128 이하로 제한됐는지 앱 receipt와 Gateway receipt로 확인한다.
+Control Center의 `현재 구현 검증`은 Browser가 보내지 않는 정상 64 Token·큰 512 Token·빈 message·client model override 네 요청을 새로 실행한다. verifier는 정상 64 유지, 512→128 제한, 잘못된 요청의 HTTP 422·Provider 미호출을 H01 Gateway receipt와 source digest로 확인한다. H02부터는 별도 `guided-bedrock-gateway`를 사용하므로 H01 미완료 상태에서도 다음 과정을 시작할 수 있다.
 
 `standard`와 `high-assurance`는 NeMo 공식 profile이 아니라
 `policies/control-plane-policy.yaml`이 정의한 프로젝트 Rail 조합이다. `standard`는

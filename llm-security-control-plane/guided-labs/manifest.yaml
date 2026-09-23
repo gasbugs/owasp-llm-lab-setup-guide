@@ -21,7 +21,7 @@ tabs:
   - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: planned, practice: P13, practice_status: planned}
 
 hands_on_H01:
-  executor: guided-student-app
+  executor: guided-h01-gateway
   verifier: guided-evidence-verifier
   provider: amazon-bedrock
   model_id: us.amazon.nova-lite-v1:0
@@ -29,7 +29,8 @@ hands_on_H01:
     - provider_request_id
     - forwarded_parameters.maxTokens
     - usage.outputTokens
-    - config_digest
-    - policy_digest
+    - source_digest
     - normal-64
     - risk-512
+    - invalid-empty-message
+    - reject-model-override
