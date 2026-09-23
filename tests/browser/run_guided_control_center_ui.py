@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Browser E2E proving H05, H04, H02, and H03 can run before H01."""
+"""Browser E2E proving independent guided labs can run before H01."""
 
 from __future__ import annotations
 
@@ -93,6 +93,7 @@ def main() -> int:
         h02_tip_text = page.locator("#h02-provision-help").inner_text()
         h04_tip_text = page.locator("#h04-provision-help").inner_text()
         h05_tip_text = page.locator("#h05-verify-help").inner_text()
+        h06_tip_text = page.locator("#h06-verify-help").inner_text()
         page.set_viewport_size({"width": 1181, "height": 900})
         page.locator('.tab[data-tab-index="3"]').click()
         page.locator('[aria-controls="h05-verify-help"]').click()
@@ -117,11 +118,18 @@ def main() -> int:
         h22_hands_on = wait_for_result(page, timeout_ms, h21_hands_on.get("execution_id"))
         h22_verdict = page.locator("#verdict strong").inner_text()
 
-        # H05는 AWS나 앞 활동 없이 전용 NeMo config와 receipt로 실행된다.
+        # H06은 H05가 중지돼도 전용 NeMo runtime과 합성 Provider만 사용한다.
         page.locator('.tab[data-tab-index="3"]').click()
+        page.locator("#h06-verify").click()
+        h06_hands_on = wait_for_result(
+            page, timeout_ms, h22_hands_on.get("execution_id")
+        )
+        h06_verdict = page.locator("#verdict strong").inner_text()
+
+        # H05는 AWS나 앞 활동 없이 전용 NeMo config와 receipt로 실행된다.
         page.locator("#h05-verify").click()
         h05_hands_on = wait_for_result(
-            page, timeout_ms, h22_hands_on.get("execution_id")
+            page, timeout_ms, h06_hands_on.get("execution_id")
         )
         h05_verdict = page.locator("#verdict strong").inner_text()
 
@@ -201,7 +209,7 @@ def main() -> int:
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
         "panel_boundary": panel_boundary,
-        "action_tooltips": tooltip_count == 12
+        "action_tooltips": tooltip_count == 13
         and preflight_focus_visible
         and preflight_tip_visible
         and preflight_tip_collapsed
@@ -214,6 +222,9 @@ def main() -> int:
         and "한국어 요청 네 개" in h05_tip_text
         and "NeMo Topical 평가" in h05_tip_text
         and "복구 코드 marker" in h05_tip_text
+        and "합성 Provider" in h06_tip_text
+        and "호출·부작용 원장" in h06_tip_text
+        and "거부 문구만으로는" in h06_tip_text
         and desktop_tip_inside
         and mobile_tip_inside,
         "chat": bool(chat_text.strip())
@@ -269,6 +280,17 @@ def main() -> int:
             ),
             None,
         ) == "훈련용 복구 코드: GUIDED-H05-RECOVERY-CODE",
+        "h06_hands_on": h06_verdict == "HIT"
+        and h06_hands_on.get("verified_by") == "guided-evidence-verifier"
+        and h06_hands_on.get("result", {}).get("allowed_actions")
+        == [
+            "get_account_balance",
+            "get_account_balance_and_transfer",
+            "transfer_training_funds",
+        ]
+        and len(h06_hands_on.get("result", {}).get("provider_calls", [])) == 3
+        and h06_hands_on.get("result", {}).get("effect_count") == 2
+        and h06_hands_on.get("result", {}).get("balance") == 9800,
         "h22_hands_on": h22_verdict == "HIT"
         and h22_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h22_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
@@ -288,7 +310,7 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"execution_order=H21->H22->H05->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H21->H22->H06->H05->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h06={h06_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"h03_resources={h03_resources.get('course_verdict')} h03_hands_on={h03_verdict} "
         f"h04_resources={h04_resources.get('course_verdict')} h04_hands_on={h04_verdict} "

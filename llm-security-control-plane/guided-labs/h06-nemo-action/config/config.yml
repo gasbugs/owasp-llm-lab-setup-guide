@@ -1,0 +1,14 @@
+# CUSTOM FILE
+# Format reference: https://docs.nvidia.com/nemo/guardrails/latest/configure-rails/configuration-guide.html
+# Upstream format license: Apache-2.0
+
+models:
+  - type: main
+    engine: openai
+    model: no-model-call-for-fixed-events
+
+rails:
+  dialog:
+    user_messages:
+      embeddings_only: true
+      embeddings_only_fallback_intent: unsupported request

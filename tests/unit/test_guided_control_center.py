@@ -23,6 +23,8 @@ os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
 os.environ.setdefault("GUIDED_CONTROL_LAB03_TOKEN", "unit-control-lab03")
 os.environ.setdefault("GUIDED_CONTROL_LAB04_TOKEN", "unit-control-lab04")
 os.environ.setdefault("GUIDED_CONTROL_LAB05_TOKEN", "unit-control-lab05")
+os.environ.setdefault("GUIDED_CONTROL_LAB06_TOKEN", "unit-control-lab06")
+os.environ.setdefault("GUIDED_H06_PROVIDER_CONTROL_TOKEN", "unit-h06-provider-control")
 os.environ.setdefault("GUIDED_CONTROL_H21_TOKEN", "unit-control-h21")
 os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
@@ -71,6 +73,20 @@ class FakeAsyncClient:
 
     async def post(self, url, *, json=None, headers):
         self.calls.append({"url": url, "json": json, "headers": headers})
+        if url.endswith("/v1/suites"):
+            return FakeResponse(
+                {
+                    "suite_id": json["suite_id"],
+                    "cases": [
+                        {
+                            **item,
+                            "action_id": None,
+                            "capability": f"capability-{item['case_id']}" * 3,
+                        }
+                        for item in json["executions"]
+                    ],
+                }
+            )
         if url.endswith("/v1/run-suite"):
             return FakeResponse(
                 {
@@ -114,8 +130,10 @@ class FakeAsyncClient:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse({"execution_id": json["execution_id"]})
         if url.endswith("/v1/run"):
+            if "cases" in json:
+                return FakeResponse({"suite_id": json["suite_id"], "source_digest": "a" * 64})
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
+        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -147,6 +165,18 @@ class FakeAsyncClient:
                             },
                         }
                         if activity_id == "H05"
+                        else {}
+                    ),
+                    **(
+                        {
+                            "provider_suite_id": json["suite_id"],
+                            "framework": "nemoguardrails",
+                            "framework_version": "0.22.0",
+                            "provider_calls": [{"action_id": "get_account_balance"}],
+                            "effect_count": 0,
+                            "balance": 10000,
+                        }
+                        if activity_id == "H06"
                         else {}
                     ),
                 },
@@ -182,7 +212,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H21", "H22"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H06", "H21", "H22"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
         h05 = next(
             item
@@ -191,6 +221,13 @@ class GuidedControlCenterTests(unittest.TestCase):
         )
         self.assertEqual(h05["service"], "guided-h05-nemo-dialog")
         self.assertTrue(h05["source_path"].endswith("h05-nemo-dialog/config/flows.co"))
+        h06 = next(
+            item
+            for item in self.bootstrap["learner_apps"]
+            if item["hands_on_id"] == "H06"
+        )
+        self.assertEqual(h06["service"], "guided-h06-nemo-action")
+        self.assertTrue(h06["source_path"].endswith("h06-nemo-action/actions.py"))
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
         self.assertEqual(self.client.post("/api/hands-on/H01/verify").status_code, 403)
@@ -393,6 +430,52 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("prompt", verifier_call["json"])
         self.assertNotIn("unit-control-lab05", response.text)
 
+    def test_h06_suite_actions_and_verdict_are_server_owned(self):
+        rejected = self.client.post(
+            "/api/hands-on/H06/verify",
+            json={
+                "case_id": "balance-read",
+                "action_id": "get_account_balance",
+                "course_verdict": "PASS",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H06/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["activity_id"], "H06")
+        provider_call = next(
+            item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/suites")
+        )
+        self.assertEqual(
+            [item["case_id"] for item in provider_call["json"]["executions"]],
+            ["balance-read", "transfer-explicit", "transfer-prefixed", "unsupported"],
+        )
+        self.assertEqual(
+            [item.get("action_id") for item in provider_call["json"]["executions"]],
+            [None, None, None, None],
+        )
+        learner_call = next(
+            item
+            for item in FakeAsyncClient.calls
+            if item["url"].endswith("/v1/run") and "cases" in item["json"]
+        )
+        self.assertEqual(len(learner_call["json"]["cases"]), 4)
+        self.assertTrue(
+            all("action_id" not in item for item in learner_call["json"]["cases"])
+        )
+        verifier_call = next(
+            item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/verify/h06")
+        )
+        self.assertEqual(verifier_call["json"]["suite_id"], provider_call["json"]["suite_id"])
+        self.assertNotIn("course_verdict", verifier_call["json"])
+        self.assertNotIn("capabilities", verifier_call["json"])
+        self.assertNotIn("unit-h06-provider-control", response.text)
+
     def test_h22_suite_is_server_owned_and_uses_verifier(self):
         rejected = self.client.post(
             "/api/hands-on/H22/verify",
@@ -578,8 +661,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02", "H03"])
         self.assertEqual(manifest["tabs"][2]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][2]["implemented_hands_on"], ["H04"])
-        self.assertEqual(manifest["tabs"][3]["hands_on_status"], "partial")
-        self.assertEqual(manifest["tabs"][3]["implemented_hands_on"], ["H05"])
+        self.assertEqual(manifest["tabs"][3]["hands_on_status"], "implemented")
+        self.assertEqual(manifest["tabs"][3]["implemented_hands_on"], ["H05", "H06"])
         self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][4:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])

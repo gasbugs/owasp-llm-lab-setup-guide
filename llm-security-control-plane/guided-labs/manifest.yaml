@@ -9,7 +9,7 @@ tabs:
   - {id: 01-nova, hands_on: [H01], hands_on_status: implemented, practice: P01, practice_status: planned}
   - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: implemented, implemented_hands_on: [H02, H03], practice: P02, practice_status: planned}
   - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: implemented, implemented_hands_on: [H04], practice: P03, practice_status: planned}
-  - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: partial, implemented_hands_on: [H05], practice: P04, practice_status: planned}
+  - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: implemented, implemented_hands_on: [H05, H06], practice: P04, practice_status: planned}
   - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: planned, practice: P05, practice_status: planned}
   - {id: 06-privacy-output, hands_on: [H09, H10], hands_on_status: planned, practice: P06, practice_status: planned}
   - {id: 07-rag-boundary, hands_on: [H11, H12], hands_on_status: planned, practice: P07, practice_status: planned}
@@ -100,13 +100,44 @@ hands_on_H05:
     - flow
     - bot_intent
     - bot_message
+    - event_chain
     - activated_rails
     - llm_calls_count
     - evaluation_id
+    - command
     - topical_samples
+    - processed_samples
+    - total_samples
     - intent_errors
     - bot_intent_errors
     - bot_message_errors
+    - artifact_digest
+    - artifact_files
+    - output_tail
+
+hands_on_H06:
+  executor: guided-h06-nemo-action
+  provider: guided-h06-action-provider
+  verifier: guided-evidence-verifier
+  framework_version: 0.22.0
+  required_evidence:
+    - source_digest
+    - scaffold_digest
+    - balance-read
+    - transfer-explicit
+    - transfer-prefixed
+    - unsupported
+    - user_intent
+    - allowed_actions
+    - cases[].expected_action_id
+    - cases[].capability_digest
+    - cases[].raw_action_events
+    - cases[].raw_bot_event
+    - cases[].action_result.kind
+    - provider_calls[].provider_call_id
+    - effects[].effect_id
+    - effect_count
+    - balance
 
 hands_on_H22:
   executor: guided-h22-host

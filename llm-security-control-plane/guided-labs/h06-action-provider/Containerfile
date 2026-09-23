@@ -1,0 +1,15 @@
+FROM docker.io/library/python:3.12.14-slim
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+COPY guided-labs/h06-action-provider/requirements.txt /app/requirements.txt
+RUN python -m pip install --no-cache-dir -r /app/requirements.txt \
+    && install -d -o 65532 -g 65532 -m 0700 /state
+
+COPY --chmod=0555 guided-labs/h06-action-provider/provider.py /app/provider.py
+
+USER 65532:65532
+EXPOSE 8000
+CMD ["uvicorn", "provider:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

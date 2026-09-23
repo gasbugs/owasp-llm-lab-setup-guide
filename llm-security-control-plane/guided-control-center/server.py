@@ -25,6 +25,10 @@ LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
 LAB03_URL = os.getenv("GUIDED_LAB03_URL", "http://guided-h03-sync-app:8000")
 LAB04_URL = os.getenv("GUIDED_LAB04_URL", "http://guided-h04-guardrail-app:8000")
 LAB05_URL = os.getenv("GUIDED_LAB05_URL", "http://guided-h05-nemo-dialog:8000")
+LAB06_URL = os.getenv("GUIDED_LAB06_URL", "http://guided-h06-nemo-action:8000")
+H06_PROVIDER_URL = os.getenv(
+    "GUIDED_H06_PROVIDER_URL", "http://guided-h06-action-provider:8000"
+)
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
 GATEWAY_URL = os.getenv(
@@ -36,6 +40,8 @@ LAB02_TOKEN = os.environ["GUIDED_CONTROL_LAB02_TOKEN"]
 LAB03_TOKEN = os.environ["GUIDED_CONTROL_LAB03_TOKEN"]
 LAB04_TOKEN = os.environ["GUIDED_CONTROL_LAB04_TOKEN"]
 LAB05_TOKEN = os.environ["GUIDED_CONTROL_LAB05_TOKEN"]
+LAB06_TOKEN = os.environ["GUIDED_CONTROL_LAB06_TOKEN"]
+H06_PROVIDER_CONTROL_TOKEN = os.environ["GUIDED_H06_PROVIDER_CONTROL_TOKEN"]
 H22_TOKEN = os.environ["GUIDED_CONTROL_H22_TOKEN"]
 H21_TOKEN = os.environ["GUIDED_CONTROL_H21_TOKEN"]
 H02_PROVISION_TOKEN = os.environ["GUIDED_LAB02_PROVISION_TOKEN"]
@@ -185,7 +191,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             "tabs": 13,
             "hands_on": 22,
             "practices": 13,
-            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H21", "H22"],
+            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H06", "H21", "H22"],
             "implemented_practices": [],
         },
         "official_uis": [
@@ -235,6 +241,11 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "hands_on_id": "H05",
                 "service": "guided-h05-nemo-dialog",
                 "source_path": "llm-security-control-plane/guided-labs/h05-nemo-dialog/config/flows.co",
+            },
+            {
+                "hands_on_id": "H06",
+                "service": "guided-h06-nemo-action",
+                "source_path": "llm-security-control-plane/guided-labs/h06-nemo-action/actions.py",
             },
             {
                 "hands_on_id": "H21",
@@ -875,6 +886,104 @@ async def verify_h05_dialog_rail(
                     "started_at": started_at,
                     "cases": cases,
                     "evaluation_id": evaluation_id,
+                },
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H06/verify")
+async def verify_h06_python_action(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    case_ids = (
+        "balance-read",
+        "transfer-explicit",
+        "transfer-prefixed",
+        "unsupported",
+    )
+    executions = [
+        {
+            "execution_id": str(uuid.uuid4()),
+            "case_id": case_id,
+        }
+        for case_id in case_ids
+    ]
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            prepared = await client.post(
+                f"{H06_PROVIDER_URL}/v1/suites",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": started_at,
+                    "executions": executions,
+                },
+                headers={"Authorization": f"Bearer {H06_PROVIDER_CONTROL_TOKEN}"},
+            )
+            if prepared.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "h06_action_provider_prepare",
+                        "downstream_called": False,
+                        "course_verdict": "ERR",
+                        "next_check": "H06 합성 Provider가 새 suite와 네 개의 일회 capability를 만들었는지 확인합니다.",
+                    },
+                )
+            grants = prepared.json().get("cases")
+            if not isinstance(grants, list) or [item.get("case_id") for item in grants] != list(case_ids):
+                raise HTTPException(status_code=502, detail="H06 provider capabilities are incomplete")
+            learner_cases = [
+                {
+                    "execution_id": item["execution_id"],
+                    "case_id": item["case_id"],
+                    "capability": item["capability"],
+                }
+                for item in grants
+            ]
+            executed = await client.post(
+                f"{LAB06_URL}/v1/run",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": started_at,
+                    "cases": learner_cases,
+                },
+                headers={"Authorization": f"Bearer {LAB06_TOKEN}"},
+            )
+            if executed.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "h06_action_provider_prepare",
+                        "stopped_stage": "guided_h06_nemo_action",
+                        "downstream_called": False,
+                        "course_verdict": "ERR",
+                        "next_check": "H06 image, Action 등록과 Colang 문법을 확인합니다.",
+                    },
+                )
+            if executed.json().get("suite_id") != suite_id:
+                raise HTTPException(status_code=502, detail="H06 suite receipt is missing")
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/h06",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": started_at,
                 },
                 headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
             )

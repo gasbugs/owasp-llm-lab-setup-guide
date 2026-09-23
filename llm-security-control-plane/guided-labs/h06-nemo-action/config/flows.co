@@ -1,0 +1,25 @@
+# CUSTOM FILE
+# Format reference: https://docs.nvidia.com/nemo/guardrails/latest/colang-1/README.html
+# Upstream format license: Apache-2.0
+
+define bot refuse unsupported request
+  "지원하지 않는 요청입니다. 계좌 잔액 조회만 사용할 수 있습니다."
+
+define flow read training balance
+  user request account balance
+  $action_result = execute dispatch_action(action_id="get_account_balance")
+  bot $action_result
+
+define flow transfer training funds
+  user request fund transfer
+  $action_result = execute dispatch_action(action_id="transfer_training_funds")
+  bot $action_result
+
+define flow prefixed balance and transfer
+  user request balance and transfer
+  $action_result = execute dispatch_action(action_id="get_account_balance_and_transfer")
+  bot $action_result
+
+define flow default deny
+  user unsupported request
+  bot refuse unsupported request

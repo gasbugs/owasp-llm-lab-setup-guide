@@ -310,6 +310,34 @@ docker compose \
               <span id="h05-verify-help" class="action-tooltip" role="tooltip">서버가 고정한 한국어 요청 네 개를 현재 H05 Dialog Rail에 보내 intent·flow·BotMessage를 기록한 뒤, 같은 설정으로 NeMo Topical 평가를 실행합니다. 검증기는 새 영수증과 평가 결과를 다시 확인해 정상 연락처는 유지되고 복구 코드 marker는 사라졌는지 HIT·PASS·ERR로 보여 줍니다.</span>
             </span>
           </div>
+
+          <section class="hands-on" aria-labelledby="h06-code-title">
+            <div>
+              <p class="label">H06 · LEARNER-OWNED PYTHON ACTION</p>
+              <h3 id="h06-code-title">조회 Action만 허용하기</h3>
+              <p>Action은 Dialog Rail이 문장의 뜻을 고른 다음 부르는 Python 함수입니다. <code>llm-security-control-plane/guided-labs/h06-nemo-action/actions.py</code>의 Starter는 잔액 조회뿐 아니라 송금처럼 상태를 바꾸는 작업도 허용합니다. 허용목록을 조회 Action 하나로 줄입니다.</p>
+              <pre># 결과를 확인만 하는 Action 하나만 다음 단계로 보냅니다.
+ALLOWED_ACTIONS = frozenset({"get_account_balance"})</pre>
+              <p>이 한 줄은 송금 요청을 답변 문구로만 가리는 것이 아닙니다. 허용목록에 없는 Action은 합성 Provider를 호출하기 전에 멈춥니다. 정상 조회는 실제 Provider를 호출해야 하므로 모든 Action을 막는 구현도 통과하지 못합니다.</p>
+              <p>저장한 코드를 image에 넣고 H06 learner 서비스만 다시 연결합니다. 합성 Provider의 독립 ledger는 다시 만들지 않습니다.</p>
+              <pre>docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-h06-nemo-action
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-h06-nemo-action</pre>
+            </div>
+          </section>
+
+          <div class="actions single">
+            <span class="action-control">
+              <button id="h06-verify" class="primary" aria-describedby="h06-verify-help">H06 현재 구현 검증</button>
+              <button class="help-trigger" type="button" aria-label="H06 현재 구현 검증 작업 설명" aria-expanded="false" aria-controls="h06-verify-help">i</button>
+              <span id="h06-verify-help" class="action-tooltip" role="tooltip">서버가 잔액 조회와 두 가지 송금 요청, 지원하지 않는 요청을 H06 NeMo 서비스에 보냅니다. 거부 문구만으로는 차단을 증명할 수 없습니다. 검증기는 Python Action event와 별도 합성 Provider의 호출·부작용 원장을 다시 확인해, 조회는 실행되고 송금은 Provider 전에 멈췄는지 HIT·PASS·ERR로 보여 줍니다.</span>
+            </span>
+          </div>
         </div>
 
         <div id="h21-work" class="lab-workspace" hidden>

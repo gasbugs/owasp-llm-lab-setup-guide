@@ -50,6 +50,8 @@ services:
       GUIDED_CONTROL_LAB03_TOKEN: ${GUIDED_CONTROL_LAB03_TOKEN:?Set GUIDED_CONTROL_LAB03_TOKEN}
       GUIDED_CONTROL_LAB04_TOKEN: ${GUIDED_CONTROL_LAB04_TOKEN:?Set GUIDED_CONTROL_LAB04_TOKEN}
       GUIDED_CONTROL_LAB05_TOKEN: ${GUIDED_CONTROL_LAB05_TOKEN:?Set GUIDED_CONTROL_LAB05_TOKEN}
+      GUIDED_CONTROL_LAB06_TOKEN: ${GUIDED_CONTROL_LAB06_TOKEN:?Set GUIDED_CONTROL_LAB06_TOKEN}
+      GUIDED_H06_PROVIDER_CONTROL_TOKEN: ${GUIDED_H06_PROVIDER_CONTROL_TOKEN:?Set GUIDED_H06_PROVIDER_CONTROL_TOKEN}
       GUIDED_CONTROL_H21_TOKEN: ${GUIDED_CONTROL_H21_TOKEN:?Set GUIDED_CONTROL_H21_TOKEN}
       GUIDED_CONTROL_H22_TOKEN: ${GUIDED_CONTROL_H22_TOKEN:?Set GUIDED_CONTROL_H22_TOKEN}
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
@@ -61,6 +63,8 @@ services:
       GUIDED_LAB03_URL: http://guided-h03-sync-app:8000
       GUIDED_LAB04_URL: http://guided-h04-guardrail-app:8000
       GUIDED_LAB05_URL: http://guided-h05-nemo-dialog:8000
+      GUIDED_LAB06_URL: http://guided-h06-nemo-action:8000
+      GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H22_HOST_URL: http://guided-h22-host:8000
       GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
@@ -74,6 +78,8 @@ services:
       guided-h03-sync-app: {condition: service_healthy}
       guided-h04-guardrail-app: {condition: service_healthy}
       guided-h05-nemo-dialog: {condition: service_healthy}
+      guided-h06-nemo-action: {condition: service_healthy}
+      guided-h06-action-provider: {condition: service_healthy}
       guided-h21-host: {condition: service_healthy}
       guided-h22-host: {condition: service_healthy}
       guided-evidence-verifier: {condition: service_healthy}
@@ -122,6 +128,8 @@ services:
       GUIDED_VERIFIER_LAB03_TOKEN: ${GUIDED_VERIFIER_LAB03_TOKEN:?Set GUIDED_VERIFIER_LAB03_TOKEN}
       GUIDED_VERIFIER_LAB04_TOKEN: ${GUIDED_VERIFIER_LAB04_TOKEN:?Set GUIDED_VERIFIER_LAB04_TOKEN}
       GUIDED_VERIFIER_LAB05_TOKEN: ${GUIDED_VERIFIER_LAB05_TOKEN:?Set GUIDED_VERIFIER_LAB05_TOKEN}
+      GUIDED_VERIFIER_LAB06_TOKEN: ${GUIDED_VERIFIER_LAB06_TOKEN:?Set GUIDED_VERIFIER_LAB06_TOKEN}
+      GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ${GUIDED_H06_PROVIDER_VERIFIER_TOKEN:?Set GUIDED_H06_PROVIDER_VERIFIER_TOKEN}
       GUIDED_VERIFIER_H21_TOKEN: ${GUIDED_VERIFIER_H21_TOKEN:?Set GUIDED_VERIFIER_H21_TOKEN}
       GUIDED_VERIFIER_H22_TOKEN: ${GUIDED_VERIFIER_H22_TOKEN:?Set GUIDED_VERIFIER_H22_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
@@ -130,6 +138,8 @@ services:
       GUIDED_LAB03_URL: http://guided-h03-sync-app:8000
       GUIDED_LAB04_URL: http://guided-h04-guardrail-app:8000
       GUIDED_LAB05_URL: http://guided-h05-nemo-dialog:8000
+      GUIDED_LAB06_URL: http://guided-h06-nemo-action:8000
+      GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H21_PROVIDER_URL: http://guided-h21-provider:8000
       GUIDED_H21_TRUSTED_MCP_URL: http://guided-h21-trusted-mcp:8000/mcp
@@ -144,6 +154,8 @@ services:
       guided-h03-sync-app: {condition: service_healthy}
       guided-h04-guardrail-app: {condition: service_healthy}
       guided-h05-nemo-dialog: {condition: service_healthy}
+      guided-h06-nemo-action: {condition: service_healthy}
+      guided-h06-action-provider: {condition: service_healthy}
       guided-h21-host: {condition: service_healthy}
       guided-h21-provider: {condition: service_healthy}
       guided-h21-trusted-mcp: {condition: service_healthy}
@@ -265,6 +277,47 @@ services:
       OPENAI_API_KEY: dialog-rails-do-not-call-a-model
       GUIDED_CONTROL_LAB05_TOKEN: ${GUIDED_CONTROL_LAB05_TOKEN:?Set GUIDED_CONTROL_LAB05_TOKEN}
       GUIDED_VERIFIER_LAB05_TOKEN: ${GUIDED_VERIFIER_LAB05_TOKEN:?Set GUIDED_VERIFIER_LAB05_TOKEN}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+
+  guided-h06-action-provider:
+    <<: *guided-service
+    tmpfs: ["/state:rw,noexec,nosuid,size=16m,uid=65532,gid=65532,mode=0700"]
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h06-action-provider/Containerfile
+    image: localhost/llm-security-guided-h06-action-provider:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h06-action-provider
+    environment:
+      GUIDED_H06_PROVIDER_CONTROL_TOKEN: ${GUIDED_H06_PROVIDER_CONTROL_TOKEN:?Set GUIDED_H06_PROVIDER_CONTROL_TOKEN}
+      GUIDED_H06_PROVIDER_ACTION_TOKEN: ${GUIDED_H06_PROVIDER_ACTION_TOKEN:?Set GUIDED_H06_PROVIDER_ACTION_TOKEN}
+      GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ${GUIDED_H06_PROVIDER_VERIFIER_TOKEN:?Set GUIDED_H06_PROVIDER_VERIFIER_TOKEN}
+      GUIDED_H06_CAPABILITY_SECRET: ${GUIDED_H06_CAPABILITY_SECRET:?Set GUIDED_H06_CAPABILITY_SECRET}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-h06-nemo-action:
+    <<: *guided-service
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h06-nemo-action/Containerfile
+    image: localhost/llm-security-guided-h06-nemo-action:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h06-nemo-action
+    environment:
+      OPENAI_API_KEY: dialog-rails-do-not-call-a-model
+      GUIDED_CONTROL_LAB06_TOKEN: ${GUIDED_CONTROL_LAB06_TOKEN:?Set GUIDED_CONTROL_LAB06_TOKEN}
+      GUIDED_VERIFIER_LAB06_TOKEN: ${GUIDED_VERIFIER_LAB06_TOKEN:?Set GUIDED_VERIFIER_LAB06_TOKEN}
+      GUIDED_H06_PROVIDER_ACTION_TOKEN: ${GUIDED_H06_PROVIDER_ACTION_TOKEN:?Set GUIDED_H06_PROVIDER_ACTION_TOKEN}
+      GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
+    depends_on:
+      guided-h06-action-provider: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 2s

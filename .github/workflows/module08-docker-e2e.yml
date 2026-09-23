@@ -9,6 +9,7 @@ on:
       - "examples/security-monitoring/**"
       - "tests/browser/**"
       - "tests/e2e/run_guided_h05_learner_fix.py"
+      - "tests/e2e/run_guided_h06_learner_fix.py"
       - "tests/e2e/module10/**"
       - ".github/workflows/module08-docker-e2e.yml"
 
@@ -171,7 +172,7 @@ jobs:
           --url http://127.0.0.1:28095
           --browser-channel chromium
 
-      - name: Build and validate independent tenant 03 H21, H22, H05, H04, H02, H03, then H01
+      - name: Build and validate independent tenant 03 H21, H22, H06, H05, H04, H02, H03, then H01
         env:
           AWS_CREDENTIALS_DIR: /tmp/guided-aws
           GUIDED_SESSION_SECRET: ci-guided-session-secret
@@ -180,6 +181,11 @@ jobs:
           GUIDED_CONTROL_LAB03_TOKEN: ci-control-lab03
           GUIDED_CONTROL_LAB04_TOKEN: ci-control-lab04
           GUIDED_CONTROL_LAB05_TOKEN: ci-control-lab05
+          GUIDED_CONTROL_LAB06_TOKEN: ci-control-lab06
+          GUIDED_H06_PROVIDER_CONTROL_TOKEN: ci-h06-provider-control
+          GUIDED_H06_PROVIDER_ACTION_TOKEN: ci-h06-provider-action
+          GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ci-h06-provider-verifier
+          GUIDED_H06_CAPABILITY_SECRET: ci-h06-capability-secret
           GUIDED_CONTROL_H21_TOKEN: ci-control-h21
           GUIDED_CONTROL_H22_TOKEN: ci-control-h22
           GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
@@ -199,6 +205,7 @@ jobs:
           GUIDED_VERIFIER_LAB03_TOKEN: ci-verifier-lab03
           GUIDED_VERIFIER_LAB04_TOKEN: ci-verifier-lab04
           GUIDED_VERIFIER_LAB05_TOKEN: ci-verifier-lab05
+          GUIDED_VERIFIER_LAB06_TOKEN: ci-verifier-lab06
           GUIDED_VERIFIER_H21_TOKEN: ci-verifier-h21
           GUIDED_VERIFIER_H22_TOKEN: ci-verifier-h22
           GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
@@ -224,6 +231,8 @@ jobs:
           python tests/browser/run_guided_control_center_ui.py \
             --url http://127.0.0.1:28097 \
             --browser-channel chromium
+          python tests/e2e/run_guided_h06_learner_fix.py \
+            --url http://127.0.0.1:28097
           python tests/e2e/run_guided_h05_learner_fix.py \
             --url http://127.0.0.1:28097
           test "$(docker ps --filter publish=28097 --format '{{.Names}}')" = \
@@ -247,6 +256,8 @@ jobs:
           docker logs llm-security-guided-h03-sync-app || true
           docker logs llm-security-guided-h04-guardrail-app || true
           docker logs llm-security-guided-h05-nemo-dialog || true
+          docker logs llm-security-guided-h06-nemo-action || true
+          docker logs llm-security-guided-h06-action-provider || true
           docker logs llm-security-guided-bedrock-gateway || true
 
       - name: Remove test resources
@@ -259,6 +270,11 @@ jobs:
           GUIDED_CONTROL_LAB03_TOKEN: ci-control-lab03
           GUIDED_CONTROL_LAB04_TOKEN: ci-control-lab04
           GUIDED_CONTROL_LAB05_TOKEN: ci-control-lab05
+          GUIDED_CONTROL_LAB06_TOKEN: ci-control-lab06
+          GUIDED_H06_PROVIDER_CONTROL_TOKEN: ci-h06-provider-control
+          GUIDED_H06_PROVIDER_ACTION_TOKEN: ci-h06-provider-action
+          GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ci-h06-provider-verifier
+          GUIDED_H06_CAPABILITY_SECRET: ci-h06-capability-secret
           GUIDED_CONTROL_H21_TOKEN: ci-control-h21
           GUIDED_CONTROL_H22_TOKEN: ci-control-h22
           GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
@@ -278,6 +294,7 @@ jobs:
           GUIDED_VERIFIER_LAB03_TOKEN: ci-verifier-lab03
           GUIDED_VERIFIER_LAB04_TOKEN: ci-verifier-lab04
           GUIDED_VERIFIER_LAB05_TOKEN: ci-verifier-lab05
+          GUIDED_VERIFIER_LAB06_TOKEN: ci-verifier-lab06
           GUIDED_VERIFIER_H21_TOKEN: ci-verifier-h21
           GUIDED_VERIFIER_H22_TOKEN: ci-verifier-h22
           GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
