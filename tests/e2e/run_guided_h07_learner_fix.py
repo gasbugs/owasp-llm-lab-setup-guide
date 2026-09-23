@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import http.cookiejar
 import json
+import os
 import subprocess
 import time
 import urllib.request
@@ -66,6 +67,10 @@ def compose(*arguments: str) -> None:
 def rebuild_h07() -> None:
     compose("build", "guided-h07-content-safety")
     compose("up", "-d", "--no-deps", "--force-recreate", "guided-h07-content-safety")
+    wait_healthy("llm-security-guided-h07-content-safety")
+
+
+def wait_healthy(container: str) -> None:
     for _ in range(90):
         completed = subprocess.run(
             [
@@ -73,7 +78,7 @@ def rebuild_h07() -> None:
                 "inspect",
                 "--format",
                 "{{.State.Health.Status}}",
-                "llm-security-guided-h07-content-safety",
+                container,
             ],
             text=True,
             capture_output=True,
@@ -82,7 +87,27 @@ def rebuild_h07() -> None:
         if completed.stdout.strip() == "healthy":
             return
         time.sleep(1)
-    raise RuntimeError("H07 container did not become healthy")
+    raise RuntimeError(f"{container} did not become healthy")
+
+
+def recreate_contract_gateway(classifier_mode: str) -> None:
+    environment = {**os.environ, "GUIDED_H07_CONTRACT_CLASSIFIER_MODE": classifier_mode}
+    command = ["docker", "compose"]
+    if COMPOSE_ENV_FILE is not None:
+        command.extend(("--env-file", str(COMPOSE_ENV_FILE)))
+    command.extend(
+        (
+            "--file",
+            str(COMPOSE_PATH),
+            "up",
+            "-d",
+            "--no-deps",
+            "--force-recreate",
+            "guided-bedrock-gateway",
+        )
+    )
+    subprocess.run(command, cwd=ROOT, env=environment, check=True)
+    wait_healthy("llm-security-guided-bedrock-gateway")
 
 
 def verify(origin: str) -> dict:
@@ -147,6 +172,11 @@ def assert_fixed_pass(result: dict) -> None:
     ]
 
 
+def assert_classifier_err(result: dict) -> None:
+    assert result["course_verdict"] == "ERR", result
+    assert "JSON parser" in result["reason"], result
+
+
 def main() -> int:
     global COMPOSE_ENV_FILE
     parser = argparse.ArgumentParser()
@@ -165,13 +195,25 @@ def main() -> int:
     assert_starter_hit(starter)
     print("h07_starter=HIT guard_calls=0 main_calls=2 risk_main=completed")
 
+    gateway_needs_restore = False
     try:
         CONFIG_PATH.write_text(FIXED_CONFIG, encoding="utf-8")
         rebuild_h07()
         fixed = verify(origin)
         assert_fixed_pass(fixed)
         print("h07_learner_edit_rebuild=PASS normal=guard1/main1 risk=guard1/main0/closed_unused")
+
+        if os.getenv("GUIDED_PROVIDER_MODE", "aws") == "contract":
+            recreate_contract_gateway("invalid")
+            gateway_needs_restore = True
+            malformed = verify(origin)
+            assert_classifier_err(malformed)
+            print("h07_invalid_classifier=ERR provider_schema_valid=false")
+            recreate_contract_gateway("valid")
+            gateway_needs_restore = False
     finally:
+        if gateway_needs_restore:
+            recreate_contract_gateway("valid")
         CONFIG_PATH.write_text(original, encoding="utf-8")
         rebuild_h07()
 
