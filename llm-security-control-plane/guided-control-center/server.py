@@ -27,6 +27,7 @@ LAB04_URL = os.getenv("GUIDED_LAB04_URL", "http://guided-h04-guardrail-app:8000"
 LAB05_URL = os.getenv("GUIDED_LAB05_URL", "http://guided-h05-nemo-dialog:8000")
 LAB06_URL = os.getenv("GUIDED_LAB06_URL", "http://guided-h06-nemo-action:8000")
 LAB07_URL = os.getenv("GUIDED_LAB07_URL", "http://guided-h07-content-safety:8000")
+LAB08_URL = os.getenv("GUIDED_LAB08_URL", "http://guided-h08-self-check-input:8000")
 H06_PROVIDER_URL = os.getenv(
     "GUIDED_H06_PROVIDER_URL", "http://guided-h06-action-provider:8000"
 )
@@ -43,8 +44,10 @@ LAB04_TOKEN = os.environ["GUIDED_CONTROL_LAB04_TOKEN"]
 LAB05_TOKEN = os.environ["GUIDED_CONTROL_LAB05_TOKEN"]
 LAB06_TOKEN = os.environ["GUIDED_CONTROL_LAB06_TOKEN"]
 LAB07_TOKEN = os.environ["GUIDED_CONTROL_LAB07_TOKEN"]
+LAB08_TOKEN = os.environ["GUIDED_CONTROL_LAB08_TOKEN"]
 H06_PROVIDER_CONTROL_TOKEN = os.environ["GUIDED_H06_PROVIDER_CONTROL_TOKEN"]
 H07_GATEWAY_CONTROL_TOKEN = os.environ["GUIDED_H07_GATEWAY_CONTROL_TOKEN"]
+H08_GATEWAY_CONTROL_TOKEN = os.environ["GUIDED_H08_GATEWAY_CONTROL_TOKEN"]
 H22_TOKEN = os.environ["GUIDED_CONTROL_H22_TOKEN"]
 H21_TOKEN = os.environ["GUIDED_CONTROL_H21_TOKEN"]
 H02_PROVISION_TOKEN = os.environ["GUIDED_LAB02_PROVISION_TOKEN"]
@@ -195,7 +198,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             "tabs": 13,
             "hands_on": 22,
             "practices": 13,
-            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H21", "H22"],
+            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08", "H21", "H22"],
             "implemented_practices": [],
         },
         "official_uis": [
@@ -255,6 +258,11 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "hands_on_id": "H07",
                 "service": "guided-h07-content-safety",
                 "source_path": "llm-security-control-plane/guided-labs/h07-content-safety/config/config.yml",
+            },
+            {
+                "hands_on_id": "H08",
+                "service": "guided-h08-self-check-input",
+                "source_path": "llm-security-control-plane/guided-labs/h08-self-check-input/config/prompts.yml",
             },
             {
                 "hands_on_id": "H21",
@@ -1024,6 +1032,25 @@ async def close_h07_gateway_suite(suite_id: str) -> bool:
         return False
 
 
+async def close_h08_gateway_suite(suite_id: str) -> bool:
+    """Close every unused H08 role grant before read-only verification."""
+    try:
+        async with httpx.AsyncClient(timeout=H07_CLOSE_TIMEOUT) as client:
+            for attempt in range(3):
+                response = await client.post(
+                    f"{GATEWAY_URL}/v1/h08/suites/{suite_id}/close",
+                    headers={"Authorization": f"Bearer {H08_GATEWAY_CONTROL_TOKEN}"},
+                )
+                if response.status_code == 200:
+                    return response.json().get("suite_id") == suite_id
+                if response.status_code != 409:
+                    return False
+                await asyncio.sleep(0.2 * (attempt + 1))
+        return False
+    except (httpx.RequestError, ValueError):
+        return False
+
+
 @app.post("/api/hands-on/H07/verify")
 async def verify_h07_content_safety(
     request: Request,
@@ -1161,6 +1188,150 @@ async def verify_h07_content_safety(
                 "downstream_called": prepare_attempted,
                 "course_verdict": "ERR",
                 "next_check": "H07 Gateway·learner 상태와 suite가 닫혔는지 확인합니다.",
+            },
+        ) from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H08/verify")
+async def verify_h08_self_check_input(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    prepare_attempted = False
+    suite_closed = False
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            prepare_attempted = True
+            prepared = await client.post(
+                f"{GATEWAY_URL}/v1/h08/suites",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {H08_GATEWAY_CONTROL_TOKEN}"},
+            )
+            if prepared.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "h08_gateway_prepare",
+                        "downstream_called": False,
+                        "course_verdict": "ERR",
+                        "next_check": "H08 Gateway가 네 요청과 역할별 일회 capability를 만들었는지 확인합니다.",
+                    },
+                )
+            provider_cases = prepared.json().get("cases")
+            expected_order = [
+                "normal-password-reset",
+                "normal-report-injection",
+                "risk-format-marker",
+                "risk-admin-marker",
+            ]
+            if not isinstance(provider_cases, list) or [
+                item.get("case_id") for item in provider_cases
+            ] != expected_order:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "h08_gateway_prepare",
+                        "stopped_stage": "h08_capability_contract",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H08 Gateway가 정상 두 건과 위험 두 건을 고정 순서로 만들었는지 확인합니다.",
+                    },
+                )
+            learner_cases = []
+            for item in provider_cases:
+                roles = item.get("roles")
+                if not isinstance(roles, dict) or set(roles) != {"self_check_input", "main"}:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={
+                            "successful_stage": "h08_gateway_prepare",
+                            "stopped_stage": "h08_capability_contract",
+                            "downstream_called": True,
+                            "course_verdict": "ERR",
+                            "next_check": "각 H08 Testcase에 Self-check와 Main 역할 capability가 있는지 확인합니다.",
+                        },
+                    )
+                learner_cases.append(
+                    {
+                        "case_id": item["case_id"],
+                        "execution_id": item["execution_id"],
+                        "self_check_input_capability": roles["self_check_input"]["capability"],
+                        "main_capability": roles["main"]["capability"],
+                    }
+                )
+            executed = await client.post(
+                f"{LAB08_URL}/v1/run",
+                json={"suite_id": suite_id, "started_at": started_at, "cases": learner_cases},
+                headers={"Authorization": f"Bearer {LAB08_TOKEN}"},
+            )
+            if executed.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "h08_gateway_prepare",
+                        "stopped_stage": "guided_h08_self_check_input",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H08 image, NeMo 0.22.0 설정과 self check input Prompt를 확인합니다.",
+                    },
+                )
+            if executed.json().get("suite_id") != suite_id:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "guided_h08_self_check_input",
+                        "stopped_stage": "h08_learner_receipt",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H08 learner가 현재 suite ID의 실행 영수증을 저장했는지 확인합니다.",
+                    },
+                )
+            suite_closed = await close_h08_gateway_suite(suite_id)
+            if not suite_closed:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "guided_h08_self_check_input",
+                        "stopped_stage": "h08_gateway_close",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "실행 중인 H08 역할 호출이 끝났고 사용하지 않은 capability가 닫혔는지 확인합니다.",
+                    },
+                )
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/h08",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except HTTPException:
+        if prepare_attempted and not suite_closed:
+            await close_h08_gateway_suite(suite_id)
+        raise
+    except httpx.RequestError as exc:
+        if prepare_attempted and not suite_closed:
+            await close_h08_gateway_suite(suite_id)
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "successful_stage": "control_center",
+                "stopped_stage": "h08_internal_service",
+                "downstream_called": prepare_attempted,
+                "course_verdict": "ERR",
+                "next_check": "H08 Gateway·learner 상태와 suite가 닫혔는지 확인합니다.",
             },
         ) from exc
     finally:

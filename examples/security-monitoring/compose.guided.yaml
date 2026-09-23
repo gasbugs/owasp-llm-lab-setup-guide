@@ -52,8 +52,10 @@ services:
       GUIDED_CONTROL_LAB05_TOKEN: ${GUIDED_CONTROL_LAB05_TOKEN:?Set GUIDED_CONTROL_LAB05_TOKEN}
       GUIDED_CONTROL_LAB06_TOKEN: ${GUIDED_CONTROL_LAB06_TOKEN:?Set GUIDED_CONTROL_LAB06_TOKEN}
       GUIDED_CONTROL_LAB07_TOKEN: ${GUIDED_CONTROL_LAB07_TOKEN:?Set GUIDED_CONTROL_LAB07_TOKEN}
+      GUIDED_CONTROL_LAB08_TOKEN: ${GUIDED_CONTROL_LAB08_TOKEN:?Set GUIDED_CONTROL_LAB08_TOKEN}
       GUIDED_H06_PROVIDER_CONTROL_TOKEN: ${GUIDED_H06_PROVIDER_CONTROL_TOKEN:?Set GUIDED_H06_PROVIDER_CONTROL_TOKEN}
       GUIDED_H07_GATEWAY_CONTROL_TOKEN: ${GUIDED_H07_GATEWAY_CONTROL_TOKEN:?Set GUIDED_H07_GATEWAY_CONTROL_TOKEN}
+      GUIDED_H08_GATEWAY_CONTROL_TOKEN: ${GUIDED_H08_GATEWAY_CONTROL_TOKEN:?Set GUIDED_H08_GATEWAY_CONTROL_TOKEN}
       GUIDED_CONTROL_H21_TOKEN: ${GUIDED_CONTROL_H21_TOKEN:?Set GUIDED_CONTROL_H21_TOKEN}
       GUIDED_CONTROL_H22_TOKEN: ${GUIDED_CONTROL_H22_TOKEN:?Set GUIDED_CONTROL_H22_TOKEN}
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
@@ -67,6 +69,7 @@ services:
       GUIDED_LAB05_URL: http://guided-h05-nemo-dialog:8000
       GUIDED_LAB06_URL: http://guided-h06-nemo-action:8000
       GUIDED_LAB07_URL: http://guided-h07-content-safety:8000
+      GUIDED_LAB08_URL: http://guided-h08-self-check-input:8000
       GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H22_HOST_URL: http://guided-h22-host:8000
@@ -84,6 +87,7 @@ services:
       guided-h06-nemo-action: {condition: service_healthy}
       guided-h06-action-provider: {condition: service_healthy}
       guided-h07-content-safety: {condition: service_healthy}
+      guided-h08-self-check-input: {condition: service_healthy}
       guided-h21-host: {condition: service_healthy}
       guided-h22-host: {condition: service_healthy}
       guided-evidence-verifier: {condition: service_healthy}
@@ -134,8 +138,10 @@ services:
       GUIDED_VERIFIER_LAB05_TOKEN: ${GUIDED_VERIFIER_LAB05_TOKEN:?Set GUIDED_VERIFIER_LAB05_TOKEN}
       GUIDED_VERIFIER_LAB06_TOKEN: ${GUIDED_VERIFIER_LAB06_TOKEN:?Set GUIDED_VERIFIER_LAB06_TOKEN}
       GUIDED_VERIFIER_LAB07_TOKEN: ${GUIDED_VERIFIER_LAB07_TOKEN:?Set GUIDED_VERIFIER_LAB07_TOKEN}
+      GUIDED_VERIFIER_LAB08_TOKEN: ${GUIDED_VERIFIER_LAB08_TOKEN:?Set GUIDED_VERIFIER_LAB08_TOKEN}
       GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ${GUIDED_H06_PROVIDER_VERIFIER_TOKEN:?Set GUIDED_H06_PROVIDER_VERIFIER_TOKEN}
       GUIDED_H07_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H07_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H07_GATEWAY_VERIFIER_TOKEN}
+      GUIDED_H08_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H08_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H08_GATEWAY_VERIFIER_TOKEN}
       GUIDED_VERIFIER_H21_TOKEN: ${GUIDED_VERIFIER_H21_TOKEN:?Set GUIDED_VERIFIER_H21_TOKEN}
       GUIDED_VERIFIER_H22_TOKEN: ${GUIDED_VERIFIER_H22_TOKEN:?Set GUIDED_VERIFIER_H22_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
@@ -146,6 +152,7 @@ services:
       GUIDED_LAB05_URL: http://guided-h05-nemo-dialog:8000
       GUIDED_LAB06_URL: http://guided-h06-nemo-action:8000
       GUIDED_LAB07_URL: http://guided-h07-content-safety:8000
+      GUIDED_LAB08_URL: http://guided-h08-self-check-input:8000
       GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H21_PROVIDER_URL: http://guided-h21-provider:8000
@@ -164,6 +171,7 @@ services:
       guided-h06-nemo-action: {condition: service_healthy}
       guided-h06-action-provider: {condition: service_healthy}
       guided-h07-content-safety: {condition: service_healthy}
+      guided-h08-self-check-input: {condition: service_healthy}
       guided-h21-host: {condition: service_healthy}
       guided-h21-provider: {condition: service_healthy}
       guided-h21-trusted-mcp: {condition: service_healthy}
@@ -205,6 +213,10 @@ services:
       GUIDED_H07_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H07_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H07_GATEWAY_VERIFIER_TOKEN}
       GUIDED_H07_CAPABILITY_SECRET: ${GUIDED_H07_CAPABILITY_SECRET:?Set GUIDED_H07_CAPABILITY_SECRET}
       GUIDED_H07_CONTRACT_CLASSIFIER_MODE: ${GUIDED_H07_CONTRACT_CLASSIFIER_MODE:-valid}
+      GUIDED_H08_GATEWAY_CONTROL_TOKEN: ${GUIDED_H08_GATEWAY_CONTROL_TOKEN:?Set GUIDED_H08_GATEWAY_CONTROL_TOKEN}
+      GUIDED_H08_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H08_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H08_GATEWAY_VERIFIER_TOKEN}
+      GUIDED_H08_CAPABILITY_SECRET: ${GUIDED_H08_CAPABILITY_SECRET:?Set GUIDED_H08_CAPABILITY_SECRET}
+      GUIDED_H08_CONTRACT_CLASSIFIER_MODE: ${GUIDED_H08_CONTRACT_CLASSIFIER_MODE:-valid}
     volumes:
       - ${AWS_CREDENTIALS_DIR:-${HOME}/.aws}:/tmp/.aws:ro
       - ../../llm-security-control-plane/.state/guided-gateway:/state:rw
@@ -359,6 +371,29 @@ services:
       timeout: 3s
       retries: 45
 
+  guided-h08-self-check-input:
+    <<: *guided-service
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=128m"]
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h08-self-check-input/Containerfile
+    image: localhost/llm-security-guided-h08-self-check-input:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h08-self-check-input
+    environment:
+      OPENAI_API_KEY: h08-transient-capability-is-injected-at-runtime
+      GUIDED_CONTROL_LAB08_TOKEN: ${GUIDED_CONTROL_LAB08_TOKEN:?Set GUIDED_CONTROL_LAB08_TOKEN}
+      GUIDED_VERIFIER_LAB08_TOKEN: ${GUIDED_VERIFIER_LAB08_TOKEN:?Set GUIDED_VERIFIER_LAB08_TOKEN}
+      GUIDED_H08_GATEWAY_URL: http://guided-bedrock-gateway:8080
+      GUIDED_H08_DATABASE: /state/receipts.sqlite3
+    volumes: [guided-h08-receipts:/state:rw]
+    depends_on:
+      guided-bedrock-gateway: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+
   guided-h22-mcp-server:
     <<: *guided-service
     tmpfs:
@@ -505,3 +540,4 @@ networks:
 
 volumes:
   guided-verifier-state:
+  guided-h08-receipts:

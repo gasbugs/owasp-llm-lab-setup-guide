@@ -80,7 +80,7 @@ bash llm-security-control-plane/deploy/stop-stack.sh
 
 ## 03 UI 후보의 독립 Hands-on 실행 환경
 
-기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 H01 Bedrock Gateway, H02 S3·Titan·Knowledge Base 연결, H03 ingestion 완료 전 검색 차단, H04 관리형 Guardrail 연결, H05 NeMo Dialog Rail 평가, H06 Python Action 허용목록, H07 NeMo Content Safety 입력 Rail, H21 Agent Gateway 정책, H22 MCP 고위험 Tool 승인을 각각 독립된 source·container·상태로 구현한다. 화면에는 전체 13개 탭이 보이며 아직 구현하지 않은 Hands-on은 잠겨 있다. 구현된 Hands-on은 입력할 정확한 코드를 화면에 보여 주고, 수강생이 해당 learner-owned source를 수정한 뒤 그 서비스만 다시 Build·생성해야 검증 결과가 바뀐다. 독립 연습문제 P01은 아직 구현하지 않았다.
+기존 02 Compose는 바꾸지 않는다. 별도 `examples/security-monitoring/compose.guided.yaml`은 현재 H01 Bedrock Gateway, H02 S3·Titan·Knowledge Base 연결, H03 ingestion 완료 전 검색 차단, H04 관리형 Guardrail 연결, H05 NeMo Dialog Rail 평가, H06 Python Action 허용목록, H07 NeMo Content Safety 입력 Rail, H08 애플리케이션 `self_check_input`, H21 Agent Gateway 정책, H22 MCP 고위험 Tool 승인을 각각 독립된 source·container·상태로 구현한다. 화면에는 전체 13개 탭이 보이며 아직 구현하지 않은 Hands-on은 잠겨 있다. 구현된 Hands-on은 입력할 정확한 코드를 화면에 보여 주고, 수강생이 해당 learner-owned source를 수정한 뒤 그 서비스만 다시 Build·생성해야 검증 결과가 바뀐다. 독립 연습문제 P01은 아직 구현하지 않았다.
 
 처음 실행할 때만 경계별 Token을 따로 만든다. Browser에는 이 값이 전달되지 않고 Control Center의 HttpOnly session cookie만 전달된다.
 
@@ -101,6 +101,7 @@ GUIDED_CONTROL_LAB04_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_LAB05_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_LAB06_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_LAB07_TOKEN=$(openssl rand -hex 32)
+GUIDED_CONTROL_LAB08_TOKEN=$(openssl rand -hex 32)
 GUIDED_H06_PROVIDER_CONTROL_TOKEN=$(openssl rand -hex 32)
 GUIDED_H06_PROVIDER_ACTION_TOKEN=$(openssl rand -hex 32)
 GUIDED_H06_PROVIDER_VERIFIER_TOKEN=$(openssl rand -hex 32)
@@ -108,6 +109,9 @@ GUIDED_H06_CAPABILITY_SECRET=$(openssl rand -hex 32)
 GUIDED_H07_GATEWAY_CONTROL_TOKEN=$(openssl rand -hex 32)
 GUIDED_H07_GATEWAY_VERIFIER_TOKEN=$(openssl rand -hex 32)
 GUIDED_H07_CAPABILITY_SECRET=$(openssl rand -hex 32)
+GUIDED_H08_GATEWAY_CONTROL_TOKEN=$(openssl rand -hex 32)
+GUIDED_H08_GATEWAY_VERIFIER_TOKEN=$(openssl rand -hex 32)
+GUIDED_H08_CAPABILITY_SECRET=$(openssl rand -hex 32)
 GUIDED_CONTROL_H21_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_H22_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_VERIFIER_TOKEN=$(openssl rand -hex 32)
@@ -129,6 +133,7 @@ GUIDED_VERIFIER_LAB04_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_LAB05_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_LAB06_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_LAB07_TOKEN=$(openssl rand -hex 32)
+GUIDED_VERIFIER_LAB08_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_H21_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_H22_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_GATEWAY_TOKEN=$(openssl rand -hex 32)
@@ -149,7 +154,7 @@ docker compose \
 | `http://127.0.0.1:18097` | Guided Control Center | 구현된 Hands-on 실행·단계·검증 영수증 |
 | `http://127.0.0.1:18192` | NeMo Chat UI | 공식 Dialog Rail 화면의 proxy 호환성 확인 |
 
-Host port를 소유하는 컨테이너는 Front Proxy 하나뿐이다. H01 수강생 Gateway와 제공 Bedrock Gateway만 `~/.aws`를 읽기 전용으로 확인한다. H05는 AWS 자격 증명 없이 로컬 NeMo intent·flow와 공식 Topical 평가를 실행한다. H06은 H05와 분리된 NeMo 서비스와 합성 Action Provider에서 호출 수와 실제 상태 변경을 확인한다. H07은 전용 NeMo 서비스가 역할별 일회 capability로 제공 Gateway를 호출하고, 검증 전에 suite를 닫아 위험 요청의 Main Model 미호출을 확인한다. H21·H22는 외부 부작용 대신 전용 로컬 Provider·MCP Server로 정책 경계를 검증한다. 별도 evidence verifier는 AWS 자격 증명·상태 변경 Token·Docker socket 없이 각 learner app의 영수증을 다시 대조한다.
+Host port를 소유하는 컨테이너는 Front Proxy 하나뿐이다. H01 수강생 Gateway와 제공 Bedrock Gateway만 `~/.aws`를 읽기 전용으로 확인한다. H05는 AWS 자격 증명 없이 로컬 NeMo intent·flow와 공식 Topical 평가를 실행한다. H06은 H05와 분리된 NeMo 서비스와 합성 Action Provider에서 호출 수와 실제 상태 변경을 확인한다. H07은 일반 위해, H08은 계정 복구 앱의 업무 규칙을 서로 다른 NeMo 서비스와 역할별 일회 capability로 검사한다. 두 검증 모두 suite를 닫은 뒤 위험 요청의 Main Model 미호출을 원장에서 확인한다. H21·H22는 외부 부작용 대신 전용 로컬 Provider·MCP Server로 정책 경계를 검증한다. 별도 evidence verifier는 AWS 자격 증명·상태 변경 Token·Docker socket 없이 각 learner app의 영수증을 다시 대조한다.
 
 Starter는 요청된 512 Token을 그대로 Provider에 전달한다. `server.py`의 요청 처리 코드를 완성한 뒤에는 다음 두 명령으로 수강생 Gateway만 다시 연결한다.
 

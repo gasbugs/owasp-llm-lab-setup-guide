@@ -11,6 +11,7 @@ on:
       - "tests/e2e/run_guided_h05_learner_fix.py"
       - "tests/e2e/run_guided_h06_learner_fix.py"
       - "tests/e2e/run_guided_h07_learner_fix.py"
+      - "tests/e2e/run_guided_h08_learner_fix.py"
       - "tests/e2e/module10/**"
       - ".github/workflows/module08-docker-e2e.yml"
 
@@ -173,7 +174,7 @@ jobs:
           --url http://127.0.0.1:28095
           --browser-channel chromium
 
-      - name: Build and validate independent tenant 03 H21, H22, H07, H06, H05, H04, H02, H03, then H01
+      - name: Build and validate independent tenant 03 H21, H22, H08, H07, H06, H05, H04, H02, H03, then H01
         env:
           AWS_CREDENTIALS_DIR: /tmp/guided-aws
           GUIDED_SESSION_SECRET: ci-guided-session-secret
@@ -184,6 +185,7 @@ jobs:
           GUIDED_CONTROL_LAB05_TOKEN: ci-control-lab05
           GUIDED_CONTROL_LAB06_TOKEN: ci-control-lab06
           GUIDED_CONTROL_LAB07_TOKEN: ci-control-lab07
+          GUIDED_CONTROL_LAB08_TOKEN: ci-control-lab08
           GUIDED_H06_PROVIDER_CONTROL_TOKEN: ci-h06-provider-control
           GUIDED_H06_PROVIDER_ACTION_TOKEN: ci-h06-provider-action
           GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ci-h06-provider-verifier
@@ -191,6 +193,9 @@ jobs:
           GUIDED_H07_GATEWAY_CONTROL_TOKEN: ci-h07-gateway-control
           GUIDED_H07_GATEWAY_VERIFIER_TOKEN: ci-h07-gateway-verifier
           GUIDED_H07_CAPABILITY_SECRET: ci-h07-capability-secret-with-at-least-32-bytes
+          GUIDED_H08_GATEWAY_CONTROL_TOKEN: ci-h08-gateway-control
+          GUIDED_H08_GATEWAY_VERIFIER_TOKEN: ci-h08-gateway-verifier
+          GUIDED_H08_CAPABILITY_SECRET: ci-h08-capability-secret-with-at-least-32-bytes
           GUIDED_CONTROL_H21_TOKEN: ci-control-h21
           GUIDED_CONTROL_H22_TOKEN: ci-control-h22
           GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
@@ -212,6 +217,7 @@ jobs:
           GUIDED_VERIFIER_LAB05_TOKEN: ci-verifier-lab05
           GUIDED_VERIFIER_LAB06_TOKEN: ci-verifier-lab06
           GUIDED_VERIFIER_LAB07_TOKEN: ci-verifier-lab07
+          GUIDED_VERIFIER_LAB08_TOKEN: ci-verifier-lab08
           GUIDED_VERIFIER_H21_TOKEN: ci-verifier-h21
           GUIDED_VERIFIER_H22_TOKEN: ci-verifier-h22
           GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway
@@ -237,6 +243,8 @@ jobs:
           python tests/browser/run_guided_control_center_ui.py \
             --url http://127.0.0.1:28097 \
             --browser-channel chromium
+          python tests/e2e/run_guided_h08_learner_fix.py \
+            --url http://127.0.0.1:28097
           python tests/e2e/run_guided_h07_learner_fix.py \
             --url http://127.0.0.1:28097
           python tests/e2e/run_guided_h06_learner_fix.py \
@@ -267,6 +275,7 @@ jobs:
           docker logs llm-security-guided-h06-nemo-action || true
           docker logs llm-security-guided-h06-action-provider || true
           docker logs llm-security-guided-h07-content-safety || true
+          docker logs llm-security-guided-h08-self-check-input || true
           docker logs llm-security-guided-bedrock-gateway || true
 
       - name: Remove test resources
@@ -281,6 +290,7 @@ jobs:
           GUIDED_CONTROL_LAB05_TOKEN: ci-control-lab05
           GUIDED_CONTROL_LAB06_TOKEN: ci-control-lab06
           GUIDED_CONTROL_LAB07_TOKEN: ci-control-lab07
+          GUIDED_CONTROL_LAB08_TOKEN: ci-control-lab08
           GUIDED_H06_PROVIDER_CONTROL_TOKEN: ci-h06-provider-control
           GUIDED_H06_PROVIDER_ACTION_TOKEN: ci-h06-provider-action
           GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ci-h06-provider-verifier
@@ -288,6 +298,9 @@ jobs:
           GUIDED_H07_GATEWAY_CONTROL_TOKEN: ci-h07-gateway-control
           GUIDED_H07_GATEWAY_VERIFIER_TOKEN: ci-h07-gateway-verifier
           GUIDED_H07_CAPABILITY_SECRET: ci-h07-capability-secret-with-at-least-32-bytes
+          GUIDED_H08_GATEWAY_CONTROL_TOKEN: ci-h08-gateway-control
+          GUIDED_H08_GATEWAY_VERIFIER_TOKEN: ci-h08-gateway-verifier
+          GUIDED_H08_CAPABILITY_SECRET: ci-h08-capability-secret-with-at-least-32-bytes
           GUIDED_CONTROL_H21_TOKEN: ci-control-h21
           GUIDED_CONTROL_H22_TOKEN: ci-control-h22
           GUIDED_CONTROL_VERIFIER_TOKEN: ci-control-verifier
@@ -309,6 +322,7 @@ jobs:
           GUIDED_VERIFIER_LAB05_TOKEN: ci-verifier-lab05
           GUIDED_VERIFIER_LAB06_TOKEN: ci-verifier-lab06
           GUIDED_VERIFIER_LAB07_TOKEN: ci-verifier-lab07
+          GUIDED_VERIFIER_LAB08_TOKEN: ci-verifier-lab08
           GUIDED_VERIFIER_H21_TOKEN: ci-verifier-h21
           GUIDED_VERIFIER_H22_TOKEN: ci-verifier-h22
           GUIDED_VERIFIER_GATEWAY_TOKEN: ci-verifier-gateway

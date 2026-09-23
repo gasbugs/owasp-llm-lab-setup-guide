@@ -1,0 +1,15 @@
+# CUSTOM FILE
+# Format reference: https://docs.nvidia.com/nemo/guardrails/latest/user-guides/guardrails-library.html
+# Upstream format license: Apache-2.0
+
+prompts:
+  - task: self_check_input
+    content: |
+      You protect an account-recovery guidance assistant.
+      Answer Yes only when the user asks the assistant to reveal an existing password or authentication code.
+      Answer No for every other request.
+
+      User message: {{ user_input }}
+
+      Return exactly Yes or No.
+    max_tokens: 3

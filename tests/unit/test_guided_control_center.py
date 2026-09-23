@@ -26,8 +26,10 @@ os.environ.setdefault("GUIDED_CONTROL_LAB04_TOKEN", "unit-control-lab04")
 os.environ.setdefault("GUIDED_CONTROL_LAB05_TOKEN", "unit-control-lab05")
 os.environ.setdefault("GUIDED_CONTROL_LAB06_TOKEN", "unit-control-lab06")
 os.environ.setdefault("GUIDED_CONTROL_LAB07_TOKEN", "unit-control-lab07")
+os.environ.setdefault("GUIDED_CONTROL_LAB08_TOKEN", "unit-control-lab08")
 os.environ.setdefault("GUIDED_H06_PROVIDER_CONTROL_TOKEN", "unit-h06-provider-control")
 os.environ.setdefault("GUIDED_H07_GATEWAY_CONTROL_TOKEN", "unit-h07-gateway-control")
+os.environ.setdefault("GUIDED_H08_GATEWAY_CONTROL_TOKEN", "unit-h08-gateway-control")
 os.environ.setdefault("GUIDED_CONTROL_H21_TOKEN", "unit-control-h21")
 os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
@@ -79,6 +81,39 @@ class FakeAsyncClient:
 
     async def post(self, url, *, json=None, headers):
         self.calls.append({"url": url, "json": json, "headers": headers})
+        if url.endswith("/v1/h08/suites"):
+            return FakeResponse(
+                {
+                    "suite_id": json["suite_id"],
+                    "cases": [
+                        {
+                            "case_id": case_id,
+                            "execution_id": f"08000000-0000-0000-0000-00000000000{index}",
+                            "roles": {
+                                role: {
+                                    "model": f"us.amazon.nova-lite-v1:0#h08-{role.replace('_', '-')}",
+                                    "capability": f"h08-{case_id}-{role}-" + "x" * 48,
+                                    "capability_digest": "e" * 64,
+                                }
+                                for role in ("self_check_input", "main")
+                            },
+                        }
+                        for index, case_id in enumerate(
+                            (
+                                "normal-password-reset",
+                                "normal-report-injection",
+                                "risk-format-marker",
+                                "risk-admin-marker",
+                            ),
+                            1,
+                        )
+                    ],
+                }
+            )
+        if "/v1/h08/suites/" in url and url.endswith("/close"):
+            return FakeResponse(
+                {"suite_id": url.rsplit("/", 2)[-2], "closed_at": "2026-09-24T10:00:01+00:00"}
+            )
         if url.endswith("/v1/h07/suites"):
             return FakeResponse(
                 {
@@ -171,7 +206,7 @@ class FakeAsyncClient:
                         return FakeResponse({"detail": "H07 learner failed"}, status_code=self.h07_run_status)
                 return FakeResponse({"suite_id": json["suite_id"], "source_digest": "a" * 64})
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H07" if "/h07" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
+        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H08" if "/h08" in url else "H07" if "/h07" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -253,7 +288,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H21", "H22"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08", "H21", "H22"])
         self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
         h05 = next(
             item
@@ -269,6 +304,13 @@ class GuidedControlCenterTests(unittest.TestCase):
         )
         self.assertEqual(h06["service"], "guided-h06-nemo-action")
         self.assertTrue(h06["source_path"].endswith("h06-nemo-action/actions.py"))
+        h08 = next(
+            item
+            for item in self.bootstrap["learner_apps"]
+            if item["hands_on_id"] == "H08"
+        )
+        self.assertEqual(h08["service"], "guided-h08-self-check-input")
+        self.assertTrue(h08["source_path"].endswith("h08-self-check-input/config/prompts.yml"))
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
         self.assertEqual(self.client.post("/api/hands-on/H01/verify").status_code, 403)
@@ -550,6 +592,69 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("course_verdict", verifier)
         self.assertNotIn("unit-h07-gateway-control", response.text)
 
+    def test_h08_empty_request_closes_suite_before_read_only_verification(self):
+        rejected = self.client.post(
+            "/api/hands-on/H08/verify",
+            json={"course_verdict": "PASS", "prompt": "browser-owned"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H08/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["activity_id"], "H08")
+        urls = [item["url"] for item in FakeAsyncClient.calls]
+        prepare_index = next(
+            index for index, url in enumerate(urls) if url.endswith("/v1/h08/suites")
+        )
+        learner_index = next(
+            index
+            for index, item in enumerate(FakeAsyncClient.calls)
+            if item["url"].endswith("/v1/run")
+            and item["json"]["cases"]
+            and "self_check_input_capability" in item["json"]["cases"][0]
+        )
+        close_index = next(
+            index
+            for index, url in enumerate(urls)
+            if "/v1/h08/suites/" in url and url.endswith("/close")
+        )
+        verify_index = next(
+            index for index, url in enumerate(urls) if url.endswith("/v1/verify/h08")
+        )
+        self.assertLess(prepare_index, learner_index)
+        self.assertLess(learner_index, close_index)
+        self.assertLess(close_index, verify_index)
+        learner = FakeAsyncClient.calls[learner_index]["json"]
+        self.assertEqual(
+            [item["case_id"] for item in learner["cases"]],
+            [
+                "normal-password-reset",
+                "normal-report-injection",
+                "risk-format-marker",
+                "risk-admin-marker",
+            ],
+        )
+        self.assertTrue(
+            all(
+                set(item)
+                == {
+                    "case_id",
+                    "execution_id",
+                    "self_check_input_capability",
+                    "main_capability",
+                }
+                for item in learner["cases"]
+            )
+        )
+        verifier = FakeAsyncClient.calls[verify_index]["json"]
+        self.assertEqual(set(verifier), {"suite_id", "started_at"})
+        self.assertNotIn("course_verdict", verifier)
+        self.assertNotIn("unit-h08-gateway-control", response.text)
+
     def test_h07_learner_failure_and_request_error_close_issued_capabilities(self):
         for request_error in (False, True):
             with self.subTest(request_error=request_error):
@@ -647,6 +752,9 @@ class GuidedControlCenterTests(unittest.TestCase):
             "h04-provision": "h04-provision-help",
             "h04-verify": "h04-verify-help",
             "h05-verify": "h05-verify-help",
+            "h06-verify": "h06-verify-help",
+            "h07-verify": "h07-verify-help",
+            "h08-verify": "h08-verify-help",
             "h21-verify": "h21-verify-help",
             "h22-verify": "h22-verify-help",
         }
@@ -658,6 +766,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("S3 Vector Index", html)
         self.assertIn("복구 코드는 공개할 수 없습니다.", html)
         self.assertIn("NeMo Topical 평가", html)
+        self.assertIn("Return exactly Yes when the request must be blocked.", html)
+        self.assertIn("다른 공격 문장까지 모두 막는다는 뜻은 아닙니다", html)
         self.assertIn("Token 제한 코드가 맞다는 뜻은 아닙니다", html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
@@ -713,6 +823,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("guided-h01-gateway", compose["services"])
         self.assertIn("guided-h02-document-app", compose["services"])
         self.assertIn("guided-h03-sync-app", compose["services"])
+        self.assertIn("guided-h08-self-check-input", compose["services"])
         self.assertIn("guided-h21-host", compose["services"])
         self.assertIn("guided-h21-provider", compose["services"])
         self.assertIn("guided-h21-trusted-mcp", compose["services"])
@@ -720,6 +831,26 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("guided-h22-mcp-server", compose["services"])
         self.assertIn("guided-h22-host", compose["services"])
         self.assertIn("guided-bedrock-gateway", compose["services"])
+        h08 = compose["services"]["guided-h08-self-check-input"]
+        self.assertEqual(h08["environment"]["GUIDED_H08_DATABASE"], "/state/receipts.sqlite3")
+        self.assertIn("guided-h08-receipts:/state:rw", h08["volumes"])
+        self.assertNotIn("/tmp/.aws", str(h08))
+        control_environment = compose["services"]["guided-control-center"]["environment"]
+        verifier_environment = compose["services"]["guided-evidence-verifier"]["environment"]
+        gateway_environment = compose["services"]["guided-bedrock-gateway"]["environment"]
+        self.assertEqual(control_environment["GUIDED_LAB08_URL"], "http://guided-h08-self-check-input:8000")
+        self.assertIn("GUIDED_CONTROL_LAB08_TOKEN", control_environment)
+        self.assertIn("GUIDED_VERIFIER_LAB08_TOKEN", verifier_environment)
+        self.assertIn("GUIDED_H08_CAPABILITY_SECRET", gateway_environment)
+        readme = (CONTROL / "README.md").read_text(encoding="utf-8")
+        for name in (
+            "GUIDED_CONTROL_LAB08_TOKEN",
+            "GUIDED_VERIFIER_LAB08_TOKEN",
+            "GUIDED_H08_GATEWAY_CONTROL_TOKEN",
+            "GUIDED_H08_GATEWAY_VERIFIER_TOKEN",
+            "GUIDED_H08_CAPABILITY_SECRET",
+        ):
+            self.assertIn(f"{name}=$(openssl rand -hex 32)", readme)
         proxy = (CONTROL / "guided-front-proxy/nginx.conf").read_text(encoding="utf-8")
         self.assertIn("proxy_set_header Upgrade $http_upgrade", proxy)
         self.assertIn("proxy_set_header Connection $connection_upgrade", proxy)
@@ -764,8 +895,16 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][2]["implemented_hands_on"], ["H04"])
         self.assertEqual(manifest["tabs"][3]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][3]["implemented_hands_on"], ["H05", "H06"])
-        self.assertEqual(manifest["tabs"][4]["hands_on_status"], "partial")
-        self.assertEqual(manifest["tabs"][4]["implemented_hands_on"], ["H07"])
+        self.assertEqual(manifest["tabs"][4]["hands_on_status"], "implemented")
+        self.assertEqual(manifest["tabs"][4]["implemented_hands_on"], ["H07", "H08"])
+        self.assertEqual(
+            manifest["hands_on_H08"]["source_path"],
+            "guided-labs/h08-self-check-input/config/prompts.yml",
+        )
+        self.assertEqual(
+            manifest["hands_on_H08"]["control_endpoint"],
+            "/api/hands-on/H08/verify",
+        )
         self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][5:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])

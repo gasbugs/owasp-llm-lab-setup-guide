@@ -1,0 +1,27 @@
+FROM docker.io/library/python:3.12.14-slim
+
+ENV NEMO_GUARDRAILS_NO_USAGE_STATS=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    XDG_CACHE_HOME=/tmp/nemo-cache
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc g++ python3-dev \
+    && python -m pip install \
+      fastapi==0.116.1 \
+      fastembed==0.7.3 \
+      nemoguardrails==0.22.0 \
+      uvicorn==0.52.0 \
+    && apt-get purge -y --auto-remove gcc g++ python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --chmod=0444 guided-labs/h08-self-check-input/Containerfile /app/learner/Containerfile
+COPY --chmod=0555 guided-labs/h08-self-check-input/config /app/learner/config
+COPY --chmod=0555 guided-labs/h08-self-check-input/server.py /app/learner/server.py
+RUN install -d -o 65532 -g 65532 -m 0700 /state \
+    && chmod 0555 /app/learner /app/learner/config
+
+USER 65532:65532
+EXPOSE 8000
+CMD ["uvicorn", "server:app", "--app-dir", "/app/learner", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]
