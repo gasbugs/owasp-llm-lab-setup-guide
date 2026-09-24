@@ -28,6 +28,10 @@ LAB05_URL = os.getenv("GUIDED_LAB05_URL", "http://guided-h05-nemo-dialog:8000")
 LAB06_URL = os.getenv("GUIDED_LAB06_URL", "http://guided-h06-nemo-action:8000")
 LAB07_URL = os.getenv("GUIDED_LAB07_URL", "http://guided-h07-content-safety:8000")
 LAB08_URL = os.getenv("GUIDED_LAB08_URL", "http://guided-h08-self-check-input:8000")
+LAB09_URL = os.getenv("GUIDED_LAB09_URL", "http://guided-h09-presidio-redaction:8000")
+H09_SINK_URL = os.getenv(
+    "GUIDED_H09_SINK_URL", "http://guided-h09-delivery-sink:8000"
+)
 H06_PROVIDER_URL = os.getenv(
     "GUIDED_H06_PROVIDER_URL", "http://guided-h06-action-provider:8000"
 )
@@ -45,6 +49,8 @@ LAB05_TOKEN = os.environ["GUIDED_CONTROL_LAB05_TOKEN"]
 LAB06_TOKEN = os.environ["GUIDED_CONTROL_LAB06_TOKEN"]
 LAB07_TOKEN = os.environ["GUIDED_CONTROL_LAB07_TOKEN"]
 LAB08_TOKEN = os.environ["GUIDED_CONTROL_LAB08_TOKEN"]
+LAB09_TOKEN = os.environ["GUIDED_CONTROL_LAB09_TOKEN"]
+H09_SINK_CONTROL_TOKEN = os.environ["GUIDED_H09_SINK_CONTROL_TOKEN"]
 H06_PROVIDER_CONTROL_TOKEN = os.environ["GUIDED_H06_PROVIDER_CONTROL_TOKEN"]
 H07_GATEWAY_CONTROL_TOKEN = os.environ["GUIDED_H07_GATEWAY_CONTROL_TOKEN"]
 H08_GATEWAY_CONTROL_TOKEN = os.environ["GUIDED_H08_GATEWAY_CONTROL_TOKEN"]
@@ -197,9 +203,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
         "course": {
             "tabs": 13,
             "hands_on": 22,
-            "practices": 13,
-            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08", "H21", "H22"],
-            "implemented_practices": [],
+            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08", "H09", "H21", "H22"],
         },
         "official_uis": [
             {
@@ -263,6 +267,11 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "hands_on_id": "H08",
                 "service": "guided-h08-self-check-input",
                 "source_path": "llm-security-control-plane/guided-labs/h08-self-check-input/config/prompts.yml",
+            },
+            {
+                "hands_on_id": "H09",
+                "service": "guided-h09-presidio-redaction",
+                "source_path": "llm-security-control-plane/guided-labs/h09-presidio-redaction/policy.py",
             },
             {
                 "hands_on_id": "H21",
@@ -1051,6 +1060,19 @@ async def close_h08_gateway_suite(suite_id: str) -> bool:
         return False
 
 
+async def close_h09_sink_suite(suite_id: str) -> bool:
+    """Close every unused H09 delivery grant before read-only verification."""
+    try:
+        async with httpx.AsyncClient(timeout=H07_CLOSE_TIMEOUT) as client:
+            response = await client.post(
+                f"{H09_SINK_URL}/v1/suites/{suite_id}/close",
+                headers={"Authorization": f"Bearer {H09_SINK_CONTROL_TOKEN}"},
+            )
+        return response.status_code == 200 and response.json().get("suite_id") == suite_id
+    except (httpx.RequestError, ValueError):
+        return False
+
+
 @app.post("/api/hands-on/H07/verify")
 async def verify_h07_content_safety(
     request: Request,
@@ -1332,6 +1354,121 @@ async def verify_h08_self_check_input(
                 "downstream_called": prepare_attempted,
                 "course_verdict": "ERR",
                 "next_check": "H08 Gateway·learner 상태와 suite가 닫혔는지 확인합니다.",
+            },
+        ) from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H09/verify")
+async def verify_h09_presidio_delivery(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    case_ids = ("clean", "input-email", "input-kr-rrn", "output-email")
+    executions = [
+        {"case_id": case_id, "execution_id": str(uuid.uuid4())}
+        for case_id in case_ids
+    ]
+    prepare_attempted = False
+    suite_closed = False
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            prepare_attempted = True
+            prepared = await client.post(
+                f"{H09_SINK_URL}/v1/suites",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": started_at,
+                    "executions": executions,
+                },
+                headers={"Authorization": f"Bearer {H09_SINK_CONTROL_TOKEN}"},
+            )
+            grants = prepared.json().get("cases") if prepared.status_code == 200 else None
+            if not isinstance(grants, list) or [
+                item.get("case_id") for item in grants
+            ] != list(case_ids):
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "h09_delivery_prepare",
+                        "downstream_called": False,
+                        "course_verdict": "ERR",
+                        "next_check": "H09 Delivery Sink가 네 고정 Case의 일회 capability를 만들었는지 확인합니다.",
+                    },
+                )
+            learner_cases = [
+                {
+                    "case_id": item["case_id"],
+                    "execution_id": item["execution_id"],
+                    "capability": item["capability"],
+                }
+                for item in grants
+            ]
+            executed = await client.post(
+                f"{LAB09_URL}/v1/run",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": started_at,
+                    "cases": learner_cases,
+                },
+                headers={"Authorization": f"Bearer {LAB09_TOKEN}"},
+            )
+            if executed.status_code != 200 or executed.json().get("suite_id") != suite_id:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "h09_delivery_prepare",
+                        "stopped_stage": "guided_h09_presidio",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H09 image와 policy.py의 Presidio 실행·전달 계약을 확인합니다.",
+                    },
+                )
+            suite_closed = await close_h09_sink_suite(suite_id)
+            if not suite_closed:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "guided_h09_presidio",
+                        "stopped_stage": "h09_delivery_close",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H09 전달이 끝났고 Sink의 일회 capability가 닫혔는지 확인합니다.",
+                    },
+                )
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/h09",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except HTTPException:
+        if prepare_attempted and not suite_closed:
+            await close_h09_sink_suite(suite_id)
+        raise
+    except (httpx.RequestError, ValueError) as exc:
+        if prepare_attempted and not suite_closed:
+            await close_h09_sink_suite(suite_id)
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "successful_stage": "control_center",
+                "stopped_stage": "h09_internal_service",
+                "downstream_called": prepare_attempted,
+                "course_verdict": "ERR",
+                "next_check": "H09 learner와 Delivery Sink 상태 및 닫힌 suite를 확인합니다.",
             },
         ) from exc
     finally:

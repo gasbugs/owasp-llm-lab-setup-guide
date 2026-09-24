@@ -27,9 +27,11 @@ os.environ.setdefault("GUIDED_CONTROL_LAB05_TOKEN", "unit-control-lab05")
 os.environ.setdefault("GUIDED_CONTROL_LAB06_TOKEN", "unit-control-lab06")
 os.environ.setdefault("GUIDED_CONTROL_LAB07_TOKEN", "unit-control-lab07")
 os.environ.setdefault("GUIDED_CONTROL_LAB08_TOKEN", "unit-control-lab08")
+os.environ.setdefault("GUIDED_CONTROL_LAB09_TOKEN", "unit-control-lab09")
 os.environ.setdefault("GUIDED_H06_PROVIDER_CONTROL_TOKEN", "unit-h06-provider-control")
 os.environ.setdefault("GUIDED_H07_GATEWAY_CONTROL_TOKEN", "unit-h07-gateway-control")
 os.environ.setdefault("GUIDED_H08_GATEWAY_CONTROL_TOKEN", "unit-h08-gateway-control")
+os.environ.setdefault("GUIDED_H09_SINK_CONTROL_TOKEN", "unit-h09-sink-control")
 os.environ.setdefault("GUIDED_CONTROL_H21_TOKEN", "unit-control-h21")
 os.environ.setdefault("GUIDED_CONTROL_H22_TOKEN", "unit-control-h22")
 os.environ.setdefault("GUIDED_CONTROL_VERIFIER_TOKEN", "unit-control-verifier")
@@ -111,6 +113,10 @@ class FakeAsyncClient:
                 }
             )
         if "/v1/h08/suites/" in url and url.endswith("/close"):
+            return FakeResponse(
+                {"suite_id": url.rsplit("/", 2)[-2], "closed_at": "2026-09-24T10:00:01+00:00"}
+            )
+        if "guided-h09-delivery-sink" in url and url.endswith("/close"):
             return FakeResponse(
                 {"suite_id": url.rsplit("/", 2)[-2], "closed_at": "2026-09-24T10:00:01+00:00"}
             )
@@ -206,7 +212,7 @@ class FakeAsyncClient:
                         return FakeResponse({"detail": "H07 learner failed"}, status_code=self.h07_run_status)
                 return FakeResponse({"suite_id": json["suite_id"], "source_digest": "a" * 64})
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H08" if "/h08" in url else "H07" if "/h07" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
+        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H09" if "/h09" in url else "H08" if "/h08" in url else "H07" if "/h07" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
@@ -287,9 +293,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("gateway_token", self.home.text.lower())
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
-        self.assertEqual(self.bootstrap["course"]["practices"], 13)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08", "H21", "H22"])
-        self.assertEqual(self.bootstrap["course"]["implemented_practices"], [])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08", "H09", "H21", "H22"])
+        self.assertNotIn("practices", self.bootstrap["course"])
+        self.assertNotIn("implemented_practices", self.bootstrap["course"])
         h05 = next(
             item
             for item in self.bootstrap["learner_apps"]
@@ -311,6 +317,13 @@ class GuidedControlCenterTests(unittest.TestCase):
         )
         self.assertEqual(h08["service"], "guided-h08-self-check-input")
         self.assertTrue(h08["source_path"].endswith("h08-self-check-input/config/prompts.yml"))
+        h09 = next(
+            item
+            for item in self.bootstrap["learner_apps"]
+            if item["hands_on_id"] == "H09"
+        )
+        self.assertEqual(h09["service"], "guided-h09-presidio-redaction")
+        self.assertTrue(h09["source_path"].endswith("h09-presidio-redaction/policy.py"))
 
     def test_origin_csrf_and_client_verdict_are_rejected(self):
         self.assertEqual(self.client.post("/api/hands-on/H01/verify").status_code, 403)
@@ -655,6 +668,56 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("course_verdict", verifier)
         self.assertNotIn("unit-h08-gateway-control", response.text)
 
+    def test_h09_uses_server_owned_cases_and_closes_sink_before_verification(self):
+        rejected = self.client.post(
+            "/api/hands-on/H09/verify",
+            json={"case_id": "attacker-case", "course_verdict": "PASS"},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 422)
+
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post(
+                "/api/hands-on/H09/verify", headers=self.headers
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["activity_id"], "H09")
+        calls = FakeAsyncClient.calls
+        prepare_index = next(
+            index
+            for index, item in enumerate(calls)
+            if "guided-h09-delivery-sink" in item["url"]
+            and item["url"].endswith("/v1/suites")
+        )
+        learner_index = next(
+            index
+            for index, item in enumerate(calls)
+            if "guided-h09-presidio-redaction" in item["url"]
+            and item["url"].endswith("/v1/run")
+        )
+        close_index = next(
+            index
+            for index, item in enumerate(calls)
+            if "guided-h09-delivery-sink" in item["url"]
+            and item["url"].endswith("/close")
+        )
+        verify_index = next(
+            index for index, item in enumerate(calls) if item["url"].endswith("/v1/verify/h09")
+        )
+        self.assertLess(prepare_index, learner_index)
+        self.assertLess(learner_index, close_index)
+        self.assertLess(close_index, verify_index)
+        learner = calls[learner_index]["json"]
+        self.assertEqual(
+            [item["case_id"] for item in learner["cases"]],
+            ["clean", "input-email", "input-kr-rrn", "output-email"],
+        )
+        self.assertTrue(
+            all(set(item) == {"case_id", "execution_id", "capability"} for item in learner["cases"])
+        )
+        self.assertNotIn("course_verdict", calls[verify_index]["json"])
+        self.assertNotIn("unit-h09-sink-control", response.text)
+
     def test_h07_learner_failure_and_request_error_close_issued_capabilities(self):
         for request_error in (False, True):
             with self.subTest(request_error=request_error):
@@ -755,6 +818,7 @@ class GuidedControlCenterTests(unittest.TestCase):
             "h06-verify": "h06-verify-help",
             "h07-verify": "h07-verify-help",
             "h08-verify": "h08-verify-help",
+            "h09-verify": "h09-verify-help",
             "h21-verify": "h21-verify-help",
             "h22-verify": "h22-verify-help",
         }
@@ -768,6 +832,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("NeMo Topical 평가", html)
         self.assertIn("Return exactly Yes when the request must be blocked.", html)
         self.assertIn("다른 공격 문장까지 모두 막는다는 뜻은 아닙니다", html)
+        self.assertIn("실제로 받은 digest", html)
         self.assertIn("Token 제한 코드가 맞다는 뜻은 아닙니다", html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
@@ -824,6 +889,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("guided-h02-document-app", compose["services"])
         self.assertIn("guided-h03-sync-app", compose["services"])
         self.assertIn("guided-h08-self-check-input", compose["services"])
+        self.assertIn("guided-h09-presidio-redaction", compose["services"])
+        self.assertIn("guided-h09-delivery-sink", compose["services"])
         self.assertIn("guided-h21-host", compose["services"])
         self.assertIn("guided-h21-provider", compose["services"])
         self.assertIn("guided-h21-trusted-mcp", compose["services"])
@@ -835,6 +902,12 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(h08["environment"]["GUIDED_H08_DATABASE"], "/state/receipts.sqlite3")
         self.assertIn("guided-h08-receipts:/state:rw", h08["volumes"])
         self.assertNotIn("/tmp/.aws", str(h08))
+        h09 = compose["services"]["guided-h09-presidio-redaction"]
+        sink = compose["services"]["guided-h09-delivery-sink"]
+        self.assertIn("guided-h09-receipts:/state:rw", h09["volumes"])
+        self.assertIn("guided-h09-sink-ledger:/state:rw", sink["volumes"])
+        self.assertNotIn("/tmp/.aws", str(h09))
+        self.assertNotIn("/tmp/.aws", str(sink))
         control_environment = compose["services"]["guided-control-center"]["environment"]
         verifier_environment = compose["services"]["guided-evidence-verifier"]["environment"]
         gateway_environment = compose["services"]["guided-bedrock-gateway"]["environment"]
@@ -849,6 +922,11 @@ class GuidedControlCenterTests(unittest.TestCase):
             "GUIDED_H08_GATEWAY_CONTROL_TOKEN",
             "GUIDED_H08_GATEWAY_VERIFIER_TOKEN",
             "GUIDED_H08_CAPABILITY_SECRET",
+            "GUIDED_CONTROL_LAB09_TOKEN",
+            "GUIDED_VERIFIER_LAB09_TOKEN",
+            "GUIDED_H09_SINK_CONTROL_TOKEN",
+            "GUIDED_H09_SINK_VERIFIER_TOKEN",
+            "GUIDED_H09_CAPABILITY_SECRET",
         ):
             self.assertIn(f"{name}=$(openssl rand -hex 32)", readme)
         proxy = (CONTROL / "guided-front-proxy/nginx.conf").read_text(encoding="utf-8")
@@ -880,14 +958,12 @@ class GuidedControlCenterTests(unittest.TestCase):
             (CONTROL / "guided-labs/manifest.yaml").read_text(encoding="utf-8")
         )
         hands_on = [str(item) for tab in manifest["tabs"] for item in tab["hands_on"]]
-        practices = [str(tab["practice"]) for tab in manifest["tabs"]]
         self.assertEqual(len(manifest["tabs"]), 13)
         self.assertEqual(len(hands_on), 22)
         self.assertEqual(len(set(hands_on)), 22)
-        self.assertEqual(len(practices), 13)
-        self.assertEqual(len(set(practices)), 13)
         self.assertEqual(hands_on[0], "H01")
-        self.assertEqual(practices[0], "P01")
+        self.assertTrue(all("practice" not in tab for tab in manifest["tabs"]))
+        self.assertTrue(all("practice_status" not in tab for tab in manifest["tabs"]))
         self.assertEqual(manifest["tabs"][0]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][1]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02", "H03"])
@@ -897,6 +973,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][3]["implemented_hands_on"], ["H05", "H06"])
         self.assertEqual(manifest["tabs"][4]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][4]["implemented_hands_on"], ["H07", "H08"])
+        self.assertEqual(manifest["tabs"][5]["hands_on_status"], "partial")
+        self.assertEqual(manifest["tabs"][5]["implemented_hands_on"], ["H09"])
         self.assertEqual(
             manifest["hands_on_H08"]["source_path"],
             "guided-labs/h08-self-check-input/config/prompts.yml",
@@ -905,12 +983,17 @@ class GuidedControlCenterTests(unittest.TestCase):
             manifest["hands_on_H08"]["control_endpoint"],
             "/api/hands-on/H08/verify",
         )
-        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][5:12]))
+        self.assertEqual(
+            manifest["hands_on_H09"]["source_path"],
+            "guided-labs/h09-presidio-redaction/policy.py",
+        )
+        self.assertEqual(
+            manifest["hands_on_H09"]["control_endpoint"],
+            "/api/hands-on/H09/verify",
+        )
+        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][6:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])
-        self.assertTrue(
-            all(tab["practice_status"] == "planned" for tab in manifest["tabs"])
-        )
 
 
 if __name__ == "__main__":

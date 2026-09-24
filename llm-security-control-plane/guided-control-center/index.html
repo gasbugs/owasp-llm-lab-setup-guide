@@ -421,6 +421,55 @@ docker compose \
           </div>
         </div>
 
+        <div id="h09-work" class="lab-workspace" hidden>
+          <p>Presidio의 Analyzer는 개인정보가 있는 위치를 찾고, Anonymizer는 그 부분을 <code>&lt;EMAIL_ADDRESS&gt;</code>처럼 바꿉니다. 하지만 앱이 마지막에 다시 원문을 보내면 계산은 성공해도 개인정보는 그대로 새어 나갑니다. H09에서는 탐지 결과와 실제 전달값을 따로 확인합니다.</p>
+
+          <section class="hands-on" aria-labelledby="h09-code-title">
+            <div>
+              <p class="label">H09 · LEARNER-OWNED PRIVACY POLICY</p>
+              <h3 id="h09-code-title">이메일과 합성 주민번호를 전달 전에 가리기</h3>
+              <p><code>guided-labs/h09-presidio-redaction/policy.py</code>의 Starter는 이메일만 찾고, 가린 후보를 만들어도 마지막에 원문을 전달합니다. 공식 한국 주민등록번호 인식기를 등록하고, 가린 문자열을 실제 전달값으로 선택합니다.</p>
+              <pre>from presidio_analyzer.predefined_recognizers import KrRrnRecognizer
+
+ENTITIES = ("EMAIL_ADDRESS", "KR_RRN")
+
+# 기본 비활성인 공식 한국 주민등록번호 인식기를 영어 pipeline에 연결합니다.
+analyzer.registry.add_recognizer(
+    KrRrnRecognizer(supported_language=LANGUAGE)
+)
+
+# Analyzer가 찾은 구간을 되돌릴 수 없는 Entity 표지로 바꿉니다.
+operators = {
+    finding.entity_type: OperatorConfig(
+        "replace", {"new_value": f"&lt;{finding.entity_type}&gt;"}
+    )
+    for finding in findings
+}
+
+# 계산만 하고 원문을 보내지 말고, 비식별화 결과를 실제 다음 단계에 전달합니다.
+"released_text": sanitized,</pre>
+              <p><code>KrRrnRecognizer</code>의 점수는 번호가 실제 사람의 것임을 증명하지 않습니다. 이 실습의 번호는 교육용 합성값이며, 개인정보처럼 보이는 문자열을 다음 단계에 원문으로 보내지 않는 경계를 확인합니다.</p>
+              <p>저장한 정책을 image에 넣고 H09 learner 서비스만 다시 연결합니다. 별도 Delivery Sink는 수강생 코드를 실행하지 않으며 실제로 받은 byte의 digest만 기록합니다.</p>
+              <pre>docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  build guided-h09-presidio-redaction
+docker compose \
+  --env-file llm-security-control-plane/.state/guided-course.env \
+  --file examples/security-monitoring/compose.guided.yaml \
+  up -d --no-deps --force-recreate guided-h09-presidio-redaction</pre>
+            </div>
+          </section>
+
+          <div class="actions single">
+            <span class="action-control">
+              <button id="h09-verify" class="primary" aria-describedby="h09-verify-help">H09 현재 구현 검증</button>
+              <button class="help-trigger" type="button" aria-label="H09 현재 구현 검증 작업 설명" aria-expanded="false" aria-controls="h09-verify-help">i</button>
+              <span id="h09-verify-help" class="action-tooltip" role="tooltip">서버가 정상 문장 하나와 합성 이메일·주민번호가 든 입력·출력 후보 세 개를 H09 앱에 보냅니다. 앱이 계산했다고 말한 값만 믿지 않고 별도 Delivery Sink가 실제로 받은 digest를 확인합니다. 정상 문장은 그대로이고 위험 문장은 Entity 표지로 바뀌어야 PASS입니다. 실제 고객 정보나 Bedrock 모델은 사용하지 않습니다.</span>
+            </span>
+          </div>
+        </div>
+
         <div id="h21-work" class="lab-workspace" hidden>
           <p>Agent가 고른 모델·MCP Server·Tool은 실행 후보일 뿐 권한이 아닙니다. H21에서는 인증된 주체의 서버 정책으로 허용목록과 Tool 횟수·결과 크기·상태 소유자를 제한합니다.</p>
           <div class="cost-note"><strong>독립 실행</strong><span>H21은 H01·H02·H22의 source, 상태와 AWS 자원을 사용하지 않습니다. 결정적 Provider fixture와 H21 전용 MCP Server 두 개로 downstream 호출 여부를 검증합니다.</span></div>

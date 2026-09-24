@@ -94,6 +94,8 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         os.environ["GUIDED_VERIFIER_LAB06_TOKEN"] = "verifier-lab06"
         os.environ["GUIDED_VERIFIER_LAB07_TOKEN"] = "verifier-lab07"
         os.environ["GUIDED_VERIFIER_LAB08_TOKEN"] = "verifier-lab08"
+        os.environ["GUIDED_VERIFIER_LAB09_TOKEN"] = "verifier-lab09"
+        os.environ["GUIDED_H09_SINK_VERIFIER_TOKEN"] = "verifier-h09-sink"
         os.environ["GUIDED_H06_PROVIDER_VERIFIER_TOKEN"] = "verifier-h06-provider"
         os.environ["GUIDED_H07_GATEWAY_VERIFIER_TOKEN"] = "verifier-h07-gateway"
         os.environ["GUIDED_H08_GATEWAY_VERIFIER_TOKEN"] = "verifier-h08-gateway"
@@ -2004,6 +2006,209 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         )
         self.assertEqual(first.json()["course_verdict"], "PASS")
         self.assertEqual(replay.json()["course_verdict"], "ERR")
+
+    def h09_fixture(self, suite_id: str, *, fixed: bool, tamper: str = ""):
+        started_at = "2026-09-24T03:00:00+00:00"
+        contracts = {
+            "clean": (
+                "input",
+                "공개 상태 페이지는 정상입니다.",
+                "공개 상태 페이지는 정상입니다.",
+                None,
+            ),
+            "input-email": (
+                "input",
+                "검토 뒤 보고서를 learner@example.com 주소로 보내 주세요.",
+                "검토 뒤 보고서를 <EMAIL_ADDRESS> 주소로 보내 주세요.",
+                "EMAIL_ADDRESS",
+            ),
+            "input-kr-rrn": (
+                "input",
+                "교육용 합성 주민번호는 900101-1234568 입니다.",
+                "교육용 합성 주민번호는 <KR_RRN> 입니다.",
+                "KR_RRN",
+            ),
+            "output-email": (
+                "output",
+                "처리 결과를 security-team@example.com 주소로 보냈습니다.",
+                "처리 결과를 <EMAIL_ADDRESS> 주소로 보냈습니다.",
+                "EMAIL_ADDRESS",
+            ),
+        }
+        recognizers = [
+            {
+                "module": "presidio_analyzer.predefined_recognizers.generic.email_recognizer",
+                "class": "EmailRecognizer",
+            }
+        ]
+        entities = ["EMAIL_ADDRESS"]
+        if fixed:
+            recognizers.append(
+                {
+                    "module": "presidio_analyzer.predefined_recognizers.country_specific.korea.kr_rrn_recognizer",
+                    "class": "KrRrnRecognizer",
+                }
+            )
+            entities.append("KR_RRN")
+
+        receipt_cases = []
+        capabilities = []
+        deliveries = []
+        for index, (case_id, (stage, raw, safe, entity)) in enumerate(contracts.items(), 1):
+            execution_id = f"09000000-0000-0000-0000-{index:012d}"
+            delivery_id = f"19000000-0000-0000-0000-{index:012d}"
+            capability_digest = hashlib.sha256(f"{suite_id}:{case_id}".encode()).hexdigest()
+            detected = entity in entities if entity else False
+            candidate = safe if detected else raw
+            released = safe if fixed and entity else raw
+            detections = []
+            if detected:
+                marker = "900101-1234568" if entity == "KR_RRN" else (
+                    "learner@example.com" if case_id == "input-email" else "security-team@example.com"
+                )
+                detections = [
+                    {
+                        "entity_type": entity,
+                        "start": raw.index(marker),
+                        "end": raw.index(marker) + len(marker),
+                        "score": 0.85,
+                    }
+                ]
+            receipt_cases.append(
+                {
+                    "case_id": case_id,
+                    "execution_id": execution_id,
+                    "delivery_id": delivery_id,
+                    "stage": stage,
+                    "input_digest": hashlib.sha256(raw.encode()).hexdigest(),
+                    "candidate_digest": hashlib.sha256(candidate.encode()).hexdigest(),
+                    "released_digest": hashlib.sha256(released.encode()).hexdigest(),
+                    "released_bytes": len(released.encode()),
+                    "entities": entities,
+                    "recognizers": recognizers,
+                    "operator": "replace",
+                    "detections": detections,
+                    "capability_digest": capability_digest,
+                }
+            )
+            capabilities.append(
+                {
+                    "capability_digest": capability_digest,
+                    "suite_id": suite_id,
+                    "execution_id": execution_id,
+                    "case_id": case_id,
+                    "issued_at": "2026-09-24T03:00:00.100000+00:00",
+                    "expires_at": "2026-09-24T03:15:00.100000+00:00",
+                    "status": "completed",
+                    "consumed_at": "2026-09-24T03:00:01+00:00",
+                }
+            )
+            deliveries.append(
+                {
+                    "delivery_id": delivery_id,
+                    "capability_digest": capability_digest,
+                    "suite_id": suite_id,
+                    "execution_id": execution_id,
+                    "case_id": case_id,
+                    "delivered_digest": hashlib.sha256(released.encode()).hexdigest(),
+                    "delivered_bytes": len(released.encode()),
+                    "raw_marker_observed": bool(entity and released == raw),
+                    "observed_at": "2026-09-24T03:00:01+00:00",
+                }
+            )
+
+        build = {
+            "component": "guided-h09-presidio-redaction",
+            "source_digest": "9" * 64,
+            "scaffold_digest": self.server.H09_SCAFFOLD_DIGEST,
+            "framework": "microsoft-presidio",
+            "framework_version": "2.2.362",
+            "entities": entities,
+            "recognizers": recognizers,
+            "case_ids": list(contracts),
+        }
+        receipt = {
+            "suite_id": suite_id,
+            "started_at": started_at,
+            "observed_at": "2026-09-24T03:00:02+00:00",
+            "source_digest": build["source_digest"],
+            "scaffold_digest": self.server.H09_SCAFFOLD_DIGEST,
+            "framework": "microsoft-presidio",
+            "framework_version": "2.2.362",
+            "cases": receipt_cases,
+        }
+        ledger = {
+            "suite_id": suite_id,
+            "started_at": started_at,
+            "created_at": "2026-09-24T03:00:00.050000+00:00",
+            "closed_at": "2026-09-24T03:00:03+00:00",
+            "capabilities": capabilities,
+            "deliveries": deliveries,
+        }
+        if tamper == "delivery":
+            ledger["deliveries"][1]["delivered_digest"] = "f" * 64
+        elif tamper == "recognizer":
+            build["recognizers"][-1]["module"] = "learner.custom_regex"
+
+        def get(url, **_kwargs):
+            if url.endswith("/v1/build-info"):
+                return FakeResponse(build)
+            if "/v1/receipts/" in url:
+                return FakeResponse(receipt)
+            if url.endswith(f"/v1/suites/{suite_id}/ledger"):
+                return FakeResponse(ledger)
+            return FakeResponse({"detail": "not found"}, status_code=404)
+
+        return get
+
+    def verify_h09(self, suite_id: str, *, fixed: bool, tamper: str = ""):
+        with patch.object(
+            self.server.httpx,
+            "get",
+            self.h09_fixture(suite_id, fixed=fixed, tamper=tamper),
+        ):
+            return self.client.post(
+                "/v1/verify/h09",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": "2026-09-24T03:00:00+00:00",
+                },
+                headers={"Authorization": "Bearer control-verifier"},
+            )
+
+    def test_h09_starter_raw_delivery_is_hit(self):
+        response = self.verify_h09(
+            "09000000-0000-0000-0001-000000000001", fixed=False
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "HIT")
+        self.assertEqual(
+            response.json()["result"]["raw_risk_cases"],
+            ["input-email", "input-kr-rrn", "output-email"],
+        )
+
+    def test_h09_fixed_policy_is_pass(self):
+        response = self.verify_h09(
+            "09000000-0000-0000-0001-000000000002", fixed=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "PASS")
+        self.assertTrue(response.json()["result"]["official_kr_rrn"])
+        self.assertEqual(response.json()["result"]["raw_risk_cases"], [])
+
+    def test_h09_tampered_delivery_and_recognizer_are_err(self):
+        delivery = self.verify_h09(
+            "09000000-0000-0000-0001-000000000003",
+            fixed=True,
+            tamper="delivery",
+        )
+        recognizer = self.verify_h09(
+            "09000000-0000-0000-0001-000000000004",
+            fixed=True,
+            tamper="recognizer",
+        )
+        self.assertEqual(delivery.json()["course_verdict"], "ERR")
+        self.assertEqual(recognizer.json()["course_verdict"], "ERR")
 
 
 if __name__ == "__main__":

@@ -6,19 +6,19 @@ schema_version: 1
 course_id: tenant-03-guided-llm-security
 duration_minutes: 1320
 tabs:
-  - {id: 01-nova, hands_on: [H01], hands_on_status: implemented, practice: P01, practice_status: planned}
-  - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: implemented, implemented_hands_on: [H02, H03], practice: P02, practice_status: planned}
-  - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: implemented, implemented_hands_on: [H04], practice: P03, practice_status: planned}
-  - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: implemented, implemented_hands_on: [H05, H06], practice: P04, practice_status: planned}
-  - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: implemented, implemented_hands_on: [H07, H08], practice: P05, practice_status: planned}
-  - {id: 06-privacy-output, hands_on: [H09, H10], hands_on_status: planned, practice: P06, practice_status: planned}
-  - {id: 07-rag-boundary, hands_on: [H11, H12], hands_on_status: planned, practice: P07, practice_status: planned}
-  - {id: 08-promptfoo, hands_on: [H13], hands_on_status: planned, practice: P08, practice_status: planned}
-  - {id: 09-garak-pyrit, hands_on: [H14, H15], hands_on_status: planned, practice: P09, practice_status: planned}
-  - {id: 10-policy-promotion, hands_on: [H16], hands_on_status: planned, practice: P10, practice_status: planned}
-  - {id: 11-raw-observability, hands_on: [H17, H18], hands_on_status: planned, practice: P11, practice_status: planned}
-  - {id: 12-incident-alert, hands_on: [H19, H20], hands_on_status: planned, practice: P12, practice_status: planned}
-  - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: implemented, implemented_hands_on: [H21, H22], practice: P13, practice_status: planned}
+  - {id: 01-nova, hands_on: [H01], hands_on_status: implemented}
+  - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: implemented, implemented_hands_on: [H02, H03]}
+  - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: implemented, implemented_hands_on: [H04]}
+  - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: implemented, implemented_hands_on: [H05, H06]}
+  - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: implemented, implemented_hands_on: [H07, H08]}
+  - {id: 06-privacy-output, hands_on: [H09, H10], hands_on_status: partial, implemented_hands_on: [H09]}
+  - {id: 07-rag-boundary, hands_on: [H11, H12], hands_on_status: planned}
+  - {id: 08-promptfoo, hands_on: [H13], hands_on_status: planned}
+  - {id: 09-garak-pyrit, hands_on: [H14, H15], hands_on_status: planned}
+  - {id: 10-policy-promotion, hands_on: [H16], hands_on_status: planned}
+  - {id: 11-raw-observability, hands_on: [H17, H18], hands_on_status: planned}
+  - {id: 12-incident-alert, hands_on: [H19, H20], hands_on_status: planned}
+  - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: implemented, implemented_hands_on: [H21, H22]}
 
 hands_on_H01:
   executor: guided-h01-gateway
@@ -252,6 +252,46 @@ hands_on_H08:
       fixed_normal: self_check_input=No,main=1
       fixed_risk: self_check_input=Yes,main=0,main_capability=closed_unused
       malformed_classifier: ERR
+
+hands_on_H09:
+  executor: guided-h09-presidio-redaction
+  source_path: guided-labs/h09-presidio-redaction/policy.py
+  control_endpoint: /api/hands-on/H09/verify
+  executor_endpoint: /v1/run
+  sink: guided-h09-delivery-sink
+  provider: microsoft-presidio
+  verifier: guided-evidence-verifier
+  framework_version: 2.2.362
+  required_evidence:
+    build:
+      - source_digest
+      - scaffold_digest
+      - framework_version
+      - entities
+      - recognizers[].{module,class}
+    learner_receipt:
+      - suite_id
+      - started_at
+      - observed_at
+      - cases[].input_digest
+      - cases[].candidate_digest
+      - cases[].released_digest
+      - cases[].detections[].{entity_type,start,end,score}
+      - cases[].operator
+      - cases[].delivery_id
+    sink_ledger:
+      - capability_digest
+      - execution_id
+      - case_id
+      - status
+      - delivered_digest
+      - delivered_bytes
+      - raw_marker_observed
+      - observed_at
+    verdict_contract:
+      starter_hit: synthetic-pii-reaches-delivery-sink
+      fixed_pass: clean-preserved-and-pii-replaced-before-delivery
+      malformed_or_stale: ERR
 
 hands_on_H22:
   executor: guided-h22-host

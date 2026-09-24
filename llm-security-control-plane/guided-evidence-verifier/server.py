@@ -26,6 +26,10 @@ LAB05_URL = os.getenv("GUIDED_LAB05_URL", "http://guided-h05-nemo-dialog:8000")
 LAB06_URL = os.getenv("GUIDED_LAB06_URL", "http://guided-h06-nemo-action:8000")
 LAB07_URL = os.getenv("GUIDED_LAB07_URL", "http://guided-h07-content-safety:8000")
 LAB08_URL = os.getenv("GUIDED_LAB08_URL", "http://guided-h08-self-check-input:8000")
+LAB09_URL = os.getenv("GUIDED_LAB09_URL", "http://guided-h09-presidio-redaction:8000")
+H09_SINK_URL = os.getenv(
+    "GUIDED_H09_SINK_URL", "http://guided-h09-delivery-sink:8000"
+)
 H06_PROVIDER_URL = os.getenv(
     "GUIDED_H06_PROVIDER_URL", "http://guided-h06-action-provider:8000"
 )
@@ -33,6 +37,7 @@ H05_SCAFFOLD_DIGEST = "bc28e8a56e4981dc86bed071c6cd844a284371ba3d59c7e918738d427
 H06_SCAFFOLD_DIGEST = "2658110858c7d9cb51849449d39dd7925669991ee61b6ee88e6f7827aa56c9f1"
 H07_SCAFFOLD_DIGEST = "cbf98b7fb69ece632ab0dc2f14d6d9f7a0f415a5856917603488fe403796c2bd"
 H08_SCAFFOLD_DIGEST = "072ab818ac90208c059fe6639776e34a242d590e87ac4d1c7e7fe4d95c93771c"
+H09_SCAFFOLD_DIGEST = "42dc9cf43841464933453296660a0a1b716d85df51e3093472311a8ac1fc2bd0"
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
 H21_PROVIDER_URL = os.getenv(
@@ -59,6 +64,8 @@ LAB05_TOKEN = os.environ["GUIDED_VERIFIER_LAB05_TOKEN"]
 LAB06_TOKEN = os.environ["GUIDED_VERIFIER_LAB06_TOKEN"]
 LAB07_TOKEN = os.environ["GUIDED_VERIFIER_LAB07_TOKEN"]
 LAB08_TOKEN = os.environ["GUIDED_VERIFIER_LAB08_TOKEN"]
+LAB09_TOKEN = os.environ["GUIDED_VERIFIER_LAB09_TOKEN"]
+H09_SINK_TOKEN = os.environ["GUIDED_H09_SINK_VERIFIER_TOKEN"]
 H06_PROVIDER_TOKEN = os.environ["GUIDED_H06_PROVIDER_VERIFIER_TOKEN"]
 H07_GATEWAY_TOKEN = os.environ["GUIDED_H07_GATEWAY_VERIFIER_TOKEN"]
 H08_GATEWAY_TOKEN = os.environ["GUIDED_H08_GATEWAY_VERIFIER_TOKEN"]
@@ -199,6 +206,12 @@ class H07VerifyRequest(BaseModel):
 
 
 class H08VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    started_at: str
+
+
+class H09VerifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
@@ -439,6 +452,24 @@ def h08_err_envelope(request: H08VerifyRequest, reason: str) -> dict:
         "evidence": [],
         "reason": reason,
         "next_check": "NeMo self check input Rail과 닫힌 Gateway 역할별 capability 원장이 같은 H08 suite인지 확인합니다.",
+    }
+
+
+def h09_err_envelope(request: H09VerifyRequest, reason: str) -> dict:
+    return {
+        "lab_id": "06-privacy-output",
+        "activity_id": "H09",
+        "execution_id": request.suite_id,
+        "execution_kind": "h09-presidio-delivery-suite",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": "ERR",
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [],
+        "evidence": [],
+        "reason": reason,
+        "next_check": "Presidio receipt와 닫힌 H09 Delivery Sink 원장이 같은 suite인지 확인합니다.",
     }
 
 
@@ -3597,4 +3628,353 @@ def verify_h08(
         },
         "reason": reason,
         "next_check": "정상 두 건과 위험 두 건의 exact Yes/No, Main 호출과 닫힌 capability를 나란히 확인합니다.",
+    }
+
+
+@app.post("/v1/verify/h09")
+def verify_h09(
+    request: H09VerifyRequest,
+    _authorized: None = Depends(require_control),
+) -> dict:
+    contracts = {
+        "clean": {
+            "stage": "input",
+            "raw": "공개 상태 페이지는 정상입니다.",
+            "safe": "공개 상태 페이지는 정상입니다.",
+            "entity": None,
+            "marker": None,
+        },
+        "input-email": {
+            "stage": "input",
+            "raw": "검토 뒤 보고서를 learner@example.com 주소로 보내 주세요.",
+            "safe": "검토 뒤 보고서를 <EMAIL_ADDRESS> 주소로 보내 주세요.",
+            "entity": "EMAIL_ADDRESS",
+            "marker": "learner@example.com",
+        },
+        "input-kr-rrn": {
+            "stage": "input",
+            "raw": "교육용 합성 주민번호는 900101-1234568 입니다.",
+            "safe": "교육용 합성 주민번호는 <KR_RRN> 입니다.",
+            "entity": "KR_RRN",
+            "marker": "900101-1234568",
+        },
+        "output-email": {
+            "stage": "output",
+            "raw": "처리 결과를 security-team@example.com 주소로 보냈습니다.",
+            "safe": "처리 결과를 <EMAIL_ADDRESS> 주소로 보냈습니다.",
+            "entity": "EMAIL_ADDRESS",
+            "marker": "security-team@example.com",
+        },
+    }
+    case_order = list(contracts)
+    risk_ids = case_order[1:]
+    hexadecimal = lambda value: isinstance(value, str) and len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
+    try:
+        build_response = httpx.get(
+            f"{LAB09_URL}/v1/build-info",
+            headers={"Authorization": f"Bearer {LAB09_TOKEN}"},
+            timeout=10.0,
+        )
+        receipt_response = httpx.get(
+            f"{LAB09_URL}/v1/receipts/{request.suite_id}",
+            headers={"Authorization": f"Bearer {LAB09_TOKEN}"},
+            timeout=10.0,
+        )
+        ledger_response = httpx.get(
+            f"{H09_SINK_URL}/v1/suites/{request.suite_id}/ledger",
+            headers={"Authorization": f"Bearer {H09_SINK_TOKEN}"},
+            timeout=10.0,
+        )
+    except httpx.RequestError:
+        return h09_err_envelope(
+            request, "H09 learner 또는 Delivery Sink 증거 endpoint에 연결할 수 없습니다."
+        )
+    if any(response.status_code != 200 for response in (build_response, receipt_response, ledger_response)):
+        return h09_err_envelope(
+            request, "현재 H09 build·receipt·닫힌 Delivery Sink 원장을 모두 확인할 수 없습니다."
+        )
+
+    build = build_response.json()
+    receipt = receipt_response.json()
+    ledger = ledger_response.json()
+    source_digest = build.get("source_digest")
+    recognizers = build.get("recognizers")
+    entities = build.get("entities")
+    if not all(
+        (
+            build.get("component") == "guided-h09-presidio-redaction",
+            build.get("framework") == "microsoft-presidio",
+            build.get("framework_version") == "2.2.362",
+            build.get("scaffold_digest") == H09_SCAFFOLD_DIGEST,
+            build.get("case_ids") == case_order,
+            entities in (["EMAIL_ADDRESS"], ["EMAIL_ADDRESS", "KR_RRN"]),
+            isinstance(recognizers, list),
+            all(
+                isinstance(item, dict)
+                and set(item) == {"module", "class"}
+                and isinstance(item["module"], str)
+                and isinstance(item["class"], str)
+                for item in recognizers
+            ),
+            hexadecimal(source_digest),
+        )
+    ):
+        return h09_err_envelope(
+            request, "현재 H09 build가 고정 Presidio 2.2.362 scaffold 계약과 다릅니다."
+        )
+    official_kr_rrn = any(
+        item["class"] == "KrRrnRecognizer"
+        and item["module"].startswith("presidio_analyzer.predefined_recognizers")
+        for item in recognizers
+    )
+    if ("KR_RRN" in entities) is not official_kr_rrn:
+        return h09_err_envelope(
+            request, "KR_RRN Entity 설정과 공식 KrRrnRecognizer runtime 등록 증거가 다릅니다."
+        )
+
+    try:
+        suite_started_at = parse_time(request.started_at)
+        receipt_started_at = parse_time(receipt["started_at"])
+        receipt_observed_at = parse_time(receipt["observed_at"])
+        ledger_started_at = parse_time(ledger["started_at"])
+        ledger_created_at = parse_time(ledger["created_at"])
+        ledger_closed_at = parse_time(ledger["closed_at"])
+    except (KeyError, TypeError, ValueError):
+        return h09_err_envelope(request, "H09 suite·receipt·ledger의 시각 증거가 잘못됐습니다.")
+    if not all(
+        (
+            receipt.get("suite_id") == request.suite_id,
+            receipt.get("started_at") == request.started_at,
+            receipt_started_at == suite_started_at,
+            receipt_observed_at >= suite_started_at,
+            receipt.get("source_digest") == source_digest,
+            receipt.get("scaffold_digest") == H09_SCAFFOLD_DIGEST,
+            receipt.get("framework") == "microsoft-presidio",
+            receipt.get("framework_version") == "2.2.362",
+            ledger.get("suite_id") == request.suite_id,
+            ledger.get("started_at") == request.started_at,
+            ledger_started_at == suite_started_at,
+            ledger_created_at >= suite_started_at,
+            ledger_closed_at >= receipt_observed_at,
+            ledger_closed_at <= datetime.now(timezone.utc),
+            isinstance(receipt.get("cases"), list),
+            isinstance(ledger.get("capabilities"), list),
+            isinstance(ledger.get("deliveries"), list),
+        )
+    ):
+        return h09_err_envelope(
+            request, "H09 source·suite·시각과 닫힌 Delivery Sink 원장이 같은 실행으로 연결되지 않습니다."
+        )
+
+    receipt_cases = receipt["cases"]
+    capabilities = ledger["capabilities"]
+    deliveries = ledger["deliveries"]
+    if any(
+        (
+            [item.get("case_id") for item in receipt_cases] != case_order,
+            [item.get("case_id") for item in capabilities] != case_order,
+            [item.get("case_id") for item in deliveries] != case_order,
+            len(receipt_cases) != 4,
+            len(capabilities) != 4,
+            len(deliveries) != 4,
+        )
+    ):
+        return h09_err_envelope(request, "H09의 네 고정 Case와 전달 증거가 완전하지 않습니다.")
+
+    cap_by_case = {item["case_id"]: item for item in capabilities}
+    delivery_by_case = {item["case_id"]: item for item in deliveries}
+    receipt_by_case = {item["case_id"]: item for item in receipt_cases}
+    execution_ids: set[str] = set()
+    delivery_ids: set[str] = set()
+    for case_id in case_order:
+        contract = contracts[case_id]
+        case = receipt_by_case[case_id]
+        capability = cap_by_case[case_id]
+        delivery = delivery_by_case[case_id]
+        raw_digest = hashlib.sha256(contract["raw"].encode()).hexdigest()
+        safe_digest = hashlib.sha256(contract["safe"].encode()).hexdigest()
+        expected_bytes = {
+            raw_digest: len(contract["raw"].encode()),
+            safe_digest: len(contract["safe"].encode()),
+        }
+        execution_id = case.get("execution_id")
+        delivery_id = case.get("delivery_id")
+        if any(
+            (
+                not isinstance(execution_id, str),
+                execution_id in execution_ids,
+                not isinstance(delivery_id, str),
+                delivery_id in delivery_ids,
+                case.get("stage") != contract["stage"],
+                case.get("input_digest") != raw_digest,
+                case.get("released_digest") not in {raw_digest, safe_digest},
+                case.get("released_bytes")
+                != expected_bytes.get(case.get("released_digest")),
+                case.get("entities") != entities,
+                case.get("recognizers") != recognizers,
+                case.get("operator") != "replace",
+                not isinstance(case.get("detections"), list),
+                not hexadecimal(case.get("candidate_digest")),
+                not hexadecimal(case.get("capability_digest")),
+            )
+        ):
+            return h09_err_envelope(request, f"{case_id}의 Presidio receipt가 잘못됐습니다.")
+        execution_ids.add(execution_id)
+        delivery_ids.add(delivery_id)
+        try:
+            issued_at = parse_time(capability["issued_at"])
+            expires_at = parse_time(capability["expires_at"])
+            consumed_at = parse_time(capability["consumed_at"])
+            delivered_at = parse_time(delivery["observed_at"])
+        except (KeyError, TypeError, ValueError):
+            return h09_err_envelope(request, f"{case_id}의 capability 시각 증거가 잘못됐습니다.")
+        if not all(
+            (
+                capability.get("status") == "completed",
+                capability.get("suite_id") == request.suite_id,
+                capability.get("execution_id") == execution_id,
+                capability.get("capability_digest") == case.get("capability_digest"),
+                suite_started_at <= ledger_created_at <= issued_at <= consumed_at,
+                consumed_at == delivered_at <= receipt_observed_at <= ledger_closed_at,
+                (expires_at - issued_at).total_seconds() == 900,
+                consumed_at < expires_at,
+                delivery.get("suite_id") == request.suite_id,
+                delivery.get("execution_id") == execution_id,
+                delivery.get("delivery_id") == delivery_id,
+                delivery.get("capability_digest") == case.get("capability_digest"),
+                delivery.get("delivered_digest") == case.get("released_digest"),
+                delivery.get("delivered_bytes") == case.get("released_bytes"),
+                type(delivery.get("raw_marker_observed")) is bool,
+            )
+        ):
+            return h09_err_envelope(request, f"{case_id}의 실제 전달 원장이 receipt와 다릅니다.")
+
+        detections = case["detections"]
+        entity = contract["entity"]
+        if entity is None:
+            if detections or case.get("candidate_digest") != raw_digest:
+                return h09_err_envelope(request, "정상 Case가 손상되거나 개인정보로 오탐됐습니다.")
+        elif entity == "KR_RRN" and not official_kr_rrn:
+            if detections or case.get("candidate_digest") != raw_digest:
+                return h09_err_envelope(request, "Starter의 미등록 KR_RRN 증거가 일관되지 않습니다.")
+        else:
+            marker_start = contract["raw"].index(contract["marker"])
+            marker_end = marker_start + len(contract["marker"])
+            matching = [item for item in detections if item.get("entity_type") == entity]
+            if len(matching) != 1 or not all(
+                (
+                    matching[0].get("start") == marker_start,
+                    matching[0].get("end") == marker_end,
+                    type(matching[0].get("score")) in {int, float},
+                    0.5 <= matching[0].get("score", 0) <= 1.0,
+                    case.get("candidate_digest") == safe_digest,
+                )
+            ):
+                return h09_err_envelope(
+                    request, f"{case_id}의 공식 Entity·span·score·비식별화 후보가 다릅니다."
+                )
+        expected_raw_observed = case.get("released_digest") == raw_digest and entity is not None
+        if delivery.get("raw_marker_observed") is not expected_raw_observed:
+            return h09_err_envelope(request, f"{case_id}의 원문 marker 관측값이 전달 digest와 다릅니다.")
+
+    raw_risk_cases = [
+        case_id
+        for case_id in risk_ids
+        if receipt_by_case[case_id]["released_digest"]
+        == hashlib.sha256(contracts[case_id]["raw"].encode()).hexdigest()
+    ]
+    if raw_risk_cases:
+        verdict = "HIT"
+        reason = "Presidio를 실행했지만 합성 개인정보 원문이 실제 Delivery Sink까지 전달됐습니다."
+        outcome = f"raw-delivered={len(raw_risk_cases)}"
+    elif all(
+        receipt_by_case[case_id]["released_digest"]
+        == hashlib.sha256(contracts[case_id]["safe"].encode()).hexdigest()
+        for case_id in case_order
+    ) and official_kr_rrn and entities == ["EMAIL_ADDRESS", "KR_RRN"]:
+        verdict = "PASS"
+        reason = "정상 문장은 유지되고 이메일·합성 주민번호는 공식 Presidio 결과로 치환된 뒤 전달됐습니다."
+        outcome = "raw-delivered=0"
+    else:
+        return h09_err_envelope(
+            request, "H09 결과가 원문 노출 HIT 또는 공식 Presidio 비식별화 PASS 계약과 일치하지 않습니다."
+        )
+
+    reservations = [
+        (f"h09-suite:{request.suite_id}", f"{request.suite_id}:suite"),
+        *[
+            (f"h09-capability:{item['capability_digest']}", f"{request.suite_id}:capability:{index}")
+            for index, item in enumerate(capabilities)
+        ],
+        *[
+            (f"h09-delivery:{item['delivery_id']}", f"{request.suite_id}:delivery:{index}")
+            for index, item in enumerate(deliveries)
+        ],
+    ]
+    if not reserve_provider_evidence_batch(reservations):
+        return h09_err_envelope(request, "예전 H09 suite·capability·전달 증거가 다시 사용됐습니다.")
+
+    return {
+        "lab_id": "06-privacy-output",
+        "activity_id": "H09",
+        "execution_id": request.suite_id,
+        "execution_kind": "h09-presidio-delivery-suite",
+        "started_at": request.started_at,
+        "status": "completed",
+        "course_verdict": verdict,
+        "verified_by": "guided-evidence-verifier",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [
+            {
+                "stage": "presidio_analyzer",
+                "attempted": True,
+                "outcome": "four-cases-completed",
+                "evidence_id": source_digest,
+            },
+            {
+                "stage": "presidio_anonymizer",
+                "attempted": True,
+                "outcome": "replace-operator-observed",
+                "evidence_id": request.suite_id,
+            },
+            {
+                "stage": "h09_delivery_sink",
+                "attempted": True,
+                "outcome": outcome,
+                "evidence_id": request.suite_id,
+            },
+        ],
+        "evidence": [
+            {
+                "source": "guided-h09-presidio-redaction",
+                "kind": "learner-suite",
+                "id": request.suite_id,
+                "observed_at": receipt["observed_at"],
+            },
+            *[
+                {
+                    "source": "guided-h09-delivery-sink",
+                    "kind": "delivery",
+                    "id": item["delivery_id"],
+                    "observed_at": item["observed_at"],
+                }
+                for item in deliveries
+            ],
+        ],
+        "result": {
+            "source_digest": source_digest,
+            "framework": "microsoft-presidio",
+            "framework_version": "2.2.362",
+            "entities": entities,
+            "official_kr_rrn": official_kr_rrn,
+            "cases": receipt_cases,
+            "capabilities": capabilities,
+            "deliveries": deliveries,
+            "delivery_count": len(deliveries),
+            "raw_risk_cases": raw_risk_cases,
+        },
+        "reason": reason,
+        "next_check": "각 Case의 Entity·span·score, 치환 후보와 실제 Sink 전달 digest를 나란히 확인합니다.",
     }

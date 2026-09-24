@@ -53,9 +53,11 @@ services:
       GUIDED_CONTROL_LAB06_TOKEN: ${GUIDED_CONTROL_LAB06_TOKEN:?Set GUIDED_CONTROL_LAB06_TOKEN}
       GUIDED_CONTROL_LAB07_TOKEN: ${GUIDED_CONTROL_LAB07_TOKEN:?Set GUIDED_CONTROL_LAB07_TOKEN}
       GUIDED_CONTROL_LAB08_TOKEN: ${GUIDED_CONTROL_LAB08_TOKEN:?Set GUIDED_CONTROL_LAB08_TOKEN}
+      GUIDED_CONTROL_LAB09_TOKEN: ${GUIDED_CONTROL_LAB09_TOKEN:?Set GUIDED_CONTROL_LAB09_TOKEN}
       GUIDED_H06_PROVIDER_CONTROL_TOKEN: ${GUIDED_H06_PROVIDER_CONTROL_TOKEN:?Set GUIDED_H06_PROVIDER_CONTROL_TOKEN}
       GUIDED_H07_GATEWAY_CONTROL_TOKEN: ${GUIDED_H07_GATEWAY_CONTROL_TOKEN:?Set GUIDED_H07_GATEWAY_CONTROL_TOKEN}
       GUIDED_H08_GATEWAY_CONTROL_TOKEN: ${GUIDED_H08_GATEWAY_CONTROL_TOKEN:?Set GUIDED_H08_GATEWAY_CONTROL_TOKEN}
+      GUIDED_H09_SINK_CONTROL_TOKEN: ${GUIDED_H09_SINK_CONTROL_TOKEN:?Set GUIDED_H09_SINK_CONTROL_TOKEN}
       GUIDED_CONTROL_H21_TOKEN: ${GUIDED_CONTROL_H21_TOKEN:?Set GUIDED_CONTROL_H21_TOKEN}
       GUIDED_CONTROL_H22_TOKEN: ${GUIDED_CONTROL_H22_TOKEN:?Set GUIDED_CONTROL_H22_TOKEN}
       GUIDED_CONTROL_VERIFIER_TOKEN: ${GUIDED_CONTROL_VERIFIER_TOKEN:?Set GUIDED_CONTROL_VERIFIER_TOKEN}
@@ -70,6 +72,8 @@ services:
       GUIDED_LAB06_URL: http://guided-h06-nemo-action:8000
       GUIDED_LAB07_URL: http://guided-h07-content-safety:8000
       GUIDED_LAB08_URL: http://guided-h08-self-check-input:8000
+      GUIDED_LAB09_URL: http://guided-h09-presidio-redaction:8000
+      GUIDED_H09_SINK_URL: http://guided-h09-delivery-sink:8000
       GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H22_HOST_URL: http://guided-h22-host:8000
@@ -88,6 +92,8 @@ services:
       guided-h06-action-provider: {condition: service_healthy}
       guided-h07-content-safety: {condition: service_healthy}
       guided-h08-self-check-input: {condition: service_healthy}
+      guided-h09-presidio-redaction: {condition: service_healthy}
+      guided-h09-delivery-sink: {condition: service_healthy}
       guided-h21-host: {condition: service_healthy}
       guided-h22-host: {condition: service_healthy}
       guided-evidence-verifier: {condition: service_healthy}
@@ -139,9 +145,11 @@ services:
       GUIDED_VERIFIER_LAB06_TOKEN: ${GUIDED_VERIFIER_LAB06_TOKEN:?Set GUIDED_VERIFIER_LAB06_TOKEN}
       GUIDED_VERIFIER_LAB07_TOKEN: ${GUIDED_VERIFIER_LAB07_TOKEN:?Set GUIDED_VERIFIER_LAB07_TOKEN}
       GUIDED_VERIFIER_LAB08_TOKEN: ${GUIDED_VERIFIER_LAB08_TOKEN:?Set GUIDED_VERIFIER_LAB08_TOKEN}
+      GUIDED_VERIFIER_LAB09_TOKEN: ${GUIDED_VERIFIER_LAB09_TOKEN:?Set GUIDED_VERIFIER_LAB09_TOKEN}
       GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ${GUIDED_H06_PROVIDER_VERIFIER_TOKEN:?Set GUIDED_H06_PROVIDER_VERIFIER_TOKEN}
       GUIDED_H07_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H07_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H07_GATEWAY_VERIFIER_TOKEN}
       GUIDED_H08_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H08_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H08_GATEWAY_VERIFIER_TOKEN}
+      GUIDED_H09_SINK_VERIFIER_TOKEN: ${GUIDED_H09_SINK_VERIFIER_TOKEN:?Set GUIDED_H09_SINK_VERIFIER_TOKEN}
       GUIDED_VERIFIER_H21_TOKEN: ${GUIDED_VERIFIER_H21_TOKEN:?Set GUIDED_VERIFIER_H21_TOKEN}
       GUIDED_VERIFIER_H22_TOKEN: ${GUIDED_VERIFIER_H22_TOKEN:?Set GUIDED_VERIFIER_H22_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
@@ -153,6 +161,8 @@ services:
       GUIDED_LAB06_URL: http://guided-h06-nemo-action:8000
       GUIDED_LAB07_URL: http://guided-h07-content-safety:8000
       GUIDED_LAB08_URL: http://guided-h08-self-check-input:8000
+      GUIDED_LAB09_URL: http://guided-h09-presidio-redaction:8000
+      GUIDED_H09_SINK_URL: http://guided-h09-delivery-sink:8000
       GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H21_PROVIDER_URL: http://guided-h21-provider:8000
@@ -172,6 +182,8 @@ services:
       guided-h06-action-provider: {condition: service_healthy}
       guided-h07-content-safety: {condition: service_healthy}
       guided-h08-self-check-input: {condition: service_healthy}
+      guided-h09-presidio-redaction: {condition: service_healthy}
+      guided-h09-delivery-sink: {condition: service_healthy}
       guided-h21-host: {condition: service_healthy}
       guided-h21-provider: {condition: service_healthy}
       guided-h21-trusted-mcp: {condition: service_healthy}
@@ -394,6 +406,47 @@ services:
       timeout: 3s
       retries: 45
 
+  guided-h09-delivery-sink:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h09-delivery-sink/Containerfile
+    image: localhost/llm-security-guided-h09-delivery-sink:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h09-delivery-sink
+    environment:
+      GUIDED_H09_SINK_CONTROL_TOKEN: ${GUIDED_H09_SINK_CONTROL_TOKEN:?Set GUIDED_H09_SINK_CONTROL_TOKEN}
+      GUIDED_H09_SINK_VERIFIER_TOKEN: ${GUIDED_H09_SINK_VERIFIER_TOKEN:?Set GUIDED_H09_SINK_VERIFIER_TOKEN}
+      GUIDED_H09_CAPABILITY_SECRET: ${GUIDED_H09_CAPABILITY_SECRET:?Set GUIDED_H09_CAPABILITY_SECRET}
+      GUIDED_H09_SINK_DATABASE: /state/ledger.sqlite3
+    volumes: [guided-h09-sink-ledger:/state:rw]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  guided-h09-presidio-redaction:
+    <<: *guided-service
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=128m"]
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h09-presidio-redaction/Containerfile
+    image: localhost/llm-security-guided-h09-presidio-redaction:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h09-presidio-redaction
+    environment:
+      GUIDED_CONTROL_LAB09_TOKEN: ${GUIDED_CONTROL_LAB09_TOKEN:?Set GUIDED_CONTROL_LAB09_TOKEN}
+      GUIDED_VERIFIER_LAB09_TOKEN: ${GUIDED_VERIFIER_LAB09_TOKEN:?Set GUIDED_VERIFIER_LAB09_TOKEN}
+      GUIDED_H09_SINK_URL: http://guided-h09-delivery-sink:8000
+      GUIDED_H09_DATABASE: /state/receipts.sqlite3
+    volumes: [guided-h09-receipts:/state:rw]
+    depends_on:
+      guided-h09-delivery-sink: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
   guided-h22-mcp-server:
     <<: *guided-service
     tmpfs:
@@ -541,3 +594,5 @@ networks:
 volumes:
   guided-verifier-state:
   guided-h08-receipts:
+  guided-h09-receipts:
+  guided-h09-sink-ledger:

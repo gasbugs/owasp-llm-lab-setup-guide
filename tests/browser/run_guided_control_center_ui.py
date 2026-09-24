@@ -50,6 +50,7 @@ def main() -> int:
             else route.abort("blockedbyclient"),
         )
         page = context.new_page()
+        page.emulate_media(color_scheme="light")
         page.on("request", lambda request: requests.append(request.url))
         response = page.goto(origin, wait_until="networkidle", timeout=timeout_ms)
         assert response is not None
@@ -96,6 +97,7 @@ def main() -> int:
         h06_tip_text = page.locator("#h06-verify-help").inner_text()
         h07_tip_text = page.locator("#h07-verify-help").inner_text()
         h08_tip_text = page.locator("#h08-verify-help").inner_text()
+        h09_tip_text = page.locator("#h09-verify-help").inner_text()
         page.set_viewport_size({"width": 1181, "height": 900})
         page.locator('.tab[data-tab-index="3"]').click()
         page.locator('[aria-controls="h05-verify-help"]').click()
@@ -129,6 +131,17 @@ def main() -> int:
             }"""
         )
         page.locator('[aria-controls="h08-verify-help"]').press("Escape")
+        page.locator('.tab[data-tab-index="5"]').click()
+        page.locator('[aria-controls="h09-verify-help"]').click()
+        page.locator("#h09-verify-help").wait_for(state="visible")
+        h09_desktop_tip_inside = page.evaluate(
+            """() => {
+                const workbench = document.querySelector(".workbench").getBoundingClientRect();
+                const tooltip = document.querySelector("#h09-verify-help").getBoundingClientRect();
+                return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
+            }"""
+        )
+        page.locator('[aria-controls="h09-verify-help"]').press("Escape")
         page.set_viewport_size({"width": 1440, "height": 1100})
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
@@ -141,11 +154,20 @@ def main() -> int:
         h22_hands_on = wait_for_result(page, timeout_ms, h21_hands_on.get("execution_id"))
         h22_verdict = page.locator("#verdict strong").inner_text()
 
+        # H09은 다른 Hands-on 상태나 AWS 없이 전용 Presidio 앱과 Delivery Sink를 사용한다.
+        page.locator('.tab[data-tab-index="5"]').click()
+        page.locator("#h09-verify").click()
+        h09_hands_on = wait_for_result(
+            page, timeout_ms, h22_hands_on.get("execution_id")
+        )
+        h09_verdict = page.locator("#verdict strong").inner_text()
+        h09_raw_text = page.locator("#raw").inner_text()
+
         # H08은 H07 상태 없이 전용 Prompt, NeMo service와 Gateway 원장을 사용한다.
         page.locator('.tab[data-tab-index="4"]').click()
         page.locator("#h08-verify").click()
         h08_hands_on = wait_for_result(
-            page, timeout_ms, h22_hands_on.get("execution_id")
+            page, timeout_ms, h09_hands_on.get("execution_id")
         )
         h08_verdict = page.locator("#verdict strong").inner_text()
         h08_raw_text = page.locator("#raw").inner_text()
@@ -239,6 +261,17 @@ def main() -> int:
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
+        page.locator('[aria-controls="h08-verify-help"]').press("Escape")
+        page.locator('.tab[data-tab-index="5"]').click()
+        page.locator('[aria-controls="h09-verify-help"]').click()
+        page.locator("#h09-verify-help").wait_for(state="visible")
+        h09_mobile_tip_inside = page.evaluate(
+            """() => {
+                const workbench = document.querySelector(".workbench").getBoundingClientRect();
+                const tooltip = document.querySelector("#h09-verify-help").getBoundingClientRect();
+                return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
+            }"""
+        )
         browser.close()
 
     internal_requests = sum(
@@ -252,14 +285,14 @@ def main() -> int:
         for url in requests
     )
     checks = {
-        "tabs": tab_count == 13 and locked_tabs == 7,
+        "tabs": tab_count == 13 and locked_tabs == 6,
         "official_links": official_links == 2,
         "csp": "object-src 'none'" in csp and "frame-ancestors 'none'" in csp,
         "session": browser_cookie_visible == "",
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
         "panel_boundary": panel_boundary,
-        "action_tooltips": tooltip_count == 15
+        "action_tooltips": tooltip_count == 16
         and preflight_focus_visible
         and preflight_tip_visible
         and preflight_tip_collapsed
@@ -281,11 +314,15 @@ def main() -> int:
         and "현재 H08 NeMo 서비스" in h08_tip_text
         and "exact Yes·No" in h08_tip_text
         and "다른 공격 문장까지 모두 막는다는 뜻은 아닙니다" in h08_tip_text
+        and "별도 Delivery Sink" in h09_tip_text
+        and "실제 고객 정보나 Bedrock 모델은 사용하지 않습니다" in h09_tip_text
         and desktop_tip_inside
         and h07_desktop_tip_inside
         and h08_desktop_tip_inside
+        and h09_desktop_tip_inside
         and mobile_tip_inside
-        and h08_mobile_tip_inside,
+        and h08_mobile_tip_inside
+        and h09_mobile_tip_inside,
         "chat": bool(chat_text.strip())
         and chat_text != "모델 응답을 받지 못했습니다."
         and "requested 512" in chat_meta
@@ -372,6 +409,18 @@ def main() -> int:
         and len(h08_hands_on.get("result", {}).get("cases", [])) == 4
         and len(h08_hands_on.get("result", {}).get("provider_calls", [])) == 8
         and '"capability"' not in h08_raw_text,
+        "h09_hands_on": h09_verdict == "HIT"
+        and h09_hands_on.get("verified_by") == "guided-evidence-verifier"
+        and h09_hands_on.get("result", {}).get("framework") == "microsoft-presidio"
+        and h09_hands_on.get("result", {}).get("entities") == ["EMAIL_ADDRESS"]
+        and h09_hands_on.get("result", {}).get("official_kr_rrn") is False
+        and h09_hands_on.get("result", {}).get("delivery_count") == 4
+        and h09_hands_on.get("result", {}).get("raw_risk_cases")
+        == ["input-email", "input-kr-rrn", "output-email"]
+        and "learner@example.com" not in h09_raw_text
+        and "900101-1234568" not in h09_raw_text
+        and "security-team@example.com" not in h09_raw_text
+        and '"capability"' not in h09_raw_text,
         "h22_hands_on": h22_verdict == "HIT"
         and h22_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h22_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
@@ -391,7 +440,7 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"execution_order=H21->H22->H08->H07->H06->H05->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h08={h08_verdict} h07={h07_verdict} h06={h06_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H21->H22->H09->H08->H07->H06->H05->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h09={h09_verdict} h08={h08_verdict} h07={h07_verdict} h06={h06_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"h03_resources={h03_resources.get('course_verdict')} h03_hands_on={h03_verdict} "
         f"h04_resources={h04_resources.get('course_verdict')} h04_hands_on={h04_verdict} "
@@ -399,7 +448,7 @@ def main() -> int:
         f"theme_button={str(manual_light and manual_dark and persisted_dark).lower()} "
         f"panel_boundary={str(panel_boundary).lower()} chat={str(checks['chat']).lower()} "
         f"action_tooltips={str(checks['action_tooltips']).lower()} "
-        f"desktop_tip_inside={str(desktop_tip_inside).lower()} h07_desktop_tip_inside={str(h07_desktop_tip_inside).lower()} h08_desktop_tip_inside={str(h08_desktop_tip_inside).lower()} mobile_tip_inside={str(mobile_tip_inside).lower()} h08_mobile_tip_inside={str(h08_mobile_tip_inside).lower()} "
+        f"desktop_tip_inside={str(desktop_tip_inside).lower()} h07_desktop_tip_inside={str(h07_desktop_tip_inside).lower()} h08_desktop_tip_inside={str(h08_desktop_tip_inside).lower()} h09_desktop_tip_inside={str(h09_desktop_tip_inside).lower()} mobile_tip_inside={str(mobile_tip_inside).lower()} h08_mobile_tip_inside={str(h08_mobile_tip_inside).lower()} h09_mobile_tip_inside={str(h09_mobile_tip_inside).lower()} "
         f"answer_controls={answer_controls} raw_nodes={raw_nodes} "
         f"internal_requests={internal_requests} mobile_overflow={str(mobile_overflow).lower()}"
     )
