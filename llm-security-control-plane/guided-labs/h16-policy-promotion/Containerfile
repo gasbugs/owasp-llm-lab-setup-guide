@@ -1,0 +1,8 @@
+FROM docker.io/library/python:3.12.14-slim
+RUN python -m pip install --no-cache-dir fastapi==0.116.1 uvicorn==0.52.0
+WORKDIR /app
+COPY --chmod=0444 guided-labs/h16-policy-promotion/policy.py /app/policy.py
+COPY --chmod=0555 guided-labs/h16-policy-promotion/server.py /app/server.py
+RUN install -d -m 0700 -o 65532 -g 65532 /state
+USER 65532:65532
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

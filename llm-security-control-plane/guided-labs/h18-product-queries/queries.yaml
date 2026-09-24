@@ -1,0 +1,5 @@
+# CUSTOM FILE
+# Query languages: LogQL, Tempo trace lookup, PromQL. License: project-authored.
+logql: '{}'
+promql: 'sum(guided_security_decisions_total)'
+trace_lookup: latest

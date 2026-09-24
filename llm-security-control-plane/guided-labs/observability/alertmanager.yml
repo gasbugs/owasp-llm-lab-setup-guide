@@ -1,0 +1,5 @@
+# CUSTOM FILE
+# Format reference: https://prometheus.io/docs/alerting/latest/configuration/
+# Upstream format license: Apache-2.0
+route: {receiver: sink, group_wait: 1s, group_interval: 1s, repeat_interval: 1h}
+receivers: [{name: sink}]

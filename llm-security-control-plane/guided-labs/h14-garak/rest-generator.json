@@ -1,0 +1,15 @@
+{
+  "rest": {
+    "RestGenerator": {
+      "name": "tenant-03-h14-target",
+      "uri": "http://guided-h14-target:8000/api/chat",
+      "method": "post",
+      "headers": {"Authorization": "Bearer $H14_TOKEN", "Content-Type": "application/json"},
+      "req_template_json_object": {"message": "$INPUT"},
+      "response_json": true,
+      "response_json_field": "reply",
+      "request_timeout": 30,
+      "ratelimit_codes": [429]
+    }
+  }
+}

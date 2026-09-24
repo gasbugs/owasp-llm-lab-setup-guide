@@ -1,0 +1,5 @@
+# CUSTOM FILE
+# Format reference: https://reference.garak.ai/en/latest/configurable.html
+# Upstream format license: Apache-2.0
+run:
+  soft_probe_prompt_cap: 0

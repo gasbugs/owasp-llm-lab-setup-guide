@@ -28,6 +28,10 @@ os.environ.setdefault("GUIDED_CONTROL_LAB06_TOKEN", "unit-control-lab06")
 os.environ.setdefault("GUIDED_CONTROL_LAB07_TOKEN", "unit-control-lab07")
 os.environ.setdefault("GUIDED_CONTROL_LAB08_TOKEN", "unit-control-lab08")
 os.environ.setdefault("GUIDED_CONTROL_LAB09_TOKEN", "unit-control-lab09")
+for number in range(10, 17):
+    os.environ.setdefault(f"GUIDED_CONTROL_LAB{number}_TOKEN", f"unit-control-lab{number}")
+os.environ.setdefault("GUIDED_CONTROL_OBSERVABILITY_TOKEN", "unit-control-observability")
+os.environ.setdefault("GUIDED_H12_PROVIDER_CONTROL_TOKEN", "unit-h12-provider-control")
 os.environ.setdefault("GUIDED_H06_PROVIDER_CONTROL_TOKEN", "unit-h06-provider-control")
 os.environ.setdefault("GUIDED_H07_GATEWAY_CONTROL_TOKEN", "unit-h07-gateway-control")
 os.environ.setdefault("GUIDED_H08_GATEWAY_CONTROL_TOKEN", "unit-h08-gateway-control")
@@ -293,7 +297,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("gateway_token", self.home.text.lower())
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08", "H09", "H21", "H22"])
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], [f"H{number:02d}" for number in range(1, 23)])
         self.assertNotIn("practices", self.bootstrap["course"])
         self.assertNotIn("implemented_practices", self.bootstrap["course"])
         h05 = next(
@@ -876,11 +880,24 @@ class GuidedControlCenterTests(unittest.TestCase):
         )
         self.assertIn("USER 65532:65532", containerfile)
 
-    def test_front_proxy_is_the_only_host_port_owner(self):
+    def test_only_front_proxy_and_official_uis_own_loopback_ports(self):
         compose = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
         owners = [name for name, service in compose["services"].items() if "ports" in service]
-        self.assertEqual(owners, ["guided-front-proxy"])
+        self.assertEqual(
+            owners,
+            [
+                "guided-front-proxy",
+                "guided-grafana",
+                "guided-promptfoo-ui",
+                "guided-pyrit-ui",
+            ],
+        )
         self.assertEqual(len(compose["services"]["guided-front-proxy"]["ports"]), 2)
+        for owner in owners:
+            self.assertTrue(
+                all(str(port).startswith("127.0.0.1:") for port in compose["services"][owner]["ports"]),
+                owner,
+            )
         verifier = compose["services"]["guided-evidence-verifier"]
         serialized = str(verifier)
         self.assertNotIn("/tmp/.aws", serialized)
@@ -973,8 +990,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(manifest["tabs"][3]["implemented_hands_on"], ["H05", "H06"])
         self.assertEqual(manifest["tabs"][4]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][4]["implemented_hands_on"], ["H07", "H08"])
-        self.assertEqual(manifest["tabs"][5]["hands_on_status"], "partial")
-        self.assertEqual(manifest["tabs"][5]["implemented_hands_on"], ["H09"])
+        self.assertEqual(manifest["tabs"][5]["hands_on_status"], "implemented")
+        self.assertEqual(manifest["tabs"][5]["implemented_hands_on"], ["H09", "H10"])
         self.assertEqual(
             manifest["hands_on_H08"]["source_path"],
             "guided-labs/h08-self-check-input/config/prompts.yml",
@@ -991,7 +1008,7 @@ class GuidedControlCenterTests(unittest.TestCase):
             manifest["hands_on_H09"]["control_endpoint"],
             "/api/hands-on/H09/verify",
         )
-        self.assertTrue(all(tab["hands_on_status"] == "planned" for tab in manifest["tabs"][6:12]))
+        self.assertTrue(all(tab["hands_on_status"] == "implemented" for tab in manifest["tabs"][6:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])
 

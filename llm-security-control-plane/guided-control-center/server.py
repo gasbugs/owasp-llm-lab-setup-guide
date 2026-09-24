@@ -29,6 +29,15 @@ LAB06_URL = os.getenv("GUIDED_LAB06_URL", "http://guided-h06-nemo-action:8000")
 LAB07_URL = os.getenv("GUIDED_LAB07_URL", "http://guided-h07-content-safety:8000")
 LAB08_URL = os.getenv("GUIDED_LAB08_URL", "http://guided-h08-self-check-input:8000")
 LAB09_URL = os.getenv("GUIDED_LAB09_URL", "http://guided-h09-presidio-redaction:8000")
+LAB10_URL = os.getenv("GUIDED_LAB10_URL", "http://guided-h10-self-check-output:8000")
+LAB11_URL = os.getenv("GUIDED_LAB11_URL", "http://guided-h11-rag-provenance:8000")
+LAB12_URL = os.getenv("GUIDED_LAB12_URL", "http://guided-h12-application-pipeline:8000")
+H12_PROVIDER_URL = os.getenv("GUIDED_H12_PROVIDER_URL", "http://guided-h12-stage-provider:8000")
+LAB13_URL = os.getenv("GUIDED_LAB13_URL", "http://guided-h13-promptfoo:8000")
+LAB14_URL = os.getenv("GUIDED_LAB14_URL", "http://guided-h14-garak:8000")
+LAB15_URL = os.getenv("GUIDED_LAB15_URL", "http://guided-h15-pyrit:8000")
+LAB16_URL = os.getenv("GUIDED_LAB16_URL", "http://guided-h16-policy-promotion:8000")
+OBSERVABILITY_URL = os.getenv("GUIDED_OBSERVABILITY_URL", "http://guided-observability:8000")
 H09_SINK_URL = os.getenv(
     "GUIDED_H09_SINK_URL", "http://guided-h09-delivery-sink:8000"
 )
@@ -50,6 +59,15 @@ LAB06_TOKEN = os.environ["GUIDED_CONTROL_LAB06_TOKEN"]
 LAB07_TOKEN = os.environ["GUIDED_CONTROL_LAB07_TOKEN"]
 LAB08_TOKEN = os.environ["GUIDED_CONTROL_LAB08_TOKEN"]
 LAB09_TOKEN = os.environ["GUIDED_CONTROL_LAB09_TOKEN"]
+LAB10_TOKEN = os.environ["GUIDED_CONTROL_LAB10_TOKEN"]
+LAB11_TOKEN = os.environ["GUIDED_CONTROL_LAB11_TOKEN"]
+LAB12_TOKEN = os.environ["GUIDED_CONTROL_LAB12_TOKEN"]
+H12_PROVIDER_CONTROL_TOKEN = os.environ["GUIDED_H12_PROVIDER_CONTROL_TOKEN"]
+LAB13_TOKEN = os.environ["GUIDED_CONTROL_LAB13_TOKEN"]
+LAB14_TOKEN = os.environ["GUIDED_CONTROL_LAB14_TOKEN"]
+LAB15_TOKEN = os.environ["GUIDED_CONTROL_LAB15_TOKEN"]
+LAB16_TOKEN = os.environ["GUIDED_CONTROL_LAB16_TOKEN"]
+OBSERVABILITY_TOKEN = os.environ["GUIDED_CONTROL_OBSERVABILITY_TOKEN"]
 H09_SINK_CONTROL_TOKEN = os.environ["GUIDED_H09_SINK_CONTROL_TOKEN"]
 H06_PROVIDER_CONTROL_TOKEN = os.environ["GUIDED_H06_PROVIDER_CONTROL_TOKEN"]
 H07_GATEWAY_CONTROL_TOKEN = os.environ["GUIDED_H07_GATEWAY_CONTROL_TOKEN"]
@@ -76,6 +94,9 @@ PROVISION_TIMEOUT = httpx.Timeout(360.0, connect=3.0)
 H07_CLOSE_TIMEOUT = httpx.Timeout(3.0, connect=1.0)
 MODEL_ID = "us.amazon.nova-lite-v1:0"
 NEMO_BROWSER_URL = os.getenv("GUIDED_NEMO_BROWSER_URL", "http://127.0.0.1:18192")
+PROMPTFOO_BROWSER_URL = os.getenv("GUIDED_PROMPTFOO_BROWSER_URL", "http://127.0.0.1:15500")
+PYRIT_BROWSER_URL = os.getenv("GUIDED_PYRIT_BROWSER_URL", "http://127.0.0.1:18098")
+GRAFANA_BROWSER_URL = os.getenv("GUIDED_GRAFANA_BROWSER_URL", "http://127.0.0.1:3001/explore")
 SESSIONS: dict[str, dict] = {}
 ACTIVE_SESSIONS: set[str] = set()
 MAX_SESSIONS = 256
@@ -203,7 +224,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
         "course": {
             "tabs": 13,
             "hands_on": 22,
-            "implemented_hands_on": ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08", "H09", "H21", "H22"],
+            "implemented_hands_on": [f"H{number:02d}" for number in range(1, 23)],
         },
         "official_uis": [
             {
@@ -220,6 +241,9 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "status": "external",
                 "boundary": "AWS 로그인과 수강생 본인 계정 권한을 사용합니다.",
             },
+            {"id": "promptfoo", "name": "Promptfoo Viewer", "browser_url": PROMPTFOO_BROWSER_URL, "status": "ready", "boundary": "H13 native evaluation을 살펴보는 공식 UI이며 PASS 판정은 별도 verifier가 수행합니다."},
+            {"id": "pyrit", "name": "PyRIT Frontend", "browser_url": PYRIT_BROWSER_URL, "status": "ready", "boundary": "PyRIT 대화를 탐색하는 공식 UI이며 실제 영향 재현은 H15 verifier가 수행합니다."},
+            {"id": "grafana", "name": "Grafana Explore", "browser_url": GRAFANA_BROWSER_URL, "status": "ready", "boundary": "원시 제품 API를 먼저 확인한 뒤 같은 신호를 화면에서 비교합니다."},
         ],
         "learner_app": {
             "hands_on_id": "H01",
@@ -273,6 +297,33 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
                 "service": "guided-h09-presidio-redaction",
                 "source_path": "llm-security-control-plane/guided-labs/h09-presidio-redaction/policy.py",
             },
+            {
+                "hands_on_id": "H10",
+                "service": "guided-h10-self-check-output",
+                "source_path": "llm-security-control-plane/guided-labs/h10-self-check-output/config/prompts.yml",
+            },
+            {
+                "hands_on_id": "H11",
+                "service": "guided-h11-rag-provenance",
+                "source_path": "llm-security-control-plane/guided-labs/h11-rag-provenance/policy.py",
+            },
+            {
+                "hands_on_id": "H12",
+                "service": "guided-h12-application-pipeline",
+                "source_path": "llm-security-control-plane/guided-labs/h12-application-pipeline/pipeline.py",
+            },
+            {
+                "hands_on_id": "H13",
+                "service": "guided-h13-promptfoo",
+                "source_path": "llm-security-control-plane/guided-labs/h13-promptfoo/promptfooconfig.yaml",
+            },
+            {"hands_on_id": "H14", "service": "guided-h14-garak", "source_path": "llm-security-control-plane/guided-labs/h14-garak/garak-config.yaml"},
+            {"hands_on_id": "H15", "service": "guided-h15-pyrit", "source_path": "llm-security-control-plane/guided-labs/h15-pyrit/attack.py"},
+            {"hands_on_id": "H16", "service": "guided-h16-policy-promotion", "source_path": "llm-security-control-plane/guided-labs/h16-policy-promotion/policy.py"},
+            {"hands_on_id": "H17", "service": "guided-observability", "source_path": "llm-security-control-plane/guided-labs/h17-telemetry/telemetry.py"},
+            {"hands_on_id": "H18", "service": "guided-observability", "source_path": "llm-security-control-plane/guided-labs/h18-product-queries/queries.yaml"},
+            {"hands_on_id": "H19", "service": "guided-observability", "source_path": "llm-security-control-plane/guided-labs/h19-incident-investigation/investigation.py"},
+            {"hands_on_id": "H20", "service": "guided-observability", "source_path": "llm-security-control-plane/guided-labs/h20-alert-dashboard/alert-rules.yml"},
             {
                 "hands_on_id": "H21",
                 "service": "guided-h21-host",
@@ -1474,6 +1525,250 @@ async def verify_h09_presidio_delivery(
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 
+
+@app.post("/api/hands-on/H10/verify")
+async def verify_h10_output_rail(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            executed = await client.post(
+                f"{LAB10_URL}/v1/run",
+                json={
+                    "suite_id": suite_id,
+                    "started_at": started_at,
+                    "execution_ids": [str(uuid.uuid4()) for _ in range(4)],
+                },
+                headers={"Authorization": f"Bearer {LAB10_TOKEN}"},
+            )
+            if executed.status_code != 200 or executed.json().get("suite_id") != suite_id:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "guided_h10_output_rail",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H10 NeMo config와 Output Rail Prompt 문법을 확인합니다.",
+                    },
+                )
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/h10",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "successful_stage": "control_center",
+                "stopped_stage": "h10_internal_service",
+                "downstream_called": False,
+                "course_verdict": "ERR",
+                "next_check": "H10 learner·Gateway·verifier 상태를 확인합니다.",
+            },
+        ) from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H11/verify")
+async def verify_h11_rag_provenance(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            executed = await client.post(
+                f"{LAB11_URL}/v1/run",
+                json={"suite_id": suite_id, "started_at": started_at, "execution_id": str(uuid.uuid4())},
+                headers={"Authorization": f"Bearer {LAB11_TOKEN}"},
+            )
+            if executed.status_code != 200 or executed.json().get("suite_id") != suite_id:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "control_center",
+                        "stopped_stage": "guided_h11_rag_provenance",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H11 policy.py와 Titan embedding 연결을 확인합니다.",
+                    },
+                )
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/h11",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="H11 internal service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H12/verify")
+async def verify_h12_application_pipeline(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            prepared = await client.post(
+                f"{H12_PROVIDER_URL}/v1/suites",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {H12_PROVIDER_CONTROL_TOKEN}"},
+            )
+            if prepared.status_code != 200:
+                raise HTTPException(status_code=502, detail="H12 stage provider did not prepare the suite")
+            executed = await client.post(
+                f"{LAB12_URL}/v1/run",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {LAB12_TOKEN}"},
+            )
+            direct = await client.post(f"{H12_PROVIDER_URL}/v1/protected/{suite_id}")
+            if executed.status_code != 200 or direct.status_code != 401:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "successful_stage": "h12_provider_prepare",
+                        "stopped_stage": "h12_application_or_protected_boundary",
+                        "downstream_called": True,
+                        "course_verdict": "ERR",
+                        "next_check": "H12 pipeline과 내부 서비스 Token 경계를 확인합니다.",
+                    },
+                )
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/h12",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="H12 internal service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+@app.post("/api/hands-on/H13/verify")
+async def verify_h13_promptfoo(
+    request: Request,
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    if await request.body():
+        raise HTTPException(status_code=422, detail="verification inputs are server-owned")
+    session_id = session[0]
+    if session_id in ACTIVE_SESSIONS:
+        raise HTTPException(status_code=409, detail="this session already has a running request")
+    ACTIVE_SESSIONS.add(session_id)
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            executed = await client.post(
+                f"{LAB13_URL}/v1/run",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {LAB13_TOKEN}"},
+            )
+            if executed.status_code != 200:
+                raise HTTPException(status_code=502, detail="Promptfoo runner did not create an artifact")
+            verified = await client.post(
+                f"{VERIFIER_URL}/v1/verify/h13",
+                json={"suite_id": suite_id, "started_at": started_at},
+                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
+            )
+        if verified.status_code != 200:
+            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+        return verified.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="H13 Promptfoo service unavailable") from exc
+    finally:
+        ACTIVE_SESSIONS.discard(session_id)
+
+
+async def run_tool_activity(activity: str, lab_url: str, lab_token: str) -> dict:
+    suite_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+        executed = await client.post(f"{lab_url}/v1/run", json={"suite_id": suite_id, "started_at": started_at}, headers={"Authorization": f"Bearer {lab_token}"})
+        if executed.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"{activity} runner did not create an artifact")
+        verified = await client.post(f"{VERIFIER_URL}/v1/verify/{activity.lower()}", json={"suite_id": suite_id, "started_at": started_at}, headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"})
+    if verified.status_code != 200: raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+    return verified.json()
+
+@app.post("/api/hands-on/H14/verify")
+async def verify_h14(request: Request, session: tuple[str, dict] = Depends(require_csrf)) -> dict:
+    if await request.body(): raise HTTPException(422, "verification inputs are server-owned")
+    return await run_tool_activity("H14", LAB14_URL, LAB14_TOKEN)
+
+@app.post("/api/hands-on/H15/verify")
+async def verify_h15(request: Request, session: tuple[str, dict] = Depends(require_csrf)) -> dict:
+    if await request.body(): raise HTTPException(422, "verification inputs are server-owned")
+    return await run_tool_activity("H15", LAB15_URL, LAB15_TOKEN)
+
+@app.post("/api/hands-on/H16/verify")
+async def verify_h16(request: Request, session: tuple[str, dict] = Depends(require_csrf)) -> dict:
+    if await request.body(): raise HTTPException(422, "verification inputs are server-owned")
+    return await run_tool_activity("H16", LAB16_URL, LAB16_TOKEN)
+
+async def run_observability_activity(activity: str) -> dict:
+    suite_id=str(uuid.uuid4()); started_at=datetime.now(timezone.utc).isoformat()
+    async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+        executed=await client.post(f"{OBSERVABILITY_URL}/v1/run/{activity}",json={"suite_id":suite_id,"started_at":started_at},headers={"Authorization":f"Bearer {OBSERVABILITY_TOKEN}"})
+        if executed.status_code != 200: raise HTTPException(502,f"{activity} signal generation failed")
+        verified=await client.post(f"{VERIFIER_URL}/v1/verify/{activity.lower()}",json={"suite_id":suite_id,"started_at":started_at},headers={"Authorization":f"Bearer {VERIFIER_TOKEN}"})
+    if verified.status_code != 200: raise HTTPException(502,"evidence verifier unavailable")
+    return verified.json()
+
+@app.post("/api/hands-on/H17/verify")
+async def verify_h17(request:Request,session:tuple[str,dict]=Depends(require_csrf))->dict:
+    if await request.body(): raise HTTPException(422,"verification inputs are server-owned")
+    return await run_observability_activity('H17')
+@app.post("/api/hands-on/H18/verify")
+async def verify_h18(request:Request,session:tuple[str,dict]=Depends(require_csrf))->dict:
+    if await request.body(): raise HTTPException(422,"verification inputs are server-owned")
+    return await run_observability_activity('H18')
+@app.post("/api/hands-on/H19/verify")
+async def verify_h19(request:Request,session:tuple[str,dict]=Depends(require_csrf))->dict:
+    if await request.body(): raise HTTPException(422,"verification inputs are server-owned")
+    return await run_observability_activity('H19')
+@app.post("/api/hands-on/H20/verify")
+async def verify_h20(request:Request,session:tuple[str,dict]=Depends(require_csrf))->dict:
+    if await request.body(): raise HTTPException(422,"verification inputs are server-owned")
+    return await run_observability_activity('H20')
 
 @app.post("/api/hands-on/H22/verify")
 async def verify_h22_mcp_server(

@@ -1,0 +1,20 @@
+FROM docker.io/library/node:24-bookworm-slim
+
+ARG PROMPTFOO_VERSION=0.121.20
+RUN npm install --global "promptfoo@${PROMPTFOO_VERSION}" --omit=optional \
+    && npm cache clean --force
+
+ENV PROMPTFOO_DISABLE_TELEMETRY=1 \
+    PROMPTFOO_DISABLE_UPDATE=1 \
+    PROMPTFOO_CONFIG_DIR=/state/.promptfoo \
+    NODE_ENV=production
+WORKDIR /work
+COPY --chmod=0444 guided-labs/h13-promptfoo/Containerfile /work/Containerfile
+COPY --chmod=0444 guided-labs/h13-promptfoo/promptfooconfig.yaml /work/promptfooconfig.yaml
+COPY --chmod=0444 guided-labs/h13-promptfoo/transform.cjs /work/transform.cjs
+COPY --chmod=0555 guided-labs/h13-promptfoo/server.mjs /work/server.mjs
+RUN install -d -o node -g node -m 0700 /state
+
+USER node
+EXPOSE 8000
+CMD ["node", "/work/server.mjs"]

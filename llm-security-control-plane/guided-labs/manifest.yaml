@@ -11,14 +11,23 @@ tabs:
   - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: implemented, implemented_hands_on: [H04]}
   - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: implemented, implemented_hands_on: [H05, H06]}
   - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: implemented, implemented_hands_on: [H07, H08]}
-  - {id: 06-privacy-output, hands_on: [H09, H10], hands_on_status: partial, implemented_hands_on: [H09]}
-  - {id: 07-rag-boundary, hands_on: [H11, H12], hands_on_status: planned}
-  - {id: 08-promptfoo, hands_on: [H13], hands_on_status: planned}
-  - {id: 09-garak-pyrit, hands_on: [H14, H15], hands_on_status: planned}
-  - {id: 10-policy-promotion, hands_on: [H16], hands_on_status: planned}
-  - {id: 11-raw-observability, hands_on: [H17, H18], hands_on_status: planned}
-  - {id: 12-incident-alert, hands_on: [H19, H20], hands_on_status: planned}
+  - {id: 06-privacy-output, hands_on: [H09, H10], hands_on_status: implemented, implemented_hands_on: [H09, H10]}
+  - {id: 07-rag-boundary, hands_on: [H11, H12], hands_on_status: implemented, implemented_hands_on: [H11, H12]}
+  - {id: 08-promptfoo, hands_on: [H13], hands_on_status: implemented, implemented_hands_on: [H13]}
+  - {id: 09-garak-pyrit, hands_on: [H14, H15], hands_on_status: implemented, implemented_hands_on: [H14, H15]}
+  - {id: 10-policy-promotion, hands_on: [H16], hands_on_status: implemented, implemented_hands_on: [H16]}
+  - {id: 11-raw-observability, hands_on: [H17, H18], hands_on_status: implemented, implemented_hands_on: [H17, H18]}
+  - {id: 12-incident-alert, hands_on: [H19, H20], hands_on_status: implemented, implemented_hands_on: [H19, H20]}
   - {id: 13-gateway-agent, hands_on: [H21, H22], hands_on_status: implemented, implemented_hands_on: [H21, H22]}
+
+hands_on_H13: {executor: guided-h13-promptfoo, verifier: guided-evidence-verifier, native_artifact: promptfoo-json}
+hands_on_H14: {executor: guided-h14-garak, verifier: guided-evidence-verifier, native_artifact: garak-report-jsonl}
+hands_on_H15: {executor: guided-h15-pyrit, verifier: guided-evidence-verifier, native_artifact: pyrit-conversation}
+hands_on_H16: {executor: guided-h16-policy-promotion, verifier: guided-evidence-verifier, evidence: [sandbox-digest, active-digest, promotion-ledger]}
+hands_on_H17: {executor: guided-observability, verifier: guided-evidence-verifier, stores: [loki, tempo, prometheus]}
+hands_on_H18: {executor: guided-observability, verifier: guided-evidence-verifier, queries: [logql, trace-id, promql]}
+hands_on_H19: {executor: guided-observability, verifier: guided-evidence-verifier, join_key: request_id}
+hands_on_H20: {executor: guided-observability, verifier: guided-evidence-verifier, evidence: [firing, resolved, dashboard-query]}
 
 hands_on_H01:
   executor: guided-h01-gateway
@@ -292,6 +301,78 @@ hands_on_H09:
       starter_hit: synthetic-pii-reaches-delivery-sink
       fixed_pass: clean-preserved-and-pii-replaced-before-delivery
       malformed_or_stale: ERR
+
+hands_on_H10:
+  executor: guided-h10-self-check-output
+  source_path: guided-labs/h10-self-check-output/config/prompts.yml
+  control_endpoint: /api/hands-on/H10/verify
+  executor_endpoint: /v1/run
+  provider: guided-bedrock-gateway
+  verifier: guided-evidence-verifier
+  framework_version: 0.22.0
+  model_id: us.amazon.nova-lite-v1:0
+  required_evidence:
+    - source_digest
+    - config_digest
+    - main_model_provider_request_ids
+    - self_check_output_provider_request_ids
+    - activated_output_rails
+    - browser_response_digest
+    - browser_marker_observed
+    - normal-reset-guide
+    - normal-report-secret
+    - risk-recovery-code
+    - risk-internal-note
+  verdict_contract:
+    starter_hit: main-marker-reaches-browser
+    fixed_pass: normal-preserved-and-risk-stopped-after-main
+    missing_or_malformed: ERR
+
+hands_on_H11:
+  executor: guided-h11-rag-provenance
+  source_path: guided-labs/h11-rag-provenance/policy.py
+  control_endpoint: /api/hands-on/H11/verify
+  executor_endpoint: /v1/run
+  provider: guided-bedrock-gateway
+  verifier: guided-evidence-verifier
+  embedding_model_id: amazon.titan-embed-text-v2:0
+  required_evidence:
+    - authenticated_principal
+    - client_claims
+    - candidate_ids
+    - selected_document_id
+    - selected_source_uri
+    - provider_request_id
+    - dimensions: 1024
+    - normal-approved
+    - client-self-approval
+    - client-tenant-spoof
+    - client-role-spoof
+  verdict_contract:
+    starter_hit: browser-claims-admit-forbidden-source
+    fixed_pass: server-principal-and-provenance-filter-before-vector-ranking
+    missing_or_malformed: ERR
+
+hands_on_H12:
+  executor: guided-h12-application-pipeline
+  source_path: guided-labs/h12-application-pipeline/pipeline.py
+  control_endpoint: /api/hands-on/H12/verify
+  executor_endpoint: /v1/run
+  provider: guided-h12-stage-provider
+  verifier: guided-evidence-verifier
+  required_evidence:
+    - declared_stage_order
+    - protected_service_call_ledger
+    - normal
+    - invalid-token
+    - indirect-injection
+    - nemo-timeout
+    - direct_access_status: 401
+    - direct_side_effects: 0
+  verdict_contract:
+    starter_hit: retrieval-before-auth-and-main-after-failure
+    fixed_pass: ordered-fail-closed-with-protected-services
+    missing_or-mismatched-ledger: ERR
 
 hands_on_H22:
   executor: guided-h22-host

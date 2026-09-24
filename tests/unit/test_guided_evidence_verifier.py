@@ -95,6 +95,12 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         os.environ["GUIDED_VERIFIER_LAB07_TOKEN"] = "verifier-lab07"
         os.environ["GUIDED_VERIFIER_LAB08_TOKEN"] = "verifier-lab08"
         os.environ["GUIDED_VERIFIER_LAB09_TOKEN"] = "verifier-lab09"
+        for number in range(10, 17):
+            os.environ[f"GUIDED_VERIFIER_LAB{number}_TOKEN"] = f"verifier-lab{number}"
+        os.environ["GUIDED_VERIFIER_OBSERVABILITY_TOKEN"] = "verifier-observability"
+        os.environ["GUIDED_H12_PROVIDER_VERIFIER_TOKEN"] = "verifier-h12-provider"
+        os.environ["GUIDED_H10_GATEWAY_VERIFIER_TOKEN"] = "verifier-h10-gateway"
+        os.environ["GUIDED_H11_GATEWAY_VERIFIER_TOKEN"] = "verifier-h11-gateway"
         os.environ["GUIDED_H09_SINK_VERIFIER_TOKEN"] = "verifier-h09-sink"
         os.environ["GUIDED_H06_PROVIDER_VERIFIER_TOKEN"] = "verifier-h06-provider"
         os.environ["GUIDED_H07_GATEWAY_VERIFIER_TOKEN"] = "verifier-h07-gateway"

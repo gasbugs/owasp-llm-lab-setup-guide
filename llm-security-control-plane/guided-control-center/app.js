@@ -79,7 +79,7 @@ function renderTabs() {
   tabNames.forEach((name, index) => {
     const button = document.createElement("button");
     button.type = "button";
-    const implemented = index <= 5 || index === 12;
+    const implemented = true;
     button.className = index === 0 ? "tab active" : implemented ? "tab" : "tab locked";
     button.disabled = !implemented;
     button.dataset.tabIndex = String(index);
@@ -89,7 +89,7 @@ function renderTabs() {
     const strong = document.createElement("strong");
     strong.textContent = name;
     const small = document.createElement("small");
-    small.textContent = index === 0 ? "H01 · 직접 작성" : index === 1 ? "H02·H03 · 직접 작성" : index === 2 ? "H04 · 직접 작성" : index === 3 ? "H05·H06 · 직접 작성" : index === 4 ? "H07·H08 · 직접 작성" : index === 5 ? "H09 · 직접 작성" : index === 12 ? "H21·H22 · 직접 작성" : "다음 구현 단계";
+    small.textContent = ["H01","H02·H03","H04","H05·H06","H07·H08","H09·H10","H11·H12","H13","H14·H15","H16","H17·H18","H19·H20","H21·H22"][index] + " · 직접 작성";
     copy.append(strong, small);
     button.append(number, copy);
     if (implemented) button.addEventListener("click", () => selectTab(index));
@@ -110,14 +110,23 @@ function selectTab(index) {
   byId("h07-work").hidden = index !== 4;
   byId("h08-work").hidden = index !== 4;
   byId("h09-work").hidden = index !== 5;
+  byId("h10-work").hidden = index !== 5;
+  byId("h11-work").hidden = index !== 6;
+  byId("h12-work").hidden = index !== 6;
+  byId("h13-work").hidden = index !== 7;
+  byId("h14-work").hidden = index !== 8; byId("h15-work").hidden = index !== 8;
+  byId("h16-work").hidden = index !== 9;
+  byId("h17-work").hidden = index !== 10; byId("h18-work").hidden = index !== 10;
+  byId("h19-work").hidden = index !== 11; byId("h20-work").hidden = index !== 11;
   byId("h21-work").hidden = index !== 12;
   byId("h22-work").hidden = index !== 12;
   const h09 = index === 5;
   const h22 = index === 12;
   setText("current-station", `${String(index + 1).padStart(2, "0")} / 13`);
-  setText("current-station-name", index === 0 ? "Nova Lite 요청 경로" : index === 1 ? "Embedding·Knowledge Base" : index === 2 ? "Bedrock 관리형 Guardrail" : index === 3 ? "NeMo Dialog Rail·Action" : index === 4 ? "NeMo 입력 안전" : index === 5 ? "Presidio·출력 Rail" : "Agent·MCP 실행 경계");
-  setText("activity-label", `HANDS-ON · ${index === 0 ? "H01" : index === 1 ? "H02·H03" : index === 2 ? "H04" : index === 3 ? "H05·H06" : index === 4 ? "H07·H08" : index === 5 ? "H09" : "H21·H22"}`);
-  setText("activity-title", index === 0 ? "Bedrock Gateway 만들기" : index === 1 ? "원문 저장과 현재 검색 연결하기" : index === 2 ? "관리형 Guardrail을 Nova Lite에 연결하기" : index === 3 ? "한국어 Dialog Rail과 Python Action 만들기" : index === 4 ? "위험 입력을 Main Model 전에 멈추기" : index === 5 ? "Presidio 개인정보 전달 경계 만들기" : "Agent 실행 정책과 MCP 승인 만들기");
+  const activityIds=["H01","H02·H03","H04","H05·H06","H07·H08","H09·H10","H11·H12","H13","H14·H15","H16","H17·H18","H19·H20","H21·H22"];
+  const stationNames=["Nova Lite 요청 경로","Embedding·Knowledge Base","Bedrock 관리형 Guardrail","NeMo Dialog Rail·Action","NeMo 입력 안전","Presidio·출력 Rail","RAG 인증·출처 경계","Promptfoo 회귀 Test","Garak·PyRIT 탐색","정책 승격","원시 관측","사고·경보","Agent·MCP 실행 경계"];
+  const activityTitles=["Bedrock Gateway 만들기","원문 저장과 현재 검색 연결하기","관리형 Guardrail을 Nova Lite에 연결하기","한국어 Dialog Rail과 Python Action 만들기","위험 입력을 Main Model 전에 멈추기","개인정보와 위험한 출력이 밖으로 나가기 전에 멈추기","RAG 권한과 Application 단일 진입점 만들기","Promptfoo 회귀 Test 작성하기","Red Team 후보를 실제 영향으로 재확인하기","검증된 정책만 승격하기","Log·Trace·Metric 원시 신호 연결하기","사고 조사와 경보 수명주기 확인하기","Agent 실행 정책과 MCP 승인 만들기"];
+  setText("current-station-name",stationNames[index]); setText("activity-label",`HANDS-ON · ${activityIds[index]}`); setText("activity-title",activityTitles[index]);
   setText("provider-label", h09 ? "SOURCE" : index === 0 ? "PROVIDER" : index === 1 ? "TITAN REQUEST" : index === 2 ? "AWS REQUEST" : index === 3 ? "EVALUATION" : "TOOL CATALOG");
   setText("model-label", h09 ? "FRAMEWORK" : index === 0 ? "MODEL" : index === 1 ? "EMBED MODEL" : index === 2 ? "GUARDRAIL" : index === 3 ? "FRAMEWORK" : "PROTOCOL");
   setText("requested-label", h09 ? "ENTITIES" : h22 ? "EFFECT ORDER" : index === 0 ? "REQUESTED" : index === 1 ? "OBJECT KEY" : index === 3 ? "SAMPLES" : "ACTION");
@@ -159,7 +168,7 @@ async function request(path, body = undefined) {
 }
 
 function setBusy(busy) {
-  ["preflight", "verify", "chat-send", "h02-provision", "h02-verify", "h03-provision", "h03-verify", "h04-provision", "h04-verify", "h05-verify", "h06-verify", "h07-verify", "h08-verify", "h09-verify", "h21-verify", "h22-verify"].forEach((id) => {
+  ["preflight", "verify", "chat-send", "h02-provision", "h02-verify", "h03-provision", "h03-verify", "h04-provision", "h04-verify", "h05-verify", "h06-verify", "h07-verify", "h08-verify", "h09-verify", "h10-verify", "h11-verify", "h12-verify", "h13-verify", "h14-verify", "h15-verify", "h16-verify", "h17-verify", "h18-verify", "h19-verify", "h20-verify", "h21-verify", "h22-verify"].forEach((id) => {
     if (byId(id)) byId(id).disabled = busy;
   });
   if (busy) {
@@ -216,6 +225,9 @@ function renderEnvelope(payload) {
   const h07 = payload.activity_id === "H07";
   const h08 = payload.activity_id === "H08";
   const h09 = payload.activity_id === "H09";
+  const h10 = payload.activity_id === "H10";
+  const h11 = payload.activity_id === "H11";
+  const h12 = payload.activity_id === "H12";
   const h21 = payload.activity_id === "H21";
   const h22 = payload.activity_id === "H22";
   if (h03) {
@@ -260,6 +272,24 @@ function renderEnvelope(payload) {
     setText("requested-label", "ENTITIES");
     setText("effective-label", "DELIVERIES");
     setText("output-label", "RAW RISK CASES");
+  } else if (h10) {
+    setText("provider-label", "GATEWAY SUITE");
+    setText("model-label", "OUTPUT RAIL");
+    setText("requested-label", "MAIN CALLS");
+    setText("effective-label", "OUTPUT CHECKS");
+    setText("output-label", "RELEASED MARKERS");
+  } else if (h11) {
+    setText("provider-label", "TITAN CALLS");
+    setText("model-label", "EMBED MODEL");
+    setText("requested-label", "DIMENSIONS");
+    setText("effective-label", "CASES");
+    setText("output-label", "FORBIDDEN CANDIDATES");
+  } else if (h12) {
+    setText("provider-label", "PIPELINE SUITE");
+    setText("model-label", "STAGE ORDER");
+    setText("requested-label", "PROTECTED CALLS");
+    setText("effective-label", "DIRECT ACCESS");
+    setText("output-label", "SIDE EFFECTS");
   } else if (h02) {
     setText("provider-label", "TITAN REQUEST");
     setText("model-label", "EMBED MODEL");
@@ -269,11 +299,11 @@ function renderEnvelope(payload) {
   }
   const h05Evaluation = payload.result?.evaluation || payload.result;
   const h05Risk = payload.result?.risk || payload.result?.recovery_case || payload.result?.cases?.find?.((item) => item.case_id === "recovery-risk");
-  setText("provider-id", h09 ? payload.execution_id : h21 || h22 ? payload.result?.tool_inventory_digest : h07 || h08 ? payload.result?.provider_suite_id || payload.execution_id : h06 ? payload.result?.provider_suite_id || payload.execution_id : h05 ? payload.result?.evaluation_id || h05Evaluation?.evaluation_id : h03 ? payload.result?.final?.provider_request_id || payload.result?.aws_request_ids?.[0] : payload.result?.provider_request_id || payload.result?.aws_request_ids?.[0]);
-  setText("model-id", h09 ? `${payload.result?.framework} ${payload.result?.framework_version}` : h21 || h22 ? payload.result?.protocol_version : h07 || h08 || h06 ? `${payload.result?.framework || "NeMo Guardrails"} ${payload.result?.framework_version || "0.22.0"}` : h05 ? `${payload.result?.cases?.[0]?.framework || "NeMo Guardrails"} ${payload.result?.cases?.[0]?.framework_version || "0.22.0"}` : h04 ? payload.result?.guardrail_id : h03 ? payload.result?.ingestion_job_id || payload.result?.seed_job_id : payload.result?.model_id || payload.result?.embedding_model_id);
-  setText("requested-max", h09 ? payload.result?.entities?.join(", ") : h21 ? payload.result?.cases?.length : h22 ? payload.result?.effect_counts?.join("→") : h08 ? payload.result?.self_check_calls : h07 ? payload.result?.content_safety_calls : h06 ? payload.result?.provider_calls?.length ?? payload.result?.provider_call_count : h05 ? h05Evaluation?.processed_samples ?? payload.result?.cases?.length : h04 ? payload.result?.action || payload.result?.output_action : h03 ? payload.result?.early?.job_status || payload.result?.old_source_uri : h02 ? payload.result?.object_key || payload.result?.source_prefix : payload.result?.requested_max_output_tokens);
-  setText("forwarded-max", h09 ? payload.result?.delivery_count : h21 ? payload.result?.verified_trusted_calls?.length : h22 ? payload.result?.server_id : h07 || h08 ? payload.result?.main_calls : h06 ? payload.result?.effect_count ?? payload.result?.effects?.length : h05 ? `${h05Evaluation?.intent_errors ?? "—"}/${h05Evaluation?.bot_intent_errors ?? "—"}/${h05Evaluation?.bot_message_errors ?? "—"}` : h04 ? payload.result?.stop_reason || payload.result?.status : h03 ? payload.result?.job_status || payload.result?.status : h02 ? payload.result?.embedding_dimension || payload.result?.dimensions : payload.result?.forwarded_parameters?.maxTokens);
-  setText("output-tokens", h09 ? payload.result?.raw_risk_cases?.length : h21 ? payload.result?.verified_provider_calls?.length : h22 ? payload.result?.verified_effects?.effects : h08 ? payload.result?.risk?.stops : h07 ? payload.result?.risk?.stop : h06 ? payload.result?.balance : h05 ? h05Risk?.bot_message : h04 ? payload.result?.output_text || payload.result?.guardrail_version : h03 ? payload.result?.final?.source_uris?.[0] || payload.result?.current_source_uri : h02 ? payload.result?.data_source_id : payload.result?.usage?.outputTokens);
+  setText("provider-id", h12 ? payload.execution_id : h11 ? payload.result?.embedding_calls : h09 || h10 ? payload.execution_id : h21 || h22 ? payload.result?.tool_inventory_digest : h07 || h08 ? payload.result?.provider_suite_id || payload.execution_id : h06 ? payload.result?.provider_suite_id || payload.execution_id : h05 ? payload.result?.evaluation_id || h05Evaluation?.evaluation_id : h03 ? payload.result?.final?.provider_request_id || payload.result?.aws_request_ids?.[0] : payload.result?.provider_request_id || payload.result?.aws_request_ids?.[0]);
+  setText("model-id", h12 ? payload.result?.declared_stage_order?.join(" → ") : h11 ? payload.result?.embedding_model_id : h09 || h10 ? `${payload.result?.framework} ${payload.result?.framework_version}` : h21 || h22 ? payload.result?.protocol_version : h07 || h08 || h06 ? `${payload.result?.framework || "NeMo Guardrails"} ${payload.result?.framework_version || "0.22.0"}` : h05 ? `${payload.result?.cases?.[0]?.framework || "NeMo Guardrails"} ${payload.result?.cases?.[0]?.framework_version || "0.22.0"}` : h04 ? payload.result?.guardrail_id : h03 ? payload.result?.ingestion_job_id || payload.result?.seed_job_id : payload.result?.model_id || payload.result?.embedding_model_id);
+  setText("requested-max", h12 ? payload.result?.protected_call_count : h11 ? payload.result?.dimensions : h10 ? payload.result?.main_calls : h09 ? payload.result?.entities?.join(", ") : h21 ? payload.result?.cases?.length : h22 ? payload.result?.effect_counts?.join("→") : h08 ? payload.result?.self_check_calls : h07 ? payload.result?.content_safety_calls : h06 ? payload.result?.provider_calls?.length ?? payload.result?.provider_call_count : h05 ? h05Evaluation?.processed_samples ?? payload.result?.cases?.length : h04 ? payload.result?.action || payload.result?.output_action : h03 ? payload.result?.early?.job_status || payload.result?.old_source_uri : h02 ? payload.result?.object_key || payload.result?.source_prefix : payload.result?.requested_max_output_tokens);
+  setText("forwarded-max", h12 ? payload.result?.direct_access_status : h11 ? payload.result?.cases?.length : h10 ? payload.result?.output_check_calls : h09 ? payload.result?.delivery_count : h21 ? payload.result?.verified_trusted_calls?.length : h22 ? payload.result?.server_id : h07 || h08 ? payload.result?.main_calls : h06 ? payload.result?.effect_count ?? payload.result?.effects?.length : h05 ? `${h05Evaluation?.intent_errors ?? "—"}/${h05Evaluation?.bot_intent_errors ?? "—"}/${h05Evaluation?.bot_message_errors ?? "—"}` : h04 ? payload.result?.stop_reason || payload.result?.status : h03 ? payload.result?.job_status || payload.result?.status : h02 ? payload.result?.embedding_dimension || payload.result?.dimensions : payload.result?.forwarded_parameters?.maxTokens);
+  setText("output-tokens", h12 ? payload.result?.direct_side_effects : h11 ? payload.result?.forbidden_candidate_cases?.length : h10 ? payload.result?.browser_released_risk_markers : h09 ? payload.result?.raw_risk_cases?.length : h21 ? payload.result?.verified_provider_calls?.length : h22 ? payload.result?.verified_effects?.effects : h08 ? payload.result?.risk?.stops : h07 ? payload.result?.risk?.stop : h06 ? payload.result?.balance : h05 ? h05Risk?.bot_message : h04 ? payload.result?.output_text || payload.result?.guardrail_version : h03 ? payload.result?.final?.source_uris?.[0] || payload.result?.current_source_uri : h02 ? payload.result?.data_source_id : payload.result?.usage?.outputTokens);
   setText("source-digest", payload.result?.source_digest?.slice(0, 12));
   setText("verified-by", payload.verified_by);
   setText("reason", payload.reason);
@@ -306,6 +336,11 @@ function renderEnvelope(payload) {
     self_check_input_ledger: "Self-check Ledger", h08_provider_ledger: "Self-check Ledger",
     presidio_analyzer: "Presidio Analyzer", presidio_anonymizer: "Presidio Anonymizer",
     h09_delivery_sink: "Delivery Sink",
+    main_model: "Main Model", self_check_output: "Self-check Output", browser_release: "Browser Release",
+    authenticate: "Authenticate", provenance_filter: "Provenance Filter",
+    titan_embedding: "Titan Embeddings", vector_retrieval: "Vector Retrieval",
+    application_entry: "Application Entry", protected_services: "Protected Services",
+    direct_access: "Direct Access",
     agent_host: "Agent Host", model_provider: "Model Provider", mcp_tools: "MCP Tools",
     mcp_host: "MCP Host", mcp_server: "MCP Server", training_effect: "Training Effect",
   };
@@ -363,6 +398,11 @@ byId("h06-verify").addEventListener("click", () => execute("/api/hands-on/H06/ve
 byId("h07-verify").addEventListener("click", () => execute("/api/hands-on/H07/verify"));
 byId("h08-verify").addEventListener("click", () => execute("/api/hands-on/H08/verify"));
 byId("h09-verify").addEventListener("click", () => execute("/api/hands-on/H09/verify"));
+byId("h10-verify").addEventListener("click", () => execute("/api/hands-on/H10/verify"));
+byId("h11-verify").addEventListener("click", () => execute("/api/hands-on/H11/verify"));
+byId("h12-verify").addEventListener("click", () => execute("/api/hands-on/H12/verify"));
+byId("h13-verify").addEventListener("click", () => execute("/api/hands-on/H13/verify"));
+for (let number = 14; number <= 20; number += 1) byId(`h${number}-verify`).addEventListener("click", () => execute(`/api/hands-on/H${number}/verify`));
 byId("h21-verify").addEventListener("click", () => execute("/api/hands-on/H21/verify"));
 byId("h22-verify").addEventListener("click", () => execute("/api/hands-on/H22/verify"));
 byId("chat-form").addEventListener("submit", sendChat);

@@ -1,0 +1,1 @@
+sum(increase(guided_security_decisions_total{hands_on="H20",decision="block"}[2m]))

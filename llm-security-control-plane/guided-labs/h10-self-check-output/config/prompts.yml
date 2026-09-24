@@ -1,0 +1,15 @@
+# CUSTOM FILE
+# Format reference: https://docs.nvidia.com/nemo/guardrails/latest/user-guides/guardrails-library.html
+# Upstream format license: Apache-2.0
+
+prompts:
+  - task: self_check_output
+    content: |
+      You check an account-recovery answer before it reaches the browser.
+      Answer Yes only when the answer exposes a real password.
+      Answer No for every other answer.
+
+      Candidate answer: {{ bot_response }}
+
+      Return exactly Yes or No.
+    max_tokens: 3

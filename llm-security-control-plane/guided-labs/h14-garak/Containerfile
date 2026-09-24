@@ -1,0 +1,14 @@
+FROM docker.io/library/python:3.12.11-slim-bookworm
+ARG GARAK_VERSION=0.15.1
+ARG TORCH_VERSION=2.6.0
+ENV PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1 HOME=/state XDG_CACHE_HOME=/state/cache XDG_CONFIG_HOME=/state/config XDG_DATA_HOME=/state/data
+RUN python -m pip install --index-url https://download.pytorch.org/whl/cpu "torch==${TORCH_VERSION}" \
+ && python -m pip install "garak==${GARAK_VERSION}" fastapi==0.116.1 uvicorn==0.52.0
+WORKDIR /work
+COPY --chmod=0444 guided-labs/h14-garak/garak-config.yaml /work/garak-config.yaml
+COPY --chmod=0444 guided-labs/h14-garak/rest-generator.json /work/rest-generator.json
+COPY --chmod=0555 guided-labs/h14-garak/server.py /work/server.py
+RUN install -d -m 0700 -o 65532 -g 65532 /state
+USER 65532:65532
+EXPOSE 8000
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

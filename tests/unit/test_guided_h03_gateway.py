@@ -38,6 +38,10 @@ class GuidedH03GatewayTests(unittest.TestCase):
             "GUIDED_H08_GATEWAY_CONTROL_TOKEN": "h08-control",
             "GUIDED_H08_GATEWAY_VERIFIER_TOKEN": "h08-verifier",
             "GUIDED_H08_CAPABILITY_SECRET": "h08-capability-secret-at-least-32-bytes",
+            "GUIDED_H10_GATEWAY_TOKEN": "h10",
+            "GUIDED_H10_GATEWAY_VERIFIER_TOKEN": "h10-verifier",
+            "GUIDED_H11_GATEWAY_TOKEN": "h11",
+            "GUIDED_H11_GATEWAY_VERIFIER_TOKEN": "h11-verifier",
         }
         os.environ.update(values)
         sys.path.insert(0, str(GATEWAY))

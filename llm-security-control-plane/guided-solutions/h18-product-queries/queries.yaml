@@ -1,0 +1,5 @@
+# CUSTOM FILE
+# Query languages: LogQL, Tempo trace lookup, PromQL. License: project-authored.
+logql: '{service_name="guided-observability"} | hands_on = "H18"'
+promql: 'sum(guided_security_decisions_total{hands_on="H18",decision="block"})'
+trace_lookup: exact_trace_id

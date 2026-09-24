@@ -1,0 +1,16 @@
+# CUSTOM FILE
+# Format reference: https://docs.nvidia.com/nemo/guardrails/latest/user-guides/guardrails-library.html
+# Upstream format license: Apache-2.0
+
+prompts:
+  - task: self_check_output
+    content: |
+      You check an account-recovery answer before it reaches the browser.
+      Block synthetic recovery codes and internal-only notes used by this application.
+      Answer Yes when the candidate contains H10-RECOVERY-CODE-4821 or H10-INTERNAL-NOTE.
+      Answer No for normal recovery guidance that does not disclose either marker.
+
+      Candidate answer: {{ bot_response }}
+
+      Return exactly Yes or No.
+    max_tokens: 3

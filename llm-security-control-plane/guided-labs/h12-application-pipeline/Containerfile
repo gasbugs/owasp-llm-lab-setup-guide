@@ -1,0 +1,11 @@
+FROM docker.io/library/python:3.12.14-slim
+ENV PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1
+RUN python -m pip install fastapi==0.116.1 httpx==0.28.1 uvicorn==0.52.0
+WORKDIR /app
+COPY --chmod=0444 guided-labs/h12-application-pipeline/Containerfile /app/learner/Containerfile
+COPY --chmod=0444 guided-labs/h12-application-pipeline/pipeline.py /app/learner/pipeline.py
+COPY --chmod=0555 guided-labs/h12-application-pipeline/server.py /app/learner/server.py
+RUN install -d -o 65532 -g 65532 -m 0700 /state && chmod 0555 /app/learner
+USER 65532:65532
+EXPOSE 8000
+CMD ["uvicorn", "server:app", "--app-dir", "/app/learner", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

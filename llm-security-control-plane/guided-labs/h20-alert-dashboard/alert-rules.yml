@@ -1,0 +1,10 @@
+# CUSTOM FILE
+# Format reference: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+# Upstream format license: Apache-2.0
+groups:
+  - name: h20
+    rules:
+      - alert: GuidedH20BlockedRequest
+        expr: guided_h20_risk_active > 0
+        for: 2s
+        labels: {severity: warning}

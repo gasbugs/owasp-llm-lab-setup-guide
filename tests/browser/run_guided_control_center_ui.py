@@ -18,7 +18,13 @@ def wait_for_result(page, timeout_ms: int, previous_id: str | None = None) -> di
         if raw.startswith("{"):
             payload = json.loads(raw)
             if payload.get("execution_id") != previous_id:
-                return payload
+                # renderEnvelope updates the raw JSON just before execute() clears
+                # the global busy state. Wait for that final UI transition so the
+                # next independent activity is not clicked while still disabled.
+                for _ in range(50):
+                    if page.locator("#verify").is_enabled():
+                        return payload
+                    page.wait_for_timeout(20)
         page.wait_for_timeout(100)
     execution_state = (page.locator("#execution-state").text_content() or "").strip()
     raise TimeoutError(
@@ -98,6 +104,14 @@ def main() -> int:
         h07_tip_text = page.locator("#h07-verify-help").inner_text()
         h08_tip_text = page.locator("#h08-verify-help").inner_text()
         h09_tip_text = page.locator("#h09-verify-help").inner_text()
+        h10_tip_text = page.locator("#h10-verify-help").inner_text()
+        h11_tip_text = page.locator("#h11-verify-help").inner_text()
+        h12_tip_text = page.locator("#h12-verify-help").inner_text()
+        h13_tip_text = page.locator("#h13-verify-help").inner_text()
+        later_tip_texts = {
+            activity: page.locator(f"#{activity.lower()}-help").inner_text()
+            for activity in ("H14", "H15", "H16", "H17", "H18", "H19", "H20")
+        }
         page.set_viewport_size({"width": 1181, "height": 900})
         page.locator('.tab[data-tab-index="3"]').click()
         page.locator('[aria-controls="h05-verify-help"]').click()
@@ -145,10 +159,35 @@ def main() -> int:
         page.set_viewport_size({"width": 1440, "height": 1100})
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
+        # 뒤 활동부터 실행해 H10~H20이 앞 활동의 완료 상태를 요구하지 않음을 확인한다.
+        later_results: dict[str, dict] = {}
+        later_verdicts: dict[str, str] = {}
+        previous_execution_id = None
+        later_tabs = {
+            "H20": 11,
+            "H19": 11,
+            "H18": 10,
+            "H17": 10,
+            "H16": 9,
+            "H15": 8,
+            "H14": 8,
+            "H13": 7,
+            "H12": 6,
+            "H11": 6,
+            "H10": 5,
+        }
+        for activity, tab_index in later_tabs.items():
+            page.locator(f'.tab[data-tab-index="{tab_index}"]').click()
+            page.locator(f"#{activity.lower()}-verify").click()
+            result = wait_for_result(page, timeout_ms, previous_execution_id)
+            later_results[activity] = result
+            later_verdicts[activity] = page.locator("#verdict strong").inner_text()
+            previous_execution_id = result.get("execution_id")
+
         # H21과 H22도 앞 문제와 무관한 전용 source·container·상태로 실행된다.
         page.locator('.tab[data-tab-index="12"]').click()
         page.locator("#h21-verify").click()
-        h21_hands_on = wait_for_result(page, timeout_ms)
+        h21_hands_on = wait_for_result(page, timeout_ms, previous_execution_id)
         h21_verdict = page.locator("#verdict strong").inner_text()
         page.locator("#h22-verify").click()
         h22_hands_on = wait_for_result(page, timeout_ms, h21_hands_on.get("execution_id"))
@@ -285,14 +324,14 @@ def main() -> int:
         for url in requests
     )
     checks = {
-        "tabs": tab_count == 13 and locked_tabs == 6,
-        "official_links": official_links == 2,
+        "tabs": tab_count == 13 and locked_tabs == 0,
+        "official_links": official_links == 5,
         "csp": "object-src 'none'" in csp and "frame-ancestors 'none'" in csp,
         "session": browser_cookie_visible == "",
         "system_theme": light_canvas != dark_canvas and system_mode,
         "theme_button": manual_light and manual_dark and persisted_dark,
         "panel_boundary": panel_boundary,
-        "action_tooltips": tooltip_count == 16
+        "action_tooltips": tooltip_count == 27
         and preflight_focus_visible
         and preflight_tip_visible
         and preflight_tip_collapsed
@@ -316,6 +355,17 @@ def main() -> int:
         and "다른 공격 문장까지 모두 막는다는 뜻은 아닙니다" in h08_tip_text
         and "별도 Delivery Sink" in h09_tip_text
         and "실제 고객 정보나 Bedrock 모델은 사용하지 않습니다" in h09_tip_text
+        and "Output Rail" in h10_tip_text
+        and "Titan Text Embeddings V2" in h11_tip_text
+        and "실패 지점" in h12_tip_text
+        and "Promptfoo 0.121.20" in h13_tip_text
+        and "Garak 0.15.1" in later_tip_texts["H14"]
+        and "PyRIT 1.0.1" in later_tip_texts["H15"]
+        and "Sandbox" in later_tip_texts["H16"]
+        and "Loki·Tempo·Prometheus" in later_tip_texts["H17"]
+        and "H17 실행 결과는 사용하지 않습니다" in later_tip_texts["H18"]
+        and "request ID" in later_tip_texts["H19"]
+        and "pending·firing" in later_tip_texts["H20"]
         and desktop_tip_inside
         and h07_desktop_tip_inside
         and h08_desktop_tip_inside
@@ -421,6 +471,23 @@ def main() -> int:
         and "900101-1234568" not in h09_raw_text
         and "security-team@example.com" not in h09_raw_text
         and '"capability"' not in h09_raw_text,
+        "h10_to_h20_starters": all(
+            later_results[activity].get("verified_by") == "guided-evidence-verifier"
+            and later_verdicts[activity] == expected
+            for activity, expected in {
+                "H10": "HIT",
+                "H11": "HIT",
+                "H12": "HIT",
+                "H13": "ERR",
+                "H14": "ERR",
+                "H15": "ERR",
+                "H16": "HIT",
+                "H17": "ERR",
+                "H18": "ERR",
+                "H19": "ERR",
+                "H20": "ERR",
+            }.items()
+        ),
         "h22_hands_on": h22_verdict == "HIT"
         and h22_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h22_hands_on.get("result", {}).get("protocol_version") == "2026-07-28"
@@ -440,7 +507,7 @@ def main() -> int:
     }
     print(
         f"tabs={tab_count} locked_tabs={locked_tabs} official_links={official_links} "
-        f"execution_order=H21->H22->H09->H08->H07->H06->H05->H04->H02->H03->H01 h21={h21_verdict} h22={h22_verdict} h09={h09_verdict} h08={h08_verdict} h07={h07_verdict} h06={h06_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
+        f"execution_order=H20->...->H10->H21->H22->H09->H08->H07->H06->H05->H04->H02->H03->H01 later={later_verdicts} h21={h21_verdict} h22={h22_verdict} h09={h09_verdict} h08={h08_verdict} h07={h07_verdict} h06={h06_verdict} h05={h05_verdict} h04={h04_verdict} preflight={preflight.get('course_verdict')} hands_on={hands_on_verdict} "
         f"h02_resources={h02_resources.get('course_verdict')} h02_hands_on={h02_verdict} "
         f"h03_resources={h03_resources.get('course_verdict')} h03_hands_on={h03_verdict} "
         f"h04_resources={h04_resources.get('course_verdict')} h04_hands_on={h04_verdict} "
