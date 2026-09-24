@@ -27,7 +27,7 @@ POLICIES = {
         "tools": {"lookup_notice", "oversized_context", "slow_context"},
         "max_tool_calls": 2,
         "max_result_bytes": 160,
-        "tool_timeout_ms": 50,
+        "tool_timeout_ms": 250,
     }
 }
 

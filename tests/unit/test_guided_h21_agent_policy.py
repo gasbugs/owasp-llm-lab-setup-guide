@@ -42,7 +42,7 @@ class GuidedH21PolicyTests(unittest.TestCase):
         self.assertEqual(admitted.tool_timeout_ms, 1000)
         self.assertEqual(policy.POLICIES["support-agent"]["max_tool_calls"], 2)
         self.assertEqual(policy.POLICIES["support-agent"]["max_result_bytes"], 160)
-        self.assertEqual(policy.POLICIES["support-agent"]["tool_timeout_ms"], 50)
+        self.assertEqual(policy.POLICIES["support-agent"]["tool_timeout_ms"], 250)
 
     def test_host_uses_real_mcp_client_and_server_owned_cases(self):
         source = (LAB / "host.py").read_text(encoding="utf-8")

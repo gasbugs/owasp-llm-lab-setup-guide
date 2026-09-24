@@ -145,7 +145,7 @@ async def slow_context(
     """Return after a short delay so the Host can enforce its timeout."""
     principal = authorize(access_token, state_owner)
     record(suite_id, case_id, trace_id, "slow_context", "allowed")
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.5)
     return {
         "principal": principal,
         "server_id": SERVER_ID,
