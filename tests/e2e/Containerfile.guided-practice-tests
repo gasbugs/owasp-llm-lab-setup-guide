@@ -1,8 +1,9 @@
 FROM docker.io/library/python:3.12.14-slim
 
-COPY llm-security-control-plane/guided-labs/h01-bedrock-gateway/requirements.txt /tmp/gateway.txt
-COPY llm-security-control-plane/guided-evidence-verifier/requirements.txt /tmp/verifier.txt
-RUN pip install --no-cache-dir -r /tmp/gateway.txt -r /tmp/verifier.txt PyYAML==6.0.3
+COPY tests/requirements.txt /tmp/test-requirements.txt
+COPY docker/vuln-rag /opt/vuln-rag
+RUN apt-get update && apt-get install -y --no-install-recommends g++ \
+    && pip install --no-cache-dir -r /tmp/test-requirements.txt -e /opt/vuln-rag
 
 ENV PYTHONDONTWRITEBYTECODE=1
 WORKDIR /workspace

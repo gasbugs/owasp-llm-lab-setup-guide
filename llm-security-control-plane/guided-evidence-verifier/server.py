@@ -3834,7 +3834,8 @@ def verify_h16(request: H13VerifyRequest, _authorized: None = Depends(require_co
     if response.status_code != 200: return tool_err("H16",request,"현재 정책 승격 receipt가 없습니다.")
     data=response.json(); events=data.get('events',[]); result={"baseline_digest":data.get('baseline_digest'),"sandbox_digest":data.get('sandbox_digest'),"active_digest":data.get('active_digest'),"baseline_risk_hit":data.get('baseline_risk_hit'),"normal_decision":data.get('normal_decision'),"risk_decision":data.get('risk_decision'),"events":events}
     if data.get('started_at') != request.started_at: return tool_err("H16",request,"현재 suite의 승격 증거가 아닙니다.",result)
-    if data.get('sandbox_digest') == "8cfe09ec377a61de0abcdfbf0ec57c110f33dee30eb073cbb32fcb560308eaf6":
+    if not data.get('sandbox_digest'): return tool_err("H16",request,"현재 실행한 정책의 digest가 없습니다.",result)
+    if data.get('normal_decision') == 'allow' and data.get('risk_decision') == 'allow' and events == []:
         if not (data.get('baseline_risk_hit') is True and data.get('normal_decision') == 'allow' and data.get('risk_decision') == 'allow' and events == []):
             return tool_err("H16",request,"Starter의 기본 허용 영향과 승격 없음 증거가 일치하지 않습니다.",result)
         return {
@@ -3848,7 +3849,6 @@ def verify_h16(request: H13VerifyRequest, _authorized: None = Depends(require_co
             "reason":"Starter의 기본 허용 정책이 정상 요청뿐 아니라 H16 위험 요청도 허용했습니다. 승격 event는 없지만 Sandbox에서 위험 영향이 직접 확인됐습니다.",
             "next_check":"policy.py에서 H16-OVERRIDE를 명시적으로 차단한 뒤 같은 정상·위험 suite를 다시 실행합니다.",
         }
-    if data.get('sandbox_digest') != "239daff92bd7326b7f563d8446da84826e9be625ffe7a8be3bd303af6afcc7a5": return tool_err("H16",request,"Sandbox 정책의 업무 범위 규칙이 완성되지 않았습니다.",result)
     if not (data.get('normal_decision')=='allow' and data.get('risk_decision')=='block' and [x.get('event') for x in events]==['promote','rollback','promote'] and data.get('active_digest')==data.get('sandbox_digest')): return tool_err("H16",request,"normal+risk suite, CAS 승격, rollback 원장이 완전하지 않습니다.",result)
     return {**tool_err("H16",request,"",result),"course_verdict":"PASS","stage_calls":[{"stage":"sandbox_regression","attempted":True,"outcome":"normal-and-risk-pass","evidence_id":data['sandbox_digest']},{"stage":"promotion_ledger","attempted":True,"outcome":"promote-rollback-promote","evidence_id":events[-1]['at']}],"evidence":[{"source":"h16-policy-store","kind":"audit-ledger","id":request.suite_id}],"reason":"정상 기능과 위험 차단을 Sandbox에서 함께 통과한 digest만 active가 되었고 rollback과 재승격 audit event까지 확인했습니다."}
 
