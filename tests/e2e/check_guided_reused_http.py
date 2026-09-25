@@ -197,6 +197,8 @@ print(json.dumps(result))'''
                         *sorted(selected - {initializer}))
                 exit_code = subprocess.check_output(["docker", "wait", project + "-" + initializer],
                                                      text=True, timeout=60).strip()
+                if exit_code != "0":
+                    compose("logs", "--tail", "60", initializer, "guided-h20-grafana")
                 assert exit_code == "0", "Grafana reader initialization failed"
                 print(subprocess.check_output(command + ["ps", "--all", "--format", "json"],
                                               env=env, text=True))

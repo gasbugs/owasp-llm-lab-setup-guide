@@ -13,12 +13,17 @@ spec.loader.exec_module(reader)
 
 
 class ReaderTests(unittest.TestCase):
-    def run_case(self, *, exists=False, admin=False, role='Viewer', identity_status=200):
+    def run_case(self, *, exists=False, admin=False, role='Viewer', identity_status=200,
+                 initial_permission_status=None):
         self.requests = []
         def handle(request):
             self.requests.append(request)
             path = request.url.path
             if path == '/api/dashboards/uid/guided-p20/permissions':
+                if len(self.requests) == 1 and initial_permission_status:
+                    if initial_permission_status == 'timeout':
+                        raise httpx.ReadTimeout('publisher fixture', request=request)
+                    return httpx.Response(initial_permission_status, json={})
                 return httpx.Response(200, json=[{'role': 'Viewer', 'permission': 1}])
             if path == '/api/users/lookup':
                 return httpx.Response(200 if exists else 404, json={})
@@ -48,6 +53,17 @@ class ReaderTests(unittest.TestCase):
         self.run_case(exists=True)
         self.assertTrue(all(r.method == 'GET' for r in self.requests))
 
+    def test_initial_permission_readiness_retries_without_duplicate_creation(self):
+        for status in (404, 502, 503, 504, 'timeout'):
+            with self.subTest(status=status), patch.object(reader.time, 'sleep'):
+                self.assertEqual(self.run_case(initial_permission_status=status)['role'], 'Viewer')
+                self.assertEqual(sum(r.method == 'POST' for r in self.requests), 1)
+
+    def test_permission_auth_failure_is_not_readiness_or_permission_grant(self):
+        with self.assertRaises(httpx.HTTPStatusError):
+            self.run_case(initial_permission_status=401)
+        self.assertEqual(len(self.requests), 1)
+
     def test_existing_admin_not_accepted_or_mutated(self):
         with self.assertRaises(ValueError): self.run_case(exists=True, admin=True)
         self.assertTrue(all(r.method == 'GET' for r in self.requests))
@@ -69,7 +85,7 @@ class ReaderTests(unittest.TestCase):
             requests.append(request)
             return httpx.Response(200, json=[])
         with httpx.Client(base_url='http://grafana', transport=httpx.MockTransport(handle)) as client:
-            with patch.object(reader.time, 'monotonic', side_effect=[0, 31]):
+            with patch.object(reader.time, 'monotonic', side_effect=[0, 61]):
                 with self.assertRaises(TimeoutError): reader.provision(client, 'admin-secret', 'reader-secret')
         self.assertEqual(len(requests), 1)
         self.assertEqual(requests[0].method, 'GET')

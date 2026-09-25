@@ -13,10 +13,13 @@ def provision(client, admin_password, reader_password):
         raise ValueError('P20 requires distinct nonempty Grafana credentials')
     admin = ('admin', admin_password)
     dashboard_path = '/api/dashboards/uid/guided-p20'
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + 60
     while True:
-        dashboard = client.get(dashboard_path + '/permissions', auth=admin)
-        if dashboard.status_code != 404:
+        try:
+            dashboard = client.get(dashboard_path + '/permissions', auth=admin)
+        except httpx.TransportError:
+            dashboard = None
+        if dashboard is not None and dashboard.status_code not in (404, 502, 503, 504):
             dashboard.raise_for_status()
             if any(item.get('role') == 'Viewer' and item.get('permission') == 1
                    for item in dashboard.json()):
@@ -51,7 +54,7 @@ def provision(client, admin_password, reader_password):
 def main():
     try:
         with httpx.Client(base_url=os.environ['GUIDED_P20_GRAFANA_URL'],
-                          timeout=3, follow_redirects=False, trust_env=False) as client:
+                          timeout=10, follow_redirects=False, trust_env=False) as client:
             deadline = time.monotonic() + 60
             while True:
                 try:
@@ -67,9 +70,12 @@ def main():
             provision(client, os.environ['GUIDED_P20_GRAFANA_ADMIN_PASSWORD'],
                       os.environ['GUIDED_P20_GRAFANA_PASSWORD'])
         print('P20 Grafana Viewer ready')
-    except (httpx.HTTPError, ValueError, KeyError, TypeError, TimeoutError):
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, TimeoutError) as error:
         # Do not print responses, request bodies, credentials or exception tracebacks.
         print('P20 Grafana Viewer preparation failed; check dedicated credentials and account role', file=sys.stderr)
+        print('Failure type: ' + type(error).__name__, file=sys.stderr)
+        if isinstance(error, httpx.HTTPStatusError):
+            print('HTTP status: ' + str(error.response.status_code), file=sys.stderr)
         return 1
     return 0
 
