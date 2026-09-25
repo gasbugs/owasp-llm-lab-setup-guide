@@ -4,7 +4,31 @@
 
 schema_version: 1
 course_id: tenant-03-guided-llm-security
-duration_minutes: 1320
+workspace: practice
+# 공개 번호만 바꾸고 기존 서비스·실행 ID는 재사용한다.
+execution_ids:
+  P01: H01
+  P02: H02
+  P03: H03
+  P04: H04
+  P05: H05
+  P06: H06
+  P07: H07
+  P08: H08
+  P09: H09
+  P10: H10
+  P11: H11
+  P12: H12
+  P13: H13
+  P14: H14
+  P15: H15
+  P16: H16
+  P17: H17
+  P18: H18
+  P19: H19
+  P20: H20
+  P21: H21
+  P22: H22
 tabs:
   - {id: 01-nova, hands_on: [H01], hands_on_status: implemented}
   - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: implemented, implemented_hands_on: [H02, H03]}
@@ -24,10 +48,10 @@ hands_on_H13: {executor: guided-h13-promptfoo, verifier: guided-evidence-verifie
 hands_on_H14: {executor: guided-h14-garak, verifier: guided-evidence-verifier, native_artifact: garak-report-jsonl}
 hands_on_H15: {executor: guided-h15-pyrit, verifier: guided-evidence-verifier, native_artifact: pyrit-conversation}
 hands_on_H16: {executor: guided-h16-policy-promotion, verifier: guided-evidence-verifier, evidence: [sandbox-digest, active-digest, promotion-ledger]}
-hands_on_H17: {executor: guided-observability, verifier: guided-evidence-verifier, stores: [loki, tempo, prometheus]}
-hands_on_H18: {executor: guided-observability, verifier: guided-evidence-verifier, queries: [logql, trace-id, promql]}
-hands_on_H19: {executor: guided-observability, verifier: guided-evidence-verifier, join_key: request_id}
-hands_on_H20: {executor: guided-observability, verifier: guided-evidence-verifier, evidence: [firing, resolved, dashboard-query]}
+hands_on_H17: {executor: guided-h17-telemetry, verifier: guided-evidence-verifier, stores: [loki, tempo, prometheus], learner_function: observe_request, public_id: P17, contract_version: 2}
+hands_on_H18: {executor: guided-h18-queries, verifier: guided-evidence-verifier, queries: [logql, trace-id, promql]}
+hands_on_H19: {executor: guided-h19-investigation, verifier: guided-evidence-verifier, learner_function: analyze_incident, public_id: P19, contract_version: 2}
+hands_on_H20: {public_id: P20, contract_version: 2, executor: guided-h20-alerts, verifier: guided-evidence-verifier, learner_artifacts: [rules.yaml, dashboard.json], products: [guided-h20-prometheus, guided-h20-alertmanager, guided-h20-grafana], evidence: [execution-build, checkpoints, pending, firing, resolved, dashboard-query]}
 
 hands_on_H01:
   executor: guided-h01-gateway
@@ -45,22 +69,27 @@ hands_on_H01:
     - reject-model-override
 
 hands_on_H02:
+  public_id: P02
+  contract_version: p02-document-v1
+  learner_function: prepare_document
+  learner_artifacts: [learner.py]
   executor: guided-h02-document-app
   provider: guided-bedrock-gateway
   verifier: guided-evidence-verifier
   embedding_model_id: amazon.titan-embed-text-v2:0
   required_evidence:
-    - provider_request_id
-    - s3_request_id
+    - closed-execution-ledger
+    - current-suite-and-runner-digest
+    - source-requery-sha256
+    - s3-and-titan-native-request-ids
     - embedding_dimension: 1024
-    - knowledge_base_id
-    - data_source_id
-    - source_digest
-    - normal-document
-    - client-key-override
-    - invalid-empty-body
+    - kb-data-source-index-binding
+    - normal-and-boundary-cases: 4
+    - rejected-cases-without-calls: 18
 
 hands_on_H03:
+  public_id: P03
+  contract_version: p03-search-v1
   executor: guided-h03-sync-app
   provider: guided-bedrock-gateway
   verifier: guided-evidence-verifier
@@ -68,13 +97,16 @@ hands_on_H03:
     - source_digest
     - ingestion_job_id
     - job_status: COMPLETE
-    - early-retrieval
-    - final-retrieval
-    - document_ids
+    - closed-execution-ledgers
+    - current-job-status-before-retrieval
+    - actual-retrieval-response
     - source_uris
-    - revoked-source-absent
+    - provider-case: 1
+    - synthetic-boundary-and-error-cases: 18
 
 hands_on_H04:
+  public_id: P04
+  contract_version: p04-guardrail-v1
   executor: guided-h04-guardrail-app
   provider: guided-bedrock-gateway
   verifier: guided-evidence-verifier
@@ -92,6 +124,10 @@ hands_on_H04:
     - stop_reason
     - usage.outputTokens
     - pii_action: ANONYMIZED
+    - closed-execution-ledgers
+    - current-policy-before-and-after
+    - provider-cases: 4
+    - synthetic-boundary-and-error-cases: 23
 
 hands_on_H05:
   executor: guided-h05-nemo-dialog
@@ -354,25 +390,28 @@ hands_on_H11:
     missing_or_malformed: ERR
 
 hands_on_H12:
+  practice_id: P12
+  contract_version: 2
   executor: guided-h12-application-pipeline
   source_path: guided-labs/h12-application-pipeline/pipeline.py
-  control_endpoint: /api/hands-on/H12/verify
+  control_endpoint: /api/practice/P12/verify
   executor_endpoint: /v1/run
-  provider: guided-h12-stage-provider
+  providers: [guided-p12-context, guided-p12-privacy, guided-p12-nemo, guided-bedrock-gateway]
   verifier: guided-evidence-verifier
+  verifier_endpoint: /v1/verify/p12
+  contract_path: guided-contracts/p12.json
   required_evidence:
-    - declared_stage_order
-    - protected_service_call_ledger
-    - normal
-    - invalid-token
-    - indirect-injection
-    - nemo-timeout
-    - direct_access_status: 401
-    - direct_side_effects: 0
+    - current_suite_and_scaffold_binding
+    - authenticated_principal_and_tenant
+    - original_input_and_actual_stage_dataflow
+    - closed_context_privacy_nemo_gateway_ledgers
+    - normal_and_all_contract_stop_paths
+    - unique_provider_request_ids_and_end_turn
+    - unchanged_before_and_after_builds
   verdict_contract:
-    starter_hit: retrieval-before-auth-and-main-after-failure
-    fixed_pass: ordered-fail-closed-with-protected-services
-    missing_or-mismatched-ledger: ERR
+    starter_incomplete: ERR
+    fixed_pass: actual-product-calls-and-dataflow-with-normal-and-stop-paths
+    missing_or_mismatched_or_truncated: ERR
 
 hands_on_H22:
   executor: guided-h22-host
