@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 
 ROOT = Path(__file__).resolve().parents[2]
 GATEWAY = ROOT / "llm-security-control-plane/guided-bedrock-gateway"
+VERIFIER_TOKEN = "verifier-" * 8
+H04_TOKEN = "h04-" * 8
+H04_PROVISION_TOKEN = "h04-provision-" * 4
 
 
 class GuidedH03GatewayTests(unittest.TestCase):
@@ -25,13 +30,13 @@ class GuidedH03GatewayTests(unittest.TestCase):
             "GUIDED_GATEWAY_DATABASE": str(Path(cls.temp.name) / "gateway.sqlite3"),
             "GUIDED_LAB01_GATEWAY_TOKEN": "lab01",
             "GUIDED_NEMO_GATEWAY_TOKEN": "nemo",
-            "GUIDED_VERIFIER_GATEWAY_TOKEN": "verifier",
+            "GUIDED_VERIFIER_GATEWAY_TOKEN": VERIFIER_TOKEN,
             "GUIDED_H02_GATEWAY_TOKEN": "h02",
             "GUIDED_LAB02_PROVISION_TOKEN": "h02-provision",
             "GUIDED_H03_GATEWAY_TOKEN": "h03",
             "GUIDED_LAB03_PROVISION_TOKEN": "h03-provision",
-            "GUIDED_H04_GATEWAY_TOKEN": "h04",
-            "GUIDED_LAB04_PROVISION_TOKEN": "h04-provision",
+            "GUIDED_H04_GATEWAY_TOKEN": H04_TOKEN,
+            "GUIDED_LAB04_PROVISION_TOKEN": H04_PROVISION_TOKEN,
             "GUIDED_H07_GATEWAY_CONTROL_TOKEN": "h07-control",
             "GUIDED_H07_GATEWAY_VERIFIER_TOKEN": "h07-verifier",
             "GUIDED_H07_CAPABILITY_SECRET": "h07-capability-secret-at-least-32-bytes",
@@ -59,135 +64,129 @@ class GuidedH03GatewayTests(unittest.TestCase):
         sys.path.remove(str(GATEWAY))
         cls.temp.cleanup()
 
-    def test_contract_exposes_revoked_then_current_source(self):
-        provision = self.client.post(
-            "/v1/h03/provision",
-            json={"execution_id": "11111111-1111-1111-1111-111111111111"},
-            headers={"Authorization": "Bearer h03-provision"},
-        )
-        self.assertEqual(provision.status_code, 200)
-        self.assertEqual(provision.json()["status"], "READY_FOR_SYNC")
+    def test_retired_execution_routes_do_not_call_backends(self):
+        backend = sys.modules["h03_backend"]
+        routes = [
+            ("POST", "/v1/h03/provision", "h03-provision"),
+            ("POST", "/v1/h03/ingestions", "h03"),
+            ("GET", "/v1/h03/ingestions/historical-job", "h03"),
+            ("POST", "/v1/h03/retrievals", "h03"),
+        ]
+        with patch.object(backend, "connect") as connect:
+            for method, path, token in routes:
+                with self.subTest(path=path):
+                    response = self.client.request(method, path,
+                        headers={"Authorization": "Bearer " + token})
+                    self.assertEqual(response.status_code, 410)
+                    self.assertEqual(self.client.request(method, path).status_code, 401)
+            connect.assert_not_called()
 
-        execution_id = "22222222-2222-2222-2222-222222222222"
-        started = self.client.post(
-            "/v1/h03/ingestions",
-            json={"execution_id": execution_id},
-            headers={"Authorization": "Bearer h03"},
-        )
-        job_id = started.json()["ingestion_job_id"]
-        first_status = self.client.get(
-            f"/v1/h03/ingestions/{job_id}",
-            headers={"Authorization": "Bearer h03"},
-        )
-        self.assertEqual(first_status.json()["status"], "IN_PROGRESS")
-        early = self.client.post(
-            "/v1/h03/retrievals",
-            json={
-                "execution_id": execution_id,
-                "phase": "early",
-                "ingestion_job_id": job_id,
-            },
-            headers={"Authorization": "Bearer h03"},
-        )
-        self.assertIn("revoked-policy.md", early.json()["source_uris"][0])
+    def test_historical_job_is_a_read_only_saved_snapshot(self):
+        backend = sys.modules["h03_backend"]
+        job = {"ingestion_job_id": "historical-job", "status": "IN_PROGRESS"}
+        with patch.object(backend, "load_state", return_value={"current_job": job}):
+            response = self.client.get("/v1/h03/jobs/historical-job",
+                headers={"Authorization": "Bearer " + VERIFIER_TOKEN})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), job)
+            missing = self.client.get("/v1/h03/jobs/different-job",
+                headers={"Authorization": "Bearer " + VERIFIER_TOKEN})
+            self.assertEqual(missing.status_code, 404)
 
-        second_status = self.client.get(
-            f"/v1/h03/ingestions/{job_id}",
-            headers={"Authorization": "Bearer h03"},
-        )
-        self.assertEqual(second_status.json()["status"], "COMPLETE")
-        final = self.client.post(
-            "/v1/h03/retrievals",
-            json={
-                "execution_id": execution_id,
-                "phase": "final",
-                "ingestion_job_id": job_id,
-            },
-            headers={"Authorization": "Bearer h03"},
-        )
-        self.assertIn("current-policy.md", final.json()["source_uris"][0])
-        self.assertNotIn("revoked-policy.md", final.text)
+    def test_historical_reads_preserve_saved_rows_without_provider_calls(self):
+        backend = sys.modules["h03_backend"]
+        state = {"provider_mode": "aws", "status": "SYNCING",
+                 "current_job": {"ingestion_job_id": "saved-job", "status": "QUEUED"}}
+        receipt = {"execution_id": "saved-execution", "phase": "early",
+                   "provider_request_id": "saved-request", "provider_mode": "aws"}
+        with backend.connect() as database:
+            database.execute("INSERT OR REPLACE INTO resource_state VALUES('h03',?)",
+                             (json.dumps(state),))
+            database.execute("INSERT OR REPLACE INTO h03_retrieval_evidence VALUES(?,?,?,?)",
+                             ("saved-execution", "early", "saved-request", json.dumps(receipt)))
+            before = list(database.iterdump())
+        with patch("boto3.client", side_effect=AssertionError("historical reads must be local")):
+            for path, expected in (
+                ("/v1/h03/resources", state),
+                ("/v1/h03/jobs/saved-job", state["current_job"]),
+                ("/v1/h03/retrievals/saved-execution/early", receipt),
+            ):
+                with self.subTest(path=path):
+                    response = self.client.get(path, headers={"Authorization": "Bearer " + VERIFIER_TOKEN})
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.json(), expected)
+                    for token in ("h03", "h03-provision", "wrong"):
+                        self.assertEqual(self.client.get(path, headers={
+                            "Authorization": "Bearer " + token}).status_code, 401)
+            self.assertEqual(self.client.get("/v1/h03/retrievals/missing/early",
+                headers={"Authorization": "Bearer " + VERIFIER_TOKEN}).status_code, 404)
+        with backend.connect() as database:
+            self.assertEqual(list(database.iterdump()), before)
 
-    def test_browser_cannot_choose_resource_or_job_state(self):
-        rejected = self.client.post(
-            "/v1/h03/provision",
-            json={
-                "execution_id": "33333333-3333-3333-3333-333333333333",
-                "bucket": "attacker-bucket",
-            },
-            headers={"Authorization": "Bearer h03-provision"},
-        )
-        self.assertEqual(rejected.status_code, 422)
-        denied = self.client.post(
-            "/v1/h03/ingestions",
-            json={"execution_id": "44444444-4444-4444-4444-444444444444"},
-            headers={"Authorization": "Bearer wrong"},
-        )
-        self.assertEqual(denied.status_code, 401)
+    def test_missing_history_is_not_synthesized(self):
+        backend = sys.modules["h03_backend"]
+        with patch.object(backend, "load_state", return_value=None):
+            response = self.client.get("/v1/h03/resources",
+                headers={"Authorization": "Bearer " + VERIFIER_TOKEN})
+            self.assertEqual(response.json(), {"status": "MISSING", "region": backend.AWS_REGION})
+            self.assertEqual(self.client.get("/v1/h03/jobs/missing",
+                headers={"Authorization": "Bearer " + VERIFIER_TOKEN}).status_code, 404)
 
-    def test_h04_contract_separates_apply_and_connected_converse(self):
-        provision = self.client.post(
-            "/v1/h04/provision",
-            json={"execution_id": "04000000-0000-0000-0000-000000000001"},
-            headers={"Authorization": "Bearer h04-provision"},
-        )
-        self.assertEqual(provision.status_code, 200)
-        self.assertEqual(provision.json()["guardrail_version"], "DRAFT")
+    def test_retired_h04_routes_cannot_execute_or_provision(self):
+        backend = sys.modules["h04_backend"]
+        with patch.object(backend, "connect") as connect, patch(
+            "boto3.client", side_effect=AssertionError("retired routes must not call AWS")
+        ):
+            for path, token in (
+                ("/v1/h04/provision", H04_PROVISION_TOKEN),
+                ("/v1/h04/apply", H04_TOKEN),
+                ("/v1/h04/converse", H04_TOKEN),
+            ):
+                for body in ({}, {"attach_guardrail": True, "course_verdict": "PASS"}):
+                    with self.subTest(path=path, body=body):
+                        response = self.client.post(path, json=body,
+                            headers={"Authorization": "Bearer " + token})
+                        self.assertEqual(response.status_code, 410)
+                        self.assertEqual(self.client.post(path, json=body).status_code, 401)
+                        self.assertEqual(self.client.post(path, json=body, headers={
+                            "Authorization": "Bearer " + VERIFIER_TOKEN}).status_code, 401)
+            connect.assert_not_called()
 
-        applied = self.client.post(
-            "/v1/h04/apply",
-            json={
-                "execution_id": "04000000-0000-0000-0000-000000000002",
-                "started_at": "2026-09-23T10:00:00+00:00",
-                "case_id": "apply-risk",
-            },
-            headers={"Authorization": "Bearer h04"},
-        )
-        self.assertEqual(applied.status_code, 200)
-        self.assertEqual(applied.json()["action"], "GUARDRAIL_INTERVENED")
-        self.assertIn("{EMAIL}", applied.text)
-        self.assertFalse(applied.json()["model_called"])
+    def test_h04_history_is_unchanged_and_never_calls_provider(self):
+        backend = sys.modules["h04_backend"]
+        state = {"status": "READY", "provider_mode": "aws",
+                 "guardrail_id": "historical-guardrail", "guardrail_version": "DRAFT"}
+        receipt = {"execution_id": "saved-h04", "provider_request_id": "saved-h04-request",
+                   "provider_mode": "aws", "guardrail_config": None}
+        with backend.connect() as database:
+            database.execute("INSERT OR REPLACE INTO resource_state VALUES('h04',?)",
+                             (json.dumps(state),))
+            database.execute("INSERT OR REPLACE INTO h04_evidence VALUES(?,?,?)",
+                             ("saved-h04", "saved-h04-request", json.dumps(receipt)))
+            before = list(database.iterdump())
+        with patch("boto3.client", side_effect=AssertionError("history must stay local")):
+            for path, expected in (
+                ("/v1/h04/resources", state), ("/v1/h04/evidence/saved-h04", receipt),
+            ):
+                response = self.client.get(path, headers={"Authorization": "Bearer " + VERIFIER_TOKEN})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json(), expected)
+                self.assertNotIn("task_completed", response.json())
+                for token in (H04_TOKEN, H04_PROVISION_TOKEN, "wrong"):
+                    self.assertEqual(self.client.get(path, headers={
+                        "Authorization": "Bearer " + token}).status_code, 401)
+            self.assertEqual(self.client.get("/v1/h04/evidence/missing", headers={
+                "Authorization": "Bearer " + VERIFIER_TOKEN}).status_code, 404)
+        with backend.connect() as database:
+            self.assertEqual(list(database.iterdump()), before)
 
-        vulnerable = self.client.post(
-            "/v1/h04/converse",
-            json={
-                "execution_id": "04000000-0000-0000-0000-000000000003",
-                "started_at": "2026-09-23T10:00:00+00:00",
-                "case_id": "converse-risk",
-                "attach_guardrail": False,
-            },
-            headers={"Authorization": "Bearer h04"},
-        )
-        self.assertIn("learner@example.com", vulnerable.json()["output_text"])
-        self.assertIsNone(vulnerable.json()["guardrail_config"])
-
-        protected = self.client.post(
-            "/v1/h04/converse",
-            json={
-                "execution_id": "04000000-0000-0000-0000-000000000004",
-                "started_at": "2026-09-23T10:00:00+00:00",
-                "case_id": "converse-risk",
-                "attach_guardrail": True,
-            },
-            headers={"Authorization": "Bearer h04"},
-        )
-        self.assertNotIn("learner@example.com", protected.json()["output_text"])
-        self.assertIn("{EMAIL}", protected.json()["output_text"])
-        self.assertEqual(
-            protected.json()["guardrail_config"]["guardrailVersion"], "DRAFT"
-        )
-
-    def test_h04_provision_rejects_browser_policy(self):
-        rejected = self.client.post(
-            "/v1/h04/provision",
-            json={
-                "execution_id": "04000000-0000-0000-0000-000000000005",
-                "name": "attacker-guardrail",
-                "outputEnabled": False,
-            },
-            headers={"Authorization": "Bearer h04-provision"},
-        )
-        self.assertEqual(rejected.status_code, 422)
+    def test_missing_h04_state_is_not_synthesized(self):
+        backend = sys.modules["h04_backend"]
+        with patch.object(backend, "load_state", return_value=None):
+            response = self.client.get("/v1/h04/resources", headers={
+                "Authorization": "Bearer " + VERIFIER_TOKEN})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {"status": "MISSING", "region": backend.AWS_REGION})
 
 
 if __name__ == "__main__":

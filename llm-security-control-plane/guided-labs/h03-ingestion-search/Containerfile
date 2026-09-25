@@ -5,8 +5,16 @@ COPY guided-labs/h03-ingestion-search/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
-COPY --chmod=0444 guided-labs/h03-ingestion-search/server.py /app/server.py
+COPY --chmod=0444 guided-labs/h03-ingestion-search/learner.py /app/learner.py
+COPY --chmod=0444 guided-labs/h03-ingestion-search/cases.py /app/cases.py
+COPY --chmod=0444 guided-labs/h03-ingestion-search/execution.py /app/execution.py
+COPY --chmod=0444 guided-labs/h03-ingestion-search/service_client.py /app/service_client.py
+COPY --chmod=0444 guided-labs/h03-ingestion-search/workflow.py /app/workflow.py
+COPY --chmod=0444 guided-labs/h03-ingestion-search/run_server.py /app/run_server.py
+COPY --chmod=0444 guided-labs/h03-ingestion-search/requirements.txt /app/requirements.txt
+COPY --chmod=0444 guided-labs/h03-ingestion-search/Containerfile /app/Containerfile
 
+RUN mkdir -p /state && chown 65532:65532 /state
 USER 65532:65532
 EXPOSE 8000
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]
+CMD ["uvicorn", "run_server:configured_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

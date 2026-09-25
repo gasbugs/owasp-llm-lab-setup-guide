@@ -6,6 +6,8 @@ RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
 COPY --chmod=0444 guided-labs/h01-bedrock-gateway/server.py /app/server.py
+COPY --chmod=0444 guided-labs/h01-bedrock-gateway/learner.py /app/learner.py
+COPY --chmod=0444 guided-labs/h01-bedrock-gateway/provider.py /app/provider.py
 
 USER 65532:65532
 EXPOSE 8000
