@@ -7,3 +7,6 @@ services:
       dockerfile: guided-labs/h18-product-queries/Containerfile
     image: ${P18_TEST_IMAGE:-localhost/guided-p18-markdown:test}
     volumes: !reset []
+  verify:
+    image: ${P18_VERIFY_IMAGE:?Set P18_VERIFY_IMAGE}
+    working_dir: /workspace

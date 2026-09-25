@@ -81,6 +81,9 @@ def main():
             return subprocess.run(compose + list(arguments), cwd=ROOT, env=env, **kwargs)
         live = LiveStack(ROOT, project, 'H20', 'http://p20:8000')
         try:
+            verifier_image = 'localhost/' + project + '-verifier:test'
+            subprocess.run(['docker', 'build', '-f', 'guided-evidence-verifier/Containerfile',
+                            '-t', verifier_image, '.'], cwd=ROOT / 'llm-security-control-plane', check=True)
             run('build', check=True)
             checked = run('run', '--rm', '--entrypoint', '/bin/promtool', 'prometheus',
                           'check', 'rules', '/etc/prometheus/p20-rules.yml', capture_output=True, text=True)
@@ -90,17 +93,15 @@ def main():
             reader_id = run('ps', '--all', '--quiet', 'reader', check=True, capture_output=True, text=True).stdout.strip()
             reader_exit = subprocess.check_output(['docker', 'wait', reader_id], text=True, timeout=90).strip()
             if reader_exit != '0':
+                run('logs', '--tail', '60', 'reader', 'grafana', check=False)
                 raise RuntimeError('P20 Grafana Viewer preparation failed')
             run('run', '--rm', '--no-deps', 'reader', check=True, timeout=90)
             subprocess.run(['docker', 'run', '--rm', '--network', project + '_default',
                 '--read-only', '--tmpfs', '/tmp', '--user', f'{os.getuid()}:{os.getgid()}',
                 '-v', f'{ROOT}:/workspace:ro', '-v', f'{output}:/evidence:rw', '-w', '/workspace',
-                '--entrypoint', 'python', 'localhost/guided-practice-tests:check', '-B',
+                '--entrypoint', 'python', verifier_image, '-B',
                 'tests/e2e/check_p20_reader_permissions.py', '/evidence/reader-permissions.json'], check=True)
             if args.tcp_verifier:
-                verifier_image = 'localhost/' + project + '-verifier:test'
-                subprocess.run(['docker', 'build', '-f', 'guided-evidence-verifier/Containerfile',
-                                '-t', verifier_image, '.'], cwd=ROOT / 'llm-security-control-plane', check=True)
                 live.start_verifier(verifier_image, {
                     'GUIDED_P20_PROMETHEUS_URL': 'http://prometheus:9090',
                     'GUIDED_P20_GRAFANA_URL': 'http://grafana:3000',
@@ -117,7 +118,7 @@ def main():
                 subprocess.run(['docker', 'run', '--rm', '--network', project + '_default',
                     '--read-only', '--tmpfs', '/tmp', '--user', f'{os.getuid()}:{os.getgid()}',
                     '-v', f'{ROOT}:/workspace:ro', '-v', f'{output}:/evidence:rw', '-w', '/workspace',
-                    '--entrypoint', 'python', 'localhost/guided-practice-tests:check', '-B',
+                    '--entrypoint', 'python', verifier_image, '-B',
                     'tests/e2e/run_guided_p20_server.py' if args.server_run else 'tests/e2e/run_guided_p20_products.py',
                     '/evidence/products.json', *(['--starter'] if args.starter else []),
                     *(['--fault', args.fault] if args.fault else []),
@@ -139,7 +140,7 @@ def main():
                 subprocess.run(['docker', 'run', '--rm', '--network', project + '_default',
                     '--read-only', '--tmpfs', '/tmp', '--user', f'{os.getuid()}:{os.getgid()}',
                     '-v', f'{ROOT}:/workspace:ro', '-v', f'{output}:/evidence:rw', '-w', '/workspace',
-                    '--entrypoint', 'python', 'localhost/guided-practice-tests:check', '-B',
+                    '--entrypoint', 'python', verifier_image, '-B',
                     'tests/e2e/check_p20_persisted_state.py', '/evidence'], check=True)
                 current_instances = deployed_instances()
                 for name in previous_instances:

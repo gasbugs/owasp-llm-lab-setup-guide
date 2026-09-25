@@ -76,7 +76,7 @@ def cleanup_aws(project, account_id, proof, preparation_path):
         operation_id = proof.get("aws_preparation", {}).get("detail", {}).get("operation_id")
         if operation_id:
             status, journal = rpc(project, "gateway:8080", "/v1/p03/preparations/" + operation_id,
-                                  "publisher-p03-read")
+                                  "publisher-p03-read-0000000000000000")
             proof["aws_preparation_journal"] = {"http_status": status, "journal": journal}
         proof["aws_cleanup"] = {"performed": False, "reason": "no complete preparation; inspect partial AWS resources"}
         return
@@ -145,7 +145,7 @@ def main():
                    for name in re.findall(r'os.environ\["([A-Z0-9_]+)"\]', path.read_text())}
             env.update(GUIDED_PROVIDER_MODE=mode, AWS_REGION="us-east-1",
                        GUIDED_LAB03_PROVISION_TOKEN="publisher-p03-provision",
-                       GUIDED_H03_GATEWAY_TOKEN="publisher-p03-runtime", GUIDED_VERIFIER_GATEWAY_TOKEN="publisher-p03-read")
+                       GUIDED_H03_GATEWAY_TOKEN="publisher-p03-runtime", GUIDED_VERIFIER_GATEWAY_TOKEN="publisher-p03-read-0000000000000000")
             gateway_extra = ["--network-alias", "gateway", "--tmpfs", "/state:uid=65532,gid=65532"]
             if mode == "aws":
                 env.update(AWS_PROFILE=args.aws_profile, AWS_EC2_METADATA_DISABLED="true",
@@ -165,7 +165,7 @@ def main():
             live.launch("learner", learner, learner_env, learner_extra)
             live.start_verifier(verifier, {"GUIDED_LAB03_URL": "http://learner:8000",
                 "GUIDED_VERIFIER_LAB03_TOKEN": "publisher-test-verifier", "GUIDED_BEDROCK_GATEWAY_URL": "http://gateway:8080",
-                "GUIDED_VERIFIER_GATEWAY_TOKEN": "publisher-p03-read"})
+                "GUIDED_VERIFIER_GATEWAY_TOKEN": "publisher-p03-read-0000000000000000"})
             for service in ("gateway:8080", "learner:8000", "verifier:8000"):
                 deadline = time.monotonic() + 30
                 while True:

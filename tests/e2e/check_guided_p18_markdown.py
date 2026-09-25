@@ -69,12 +69,12 @@ def main():
             shutil.copy2(ROOT / 'llm-security-control-plane' / relative, target)
         (context / QUERY).write_text(solution, encoding='utf-8')
         env = {**os.environ, 'P18_BUILD_CONTEXT': temporary,
-               'P18_TEST_IMAGE': 'localhost/' + project + ':test'}
+               'P18_TEST_IMAGE': 'localhost/' + project + ':test', 'P18_VERIFY_IMAGE': verifier_image}
         try:
             subprocess.run(compose + ['up', '-d', '--build'], cwd=ROOT, env=env, check=True)
+            subprocess.run(['docker', 'build', '-f', 'guided-evidence-verifier/Containerfile',
+                            '-t', verifier_image, '.'], cwd=ROOT / 'llm-security-control-plane', check=True)
             if args.tcp_verifier:
-                subprocess.run(['docker', 'build', '-f', 'guided-evidence-verifier/Containerfile',
-                                '-t', verifier_image, '.'], cwd=ROOT / 'llm-security-control-plane', check=True)
                 live.start_verifier(verifier_image)
             subprocess.run(compose + [
                 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',

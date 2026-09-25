@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -106,7 +107,19 @@ class IsolationCheckerTests(unittest.TestCase):
             three = checker.render([str(guided)], None)
             for path in others:
                 with self.subTest(compose=str(path.relative_to(root))):
-                    two = checker.render([str(path)], None)
+                    if path == root / "examples/runtime-security/compose.yaml":
+                        # Older Compose validates env_file existence even with
+                        # --no-env-resolution. Supply an empty publisher fixture,
+                        # never an existing learner runtime.env or credentials.
+                        with tempfile.TemporaryDirectory() as directory:
+                            copied = Path(directory) / "compose.yaml"
+                            copied.write_text(path.read_text())
+                            state = Path(directory) / ".state"
+                            state.mkdir()
+                            (state / "runtime.env").write_text("")
+                            two = checker.render([str(copied)], None)
+                    else:
+                        two = checker.render([str(path)], None)
                     self.assertEqual(checker.check_isolation(two, three), [])
             two = checker.render([str(others[0])], None)
             collision = next(iter(checker.port_numbers(two)))

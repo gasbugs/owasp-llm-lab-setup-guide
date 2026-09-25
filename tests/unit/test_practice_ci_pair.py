@@ -22,8 +22,11 @@ class PracticeCiPairTests(unittest.TestCase):
                     self.assertTrue((ROOT / command[1]).is_file())
                     self.assertFalse(any(arg.startswith("--aws") for arg in command))
                     for arg in command[2:]:
-                        if arg.startswith("tests/e2e/fixtures/"):
+                        if arg.startswith(("tests/e2e/fixtures/", "llm-security-control-plane/guided-labs/")):
                             self.assertTrue((ROOT / arg).is_file(), arg)
+                if practice in ("P17", "P19"):
+                    self.assertIn("guided-labs/", starter[2])
+                    self.assertIn("fixtures/", solution[2])
 
 
 if __name__ == "__main__":

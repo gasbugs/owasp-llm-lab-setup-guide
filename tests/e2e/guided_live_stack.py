@@ -3,6 +3,7 @@ from contextlib import ExitStack
 import re
 import socket
 import subprocess
+import sys
 
 
 class LiveStack:
@@ -20,6 +21,9 @@ class LiveStack:
         self.images = {}
 
     def close(self):
+        if sys.exc_info()[0] is not None:
+            for role in self.images:
+                subprocess.run(['docker', 'logs', '--tail', '60', self.project + '-' + role], check=False)
         self.cleanup.close()
 
     def required_env(self, role):

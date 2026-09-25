@@ -27,7 +27,11 @@ def commands(practice, output, python):
         elif practice in ("P17", "P19"):
             name = "check_guided_" + practice.lower() + "_implementation.py"
             fixture = "p17_instrumentation.py" if practice == "P17" else "p19_analysis.py"
-            args = [fixtures + fixture, "--tcp-verifier", *browser]
+            source = fixtures + fixture
+            if starter:
+                source = "llm-security-control-plane/guided-labs/" + (
+                    "h17-telemetry/instrumentation.py" if practice == "P17" else "h19-incident-investigation/investigation.py")
+            args = [source, "--tcp-verifier", *browser]
             if starter:
                 args.append("--starter")
         elif practice == "P18":

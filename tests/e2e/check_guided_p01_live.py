@@ -133,7 +133,7 @@ def main():
                 try:
                     if request(opener, origin + '/readyz')[0] == 200:
                         break
-                except (URLError, TimeoutError):
+                except (URLError, TimeoutError, json.JSONDecodeError):
                     pass
                 if time.monotonic() >= deadline:
                     raise TimeoutError('common UI startup')

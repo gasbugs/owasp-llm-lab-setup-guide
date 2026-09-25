@@ -110,7 +110,7 @@ def main():
             gateway_env.update(GUIDED_PROVIDER_MODE=mode, AWS_REGION="us-east-1",
                 GUIDED_H02_GATEWAY_TOKEN="publisher-p02-runtime",
                 GUIDED_LAB02_PROVISION_TOKEN="publisher-p02-provision",
-                GUIDED_VERIFIER_GATEWAY_TOKEN="publisher-p02-read")
+                GUIDED_VERIFIER_GATEWAY_TOKEN="publisher-p02-read-0000000000000000")
             extra = ["--network-alias", "gateway", "--tmpfs", "/state:uid=65532,gid=65532"]
             if mode == "aws":
                 gateway_env.update(AWS_PROFILE=args.aws_profile, AWS_DEFAULT_REGION="us-east-1",
@@ -127,7 +127,7 @@ def main():
             live.start_verifier(verifier_image, {"GUIDED_LAB02_URL": "http://learner:8000",
                 "GUIDED_VERIFIER_LAB02_TOKEN": "publisher-test-verifier",
                 "GUIDED_BEDROCK_GATEWAY_URL": "http://gateway:8080",
-                "GUIDED_VERIFIER_GATEWAY_TOKEN": "publisher-p02-read"})
+                "GUIDED_VERIFIER_GATEWAY_TOKEN": "publisher-p02-read-0000000000000000"})
             origin = live.start_browser({"GUIDED_LAB02_URL": "http://learner:8000",
                 "GUIDED_CONTROL_LAB02_TOKEN": "publisher-test-control"})
             opener = build_opener(ProxyHandler({}), HTTPCookieProcessor(http.cookiejar.CookieJar()))
@@ -136,13 +136,22 @@ def main():
                 try:
                     if request(opener, origin + "/readyz")[0] == 200:
                         break
-                except (URLError, TimeoutError):
+                except (URLError, TimeoutError, json.JSONDecodeError):
                     pass
                 if time.monotonic() >= deadline:
                     raise TimeoutError("common UI startup")
                 time.sleep(.5)
             for service in ("http://gateway:8080", "http://learner:8000", "http://verifier:8000"):
-                assert rpc(project, service, "/readyz")[0] == 200
+                deadline = time.monotonic() + 60
+                while True:
+                    try:
+                        if rpc(project, service, "/readyz")[0] == 200:
+                            break
+                    except (subprocess.CalledProcessError, json.JSONDecodeError):
+                        pass
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("service startup: " + service)
+                    time.sleep(.5)
             if mode == "aws":
                 proof["aws_preflight"] = aws_scope(project, "preflight", {"account_id": args.aws_account})
             status, prepared = rpc(project, "http://gateway:8080", "/v1/h02/provision",
@@ -178,7 +187,7 @@ def main():
             assert root["build"]["source_digest"] == proof["source_digest"]
             ledgers = []
             for row in root["cases"]:
-                status, ledger = rpc(project, "http://gateway:8080", "/v1/p02/executions/" + row["execution_id"], "publisher-p02-read")
+                status, ledger = rpc(project, "http://gateway:8080", "/v1/p02/executions/" + row["execution_id"], "publisher-p02-read-0000000000000000")
                 assert status == 200 and ledger["closed"] is True and ledger["suite_id"] == suite
                 ledgers.append(ledger)
             proof["ledgers"] = ledgers
@@ -212,7 +221,7 @@ def main():
                     assert status == 200 and after_reuse["task_completed"] is (not incomplete)
                     proof["reverified_after_reuse"] = after_reuse
                 finally:
-                    state_status, latest_state = rpc(project, "http://gateway:8080", "/v1/h02/resources", "publisher-p02-read")
+                    state_status, latest_state = rpc(project, "http://gateway:8080", "/v1/h02/resources", "publisher-p02-read-0000000000000000")
                     assert state_status == 200
                     proof["aws_cleanup"] = aws_scope(project, "cleanup", {"account_id": args.aws_account,
                         "preflight": proof["aws_preflight"], "state": latest_state,
