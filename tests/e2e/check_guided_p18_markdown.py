@@ -38,18 +38,21 @@ def extract_solution(document):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('markdown', type=Path)
+    parser.add_argument('markdown', type=Path, nargs='?')
+    parser.add_argument('--source', type=Path, help='Publisher query fixture, outside the Starter image')
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--tcp-verifier', action='store_true')
     parser.add_argument('--browser-python', type=Path)
     parser.add_argument('--starter', action='store_true')
     args = parser.parse_args()
+    if bool(args.markdown) == bool(args.source):
+        parser.error('select exactly one Markdown or --source query file')
     if args.browser_python and not args.tcp_verifier:
         parser.error('--browser-python requires --tcp-verifier')
     from guided_live_stack import LiveStack
-    document = args.markdown.read_text(encoding='utf-8')
+    document = args.markdown.read_text(encoding='utf-8') if args.markdown else None
     solution = ((ROOT / 'llm-security-control-plane' / QUERY).read_text()
-                if args.starter else extract_solution(document))
+                if args.starter else args.source.read_text() if args.source else extract_solution(document))
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     project = 'guided-p18-check-' + uuid.uuid4().hex[:10]
@@ -90,7 +93,7 @@ def main():
                 if args.starter:
                     command.append('--incomplete')
                 subprocess.run(command, cwd=ROOT, check=True)
-            proof = {'markdown_sha256': hashlib.sha256(document.encode()).hexdigest(),
+            proof = {'markdown_sha256': hashlib.sha256(document.encode()).hexdigest() if document else None,
                      'query_sha256': expected, 'suite_id': evidence['receipt']['suite_id'],
                      'project': project, 'runner_inputs': {
                          path: hashlib.sha256((context / path).read_bytes()).hexdigest() for path in INPUTS},

@@ -66,7 +66,7 @@ class PrivacyProductTests(unittest.TestCase):
         from unittest.mock import patch
         with patch("requests.sessions.Session.request", side_effect=AssertionError("HTTP forbidden")) as request:
             boundary = module.PrivacyBoundary()
-            result = boundary.process("input_privacy", "Mail: independent@example.org")
+            result = boundary.process("input_privacy", "Mail: independent@example.com")
         request.assert_not_called()
         self.assertEqual(result["text"], "Mail: <EMAIL_ADDRESS>")
 

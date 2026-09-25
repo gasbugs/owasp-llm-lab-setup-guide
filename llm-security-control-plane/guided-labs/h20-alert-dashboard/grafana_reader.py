@@ -27,7 +27,7 @@ def provision(client, admin_password, reader_password):
     lookup = client.get('/api/users/lookup', params={'loginOrEmail': LOGIN}, auth=admin)
     if lookup.status_code == 404:
         created = client.post('/api/admin/users', auth=admin, json={
-            'name': 'P20 evidence reader', 'email': 'p20-reader@example.invalid',
+            'name': 'P20 evidence reader', 'email': 'p20-reader@example.com',
             'login': LOGIN, 'password': reader_password, 'OrgId': 1})
         created.raise_for_status()
     else:

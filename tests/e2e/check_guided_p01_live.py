@@ -72,6 +72,7 @@ def main():
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument('--starter', action='store_true')
     selection.add_argument('--markdown', type=Path)
+    selection.add_argument('--source', type=Path, help='Publisher fixture; never copied into the Starter image')
     parser.add_argument('--aws-config-dir', type=Path)
     parser.add_argument('--aws-profile', default='default')
     parser.add_argument('--browser-python', type=Path)
@@ -83,7 +84,9 @@ def main():
         parser.error('AWS requires a solution and an existing credential directory')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     mode = 'aws' if args.aws_config_dir else 'contract'
-    source = (LAB / 'learner.py').read_bytes() if args.starter else markdown_source(args.markdown)
+    source = ((LAB / 'learner.py').read_bytes() if args.starter else
+              args.source.read_bytes() if args.source else markdown_source(args.markdown))
+    compile(source, 'learner.py', 'exec')
     source_files = {name: (source if name == 'learner.py' else (LAB / name).read_bytes())
                     for name in ('server.py', 'learner.py', 'provider.py')}
     identity = hashlib.sha256()

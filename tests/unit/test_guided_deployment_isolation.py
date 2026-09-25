@@ -36,17 +36,16 @@ def published_ports(document: dict) -> set[int]:
 
 
 class GuidedDeploymentIsolationTests(unittest.TestCase):
-    def test_ci_start_and_cleanup_supply_all_required_values(self):
-        required = set(re.findall(r"\$\{(\w+):\?", GUIDED.read_text()))
-        workflow = yaml.safe_load((ROOT / ".github/workflows/module08-docker-e2e.yml").read_text())
-        steps = workflow["jobs"]["docker-e2e"]["steps"]
-        checked = 0
-        for step in steps:
-            if "compose.guided.yaml" not in step.get("run", ""):
-                continue
-            checked += 1
-            self.assertFalse(required - set(step.get("env", {})), step["name"])
-        self.assertEqual(checked, 2)
+    def test_ci_covers_all_public_practices_with_isolated_publishers(self):
+        workflow = yaml.safe_load((ROOT / ".github/workflows/guided-practice-e2e.yml").read_text())
+        jobs = workflow["jobs"]
+        reused = {"P" + item[1:] for group in jobs["reused-services"]["strategy"]["matrix"]["activities"]
+                  for item in group.split()}
+        implemented = set(jobs["implementation-services"]["strategy"]["matrix"]["practice"])
+        self.assertFalse(reused & implemented)
+        self.assertEqual(reused | implemented, {f"P{number:02}" for number in range(1, 23)})
+        self.assertIn("--startup-only", jobs["canonical-startup"]["steps"][-1]["run"])
+        self.assertIn("check_guided_problem_surface.py", jobs["problem-surface"]["steps"][-1]["run"])
 
     def setUp(self):
         self.source = GUIDED.read_text()

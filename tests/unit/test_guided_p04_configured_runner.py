@@ -52,7 +52,7 @@ class ConfiguredRunnerTests(unittest.TestCase):
     def test_invalid_gateway_origin_fails_before_request(self):
         with TemporaryDirectory() as directory:
             env = self.environment(directory)
-            for address in ("http://gateway.invalid/other-path", "http://user:secret@gateway.invalid", "file:///tmp/state"):
+            for address in ("http://gateway.invalid/other-path", "http://user:secret@example.com", "file:///tmp/state"):
                 env["GUIDED_BEDROCK_GATEWAY_URL"] = address
                 with self.subTest(address=address), self.assertRaises(ValueError):
                     self.configured(env)
