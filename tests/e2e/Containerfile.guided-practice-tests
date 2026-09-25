@@ -2,7 +2,7 @@ FROM docker.io/library/python:3.12.14-slim
 
 COPY tests/requirements.txt /tmp/test-requirements.txt
 COPY docker/vuln-rag /opt/vuln-rag
-RUN apt-get update && apt-get install -y --no-install-recommends g++ \
+RUN apt-get update && apt-get install -y --no-install-recommends g++ git jq curl \
     && pip install --no-cache-dir -r /tmp/test-requirements.txt -e /opt/vuln-rag
 
 ENV PYTHONDONTWRITEBYTECODE=1
