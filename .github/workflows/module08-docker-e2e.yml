@@ -133,20 +133,20 @@ jobs:
           docker run --detach --name promptfoo-official-ui \
             --network llm-security-control-plane \
             --network-alias llm-security-promptfoo-official-ui \
-            --publish 127.0.0.1:25500:15500 \
+            --publish 127.0.0.1:25501:15500 \
             localhost/llm-security-promptfoo-official-ui:0.121.20
           docker run --detach --name pyrit-official-ui \
             --network llm-security-control-plane \
             --network-alias llm-security-pyrit-official-ui \
-            --publish 127.0.0.1:28098:8000 \
+            --publish 127.0.0.1:28099:8000 \
             localhost/llm-security-pyrit-official-ui:1.0.1
 
           curl --fail --location --retry 60 --retry-delay 1 --retry-all-errors \
             http://127.0.0.1:28192/ | grep -F '<title>Assistant</title>'
           curl --fail --retry 60 --retry-delay 1 --retry-all-errors \
-            http://127.0.0.1:25500/ >/dev/null
+            http://127.0.0.1:25501/ >/dev/null
           curl --fail --retry 60 --retry-delay 1 --retry-all-errors \
-            http://127.0.0.1:28098/ >/dev/null
+            http://127.0.0.1:28099/ >/dev/null
 
           curl --fail --silent --show-error \
             --header 'Content-Type: application/json' \
@@ -177,7 +177,7 @@ jobs:
           --url http://127.0.0.1:28095
           --browser-channel chromium
 
-      - name: Build and validate all independent tenant 03 Hands-on activities
+      - name: Build and validate all independent tenant 03 Practice activities
         env:
           AWS_CREDENTIALS_DIR: /tmp/guided-aws
           GUIDED_SESSION_SECRET: ci-guided-session-secret
@@ -198,6 +198,28 @@ jobs:
           GUIDED_CONTROL_LAB15_TOKEN: ci-control-lab15
           GUIDED_CONTROL_LAB16_TOKEN: ci-control-lab16
           GUIDED_CONTROL_OBSERVABILITY_TOKEN: ci-control-observability
+          GUIDED_CONTROL_H17_TOKEN: ci-guided-control-h17-token
+          GUIDED_CONTROL_H18_TOKEN: ci-guided-control-h18-token
+          GUIDED_CONTROL_H19_TOKEN: ci-guided-control-h19-token
+          GUIDED_CONTROL_H20_TOKEN: ci-guided-control-h20-token
+          GUIDED_VERIFIER_H17_TOKEN: ci-guided-verifier-h17-token
+          GUIDED_VERIFIER_H18_TOKEN: ci-guided-verifier-h18-token
+          GUIDED_VERIFIER_H19_TOKEN: ci-guided-verifier-h19-token
+          GUIDED_VERIFIER_H20_TOKEN: ci-guided-verifier-h20-token
+          GUIDED_H20_WEBHOOK_TOKEN: ci-guided-h20-webhook-token
+          GUIDED_P20_GRAFANA_ADMIN_PASSWORD: ci-guided-p20-grafana-admin-password
+          GUIDED_P20_GRAFANA_PASSWORD: ci-guided-p20-grafana-password
+          GUIDED_P12_CONTEXT_CONTROL_TOKEN: ci-guided-p12-context-control-token
+          GUIDED_P12_CONTEXT_SERVICE_TOKEN: ci-guided-p12-context-service-token
+          GUIDED_P12_CONTEXT_VERIFIER_TOKEN: ci-guided-p12-context-verifier-token
+          GUIDED_P12_NEMO_CONTROL_TOKEN: ci-guided-p12-nemo-control-token
+          GUIDED_P12_NEMO_SERVICE_TOKEN: ci-guided-p12-nemo-service-token
+          GUIDED_P12_NEMO_VERIFIER_TOKEN: ci-guided-p12-nemo-verifier-token
+          GUIDED_P12_PRIVACY_CONTROL_TOKEN: ci-guided-p12-privacy-control-token
+          GUIDED_P12_PRIVACY_SERVICE_TOKEN: ci-guided-p12-privacy-service-token
+          GUIDED_P12_PRIVACY_VERIFIER_TOKEN: ci-guided-p12-privacy-verifier-token
+          GUIDED_P12_GATEWAY_CONTROL_TOKEN: ci-guided-p12-gateway-control-token
+          GUIDED_P12_GATEWAY_VERIFIER_TOKEN: ci-guided-p12-gateway-verifier-token
           GUIDED_H06_PROVIDER_CONTROL_TOKEN: ci-h06-provider-control
           GUIDED_H06_PROVIDER_ACTION_TOKEN: ci-h06-provider-action
           GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ci-h06-provider-verifier
@@ -343,6 +365,28 @@ jobs:
           GUIDED_CONTROL_LAB15_TOKEN: ci-control-lab15
           GUIDED_CONTROL_LAB16_TOKEN: ci-control-lab16
           GUIDED_CONTROL_OBSERVABILITY_TOKEN: ci-control-observability
+          GUIDED_CONTROL_H17_TOKEN: ci-guided-control-h17-token
+          GUIDED_CONTROL_H18_TOKEN: ci-guided-control-h18-token
+          GUIDED_CONTROL_H19_TOKEN: ci-guided-control-h19-token
+          GUIDED_CONTROL_H20_TOKEN: ci-guided-control-h20-token
+          GUIDED_VERIFIER_H17_TOKEN: ci-guided-verifier-h17-token
+          GUIDED_VERIFIER_H18_TOKEN: ci-guided-verifier-h18-token
+          GUIDED_VERIFIER_H19_TOKEN: ci-guided-verifier-h19-token
+          GUIDED_VERIFIER_H20_TOKEN: ci-guided-verifier-h20-token
+          GUIDED_H20_WEBHOOK_TOKEN: ci-guided-h20-webhook-token
+          GUIDED_P20_GRAFANA_ADMIN_PASSWORD: ci-guided-p20-grafana-admin-password
+          GUIDED_P20_GRAFANA_PASSWORD: ci-guided-p20-grafana-password
+          GUIDED_P12_CONTEXT_CONTROL_TOKEN: ci-guided-p12-context-control-token
+          GUIDED_P12_CONTEXT_SERVICE_TOKEN: ci-guided-p12-context-service-token
+          GUIDED_P12_CONTEXT_VERIFIER_TOKEN: ci-guided-p12-context-verifier-token
+          GUIDED_P12_NEMO_CONTROL_TOKEN: ci-guided-p12-nemo-control-token
+          GUIDED_P12_NEMO_SERVICE_TOKEN: ci-guided-p12-nemo-service-token
+          GUIDED_P12_NEMO_VERIFIER_TOKEN: ci-guided-p12-nemo-verifier-token
+          GUIDED_P12_PRIVACY_CONTROL_TOKEN: ci-guided-p12-privacy-control-token
+          GUIDED_P12_PRIVACY_SERVICE_TOKEN: ci-guided-p12-privacy-service-token
+          GUIDED_P12_PRIVACY_VERIFIER_TOKEN: ci-guided-p12-privacy-verifier-token
+          GUIDED_P12_GATEWAY_CONTROL_TOKEN: ci-guided-p12-gateway-control-token
+          GUIDED_P12_GATEWAY_VERIFIER_TOKEN: ci-guided-p12-gateway-verifier-token
           GUIDED_H06_PROVIDER_CONTROL_TOKEN: ci-h06-provider-control
           GUIDED_H06_PROVIDER_ACTION_TOKEN: ci-h06-provider-action
           GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ci-h06-provider-verifier

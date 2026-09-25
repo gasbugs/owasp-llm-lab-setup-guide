@@ -36,6 +36,18 @@ def published_ports(document: dict) -> set[int]:
 
 
 class GuidedDeploymentIsolationTests(unittest.TestCase):
+    def test_ci_start_and_cleanup_supply_all_required_values(self):
+        required = set(re.findall(r"\$\{(\w+):\?", GUIDED.read_text()))
+        workflow = yaml.safe_load((ROOT / ".github/workflows/module08-docker-e2e.yml").read_text())
+        steps = workflow["jobs"]["docker-e2e"]["steps"]
+        checked = 0
+        for step in steps:
+            if "compose.guided.yaml" not in step.get("run", ""):
+                continue
+            checked += 1
+            self.assertFalse(required - set(step.get("env", {})), step["name"])
+        self.assertEqual(checked, 2)
+
     def setUp(self):
         self.source = GUIDED.read_text()
         self.compose = yaml.safe_load(self.source)
