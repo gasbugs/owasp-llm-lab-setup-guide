@@ -1,0 +1,3 @@
+FROM docker.io/prom/prometheus:v3.5.0
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/prometheus.yaml /etc/prometheus/prometheus.yml
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/rules.yaml /etc/prometheus/p20-rules.yml

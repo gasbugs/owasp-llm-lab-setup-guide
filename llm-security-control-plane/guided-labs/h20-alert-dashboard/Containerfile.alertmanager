@@ -1,0 +1,5 @@
+FROM docker.io/prom/alertmanager:v0.28.1
+COPY --chmod=0555 guided-labs/h20-alert-dashboard/alertmanager-entrypoint.sh /bin/p20-entrypoint
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/alertmanager.yaml /etc/alertmanager/p20.yaml
+ENTRYPOINT ["/bin/p20-entrypoint"]
+CMD ["--config.file=/etc/alertmanager/p20.yaml", "--cluster.listen-address="]

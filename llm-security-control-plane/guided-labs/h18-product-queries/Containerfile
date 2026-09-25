@@ -1,11 +1,11 @@
 FROM docker.io/library/python:3.12.14-slim
 RUN python -m pip install --no-cache-dir fastapi==0.116.1 uvicorn==0.52.0 httpx==0.28.1 pyyaml==6.0.3 prometheus-client==0.22.1 opentelemetry-sdk==1.37.0 opentelemetry-exporter-otlp-proto-http==1.37.0
 WORKDIR /app
-COPY --chmod=0555 guided-labs/observability/server.py /app/server.py
-COPY --chmod=0444 guided-labs/h17-telemetry/telemetry.py /app/h17.py
+COPY --chmod=0444 guided-labs/observability/server.py /app/server.py
+COPY --chmod=0444 guided-labs/observability/query_execution.py /app/query_execution.py
 COPY --chmod=0444 guided-labs/h18-product-queries/queries.yaml /app/h18.yaml
-COPY --chmod=0444 guided-labs/h19-incident-investigation/investigation.py /app/h19.py
-COPY --chmod=0444 guided-labs/h20-alert-dashboard/dashboard-query.txt /app/h20.txt
+COPY --chmod=0444 guided-labs/h18-product-queries/request_workflow.py /app/request_workflow.py
+ENV GUIDED_OBSERVABILITY_ACTIVITIES=H18 OTEL_SERVICE_NAME=guided-h18-queries
 RUN install -d -m 0700 -o 65532 -g 65532 /state
 USER 65532:65532
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

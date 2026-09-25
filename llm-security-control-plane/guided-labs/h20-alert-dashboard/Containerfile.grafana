@@ -1,0 +1,7 @@
+FROM docker.io/grafana/grafana:12.1.0
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/grafana-datasource.yaml /etc/grafana/provisioning/datasources/p20.yaml
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/grafana-provider.yaml /etc/grafana/provisioning/dashboards/p20.yaml
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/dashboard.json /etc/grafana/p20/dashboard.json
+USER root
+RUN chmod 0755 /etc/grafana/p20
+USER 472

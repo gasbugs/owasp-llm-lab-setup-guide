@@ -1,0 +1,6 @@
+FROM docker.io/library/python:3.12.14-slim
+RUN python -m pip install --no-cache-dir httpx==0.28.1
+RUN install -d -m 0755 /app
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/grafana_reader.py /app/grafana_reader.py
+USER 65532:65532
+CMD ["python", "-B", "/app/grafana_reader.py"]

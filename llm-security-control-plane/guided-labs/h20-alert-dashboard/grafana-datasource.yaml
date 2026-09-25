@@ -1,0 +1,11 @@
+# CUSTOM FILE
+# Format: https://grafana.com/docs/grafana/latest/administration/provisioning/ · AGPL-3.0
+apiVersion: 1
+datasources:
+  - name: P20 Prometheus
+    uid: p20
+    type: prometheus
+    access: proxy
+    url: http://guided-h20-prometheus:9090
+    isDefault: true
+    editable: false

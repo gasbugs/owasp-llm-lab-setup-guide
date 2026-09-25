@@ -1,0 +1,9 @@
+# CUSTOM FILE: P20 learner Starter
+# Format: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/ · Apache-2.0
+groups:
+  - name: p20
+    rules:
+      - alert: GuidedP20BlockedRequests
+        expr: vector(0) > 1
+        for: 0s
+        labels: {severity: warning, practice: P20}

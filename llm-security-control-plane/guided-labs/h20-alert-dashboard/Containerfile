@@ -1,0 +1,9 @@
+FROM docker.io/library/python:3.12.14-slim
+RUN python -m pip install --no-cache-dir fastapi==0.116.1 uvicorn==0.52.0 prometheus-client==0.22.1 httpx==0.28.1
+WORKDIR /app
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/server.py guided-labs/h20-alert-dashboard/workflow.py /app/
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/execution.py /app/
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/rules.yaml guided-labs/h20-alert-dashboard/dashboard.json /app/
+RUN install -d -m 0700 -o 65532 -g 65532 /state
+USER 65532:65532
+CMD ["uvicorn", "server:configured_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

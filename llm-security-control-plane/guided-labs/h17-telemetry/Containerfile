@@ -1,0 +1,7 @@
+FROM docker.io/library/python:3.12.14-slim
+RUN python -m pip install --no-cache-dir fastapi==0.116.1 uvicorn==0.52.0 httpx==0.28.1 prometheus-client==0.22.1 opentelemetry-sdk==1.37.0 opentelemetry-exporter-otlp-proto-http==1.37.0
+WORKDIR /app
+COPY --chmod=0444 guided-labs/h17-telemetry/server.py guided-labs/h17-telemetry/runner.py guided-labs/h17-telemetry/workflow.py guided-labs/h17-telemetry/instrumentation.py /app/
+RUN install -d -m 0700 -o 65532 -g 65532 /state
+USER 65532:65532
+CMD ["uvicorn", "server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

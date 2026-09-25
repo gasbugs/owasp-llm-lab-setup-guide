@@ -1,0 +1,11 @@
+FROM docker.io/library/python:3.12.14-slim
+ENV PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1 XDG_CACHE_HOME=/tmp/presidio-cache
+COPY guided-labs/h12-protected-services/requirements.txt /tmp/requirements.txt
+RUN python -m pip install --requirement /tmp/requirements.txt \
+    && python -m pip install 'https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl'
+WORKDIR /app
+COPY --chmod=0444 guided-labs/h12-protected-services/privacy.py guided-labs/h12-protected-services/privacy_server.py /app/
+RUN install -d -o 65532 -g 65532 -m 0700 /state
+USER 65532:65532
+EXPOSE 8000
+CMD ["uvicorn", "privacy_server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]
