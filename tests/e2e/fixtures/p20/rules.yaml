@@ -1,0 +1,9 @@
+# CUSTOM FILE: publisher reference; excluded from Starter images.
+# Format: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/ · Apache-2.0
+groups:
+  - name: p20
+    rules:
+      - alert: GuidedP20BlockedRequests
+        expr: sum(increase(guided_p20_decisions_total{practice="P20",decision="block"}[20s])) > 0
+        for: 4s
+        labels: {severity: warning, practice: P20}

@@ -1,0 +1,9 @@
+# CUSTOM FILE: publisher-only Markdown solution build override.
+# Format: https://compose-spec.io/ · Apache-2.0
+services:
+  p18:
+    build:
+      context: ${P18_BUILD_CONTEXT:?Set P18_BUILD_CONTEXT}
+      dockerfile: guided-labs/h18-product-queries/Containerfile
+    image: ${P18_TEST_IMAGE:-localhost/guided-p18-markdown:test}
+    volumes: !reset []

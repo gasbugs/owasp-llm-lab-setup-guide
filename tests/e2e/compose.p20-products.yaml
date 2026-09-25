@@ -1,0 +1,71 @@
+# CUSTOM FILE: isolated product validation, no host ports or AWS credentials.
+# Format: https://compose-spec.io/ · Apache-2.0
+services:
+  p20:
+    build:
+      context: ${P20_BUILD_CONTEXT:?Set P20_BUILD_CONTEXT}
+      dockerfile: guided-labs/h20-alert-dashboard/Containerfile
+    image: ${P20_TEST_PREFIX:?Set P20_TEST_PREFIX}-app:test
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    tmpfs: [/tmp, "/state:uid=65532,gid=65532"]
+    networks: {default: {aliases: [guided-h20-alerts]}}
+    environment:
+      GUIDED_CONTROL_H20_TOKEN: publisher-test-control
+      GUIDED_VERIFIER_H20_TOKEN: publisher-test-verifier
+      GUIDED_H20_WEBHOOK_TOKEN: publisher-test-webhook
+      GUIDED_P20_PROMETHEUS_URL: http://prometheus:9090
+      GUIDED_P20_ALERTMANAGER_URL: http://alertmanager:9093
+      GUIDED_P20_GRAFANA_URL: http://grafana:3000
+      GUIDED_P20_GRAFANA_USER: p20-reader
+      GUIDED_P20_GRAFANA_PASSWORD: publisher-test-reader
+  prometheus:
+    build:
+      context: ${P20_BUILD_CONTEXT:?Set P20_BUILD_CONTEXT}
+      dockerfile: guided-labs/h20-alert-dashboard/Containerfile.prometheus
+    image: ${P20_TEST_PREFIX:?Set P20_TEST_PREFIX}-prometheus:test
+    tmpfs: ["/prometheus:uid=65534,gid=65534"]
+    networks: {default: {aliases: [guided-h20-prometheus]}}
+  alertmanager:
+    build:
+      context: ${P20_BUILD_CONTEXT:?Set P20_BUILD_CONTEXT}
+      dockerfile: guided-labs/h20-alert-dashboard/Containerfile.alertmanager
+    image: ${P20_TEST_PREFIX:?Set P20_TEST_PREFIX}-alertmanager:test
+    read_only: true
+    environment:
+      GUIDED_H20_WEBHOOK_TOKEN: publisher-test-webhook
+    networks: {default: {aliases: [guided-h20-alertmanager]}}
+    tmpfs: ["/alertmanager:uid=65534,gid=65534", "/run/p20:uid=65534,gid=65534,mode=0700"]
+  grafana:
+    build:
+      context: ${P20_BUILD_CONTEXT:?Set P20_BUILD_CONTEXT}
+      dockerfile: guided-labs/h20-alert-dashboard/Containerfile.grafana
+    image: ${P20_TEST_PREFIX:?Set P20_TEST_PREFIX}-grafana:test
+    tmpfs: ["/var/lib/grafana:uid=472,gid=472", "/var/log/grafana:uid=472,gid=472"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: publisher-test-grafana
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED: "true"
+  reader:
+    build:
+      context: ${P20_BUILD_CONTEXT:?Set P20_BUILD_CONTEXT}
+      dockerfile: guided-labs/h20-alert-dashboard/Containerfile.reader
+    image: ${P20_TEST_PREFIX:?Set P20_TEST_PREFIX}-reader:test
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    environment:
+      GUIDED_P20_GRAFANA_URL: http://grafana:3000
+      GUIDED_P20_GRAFANA_ADMIN_PASSWORD: publisher-test-grafana
+      GUIDED_P20_GRAFANA_PASSWORD: publisher-test-reader
+    depends_on: {grafana: {condition: service_started}}
+networks:
+  default:
+    internal: true

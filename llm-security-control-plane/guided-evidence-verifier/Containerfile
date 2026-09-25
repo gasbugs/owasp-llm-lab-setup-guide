@@ -5,8 +5,44 @@ COPY guided-evidence-verifier/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --requirement /tmp/requirements.txt
 
 WORKDIR /app
+COPY --chmod=0444 guided-contracts/p01.json /app/p01.json
+COPY --chmod=0444 guided-labs/h01-bedrock-gateway/server.py guided-labs/h01-bedrock-gateway/provider.py /app/p01-runner/
+RUN chmod 0755 /app/p01-runner
+COPY --chmod=0444 guided-contracts/p12.json /app/p12.json
 COPY --chmod=0444 guided-evidence-verifier/server.py /app/server.py
-RUN install -d -o 65532 -g 65532 -m 0700 /state
+COPY --chmod=0444 guided-evidence-verifier/p02_results.py guided-evidence-verifier/p02_verification.py /app/
+COPY --chmod=0444 guided-labs/h02-document-ingestion/cases.py guided-labs/h02-document-ingestion/execution.py guided-labs/h02-document-ingestion/service_client.py guided-labs/h02-document-ingestion/workflow.py guided-labs/h02-document-ingestion/run_server.py guided-labs/h02-document-ingestion/requirements.txt guided-labs/h02-document-ingestion/Containerfile /app/p02-runner/
+RUN chmod 0755 /app/p02-runner
+COPY --chmod=0444 guided-evidence-verifier/p03_results.py guided-evidence-verifier/p03_suite_verification.py guided-evidence-verifier/p03_grading_api.py /app/
+COPY --chmod=0444 guided-labs/h03-ingestion-search/cases.py guided-labs/h03-ingestion-search/execution.py guided-labs/h03-ingestion-search/service_client.py guided-labs/h03-ingestion-search/workflow.py guided-labs/h03-ingestion-search/run_server.py guided-labs/h03-ingestion-search/requirements.txt guided-labs/h03-ingestion-search/Containerfile /app/p03-runner/
+RUN chmod 0755 /app/p03-runner
+COPY --chmod=0444 guided-evidence-verifier/p04_results.py guided-evidence-verifier/p04_product.py guided-evidence-verifier/p04_suite_results.py guided-evidence-verifier/p04_suite_verification.py guided-evidence-verifier/p04_grading_api.py /app/
+COPY --chmod=0444 guided-labs/h04-bedrock-guardrail/cases.py guided-labs/h04-bedrock-guardrail/execution.py guided-labs/h04-bedrock-guardrail/service_client.py guided-labs/h04-bedrock-guardrail/workflow.py guided-labs/h04-bedrock-guardrail/run_server.py guided-labs/h04-bedrock-guardrail/requirements.txt guided-labs/h04-bedrock-guardrail/Containerfile /app/p04-runner/
+RUN chmod 0755 /app/p04-runner
+COPY --chmod=0444 guided-evidence-verifier/p12_results.py guided-evidence-verifier/p12_verification.py guided-evidence-verifier/p12_binding.py /app/
+COPY --chmod=0444 guided-evidence-verifier/p12_grading.py /app/
+COPY --chmod=0444 guided-evidence-verifier/p12_api.py /app/
+COPY --chmod=0444 guided-evidence-verifier/p12_deployment.py /app/
+COPY --chmod=0444 guided-labs/h12-application-pipeline/Containerfile guided-labs/h12-application-pipeline/execution.py guided-labs/h12-application-pipeline/service_client.py guided-labs/h12-application-pipeline/workflow.py guided-labs/h12-application-pipeline/run_server.py /app/p12-runner/
+RUN chmod 0755 /app/p12-runner
+COPY --chmod=0444 guided-evidence-verifier/p18_results.py /app/p18_results.py
+COPY --chmod=0444 guided-evidence-verifier/p17_results.py guided-evidence-verifier/p17_verification.py /app/
+COPY --chmod=0444 guided-evidence-verifier/p20_results.py guided-evidence-verifier/p20_verification.py guided-evidence-verifier/p20_binding.py /app/
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/server.py guided-labs/h20-alert-dashboard/workflow.py /app/p20-runner/
+COPY --chmod=0444 guided-labs/h20-alert-dashboard/execution.py /app/p20-runner/
+RUN chmod 0755 /app/p20-runner
+COPY --chmod=0444 guided-labs/h17-telemetry/server.py guided-labs/h17-telemetry/runner.py guided-labs/h17-telemetry/workflow.py /app/p17-runner/
+RUN chmod 0755 /app/p17-runner
+COPY --chmod=0444 guided-evidence-verifier/p19_results.py guided-evidence-verifier/p19_verification.py /app/
+COPY --chmod=0444 guided-labs/h19-incident-investigation/analysis_inputs.py /app/p19_inputs.py
+COPY --chmod=0444 guided-labs/h19-incident-investigation/collection.py /app/p19_collection.py
+COPY --chmod=0444 guided-labs/h19-incident-investigation/server.py guided-labs/h19-incident-investigation/analysis_inputs.py guided-labs/h19-incident-investigation/collection.py guided-labs/h19-incident-investigation/execution.py guided-labs/h19-incident-investigation/workflow.py /app/p19-runner/
+RUN chmod 0755 /app/p19-runner
+COPY --chmod=0444 guided-labs/observability/query_execution.py /app/query_execution.py
+COPY --chmod=0444 guided-labs/observability/server.py /app/p18-runner/server.py
+COPY --chmod=0444 guided-labs/observability/query_execution.py /app/p18-runner/query_execution.py
+COPY --chmod=0444 guided-labs/h18-product-queries/request_workflow.py /app/p18-runner/request_workflow.py
+RUN chmod 0755 /app/p18-runner && install -d -o 65532 -g 65532 -m 0700 /state
 
 USER 65532:65532
 EXPOSE 8000

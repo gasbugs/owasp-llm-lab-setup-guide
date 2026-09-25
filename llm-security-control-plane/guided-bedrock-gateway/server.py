@@ -24,6 +24,7 @@ from h03_backend import router as h03_router
 from h04_backend import router as h04_router
 from h07_backend import router as h07_router
 from h08_backend import router as h08_router
+from p02_reuse import check_bucket, check_role, preflight, PUBLIC_BLOCK, TAGS
 
 
 MODEL_ID = "us.amazon.nova-lite-v1:0"
@@ -123,16 +124,6 @@ class ChatRequest(BaseModel):
     stream: bool = False
 
 
-class H02DocumentRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
-    title: str = Field(min_length=1, max_length=120)
-    body: str = Field(min_length=10, max_length=4000)
-    object_key: str = Field(
-        pattern=r"^h02/(knowledge|untrusted)/[0-9a-f-]{36}\.md$"
-    )
-    scenario: Literal["normal", "risk"]
 
 
 class H02ProvisionRequest(BaseModel):
@@ -349,32 +340,30 @@ def provision_h02_aws(execution_id: str) -> dict:
     iam = boto3.client("iam", region_name=AWS_REGION)
     agent = boto3.client("bedrock-agent", region_name=AWS_REGION)
 
+    reused = preflight(template, s3=s3, vectors=s3vectors, iam=iam, agent=agent,
+                       policy_name=f"{H02_PREFIX}-knowledge-base-runtime")
+    if reused is not None:
+        reused.update(execution_id=execution_id, observed_at=datetime.now(timezone.utc).isoformat())
+        save_h02_state(reused)
+        return reused
+
     try:
-        s3.head_bucket(Bucket=template["source_bucket"])
+        s3.head_bucket(Bucket=template["source_bucket"], ExpectedBucketOwner=account_id)
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") not in {"404", "NoSuchBucket"}:
             raise
         created = s3.create_bucket(Bucket=template["source_bucket"])
         request_ids.append(created["ResponseMetadata"]["RequestId"])
-    s3.put_public_access_block(
-        Bucket=template["source_bucket"],
-        PublicAccessBlockConfiguration={
-            "BlockPublicAcls": True,
-            "IgnorePublicAcls": True,
-            "BlockPublicPolicy": True,
-            "RestrictPublicBuckets": True,
-        },
-    )
-    s3.put_bucket_tagging(
-        Bucket=template["source_bucket"],
-        Tagging={
-            "TagSet": [
-                {"Key": "Course", "Value": "tenant-03"},
-                {"Key": "Activity", "Value": "H02"},
-                {"Key": "ManagedBy", "Value": "guided-control-center"},
-            ]
-        },
-    )
+        s3.put_public_access_block(
+            Bucket=template["source_bucket"], ExpectedBucketOwner=account_id,
+            PublicAccessBlockConfiguration=PUBLIC_BLOCK,
+        )
+        s3.put_bucket_tagging(
+            Bucket=template["source_bucket"], ExpectedBucketOwner=account_id,
+            Tagging={"TagSet": [{"Key": key, "Value": value} for key, value in TAGS.items()]},
+        )
+    else:
+        check_bucket(s3, template)
 
     try:
         vector = s3vectors.get_vector_bucket(
@@ -423,10 +412,6 @@ def provision_h02_aws(execution_id: str) -> dict:
 
     try:
         role = iam.get_role(RoleName=template["role_name"])["Role"]
-        iam.update_assume_role_policy(
-            RoleName=template["role_name"],
-            PolicyDocument=json.dumps(template["trust_policy"]),
-        )
     except iam.exceptions.NoSuchEntityException:
         created = iam.create_role(
             RoleName=template["role_name"],
@@ -439,14 +424,18 @@ def provision_h02_aws(execution_id: str) -> dict:
         )
         request_ids.append(created["ResponseMetadata"]["RequestId"])
         role = created["Role"]
+        if role.get("Arn") != template["role_arn"]:
+            raise HTTPException(status_code=409, detail="foreign IAM role")
+        policy = iam.put_role_policy(
+            RoleName=template["role_name"],
+            PolicyName=f"{H02_PREFIX}-knowledge-base-runtime",
+            PolicyDocument=json.dumps(template["runtime_policy"]),
+        )
+        request_ids.append(policy["ResponseMetadata"]["RequestId"])
+    else:
+        check_role(iam, template, role, f"{H02_PREFIX}-knowledge-base-runtime")
     if role["Arn"] != template["role_arn"]:
         raise HTTPException(status_code=409, detail="foreign IAM role")
-    policy = iam.put_role_policy(
-        RoleName=template["role_name"],
-        PolicyName=f"{H02_PREFIX}-knowledge-base-runtime",
-        PolicyDocument=json.dumps(template["runtime_policy"]),
-    )
-    request_ids.append(policy["ResponseMetadata"]["RequestId"])
 
     summaries = agent.list_knowledge_bases(maxResults=100).get(
         "knowledgeBaseSummaries", []
@@ -616,50 +605,6 @@ def provision_h02(execution_id: str) -> dict:
         H02_PROVISION_LOCK.release()
 
 
-def call_titan_and_store(request: H02DocumentRequest, state: dict) -> dict:
-    if PROVIDER_MODE == "contract":
-        digest = hashlib.sha256(
-            f"{request.execution_id}:{request.body}".encode()
-        ).hexdigest()
-        return {
-            "provider_request_id": f"contract-titan-{digest[:16]}",
-            "s3_request_id": f"contract-s3-{digest[16:32]}",
-            "input_token_count": max(1, len(request.body.split())),
-            "embedding_dimension": 1024,
-            "embedding_norm": 1.0,
-            "object_exists": True,
-        }
-
-    runtime = boto3.client("bedrock-runtime", region_name=AWS_REGION)
-    result = runtime.invoke_model(
-        modelId=EMBEDDING_MODEL_ID,
-        contentType="application/json",
-        accept="application/json",
-        body=json.dumps(
-            {"inputText": request.body, "dimensions": 1024, "normalize": True}
-        ),
-    )
-    provider_id = result.get("ResponseMetadata", {}).get("RequestId")
-    payload = json.loads(result["body"].read())
-    embedding = payload.get("embedding")
-    if not provider_id or not isinstance(embedding, list) or len(embedding) != 1024:
-        raise HTTPException(status_code=502, detail="Titan embedding evidence is invalid")
-    norm = sum(float(value) ** 2 for value in embedding) ** 0.5
-    stored = boto3.client("s3", region_name=AWS_REGION).put_object(
-        Bucket=state["source_bucket"],
-        Key=request.object_key,
-        Body=(f"# {request.title}\n\n{request.body}\n").encode(),
-        ContentType="text/markdown; charset=utf-8",
-        Metadata={"course": "tenant-03", "activity": "h02"},
-    )
-    return {
-        "provider_request_id": provider_id,
-        "s3_request_id": stored["ResponseMetadata"]["RequestId"],
-        "input_token_count": payload.get("inputTextTokenCount"),
-        "embedding_dimension": len(embedding),
-        "embedding_norm": round(norm, 6),
-        "object_exists": True,
-    }
 
 
 def config_digest(max_output_tokens: int, temperature: float) -> str:
@@ -792,6 +737,25 @@ app.include_router(h03_router)
 app.include_router(h04_router)
 app.include_router(h07_router)
 app.include_router(h08_router)
+from p12_gateway import configured_app as p12_configured_app
+app.mount("/v1/p12", p12_configured_app())
+from p02_gateway import configured_app as p02_configured_app
+app.mount("/v1/p02", p02_configured_app(
+    load_h02_state, DATABASE_PATH, provider_mode=PROVIDER_MODE,
+    control_token=H02_RUNTIME_TOKEN, verifier_token=VERIFIER_TOKEN, region=AWS_REGION,
+))
+from p03_gateway import configured_app as p03_configured_app
+app.mount("/v1/p03", p03_configured_app(
+    DATABASE_PATH, provider_mode=PROVIDER_MODE,
+    control_token=os.environ["GUIDED_H03_GATEWAY_TOKEN"], verifier_token=VERIFIER_TOKEN, region=AWS_REGION,
+    provision_token=os.getenv("GUIDED_LAB03_PROVISION_TOKEN"),
+))
+from p04_gateway import configured_app as p04_configured_app
+app.mount("/v1/p04", p04_configured_app(
+    DATABASE_PATH, provider_mode=PROVIDER_MODE,
+    control_token=os.environ["GUIDED_H04_GATEWAY_TOKEN"], verifier_token=VERIFIER_TOKEN, region=AWS_REGION,
+    provision_token=os.getenv("GUIDED_LAB04_PROVISION_TOKEN"),
+))
 
 
 @app.get("/livez")
@@ -849,60 +813,11 @@ def h02_provision(
 
 
 @app.post("/v1/h02/documents")
-def h02_documents(
-    request: H02DocumentRequest,
-    _authorized: None = Depends(require_h02_runtime),
-) -> dict:
-    with connect() as database:
-        if database.execute(
-            "SELECT 1 FROM evidence WHERE execution_id=?", (request.execution_id,)
-        ).fetchone():
-            raise HTTPException(status_code=409, detail="execution ID already exists")
-    state = load_h02_state()
-    if not state or state.get("status") != "READY":
-        raise HTTPException(status_code=409, detail="H02 resources are not ready")
-    try:
-        provider = call_titan_and_store(request, state)
-    except (BotoCoreError, ClientError) as exc:
-        raise HTTPException(
-            status_code=502, detail=f"H02 document call failed: {type(exc).__name__}"
-        ) from exc
-    observed_at = datetime.now(timezone.utc).isoformat()
-    receipt = {
-        "execution_id": request.execution_id,
-        "started_at": request.started_at,
-        "observed_at": observed_at,
-        "scenario": request.scenario,
-        "provider_mode": PROVIDER_MODE,
-        "provider_request_id": provider["provider_request_id"],
-        "s3_request_id": provider["s3_request_id"],
-        "model_id": EMBEDDING_MODEL_ID,
-        "region": AWS_REGION,
-        "object_key": request.object_key,
-        "object_uri": f"s3://{state['source_bucket']}/{request.object_key}",
-        "object_exists": provider["object_exists"],
-        "embedding_dimension": provider["embedding_dimension"],
-        "embedding_norm": provider["embedding_norm"],
-        "input_token_count": provider["input_token_count"],
-        "knowledge_base_id": state["knowledge_base_id"],
-        "data_source_id": state["data_source_id"],
-        "template_digest": state["template_digest"],
-        "upstream_called": True,
-    }
-    try:
-        with connect() as database:
-            database.execute(
-                "INSERT INTO evidence VALUES(?,?,?,?)",
-                (
-                    request.execution_id,
-                    provider["provider_request_id"],
-                    observed_at,
-                    json.dumps(receipt, ensure_ascii=False),
-                ),
-            )
-    except sqlite3.IntegrityError as exc:
-        raise HTTPException(status_code=409, detail="provider evidence already used") from exc
-    return receipt
+def retired_h02_documents(_authorized: None = Depends(require_h02_runtime)) -> dict:
+    raise HTTPException(
+        status_code=410,
+        detail="H02 document execution is retired; use the P02 registered execution API.",
+    )
 
 
 @app.get("/v1/h02/resources")

@@ -22,3 +22,4 @@ core:
       embedding_model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
       embedding_parameters:
         cache_dir: /opt/nemo-cache
+        local_files_only: true

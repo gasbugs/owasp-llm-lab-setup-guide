@@ -1,0 +1,8 @@
+# CUSTOM FILE: publisher-only implementation build override.
+# Format: https://compose-spec.io/ · Apache-2.0
+services:
+  p19:
+    build:
+      context: ${P19_BUILD_CONTEXT:?Set P19_BUILD_CONTEXT}
+      dockerfile: guided-labs/h19-incident-investigation/Containerfile
+    image: ${P19_TEST_IMAGE:?Set P19_TEST_IMAGE}

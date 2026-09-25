@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and verify the real H10-H20 learner fixes, then restore Starter."""
+"""Legacy H10-H16 checks excluding P12; P12 and P17-P20 use isolated checkers."""
 
 from __future__ import annotations
 
@@ -30,12 +30,6 @@ ACTIVITIES = {
         "guided-h11-rag-provenance",
         "llm-security-guided-h11-rag-provenance",
     ),
-    "H12": (
-        CONTROL / "guided-labs/h12-application-pipeline/pipeline.py",
-        CONTROL / "guided-solutions/h12-application-pipeline/pipeline.py",
-        "guided-h12-application-pipeline",
-        "llm-security-guided-h12-application-pipeline",
-    ),
     "H13": (
         CONTROL / "guided-labs/h13-promptfoo/promptfooconfig.yaml",
         CONTROL / "guided-solutions/h13-promptfoo/promptfooconfig.yaml",
@@ -61,30 +55,6 @@ ACTIVITIES = {
         "llm-security-guided-h16-policy-promotion",
     ),
 }
-
-OBSERVABILITY = {
-    "H17": (
-        CONTROL / "guided-labs/h17-telemetry/telemetry.py",
-        CONTROL / "guided-solutions/h17-telemetry/telemetry.py",
-    ),
-    "H18": (
-        CONTROL / "guided-labs/h18-product-queries/queries.yaml",
-        CONTROL / "guided-solutions/h18-product-queries/queries.yaml",
-    ),
-    "H19": (
-        CONTROL / "guided-labs/h19-incident-investigation/investigation.py",
-        CONTROL / "guided-solutions/h19-incident-investigation/investigation.py",
-    ),
-    "H20-rule": (
-        CONTROL / "guided-labs/h20-alert-dashboard/alert-rules.yml",
-        CONTROL / "guided-solutions/h20-alert-dashboard/alert-rules.yml",
-    ),
-    "H20": (
-        CONTROL / "guided-labs/h20-alert-dashboard/dashboard-query.txt",
-        CONTROL / "guided-solutions/h20-alert-dashboard/dashboard-query.txt",
-    ),
-}
-
 
 def compose(*arguments: str) -> None:
     command = ["docker", "compose"]
@@ -140,14 +110,6 @@ def verify(origin: str, activity: str) -> dict:
     return result
 
 
-def replace_with_solutions(paths: dict[str, tuple[Path, Path]]) -> dict[Path, bytes]:
-    originals = {}
-    for learner, solution in paths.values():
-        originals[learner] = learner.read_bytes()
-        learner.write_bytes(solution.read_bytes())
-    return originals
-
-
 def restore(originals: dict[Path, bytes]) -> None:
     for path, content in originals.items():
         path.write_bytes(content)
@@ -155,10 +117,10 @@ def restore(originals: dict[Path, bytes]) -> None:
 
 def main() -> int:
     global COMPOSE_ENV_FILE
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:28097")
     parser.add_argument("--env-file")
-    parser.add_argument("--start-at", choices=[f"H{number:02d}" for number in range(10, 21)], default="H10")
+    parser.add_argument("--start-at", choices=list(ACTIVITIES), default="H10")
     args = parser.parse_args()
     if args.env_file:
         COMPOSE_ENV_FILE = Path(args.env_file).resolve()
@@ -176,16 +138,6 @@ def main() -> int:
             result = verify(origin, activity)
             print(f"{activity.lower()}_learner_edit_rebuild=PASS evidence={len(result.get('evidence', []))}")
 
-        if start_number <= 20:
-            originals.update(replace_with_solutions(OBSERVABILITY))
-            rebuild("guided-observability", "llm-security-guided-observability")
-            compose("up", "-d", "--no-deps", "--force-recreate", "guided-prometheus")
-            wait_healthy("llm-security-guided-prometheus")
-            for activity in ("H17", "H18", "H19", "H20"):
-                if int(activity[1:]) < start_number:
-                    continue
-                result = verify(origin, activity)
-                print(f"{activity.lower()}_learner_edit_rebuild=PASS evidence={len(result.get('evidence', []))}")
     finally:
         restore(originals)
         services = [
@@ -193,21 +145,14 @@ def main() -> int:
             for activity, item in ACTIVITIES.items()
             if int(activity[1:]) >= start_number
         ]
-        if start_number <= 20:
-            services.append("guided-observability")
         if services:
             compose("build", *services)
             compose("up", "-d", "--no-deps", "--force-recreate", *services)
-        if start_number <= 20:
-            compose("up", "-d", "--no-deps", "--force-recreate", "guided-prometheus")
         for activity, item in ACTIVITIES.items():
             if int(activity[1:]) >= start_number:
                 wait_healthy(item[3])
-        if start_number <= 20:
-            wait_healthy("llm-security-guided-observability")
-            wait_healthy("llm-security-guided-prometheus")
 
-    print("h10_h20_starter_restore=PASS")
+    print("h10_h16_starter_restore=PASS")
     return 0
 
 

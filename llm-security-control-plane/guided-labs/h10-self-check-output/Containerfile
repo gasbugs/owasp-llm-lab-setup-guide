@@ -17,7 +17,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --chmod=0444 guided-labs/h10-self-check-output/Containerfile /app/learner/Containerfile
-COPY --chmod=0555 guided-labs/h10-self-check-output/config /app/learner/config
+COPY --chmod=0555 guided-labs/h10-self-check-output/config/config.yml guided-labs/h10-self-check-output/config/prompts.yml /app/learner/config/
 COPY --chmod=0555 guided-labs/h10-self-check-output/server.py /app/learner/server.py
 RUN install -d -o 65532 -g 65532 -m 0700 /state \
     && chmod 0555 /app/learner /app/learner/config

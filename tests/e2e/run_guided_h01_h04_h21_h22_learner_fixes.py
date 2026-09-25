@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Verify the real H01-H04 and H21-H22 learner fixes, then restore Starter."""
+"""Verify H01/H21/H22 fixes; P02/P03/P04 use check_guided_p02_live.py,
+check_guided_p03_live.py, and check_guided_p04_live.py."""
 
 from __future__ import annotations
 
 import argparse
 import http.cookiejar
 import json
+import re
 import subprocess
 import time
 import urllib.request
@@ -19,58 +21,10 @@ COMPOSE_ENV_FILE: Path | None = None
 
 ACTIVITIES = {
     "H01": {
-        "path": CONTROL / "guided-labs/h01-bedrock-gateway/server.py",
-        "replacements": [
-            (
-                "effective_max_tokens = request.max_output_tokens",
-                "effective_max_tokens = min(request.max_output_tokens, 128)",
-            )
-        ],
+        "path": CONTROL / "guided-labs/h01-bedrock-gateway/learner.py",
+        "replacements": [],
         "services": ["guided-h01-gateway"],
         "containers": ["llm-security-guided-h01-gateway"],
-    },
-    "H02": {
-        "path": CONTROL / "guided-labs/h02-document-ingestion/server.py",
-        "replacements": [
-            ('model_config = ConfigDict(extra="allow")', 'model_config = ConfigDict(extra="forbid")'),
-            (
-                '''    """Starter: a client-supplied object key crosses the application boundary."""
-    extra_key = (request.model_extra or {}).get("object_key")
-    object_key = (
-        extra_key
-        if isinstance(extra_key, str)
-        else f"h02/knowledge/{request.execution_id}.md"
-    )''',
-                '''    """Build the object key only from the server-owned execution ID."""
-    object_key = f"h02/knowledge/{request.execution_id}.md"''',
-            ),
-        ],
-        "services": ["guided-h02-document-app"],
-        "containers": ["llm-security-guided-h02-document-app"],
-        "provision": True,
-    },
-    "H03": {
-        "path": CONTROL / "guided-labs/h03-ingestion-search/server.py",
-        "replacements": [
-            (
-                '''    """Starter: retrieval is allowed before the current job is complete."""
-    # TODO(H03): 같은 현재 job이고 상태가 COMPLETE일 때만 True를 반환한다.
-    return True''',
-                '''    """Retrieve only after this server's current job has completed."""
-    same_job = hmac.compare_digest(current_job_id, observed_job_id)
-    return same_job and status == "COMPLETE"''',
-            )
-        ],
-        "services": ["guided-h03-sync-app"],
-        "containers": ["llm-security-guided-h03-sync-app"],
-        "provision": True,
-    },
-    "H04": {
-        "path": CONTROL / "guided-labs/h04-bedrock-guardrail/server.py",
-        "replacements": [("USE_GUARDRAIL_FOR_CONVERSE = False", "USE_GUARDRAIL_FOR_CONVERSE = True")],
-        "services": ["guided-h04-guardrail-app"],
-        "containers": ["llm-security-guided-h04-guardrail-app"],
-        "provision": True,
     },
     "H21": {
         "path": CONTROL / "guided-labs/h21-agent-policy/policy.py",
@@ -186,11 +140,15 @@ def action(origin: str, activity: str, name: str, timeout: int = 360) -> dict:
         return json.load(response)
 
 
-def apply_fix(activity: str) -> bytes:
+def apply_fix(activity: str, p01_solution: str | None = None) -> bytes:
     definition = ACTIVITIES[activity]
     path = definition["path"]
     original = path.read_bytes()
     fixed = original.decode()
+    if activity == "H01":
+        if p01_solution is None:
+            raise RuntimeError("P01 requires the exact Markdown solution")
+        fixed = p01_solution
     for before, after in definition["replacements"]:
         if fixed.count(before) != 1:
             raise RuntimeError(f"{activity} Starter marker did not match exactly once")
@@ -200,30 +158,21 @@ def apply_fix(activity: str) -> bytes:
 
 
 def assert_result(activity: str, result: dict) -> None:
+    if activity not in ACTIVITIES:
+        raise ValueError(f"Unsupported activity: {activity}; P02/P03/P04 use their check_guided_pNN_live.py runners")
     assert result["course_verdict"] == "PASS", result
     assert result["verified_by"] == "guided-evidence-verifier", result
     payload = result["result"]
     if activity == "H01":
+        assert result["activity_id"] == "P01", result
+        assert result["task_completed"] is True, result
+        assert result["security_verdict"] == "PASS", result
         cases = {item["case_id"]: item for item in payload["cases"]}
+        assert len(cases) == 21, result
         assert cases["normal-64"]["effective_max_output_tokens"] == 64
         assert cases["risk-512"]["effective_max_output_tokens"] == 128
         assert cases["invalid-empty-message"]["http_status"] == 422
         assert cases["reject-model-override"]["http_status"] == 422
-    elif activity == "H02":
-        cases = {item["case_id"]: item for item in payload["cases"]}
-        assert cases["client-key-override"]["http_status"] == 422
-        assert cases["invalid-empty-body"]["http_status"] == 422
-        assert payload["embedding_dimension"] == 1024
-    elif activity == "H03":
-        assert payload["early"]["retrieval_called"] is False
-        assert payload["early_provider"] is None
-        assert payload["job_status"] == "COMPLETE"
-        assert payload["final"]["source_uris"]
-    elif activity == "H04":
-        cases = {item["case_id"]: item for item in payload["cases"]}
-        assert cases["converse-normal"]["guardrail_config"]["guardrailVersion"] == "DRAFT"
-        assert cases["converse-risk"]["guardrail_config"]["guardrailVersion"] == "DRAFT"
-        assert "{EMAIL}" in cases["converse-risk"]["output_text"]
     elif activity == "H21":
         assert not any(payload["impacts"].values())
         assert payload["verified_counts"]["untrusted_mcp"] == 0
@@ -238,16 +187,27 @@ def assert_result(activity: str, result: dict) -> None:
 
 def main() -> int:
     global COMPOSE_ENV_FILE
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:28097")
     parser.add_argument("--env-file")
+    parser.add_argument("--p01-markdown", type=Path, help="Course P01 file containing the solution section")
     parser.add_argument(
         "--activities",
         nargs="+",
         choices=tuple(ACTIVITIES),
-        default=["H22", "H21", "H04", "H03", "H02", "H01"],
+        default=["H22", "H21", "H01"],
     )
     args = parser.parse_args()
+    p01_solution = None
+    if "H01" in args.activities:
+        if args.p01_markdown is None:
+            parser.error("--p01-markdown is required when H01/P01 is selected")
+        parts = re.split(r"^## \d+\. 풀이.*$", args.p01_markdown.read_text(), flags=re.MULTILINE)
+        blocks = re.findall(r"^```python\n(.*?)^```$", parts[1], re.MULTILINE | re.DOTALL) if len(parts) == 2 else []
+        if len(blocks) != 1:
+            parser.error("P01 must contain exactly one complete Python solution after 풀이")
+        p01_solution = blocks[0]
+        compile(p01_solution, str(args.p01_markdown), "exec")
     if args.env_file:
         COMPOSE_ENV_FILE = Path(args.env_file).resolve()
     origin = args.url.rstrip("/")
@@ -256,7 +216,7 @@ def main() -> int:
     completed: list[str] = []
     try:
         for activity in args.activities:
-            originals[activity] = apply_fix(activity)
+            originals[activity] = apply_fix(activity, p01_solution)
             rebuild(activity)
             if ACTIVITIES[activity].get("provision"):
                 provisioned = action(origin, activity, "provision")
@@ -277,7 +237,7 @@ def main() -> int:
         for activity in not_completed:
             rebuild(activity)
 
-    print("h01_h04_h21_h22_starter_restore=PASS")
+    print("h01_h21_h22_starter_restore=PASS")
     return 0
 
 

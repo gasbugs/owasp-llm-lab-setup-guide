@@ -2,21 +2,106 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import importlib.util
 import hmac
 import json
 import math
 import os
+import re
 import sqlite3
+import sys
 import time
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from mcp import Client
 from pydantic import BaseModel, ConfigDict, Field
+
+sys.path.insert(0, str(Path(__file__).parent))
+from p12_deployment import load_configuration as load_p12_configuration
+from p12_grading import grade_run as grade_p12_run
+
+try:
+    P12_CONFIGURATION = load_p12_configuration()
+except (ValueError, KeyError, OSError):
+    P12_CONFIGURATION = None
+P12_LOCK = asyncio.Lock()
+
+P01_PATH = Path(__file__).with_name("p01.json")
+if not P01_PATH.exists():
+    P01_PATH = Path(__file__).resolve().parents[1] / "guided-contracts/p01.json"
+P01_CONTRACT = json.loads(P01_PATH.read_text())
+P01_RUNNER_ROOT = Path(__file__).with_name("p01-runner")
+if not P01_RUNNER_ROOT.is_dir():
+    P01_RUNNER_ROOT = Path(__file__).resolve().parents[1] / "guided-labs/h01-bedrock-gateway"
+P01_RUNNER_DIGESTS = {name: hashlib.sha256((P01_RUNNER_ROOT / name).read_bytes()).hexdigest()
+                      for name in ("server.py", "provider.py")}
+H18_URL = os.getenv("GUIDED_H18_URL", "http://guided-h18-queries:8000")
+H18_TOKEN = os.environ["GUIDED_VERIFIER_H18_TOKEN"]
+H19_URL = os.getenv("GUIDED_H19_URL", "http://guided-h19-investigation:8000")
+H19_TOKEN = os.environ["GUIDED_VERIFIER_H19_TOKEN"]
+H17_URL = os.getenv("GUIDED_H17_URL", "http://guided-h17-telemetry:8000")
+H17_TOKEN = os.environ["GUIDED_VERIFIER_H17_TOKEN"]
+H20_URL = os.getenv("GUIDED_H20_URL", "http://guided-h20-alerts:8000")
+H20_TOKEN = os.getenv("GUIDED_VERIFIER_H20_TOKEN", "")
+P20_PROMETHEUS_URL = os.getenv("GUIDED_P20_PROMETHEUS_URL", "http://guided-h20-prometheus:9090")
+P20_GRAFANA_URL = os.getenv("GUIDED_P20_GRAFANA_URL", "http://guided-h20-grafana:3000")
+P20_GRAFANA_USER = os.getenv("GUIDED_P20_GRAFANA_USER", "viewer")
+P20_GRAFANA_PASSWORD = os.getenv("GUIDED_P20_GRAFANA_PASSWORD", "")
+
+def load_p18_helper(filename, fallback=None):
+    path = Path(__file__).with_name(filename)
+    if not path.exists() and fallback:
+        path = Path(__file__).resolve().parents[1] / fallback
+    spec = importlib.util.spec_from_file_location(filename.removesuffix('.py'), path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+P18_RESULTS = load_p18_helper('p18_results.py')
+P17_VERIFICATION = load_p18_helper('p17_verification.py')
+P17_RUNNER_ROOT = Path(__file__).with_name('p17-runner')
+if not P17_RUNNER_ROOT.is_dir():
+    P17_RUNNER_ROOT = Path(__file__).resolve().parents[1] / 'guided-labs/h17-telemetry'
+P17_RUNNER_DIGESTS = {name: hashlib.sha256((P17_RUNNER_ROOT / name).read_bytes()).hexdigest()
+                      for name in ('server.py', 'runner.py', 'workflow.py')}
+P18_QUERIES = load_p18_helper('query_execution.py', 'guided-labs/observability/query_execution.py')
+
+
+def p18_runner_digests():
+    copied = Path(__file__).with_name('p18-runner')
+    root = Path(__file__).resolve().parents[1] / 'guided-labs'
+    sources = {'server.py': root / 'observability/server.py',
+               'query_execution.py': root / 'observability/query_execution.py',
+               'request_workflow.py': root / 'h18-product-queries/request_workflow.py'}
+    return {name: hashlib.sha256((copied / name if copied.is_dir() else path).read_bytes()).hexdigest()
+            for name, path in sources.items()}
+
+
+P18_RUNNER_DIGESTS = p18_runner_digests()
+P19_VERIFICATION = load_p18_helper('p19_verification.py')
+P19_COLLECTION = load_p18_helper('p19_collection.py', 'guided-labs/h19-incident-investigation/collection.py')
+P19_RUNNER_ROOT = Path(__file__).with_name('p19-runner')
+if not P19_RUNNER_ROOT.is_dir():
+    P19_RUNNER_ROOT = Path(__file__).resolve().parents[1] / 'guided-labs/h19-incident-investigation'
+P19_RUNNER_DIGESTS = {name: hashlib.sha256((P19_RUNNER_ROOT / name).read_bytes()).hexdigest()
+                      for name in ('server.py', 'analysis_inputs.py', 'collection.py', 'execution.py', 'workflow.py')}
+P20_VERIFICATION = load_p18_helper('p20_verification.py')
+P20_RUNNER_ROOT = Path(__file__).with_name('p20-runner')
+if not P20_RUNNER_ROOT.is_dir():
+    P20_RUNNER_ROOT = Path(__file__).resolve().parents[1] / 'guided-labs/h20-alert-dashboard'
+P20_RUNNER_DIGESTS = {name: hashlib.sha256((P20_RUNNER_ROOT / name).read_bytes()).hexdigest()
+                    for name in ('server.py', 'workflow.py', 'execution.py')}
 
 
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
@@ -31,7 +116,6 @@ LAB09_URL = os.getenv("GUIDED_LAB09_URL", "http://guided-h09-presidio-redaction:
 LAB10_URL = os.getenv("GUIDED_LAB10_URL", "http://guided-h10-self-check-output:8000")
 LAB11_URL = os.getenv("GUIDED_LAB11_URL", "http://guided-h11-rag-provenance:8000")
 LAB12_URL = os.getenv("GUIDED_LAB12_URL", "http://guided-h12-application-pipeline:8000")
-H12_PROVIDER_URL = os.getenv("GUIDED_H12_PROVIDER_URL", "http://guided-h12-stage-provider:8000")
 LAB13_URL = os.getenv("GUIDED_LAB13_URL", "http://guided-h13-promptfoo:8000")
 LAB14_URL = os.getenv("GUIDED_LAB14_URL", "http://guided-h14-garak:8000")
 LAB15_URL = os.getenv("GUIDED_LAB15_URL", "http://guided-h15-pyrit:8000")
@@ -47,14 +131,13 @@ H09_SINK_URL = os.getenv(
 H06_PROVIDER_URL = os.getenv(
     "GUIDED_H06_PROVIDER_URL", "http://guided-h06-action-provider:8000"
 )
-H05_SCAFFOLD_DIGEST = "bc28e8a56e4981dc86bed071c6cd844a284371ba3d59c7e918738d42793b50d3"
-H06_SCAFFOLD_DIGEST = "2658110858c7d9cb51849449d39dd7925669991ee61b6ee88e6f7827aa56c9f1"
-H07_SCAFFOLD_DIGEST = "cbf98b7fb69ece632ab0dc2f14d6d9f7a0f415a5856917603488fe403796c2bd"
-H08_SCAFFOLD_DIGEST = "072ab818ac90208c059fe6639776e34a242d590e87ac4d1c7e7fe4d95c93771c"
+H05_SCAFFOLD_DIGEST = "f10fc0d4e85ebf6f32a45908ee1b400cfca1fca116588555f0d967672d28eb5f"
+H06_SCAFFOLD_DIGEST = "9096e260f965bc83f33463f3ae041e7b6ad730fa96b975923f7d4fbbebae36b7"
+H07_SCAFFOLD_DIGEST = "24b9412dac75d2dd776ae9e36d0b2308a8a473eb1c10ba829ac25b6a902a3fbf"
+H08_SCAFFOLD_DIGEST = "4feeaa9008a3f4f8368d1dcba87d8bca9e805e45fe6e77e8a62b94749edfb78a"
 H09_SCAFFOLD_DIGEST = "42dc9cf43841464933453296660a0a1b716d85df51e3093472311a8ac1fc2bd0"
-H10_SCAFFOLD_DIGEST = "22a79cce6675de09dcf869c39cca700e7de1bd9be6affdc7e16f1ffb761f2fd4"
+H10_SCAFFOLD_DIGEST = "5a4d643ab5fef2619fa24dc7709f11a2cafb674d95513cfd57c6b7b6741d4c1d"
 H11_SCAFFOLD_DIGEST = "b20494de3859da85f063ba10192904d51f49a2bc1bd8dcdbb6cbb7e5d46f0a8e"
-H12_SCAFFOLD_DIGEST = "24196efee6cd0448a78c0a567e1685baef19ce8bfae03371f28aed8a2a5989ad"
 H13_SCAFFOLD_DIGEST = "cf510b86dadafe4215cbc7598b51ff9348056160799717148ebfcb0b0c7a79c1"
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
@@ -86,7 +169,6 @@ LAB09_TOKEN = os.environ["GUIDED_VERIFIER_LAB09_TOKEN"]
 LAB10_TOKEN = os.environ["GUIDED_VERIFIER_LAB10_TOKEN"]
 LAB11_TOKEN = os.environ["GUIDED_VERIFIER_LAB11_TOKEN"]
 LAB12_TOKEN = os.environ["GUIDED_VERIFIER_LAB12_TOKEN"]
-H12_PROVIDER_TOKEN = os.environ["GUIDED_H12_PROVIDER_VERIFIER_TOKEN"]
 LAB13_TOKEN = os.environ["GUIDED_VERIFIER_LAB13_TOKEN"]
 LAB14_TOKEN = os.environ["GUIDED_VERIFIER_LAB14_TOKEN"]
 LAB15_TOKEN = os.environ["GUIDED_VERIFIER_LAB15_TOKEN"]
@@ -123,17 +205,11 @@ with connect() as database:
 
 class ExpectedCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    case_id: Literal[
-        "provider-preflight",
-        "normal-64",
-        "risk-512",
-        "invalid-empty-message",
-        "reject-model-override",
-    ]
+    case_id: str
     scenario: Literal["preflight", "normal", "risk"]
     execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
-    requested_max_output_tokens: int = Field(ge=1, le=512)
+    requested_max_output_tokens: object = None
     expected_status: Literal[200, 422]
     observed_status: int
 
@@ -143,25 +219,7 @@ class VerifyRequest(BaseModel):
     suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
     suite_kind: Literal["preflight", "hands_on"]
-    cases: list[ExpectedCase] = Field(min_length=1, max_length=4)
-
-
-class H02ExpectedCase(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    case_id: Literal[
-        "normal-document", "client-key-override", "invalid-empty-body"
-    ]
-    scenario: Literal["normal", "risk"]
-    execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
-    observed_status: Literal[200, 422]
-
-
-class H02VerifyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
-    cases: list[H02ExpectedCase] = Field(min_length=3, max_length=3)
+    cases: list[ExpectedCase] = Field(min_length=1, max_length=64)
 
 
 class H02ResourceVerifyRequest(BaseModel):
@@ -170,39 +228,9 @@ class H02ResourceVerifyRequest(BaseModel):
     started_at: str
 
 
-class H03VerifyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
 
 
-class H03ResourceVerifyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
 
-
-class H04ExpectedCase(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    case_id: Literal[
-        "apply-normal", "apply-risk", "converse-normal", "converse-risk"
-    ]
-    execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
-
-
-class H04VerifyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
-    cases: list[H04ExpectedCase] = Field(min_length=4, max_length=4)
-
-
-class H04ResourceVerifyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
 
 
 class H05ExpectedCase(BaseModel):
@@ -260,8 +288,7 @@ class H11VerifyRequest(BaseModel):
 
 class H12VerifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    suite_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
-    started_at: str
+    suite_id: UUID
 
 
 class H13VerifyRequest(BaseModel):
@@ -313,7 +340,11 @@ def mcp_tool_payload(result) -> dict | None:
 def err_envelope(request: VerifyRequest, reason: str) -> dict:
     return {
         "lab_id": "01-nova",
-        "activity_id": "H01",
+        "activity_id": "P01",
+        "internal_activity_id": "H01",
+        "contract_version": 2,
+        "task_completed": False,
+        "security_verdict": "ERR",
         "execution_id": request.suite_id,
         "execution_kind": "learner-gateway-suite",
         "started_at": request.started_at,
@@ -328,7 +359,7 @@ def err_envelope(request: VerifyRequest, reason: str) -> dict:
     }
 
 
-def h02_err_envelope(request: H02VerifyRequest | H02ResourceVerifyRequest, reason: str) -> dict:
+def h02_err_envelope(request: H02ResourceVerifyRequest, reason: str) -> dict:
     return {
         "lab_id": "02-embedding-kb",
         "activity_id": "H02",
@@ -371,69 +402,9 @@ def fetch_h02_resources() -> dict | None:
     return state if all(required) else None
 
 
-def h03_err_envelope(
-    request: H03VerifyRequest | H03ResourceVerifyRequest, reason: str
-) -> dict:
-    return {
-        "lab_id": "02-embedding-kb",
-        "activity_id": "H03",
-        "execution_id": request.suite_id,
-        "execution_kind": "h03-ingestion-retrieval-suite",
-        "started_at": request.started_at,
-        "status": "completed",
-        "course_verdict": "ERR",
-        "verified_by": "guided-evidence-verifier",
-        "verified_at": datetime.now(timezone.utc).isoformat(),
-        "stage_calls": [],
-        "evidence": [],
-        "reason": reason,
-        "next_check": "현재 ingestion job ID·상태와 early·final retrieval source를 확인합니다.",
-    }
 
 
-def fetch_h03_resources() -> dict | None:
-    response = httpx.get(
-        f"{GATEWAY_URL}/v1/h03/resources",
-        headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
-        timeout=15.0,
-    )
-    if response.status_code != 200:
-        return None
-    state = response.json()
-    required = (
-        state.get("status") in {"READY_FOR_SYNC", "SYNCING", "CURRENT"},
-        state.get("region") == "us-east-1",
-        state.get("source_prefix") == "h03/knowledge/",
-        isinstance(state.get("account_id"), str),
-        len(state.get("account_id", "")) == 12,
-        isinstance(state.get("template_digest"), str),
-        len(state.get("template_digest", "")) == 64,
-        bool(state.get("knowledge_base_id")),
-        bool(state.get("data_source_id")),
-        bool(state.get("old_source_uri")),
-        bool(state.get("current_source_uri")),
-    )
-    return state if all(required) else None
 
-
-def h04_err_envelope(
-    request: H04VerifyRequest | H04ResourceVerifyRequest, reason: str
-) -> dict:
-    return {
-        "lab_id": "03-bedrock-guardrail",
-        "activity_id": "H04",
-        "execution_id": request.suite_id,
-        "execution_kind": "h04-managed-guardrail-suite",
-        "started_at": request.started_at,
-        "status": "completed",
-        "course_verdict": "ERR",
-        "verified_by": "guided-evidence-verifier",
-        "verified_at": datetime.now(timezone.utc).isoformat(),
-        "stage_calls": [],
-        "evidence": [],
-        "reason": reason,
-        "next_check": "H04 Guardrail ID, learner source와 ApplyGuardrail·Converse 영수증을 확인합니다.",
-    }
 
 
 def h05_err_envelope(request: H05VerifyRequest, reason: str) -> dict:
@@ -526,29 +497,6 @@ def h09_err_envelope(request: H09VerifyRequest, reason: str) -> dict:
     }
 
 
-def fetch_h04_resources() -> dict | None:
-    response = httpx.get(
-        f"{GATEWAY_URL}/v1/h04/resources",
-        headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
-        timeout=15.0,
-    )
-    if response.status_code != 200:
-        return None
-    state = response.json()
-    required = (
-        state.get("status") == "READY",
-        state.get("region") == "us-east-1",
-        state.get("guardrail_version") == "DRAFT",
-        state.get("pii_type") == "EMAIL",
-        state.get("input_enabled") is False,
-        state.get("output_enabled") is True,
-        state.get("output_action") == "ANONYMIZE",
-        isinstance(state.get("guardrail_id"), str),
-        bool(state.get("guardrail_id")),
-        isinstance(state.get("template_digest"), str),
-        len(state.get("template_digest", "")) == 64,
-    )
-    return state if all(required) else None
 
 
 def reserve_provider_evidence(provider_id: str, execution_id: str) -> bool:
@@ -601,6 +549,13 @@ def reserve_provider_evidence_batch(reservations: list[tuple[str, str]]) -> bool
 app = FastAPI(title="Tenant 03 Evidence Verifier", docs_url=None, redoc_url=None)
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_error(request, error):
+    if request.url.path in {"/v1/verify/p03", "/v1/verify/p04"}:
+        return JSONResponse(status_code=422, content={"detail": "invalid verification fields"})
+    return await request_validation_exception_handler(request, error)
+
+
 @app.get("/livez")
 def livez() -> dict[str, str]:
     return {"status": "alive"}
@@ -615,13 +570,15 @@ def readyz() -> dict[str, str]:
 
 @app.post("/v1/verify/lab-01")
 def verify(request: VerifyRequest, _authorized: None = Depends(require_control)) -> dict:
-    expected_ids = (
-        {"provider-preflight"}
-        if request.suite_kind == "preflight"
-        else {"normal-64", "risk-512", "invalid-empty-message", "reject-model-override"}
-    )
-    if {item.case_id for item in request.cases} != expected_ids:
+    definitions = {item["case_id"]: item for item in P01_CONTRACT["preflight" if request.suite_kind == "preflight" else "cases"]}
+    if {item.case_id for item in request.cases} != set(definitions) or len(request.cases) != len(definitions):
         return err_envelope(request, "the server-owned test suite is incomplete")
+    if len({item.execution_id for item in request.cases}) != len(request.cases):
+        return err_envelope(request, "execution IDs must be unique within the suite")
+    for expected in request.cases:
+        definition = definitions[expected.case_id]
+        if expected.scenario != definition["scenario"] or expected.expected_status != definition["expected_status"] or json.dumps(expected.requested_max_output_tokens) != json.dumps(definition["body"].get("max_output_tokens")):
+            return err_envelope(request, "case parameters differ from the server-owned contract")
 
     try:
         build_response = httpx.get(
@@ -631,22 +588,55 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
         )
         if build_response.status_code != 200:
             return err_envelope(request, "learner Gateway build information is missing")
-        source_digest = build_response.json().get("source_digest")
+        build = build_response.json()
+        if build.get("runner_digests") != P01_RUNNER_DIGESTS:
+            return err_envelope(request, "provided Gateway runner differs from the verifier baseline")
+        source_digest = build.get("source_digest")
         if not isinstance(source_digest, str) or len(source_digest) != 64:
             return err_envelope(request, "learner Gateway source digest is invalid")
 
         verified_cases = []
         evidence = []
         for expected in request.cases:
+            definition = definitions[expected.case_id]
             if expected.observed_status != expected.expected_status:
                 return err_envelope(request, f"{expected.case_id} returned an unexpected HTTP status")
+            execution_response = httpx.get(
+                f"{LAB_URL}/v1/executions/{expected.execution_id}",
+                headers={"Authorization": f"Bearer {LAB_TOKEN}"}, timeout=5.0,
+            )
+            if execution_response.status_code != 200:
+                return err_envelope(request, "Gateway execution record is missing")
+            execution = execution_response.json()
+            if not all((
+                execution.get("closed") is True,
+                execution.get("activity_id") == "P01",
+                execution.get("internal_activity_id") == "H01",
+                execution.get("contract_version") == 2,
+                execution.get("execution_id") == expected.execution_id,
+                execution.get("started_at") == expected.started_at,
+                execution.get("scenario") == expected.scenario,
+                execution.get("source_digest") == source_digest,
+                execution.get("runner_digests") == P01_RUNNER_DIGESTS,
+                execution.get("http_status") == expected.observed_status,
+                execution.get("request_digest") == hashlib.sha256(json.dumps(definition["body"], sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest(),
+            )):
+                return err_envelope(request, "Gateway execution record is open or does not match this request")
             receipt_response = httpx.get(
                 f"{LAB_URL}/v1/receipts/{expected.execution_id}",
                 headers={"Authorization": f"Bearer {LAB_TOKEN}"},
                 timeout=5.0,
             )
             if expected.expected_status == 422:
-                if receipt_response.status_code != 404:
+                if receipt_response.status_code != 404 or not all((
+                    type(execution.get("invocation_attempts")) is int,
+                    execution.get("invocation_attempts") == 0,
+                    type(execution.get("provider_attempts")) is int,
+                    execution.get("provider_attempts") == 0,
+                    type(execution.get("provider_results")) is int,
+                    execution.get("provider_results") == 0,
+                    execution.get("provider_request_ids") == [],
+                )):
                     return err_envelope(request, f"{expected.case_id} reached the Provider path")
                 verified_cases.append(
                     {
@@ -672,12 +662,26 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
             fields_match = all(
                 (
                     receipt.get("execution_id") == expected.execution_id,
+                    receipt.get("activity_id") == "P01",
+                    receipt.get("internal_activity_id") == "H01",
+                    receipt.get("contract_version") == 2,
+                    execution.get("provider_request_ids") == [provider_id],
+                    type(execution.get("invocation_attempts")) is int,
+                    execution.get("invocation_attempts") == 1,
+                    type(execution.get("provider_attempts")) is int,
+                    execution.get("provider_attempts") == 1,
+                    type(execution.get("provider_results")) is int,
+                    execution.get("provider_results") == 1,
+                    execution.get("provider_mode") == receipt.get("provider_mode"),
                     receipt.get("scenario") == expected.scenario,
                     receipt.get("requested_max_output_tokens") == expected.requested_max_output_tokens,
                     receipt.get("source_digest") == source_digest,
+                    receipt.get("runner_digests") == P01_RUNNER_DIGESTS,
                     receipt.get("model_id") == MODEL_ID,
                     receipt.get("region") == "us-east-1",
                     receipt.get("forwarded_parameters", {}).get("maxTokens") == effective,
+                    receipt.get("forwarded_parameters", {}).get("temperature") == 0.0,
+                    receipt.get("forwarded_messages") == [{"role": "user", "content": [{"text": definition["body"]["message"]}]}],
                     receipt.get("upstream_called") is True,
                     type(effective) is int,
                     type(usage.get("outputTokens")) is int,
@@ -689,6 +693,8 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
             )
             if not fields_match:
                 return err_envelope(request, "Gateway receipt does not match the requested execution")
+            if expected.case_id != "risk-512" and effective != definition["effective_max_tokens"]:
+                return err_envelope(request, "Gateway changed a normal or boundary request limit")
             if not reserve_provider_evidence(provider_id, expected.execution_id):
                 return err_envelope(request, "stale Provider evidence was reused")
             item = {
@@ -717,7 +723,13 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
                     "observed_at": receipt["observed_at"],
                 }
             )
-    except httpx.RequestError:
+        final_build = httpx.get(
+            f"{LAB_URL}/v1/build-info",
+            headers={"Authorization": f"Bearer {LAB_TOKEN}"}, timeout=5.0,
+        )
+        if final_build.status_code != 200 or final_build.json() != build:
+            return err_envelope(request, "Gateway build changed during evidence verification")
+    except (httpx.RequestError, ValueError, TypeError, KeyError, AttributeError):
         return err_envelope(request, "read-only Gateway evidence endpoint unavailable")
 
     by_id = {item["case_id"]: item for item in verified_cases}
@@ -729,8 +741,11 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
         if normal["effective_max_output_tokens"] != 64:
             verdict = "ERR"
             reason = "정상 64 Token 요청까지 바꾸어 정상 기능 유지를 확인할 수 없습니다."
-        elif risk["effective_max_output_tokens"] <= 128:
+        elif risk["effective_max_output_tokens"] == 128:
             reason = "정상 요청은 유지하고 큰 요청은 제한했으며 잘못된 body와 모델 변경도 Provider 전에 거부했습니다."
+        elif risk["effective_max_output_tokens"] < 128:
+            verdict = "ERR"
+            reason = "큰 요청의 상한을 계약의 128보다 작게 바꾸어 요구한 호출을 확인할 수 없습니다."
         elif risk["usage"]["outputTokens"] > 128:
             verdict = "HIT"
             reason = "512 Token 요청이 제한 없이 실제 Provider 출력으로 이어졌습니다."
@@ -738,10 +753,14 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
             verdict = "ERR"
             reason = "전달 상한은 크지만 이번 응답이 짧아 실제 영향을 확정할 수 없습니다."
 
-    focus = next(item for item in reversed(verified_cases) if item.get("http_status") == 200)
+    focus = by_id["risk-512"] if request.suite_kind == "hands_on" else by_id["provider-preflight"]
     return {
         "lab_id": "01-nova",
-        "activity_id": "H01",
+        "activity_id": "P01",
+        "internal_activity_id": "H01",
+        "contract_version": 2,
+        "task_completed": request.suite_kind == "hands_on" and verdict == "PASS",
+        "security_verdict": verdict,
         "execution_id": request.suite_id,
         "execution_kind": "learner-gateway-suite",
         "started_at": request.started_at,
@@ -756,7 +775,7 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
         "evidence": evidence,
         "result": {**focus, "cases": verified_cases},
         "reason": reason,
-        "next_check": "네 case의 HTTP 상태, upstream_called와 Provider maxTokens를 순서대로 비교합니다.",
+        "next_check": "각 사례의 HTTP 상태, upstream_called와 Provider maxTokens를 순서대로 비교합니다.",
     }
 
 
@@ -826,467 +845,20 @@ def verify_h02_resources(
 
 
 @app.post("/v1/verify/lab-02")
-def verify_h02(
-    request: H02VerifyRequest,
-    _authorized: None = Depends(require_control),
-) -> dict:
-    expected_ids = {"normal-document", "client-key-override", "invalid-empty-body"}
-    if {item.case_id for item in request.cases} != expected_ids:
-        return h02_err_envelope(request, "the server-owned H02 suite is incomplete")
-    try:
-        state = fetch_h02_resources()
-        if state is None:
-            return h02_err_envelope(request, "Knowledge Base 연결 자원이 READY가 아닙니다.")
-        build_response = httpx.get(
-            f"{LAB02_URL}/v1/build-info",
-            headers={"Authorization": f"Bearer {LAB02_TOKEN}"},
-            timeout=5.0,
-        )
-        if build_response.status_code != 200:
-            return h02_err_envelope(request, "learner H02 build information is missing")
-        source_digest = build_response.json().get("source_digest")
-        if not isinstance(source_digest, str) or len(source_digest) != 64:
-            return h02_err_envelope(request, "learner H02 source digest is invalid")
-
-        verified_cases = []
-        evidence = []
-        for expected in request.cases:
-            app_response = httpx.get(
-                f"{LAB02_URL}/v1/receipts/{expected.execution_id}",
-                headers={"Authorization": f"Bearer {LAB02_TOKEN}"},
-                timeout=5.0,
-            )
-            gateway_response = httpx.get(
-                f"{GATEWAY_URL}/v1/h02/evidence/{expected.execution_id}",
-                headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
-                timeout=10.0,
-            )
-            if expected.observed_status == 422:
-                if app_response.status_code != 404 or gateway_response.status_code != 404:
-                    return h02_err_envelope(
-                        request, f"{expected.case_id} reached the AWS document path"
-                    )
-                verified_cases.append(
-                    {
-                        "case_id": expected.case_id,
-                        "execution_id": expected.execution_id,
-                        "http_status": 422,
-                        "upstream_called": False,
-                    }
-                )
-                continue
-            if app_response.status_code != 200 or gateway_response.status_code != 200:
-                return h02_err_envelope(request, f"{expected.case_id} evidence is missing")
-            app_receipt = app_response.json()
-            gateway_receipt = gateway_response.json()
-            try:
-                started_at = parse_time(expected.started_at)
-                observed_at = parse_time(gateway_receipt["observed_at"])
-            except (KeyError, TypeError, ValueError):
-                return h02_err_envelope(request, "H02 evidence timestamp is invalid")
-            expected_key = (
-                f"h02/knowledge/{expected.execution_id}.md"
-                if expected.case_id == "normal-document"
-                else f"h02/untrusted/{expected.execution_id}.md"
-            )
-            fields_match = all(
-                (
-                    app_receipt.get("execution_id") == expected.execution_id,
-                    app_receipt.get("source_digest") == source_digest,
-                    app_receipt.get("gateway_evidence_id") == expected.execution_id,
-                    app_receipt.get("object_key") == expected_key,
-                    gateway_receipt.get("execution_id") == expected.execution_id,
-                    gateway_receipt.get("scenario") == expected.scenario,
-                    gateway_receipt.get("object_key") == expected_key,
-                    gateway_receipt.get("model_id") == EMBEDDING_MODEL_ID,
-                    gateway_receipt.get("region") == "us-east-1",
-                    gateway_receipt.get("embedding_dimension") == 1024,
-                    gateway_receipt.get("knowledge_base_id")
-                    == state["knowledge_base_id"],
-                    gateway_receipt.get("data_source_id") == state["data_source_id"],
-                    gateway_receipt.get("template_digest")
-                    == state["template_digest"],
-                    gateway_receipt.get("object_exists") is True,
-                    gateway_receipt.get("upstream_called") is True,
-                    observed_at >= started_at,
-                )
-            )
-            if not fields_match:
-                return h02_err_envelope(
-                    request, f"{expected.case_id} receipt does not match the execution"
-                )
-            provider_id = gateway_receipt.get("provider_request_id")
-            if not isinstance(provider_id, str) or not provider_id:
-                return h02_err_envelope(request, "Titan request ID is missing")
-            if not reserve_provider_evidence(provider_id, expected.execution_id):
-                return h02_err_envelope(request, "stale Titan evidence was reused")
-            item = {
-                "case_id": expected.case_id,
-                "execution_id": expected.execution_id,
-                "http_status": 200,
-                "source_digest": source_digest,
-                "provider_request_id": provider_id,
-                "s3_request_id": gateway_receipt["s3_request_id"],
-                "provider_mode": gateway_receipt["provider_mode"],
-                "model_id": gateway_receipt["model_id"],
-                "object_key": gateway_receipt["object_key"],
-                "object_uri": gateway_receipt["object_uri"],
-                "object_exists": True,
-                "embedding_dimension": 1024,
-                "embedding_norm": gateway_receipt["embedding_norm"],
-                "knowledge_base_id": gateway_receipt["knowledge_base_id"],
-                "data_source_id": gateway_receipt["data_source_id"],
-                "upstream_called": True,
-            }
-            verified_cases.append(item)
-            evidence.extend(
-                [
-                    {
-                        "source": "amazon-bedrock"
-                        if gateway_receipt["provider_mode"] == "aws"
-                        else "contract-provider",
-                        "kind": expected.case_id,
-                        "id": provider_id,
-                        "observed_at": gateway_receipt["observed_at"],
-                    },
-                    {
-                        "source": "amazon-s3"
-                        if gateway_receipt["provider_mode"] == "aws"
-                        else "contract-provider",
-                        "kind": "source-object",
-                        "id": gateway_receipt["s3_request_id"],
-                        "observed_at": gateway_receipt["observed_at"],
-                    },
-                ]
-            )
-    except httpx.RequestError:
-        return h02_err_envelope(request, "H02 read-only evidence endpoint unavailable")
-
-    by_id = {item["case_id"]: item for item in verified_cases}
-    normal = by_id["normal-document"]
-    risk = by_id["client-key-override"]
-    verdict = "PASS" if risk["http_status"] == 422 else "HIT"
-    reason = (
-        "정상 문서는 고정 S3 경로에 저장하고 Titan 1024차원 변환을 유지했으며, 클라이언트 경로 변경은 AWS 호출 전에 거부했습니다."
-        if verdict == "PASS"
-        else "클라이언트가 지정한 경로에 실제 S3 객체가 생기고 Titan 호출까지 실행됐습니다."
+def retired_h02_verifier(_authorized: None = Depends(require_control)) -> dict:
+    raise HTTPException(
+        status_code=410,
+        detail="H02 grading is retired; use /v1/verify/p02 with the current P02 suite.",
     )
-    return {
-        "lab_id": "02-embedding-kb",
-        "activity_id": "H02",
-        "execution_id": request.suite_id,
-        "execution_kind": "learner-document-suite",
-        "started_at": request.started_at,
-        "status": "completed",
-        "course_verdict": verdict,
-        "verified_by": "guided-evidence-verifier",
-        "verified_at": datetime.now(timezone.utc).isoformat(),
-        "stage_calls": [
-            {
-                "stage": "learner_document_app",
-                "attempted": True,
-                "outcome": "completed",
-                "evidence_id": source_digest,
-            },
-            {
-                "stage": "bedrock_titan",
-                "attempted": True,
-                "outcome": "completed",
-                "evidence_id": normal["provider_request_id"],
-            },
-            {
-                "stage": "s3_source",
-                "attempted": True,
-                "outcome": "stored",
-                "evidence_id": normal["s3_request_id"],
-            },
-            {
-                "stage": "knowledge_base",
-                "attempted": True,
-                "outcome": "connected",
-                "evidence_id": normal["knowledge_base_id"],
-            },
-        ],
-        "evidence": evidence,
-        "result": {**normal, "cases": verified_cases},
-        "reason": reason,
-        "next_check": "세 case의 HTTP 상태, object_key, 1024차원과 AWS 미호출 여부를 비교합니다.",
-    }
 
 
 @app.post("/v1/verify/lab-03-resources")
-def verify_h03_resources(
-    request: H03ResourceVerifyRequest,
-    _authorized: None = Depends(require_control),
-) -> dict:
-    try:
-        state = fetch_h03_resources()
-    except httpx.RequestError:
-        state = None
-    if state is None:
-        return h03_err_envelope(request, "H03 전용 Knowledge Base 상태를 확인할 수 없습니다.")
-    old_indexed = any(
-        item.get("source_uri") == state["old_source_uri"]
-        and item.get("status") == "INDEXED"
-        for item in state.get("indexed_documents", [])
-    )
-    if any(
-        (
-            state.get("status") != "READY_FOR_SYNC",
-            state.get("old_source_exists") is not False,
-            state.get("current_source_exists") is not True,
-            not old_indexed,
-        )
-    ):
-        return h03_err_envelope(
-            request,
-            "폐기 문서는 검색 저장소에 남고 S3에는 현재 문서만 있는 H03 기준선이 아닙니다.",
-        )
-    return {
-        "lab_id": "02-embedding-kb",
-        "activity_id": "H03",
-        "execution_id": request.suite_id,
-        "execution_kind": "h03-baseline-provisioning",
-        "started_at": request.started_at,
-        "status": "completed",
-        "course_verdict": "PASS",
-        "verified_by": "guided-evidence-verifier",
-        "verified_at": datetime.now(timezone.utc).isoformat(),
-        "stage_calls": [
-            {
-                "stage": "h03_s3_source",
-                "attempted": True,
-                "outcome": "current-source-ready",
-                "evidence_id": state["current_source_uri"],
-            },
-            {
-                "stage": "h03_knowledge_base",
-                "attempted": True,
-                "outcome": "revoked-source-indexed",
-                "evidence_id": state["old_source_uri"],
-            },
-        ],
-        "evidence": [
-            {
-                "source": "amazon-bedrock"
-                if state["provider_mode"] == "aws"
-                else "contract-provider",
-                "kind": "seed-ingestion-job",
-                "id": state["seed_job_id"],
-                "observed_at": state["observed_at"],
-            }
-        ],
-        "result": state,
-        "reason": "S3에는 현재 문서만 있고 검색 저장소에는 폐기 문서가 남은 H03 전용 시작 상태를 확인했습니다.",
-        "next_check": "Starter를 검증해 현재 ingestion 완료 전 폐기 문서가 검색되는지 확인합니다.",
-    }
-
-
 @app.post("/v1/verify/lab-03")
-def verify_h03(
-    request: H03VerifyRequest,
-    _authorized: None = Depends(require_control),
-) -> dict:
-    try:
-        build_response = httpx.get(
-            f"{LAB03_URL}/v1/build-info",
-            headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
-            timeout=5.0,
-        )
-        state = fetch_h03_resources()
-        if build_response.status_code != 200 or state is None:
-            return h03_err_envelope(request, "H03 앱 build 또는 AWS 상태 증거가 없습니다.")
-        source_digest = build_response.json().get("source_digest")
-        if not isinstance(source_digest, str) or len(source_digest) != 64:
-            return h03_err_envelope(request, "H03 learner source digest가 올바르지 않습니다.")
-
-        app_receipts: dict[str, dict] = {}
-        for phase in ("start", "early", "final"):
-            response = httpx.get(
-                f"{LAB03_URL}/v1/receipts/{request.execution_id}/{phase}",
-                headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
-                timeout=5.0,
-            )
-            if response.status_code != 200:
-                return h03_err_envelope(request, f"H03 {phase} learner receipt가 없습니다.")
-            app_receipts[phase] = response.json()
-
-        job_id = app_receipts["start"].get("ingestion_job_id")
-        job_response = httpx.get(
-            f"{GATEWAY_URL}/v1/h03/jobs/{job_id}",
-            headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
-            timeout=10.0,
-        )
-        final_response = httpx.get(
-            f"{GATEWAY_URL}/v1/h03/retrievals/{request.execution_id}/final",
-            headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
-            timeout=10.0,
-        )
-        early_response = httpx.get(
-            f"{GATEWAY_URL}/v1/h03/retrievals/{request.execution_id}/early",
-            headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
-            timeout=10.0,
-        )
-        if job_response.status_code != 200 or final_response.status_code != 200:
-            return h03_err_envelope(request, "현재 ingestion job 또는 final retrieval 증거가 없습니다.")
-        job = job_response.json()
-        final = final_response.json()
-        early = early_response.json() if early_response.status_code == 200 else None
-
-        try:
-            started_at = parse_time(request.started_at)
-            start_observed = parse_time(app_receipts["start"]["observed_at"])
-            early_observed = parse_time(app_receipts["early"]["observed_at"])
-            final_observed = parse_time(final["observed_at"])
-        except (KeyError, TypeError, ValueError):
-            return h03_err_envelope(request, "H03 증거 시각이 올바르지 않습니다.")
-
-        base_matches = all(
-            (
-                app_receipts["start"].get("execution_id") == request.execution_id,
-                app_receipts["start"].get("source_digest") == source_digest,
-                app_receipts["early"].get("source_digest") == source_digest,
-                app_receipts["final"].get("source_digest") == source_digest,
-                app_receipts["early"].get("ingestion_job_id") == job_id,
-                app_receipts["early"].get("observed_job_id") == job_id,
-                app_receipts["final"].get("ingestion_job_id") == job_id,
-                app_receipts["final"].get("observed_job_id") == job_id,
-                job.get("ingestion_job_id") == job_id,
-                job.get("status") == "COMPLETE",
-                state.get("status") == "CURRENT",
-                state.get("old_source_exists") is False,
-                state.get("current_source_exists") is True,
-                final.get("execution_id") == request.execution_id,
-                final.get("phase") == "final",
-                final.get("ingestion_job_id") == job_id,
-                final.get("job_status_at_retrieval") == "COMPLETE",
-                final.get("knowledge_base_id") == state.get("knowledge_base_id"),
-                final.get("data_source_id") == state.get("data_source_id"),
-                final.get("template_digest") == state.get("template_digest"),
-                state.get("current_source_uri") in final.get("source_uris", []),
-                state.get("old_source_uri") not in final.get("source_uris", []),
-                bool(final.get("document_ids")),
-                app_receipts["final"].get("retrieval_request_id")
-                == final.get("provider_request_id"),
-                started_at <= start_observed <= early_observed <= final_observed,
-            )
-        )
-        current_indexed = any(
-            item.get("source_uri") == state["current_source_uri"]
-            and item.get("status") == "INDEXED"
-            for item in state.get("indexed_documents", [])
-        )
-        if not base_matches or not current_indexed:
-            return h03_err_envelope(request, "H03 현재 job과 final 검색 증거가 같은 실행으로 연결되지 않습니다.")
-        final_id = final.get("provider_request_id")
-        if not isinstance(final_id, str) or not reserve_provider_evidence(
-            final_id, f"{request.execution_id}:final"
-        ):
-            return h03_err_envelope(request, "H03 final retrieval 증거가 stale 상태입니다.")
-
-        early_called = app_receipts["early"].get("retrieval_called") is True
-        early_blocked = all(
-            (
-                app_receipts["early"].get("decision") == "wait",
-                app_receipts["early"].get("retrieval_called") is False,
-                app_receipts["early"].get("job_status")
-                in {"QUEUED", "STARTING", "IN_PROGRESS"},
-                early_response.status_code == 404,
-            )
-        )
-        stale_hit = bool(
-            early_called
-            and early
-            and early.get("job_status_at_retrieval")
-            in {"QUEUED", "STARTING", "IN_PROGRESS"}
-            and state.get("old_source_uri") in early.get("source_uris", [])
-            and state.get("current_source_uri") not in early.get("source_uris", [])
-            and bool(early.get("document_ids"))
-        )
-        if stale_hit:
-            early_id = early.get("provider_request_id")
-            if not isinstance(early_id, str) or not reserve_provider_evidence(
-                early_id, f"{request.execution_id}:early"
-            ):
-                return h03_err_envelope(request, "H03 early retrieval 증거가 stale 상태입니다.")
-            verdict = "HIT"
-            reason = "현재 ingestion이 끝나기 전에 S3에서 삭제된 폐기 문서가 실제 retrieval hit로 공개됐습니다."
-        elif early_blocked:
-            verdict = "PASS"
-            reason = "현재 job이 끝나기 전 검색을 막고, COMPLETE 뒤 새 문서만 검색해 정상 기능도 유지했습니다."
-        else:
-            verdict = "ERR"
-            reason = "완료 전 검색 차단 또는 폐기 문서 hit 가운데 어느 결과도 충분히 확인하지 못했습니다."
-    except httpx.RequestError:
-        return h03_err_envelope(request, "H03 read-only evidence endpoint를 조회할 수 없습니다.")
-
-    early_outcome = "revoked-source-hit" if verdict == "HIT" else "blocked-before-retrieval" if verdict == "PASS" else "unknown"
-    return {
-        "lab_id": "02-embedding-kb",
-        "activity_id": "H03",
-        "execution_id": request.suite_id,
-        "execution_kind": "h03-ingestion-retrieval-suite",
-        "started_at": request.started_at,
-        "status": "completed",
-        "course_verdict": verdict,
-        "verified_by": "guided-evidence-verifier",
-        "verified_at": datetime.now(timezone.utc).isoformat(),
-        "stage_calls": [
-            {
-                "stage": "learner_sync_app",
-                "attempted": True,
-                "outcome": "current-job-bound",
-                "evidence_id": source_digest,
-            },
-            {
-                "stage": "knowledge_base_ingestion",
-                "attempted": True,
-                "outcome": "COMPLETE",
-                "evidence_id": job_id,
-            },
-            {
-                "stage": "early_retrieval",
-                "attempted": early_called,
-                "outcome": early_outcome,
-                "evidence_id": early.get("provider_request_id") if early else None,
-            },
-            {
-                "stage": "current_retrieval",
-                "attempted": True,
-                "outcome": "current-source-hit",
-                "evidence_id": final_id,
-            },
-        ],
-        "evidence": [
-            {
-                "source": "amazon-bedrock"
-                if state["provider_mode"] == "aws"
-                else "contract-provider",
-                "kind": "ingestion-job",
-                "id": job_id,
-                "observed_at": final["observed_at"],
-            },
-            {
-                "source": "amazon-bedrock"
-                if state["provider_mode"] == "aws"
-                else "contract-provider",
-                "kind": "final-retrieval",
-                "id": final_id,
-                "observed_at": final["observed_at"],
-            },
-        ],
-        "result": {
-            "source_digest": source_digest,
-            "ingestion_job_id": job_id,
-            "job_status": job["status"],
-            "early": app_receipts["early"],
-            "early_provider": early,
-            "final": final,
-            "indexed_documents": state.get("indexed_documents", []),
-        },
-        "reason": reason,
-        "next_check": "early 단계의 job_status·retrieval 호출 여부와 final source URI를 비교합니다.",
-    }
+def retired_h03_verifier(_authorized: None = Depends(require_control)) -> dict:
+    raise HTTPException(
+        status_code=410,
+        detail="H03 grading is retired; use /v1/verify/p03 with the current P03 suite.",
+    )
 
 
 @app.post("/v1/verify/lab-21")
@@ -1682,266 +1254,9 @@ async def verify_h22(
 
 
 @app.post("/v1/verify/lab-04-resources")
-def verify_h04_resources(
-    request: H04ResourceVerifyRequest,
-    _authorized: None = Depends(require_control),
-) -> dict:
-    try:
-        state = fetch_h04_resources()
-    except httpx.RequestError:
-        state = None
-    if state is None:
-        return h04_err_envelope(request, "H04 전용 DRAFT Guardrail을 확인할 수 없습니다.")
-    return {
-        "lab_id": "03-bedrock-guardrail",
-        "activity_id": "H04",
-        "execution_id": request.suite_id,
-        "execution_kind": "aws-resource-provisioning",
-        "started_at": request.started_at,
-        "status": "completed",
-        "course_verdict": "PASS",
-        "verified_by": "guided-evidence-verifier",
-        "verified_at": datetime.now(timezone.utc).isoformat(),
-        "stage_calls": [
-            {
-                "stage": "bedrock_guardrail",
-                "attempted": True,
-                "outcome": "ready",
-                "evidence_id": state["guardrail_id"],
-            }
-        ],
-        "evidence": [
-            {
-                "source": "amazon-bedrock"
-                if state["provider_mode"] == "aws"
-                else "contract-provider",
-                "kind": "guardrail-draft",
-                "id": state["guardrail_id"],
-                "observed_at": state["observed_at"],
-            }
-        ],
-        "result": state,
-        "reason": "H04 전용 DRAFT에서 출력 EMAIL 비식별화 설정을 확인했습니다.",
-        "next_check": "이 PASS는 정책 자원이 준비됐다는 뜻이며 수강생 앱의 Converse 연결은 아직 검증하지 않았습니다.",
-    }
-
-
 @app.post("/v1/verify/lab-04")
-def verify_h04(
-    request: H04VerifyRequest,
-    _authorized: None = Depends(require_control),
-) -> dict:
-    expected_ids = {
-        "apply-normal",
-        "apply-risk",
-        "converse-normal",
-        "converse-risk",
-    }
-    if {item.case_id for item in request.cases} != expected_ids:
-        return h04_err_envelope(request, "H04 서버 고정 Testcase가 완전하지 않습니다.")
-    try:
-        state = fetch_h04_resources()
-        if state is None:
-            return h04_err_envelope(request, "H04 Guardrail 상태가 준비되지 않았습니다.")
-        build = httpx.get(
-            f"{LAB04_URL}/v1/build-info",
-            headers={"Authorization": f"Bearer {LAB04_TOKEN}"},
-            timeout=5.0,
-        )
-        if build.status_code != 200:
-            return h04_err_envelope(request, "H04 learner source digest가 없습니다.")
-        source_digest = build.json().get("source_digest")
-        if not isinstance(source_digest, str) or len(source_digest) != 64:
-            return h04_err_envelope(request, "H04 learner source digest가 올바르지 않습니다.")
-
-        verified: dict[str, dict] = {}
-        evidence = []
-        for expected in request.cases:
-            learner = httpx.get(
-                f"{LAB04_URL}/v1/receipts/{expected.execution_id}",
-                headers={"Authorization": f"Bearer {LAB04_TOKEN}"},
-                timeout=5.0,
-            )
-            gateway = httpx.get(
-                f"{GATEWAY_URL}/v1/h04/evidence/{expected.execution_id}",
-                headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"},
-                timeout=10.0,
-            )
-            if learner.status_code != 200 or gateway.status_code != 200:
-                return h04_err_envelope(request, f"{expected.case_id} 영수증이 없습니다.")
-            app_receipt = learner.json()
-            provider = gateway.json()
-            try:
-                started_at = parse_time(expected.started_at)
-                observed_at = parse_time(provider["observed_at"])
-            except (KeyError, TypeError, ValueError):
-                return h04_err_envelope(request, f"{expected.case_id} 시각 증거가 잘못됐습니다.")
-            fields_match = all(
-                (
-                    app_receipt.get("execution_id") == expected.execution_id,
-                    app_receipt.get("case_id") == expected.case_id,
-                    app_receipt.get("source_digest") == source_digest,
-                    app_receipt.get("gateway_evidence_id") == expected.execution_id,
-                    app_receipt.get("provider_request_id")
-                    == provider.get("provider_request_id"),
-                    provider.get("execution_id") == expected.execution_id,
-                    provider.get("case_id") == expected.case_id,
-                    provider.get("template_digest") == state["template_digest"],
-                    observed_at >= started_at,
-                    isinstance(provider.get("provider_request_id"), str),
-                    bool(provider.get("provider_request_id")),
-                )
-            )
-            if not fields_match:
-                return h04_err_envelope(request, f"{expected.case_id} 실행 증거가 서로 다릅니다.")
-            if not reserve_provider_evidence(
-                provider["provider_request_id"], expected.execution_id
-            ):
-                return h04_err_envelope(request, f"{expected.case_id}가 예전 AWS 증거를 재사용했습니다.")
-            verified[expected.case_id] = {**provider, "source_digest": source_digest}
-            evidence.append(
-                {
-                    "source": "amazon-bedrock"
-                    if provider.get("provider_mode") == "aws"
-                    else "contract-provider",
-                    "kind": expected.case_id,
-                    "id": provider["provider_request_id"],
-                    "observed_at": provider["observed_at"],
-                }
-            )
-    except httpx.RequestError:
-        return h04_err_envelope(request, "H04 read-only evidence endpoint에 연결할 수 없습니다.")
-
-    apply_normal = verified["apply-normal"]
-    apply_risk = verified["apply-risk"]
-    converse_normal = verified["converse-normal"]
-    converse_risk = verified["converse-risk"]
-    standalone_ok = all(
-        (
-            apply_normal.get("operation") == "apply_guardrail",
-            apply_normal.get("guardrail_id") == state["guardrail_id"],
-            apply_normal.get("guardrail_version") == "DRAFT",
-            apply_normal.get("action") == "NONE",
-            apply_normal.get("outputs") == [],
-            apply_normal.get("model_called") is False,
-            apply_risk.get("operation") == "apply_guardrail",
-            apply_risk.get("guardrail_id") == state["guardrail_id"],
-            apply_risk.get("guardrail_version") == "DRAFT",
-            apply_risk.get("action") == "GUARDRAIL_INTERVENED",
-            "{EMAIL}"
-            in " ".join(item.get("text", "") for item in apply_risk.get("outputs", [])),
-            any(
-                item.get("type") == "EMAIL" and item.get("action") == "ANONYMIZED"
-                for item in apply_risk.get("pii_actions", [])
-            ),
-            apply_risk.get("model_called") is False,
-        )
-    )
-    normal_usage = converse_normal.get("usage", {})
-    normal_ok = all(
-        (
-            converse_normal.get("operation") == "converse",
-            converse_normal.get("model_id") == MODEL_ID,
-            converse_normal.get("model_called") is True,
-            type(normal_usage.get("outputTokens")) is int,
-            normal_usage.get("outputTokens", 0) > 0,
-            bool(converse_normal.get("output_text")),
-            "learner@example.com" not in converse_normal.get("output_text", ""),
-        )
-    )
-    if not standalone_ok or not normal_ok:
-        return h04_err_envelope(request, "단독 Guardrail 또는 정상 Nova Lite 대조군 증거가 부족합니다.")
-
-    risk_usage = converse_risk.get("usage", {})
-    config = converse_risk.get("guardrail_config")
-    exposed = "learner@example.com" in converse_risk.get("output_text", "")
-    expected_config = {
-        "guardrailIdentifier": state["guardrail_id"],
-        "guardrailVersion": "DRAFT",
-    }
-    risk_model_ok = all(
-        (
-            converse_risk.get("operation") == "converse",
-            converse_risk.get("model_id") == MODEL_ID,
-            converse_risk.get("model_called") is True,
-            type(risk_usage.get("outputTokens")) is int,
-            risk_usage.get("outputTokens", 0) > 0,
-            bool(converse_risk.get("stop_reason")),
-        )
-    )
-    if exposed and config is None and risk_model_ok:
-        verdict = "HIT"
-        reason = "단독 검사는 이메일을 찾았지만 실제 Nova Lite 요청에는 Guardrail이 연결되지 않아 원문 이메일이 공개됐습니다."
-        outcome = "raw-email-exposed"
-    else:
-        protected = all(
-            (
-                converse_normal.get("guardrail_config") == expected_config,
-                config == expected_config,
-                risk_model_ok,
-                not exposed,
-                "{EMAIL}" in converse_risk.get("output_text", ""),
-                any(
-                    item.get("type") == "EMAIL"
-                    and item.get("action") == "ANONYMIZED"
-                    for item in converse_risk.get("pii_actions", [])
-                ),
-            )
-        )
-        verdict = "PASS" if protected else "ERR"
-        reason = (
-            "단독 검사와 같은 DRAFT를 Nova Lite에 연결해 정상 응답은 유지하고 합성 이메일은 Browser 공개 전에 비식별화했습니다."
-            if protected
-            else "Guardrail 연결·trace·Token 사용량 또는 비식별화 출력 가운데 하나가 부족합니다."
-        )
-        outcome = "email-anonymized" if protected else "evidence-incomplete"
-
-    return {
-        "lab_id": "03-bedrock-guardrail",
-        "activity_id": "H04",
-        "execution_id": request.suite_id,
-        "execution_kind": "h04-managed-guardrail-suite",
-        "started_at": request.started_at,
-        "status": "completed",
-        "course_verdict": verdict,
-        "verified_by": "guided-evidence-verifier",
-        "verified_at": datetime.now(timezone.utc).isoformat(),
-        "stage_calls": [
-            {
-                "stage": "learner_guardrail_app",
-                "attempted": True,
-                "outcome": "completed",
-                "evidence_id": source_digest,
-            },
-            {
-                "stage": "apply_guardrail",
-                "attempted": True,
-                "outcome": "email-detected",
-                "evidence_id": apply_risk["provider_request_id"],
-            },
-            {
-                "stage": "bedrock_main_with_guardrail",
-                "attempted": True,
-                "outcome": outcome,
-                "evidence_id": converse_risk["provider_request_id"],
-            },
-        ],
-        "evidence": evidence,
-        "result": {
-            "source_digest": source_digest,
-            "guardrail_id": state["guardrail_id"],
-            "guardrail_version": state["guardrail_version"],
-            "model_id": MODEL_ID,
-            "provider_request_id": converse_risk["provider_request_id"],
-            "action": apply_risk["action"],
-            "stop_reason": converse_risk.get("stop_reason"),
-            "usage": converse_risk.get("usage"),
-            "output_text": converse_risk.get("output_text"),
-            "cases": list(verified.values()),
-        },
-        "reason": reason,
-        "next_check": "ApplyGuardrail action과 Converse의 guardrailConfig·출력·Token usage를 같은 suite에서 비교합니다.",
-    }
+def retired_h04_verification(_authorized: None = Depends(require_control)) -> dict:
+    raise HTTPException(status_code=410, detail="H04 grading retired; use /v1/verify/p04")
 
 
 @app.post("/v1/verify/lab-05")
@@ -4345,130 +3660,35 @@ def verify_h11(
 
 
 @app.post("/v1/verify/h12")
-def verify_h12(
+@app.post("/v1/verify/p12")
+async def verify_h12(
     request: H12VerifyRequest,
     _authorized: None = Depends(require_control),
 ) -> dict:
-    def err(reason: str) -> dict:
-        return {
-            "lab_id": "07-rag-boundary",
-            "activity_id": "H12",
-            "execution_id": request.suite_id,
-            "execution_kind": "h12-application-pipeline-suite",
-            "started_at": request.started_at,
-            "status": "completed",
-            "course_verdict": "ERR",
-            "verified_by": "guided-evidence-verifier",
-            "verified_at": datetime.now(timezone.utc).isoformat(),
-            "stage_calls": [],
-            "evidence": [],
-            "reason": reason,
-            "next_check": "H12 Application receipt와 보호 서비스의 실제 stage ledger를 확인합니다.",
-        }
-
-    case_ids = ["normal", "invalid-token", "indirect-injection", "nemo-timeout"]
-    secure_order = ["authenticate", "authorize", "input_privacy", "input_rail", "retrieval", "main", "output_rail", "output_privacy"]
-    starter_order = ["retrieval", "authenticate", "authorize", "input_privacy", "input_rail", "main", "output_rail", "output_privacy"]
-    try:
-        build_response = httpx.get(f"{LAB12_URL}/v1/build-info", headers={"Authorization": f"Bearer {LAB12_TOKEN}"}, timeout=10.0)
-        receipt_response = httpx.get(f"{LAB12_URL}/v1/receipts/{request.suite_id}", headers={"Authorization": f"Bearer {LAB12_TOKEN}"}, timeout=10.0)
-        ledger_response = httpx.get(f"{H12_PROVIDER_URL}/v1/suites/{request.suite_id}/ledger", headers={"Authorization": f"Bearer {H12_PROVIDER_TOKEN}"}, timeout=10.0)
-    except httpx.RequestError:
-        return err("H12 learner 또는 보호 서비스 evidence endpoint에 연결할 수 없습니다.")
-    if any(item.status_code != 200 for item in (build_response, receipt_response, ledger_response)):
-        return err("현재 H12 build·receipt·stage ledger를 모두 확인할 수 없습니다.")
-    build, receipt, ledger = build_response.json(), receipt_response.json(), ledger_response.json()
-    if not all(
-        (
-            build.get("component") == "guided-h12-application-pipeline",
-            build.get("scaffold_digest") == H12_SCAFFOLD_DIGEST,
-            build.get("case_ids") == case_ids,
-            receipt.get("suite_id") == request.suite_id,
-            receipt.get("started_at") == request.started_at,
-            receipt.get("source_digest") == build.get("source_digest"),
-            receipt.get("scaffold_digest") == H12_SCAFFOLD_DIGEST,
-            receipt.get("policy_digest") == build.get("policy_digest"),
-            ledger.get("suite_id") == request.suite_id,
-            ledger.get("started_at") == request.started_at,
-        )
-    ):
-        return err("H12 source·policy·suite가 같은 실행으로 연결되지 않습니다.")
-    cases = receipt.get("cases")
-    ledger_calls = ledger.get("calls")
-    if not isinstance(cases, list) or [item.get("case_id") for item in cases] != case_ids or not isinstance(ledger_calls, list):
-        return err("H12 네 고정 Case 또는 보호 서비스 원장이 없습니다.")
-    receipt_by_case = {item["case_id"]: item["calls"] for item in cases}
-    ledger_by_case = {case_id: [] for case_id in case_ids}
-    direct_calls = []
-    for item in ledger_calls:
-        if item.get("case_id") == "direct-protected":
-            direct_calls.append(item)
-        elif item.get("case_id") in ledger_by_case:
-            ledger_by_case[item["case_id"]].append({"stage": item.get("stage"), "status": item.get("status")})
+    suite = str(request.suite_id)
+    if P12_LOCK.locked():
+        raise HTTPException(status_code=409, detail="P12 verification is already running")
+    async with P12_LOCK:
+        if P12_CONFIGURATION is None:
+            result = {"practice_id": "P12", "execution_id": "H12", "contract_version": 2,
+                      "suite_id": suite, "task_completed": False, "security_verdict": "ERR",
+                      "cases": [], "failed_case": None,
+                      "next_check": "P12 검증기의 전용 서비스 주소와 조회 자격 증명을 확인하세요."}
         else:
-            return err("H12 원장에 고정 suite 밖의 Case가 있습니다.")
-    if any(receipt_by_case[case_id] != ledger_by_case[case_id] for case_id in case_ids):
-        return err("H12 learner가 보고한 stage와 보호 서비스의 실제 호출 원장이 다릅니다.")
-    if len(direct_calls) != 1 or direct_calls[0].get("stage") != "protected_direct" or direct_calls[0].get("status") != 401 or direct_calls[0].get("authorized") != 0:
-        return err("H12 내부 보호 서비스의 직접 접근 거부 증거가 없습니다.")
-    starter_hit = (
-        receipt.get("declared_stage_order") == starter_order
-        and all([item["stage"] for item in receipt_by_case[case_id]] == starter_order for case_id in case_ids)
-        and all(any(item["stage"] == "main" for item in receipt_by_case[case_id]) for case_id in case_ids[1:])
-    )
-    fixed_expected = {
-        "normal": secure_order,
-        "invalid-token": ["authenticate"],
-        "indirect-injection": ["authenticate", "authorize", "input_privacy", "input_rail"],
-        "nemo-timeout": ["authenticate", "authorize", "input_privacy", "input_rail"],
-    }
-    fixed_pass = receipt.get("declared_stage_order") == secure_order and all(
-        [item["stage"] for item in receipt_by_case[case_id]] == expected
-        for case_id, expected in fixed_expected.items()
-    )
-    if starter_hit:
-        verdict = "HIT"
-        reason = "Retrieval이 인증보다 먼저 실행됐고 인증·Rail 실패 뒤에도 Main 단계까지 호출되어 fail-open 부작용이 확인됐습니다."
-        outcome = "retrieval-and-main-after-failure"
-    elif fixed_pass:
-        verdict = "PASS"
-        reason = "정상 요청만 전체 단계를 통과했고 인증 실패·간접 주입·NeMo timeout은 정확한 단계에서 멈춰 뒤 Retrieval·Main 호출이 없었습니다."
-        outcome = "ordered-fail-closed"
-    else:
-        return err("H12 결과가 Starter HIT 또는 수정 PASS stage 계약과 일치하지 않습니다.")
-    evidence_digest = hashlib.sha256(json.dumps(ledger_calls, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    if not reserve_provider_evidence_batch([(f"h12-ledger:{request.suite_id}", evidence_digest)]):
-        return err("예전 H12 stage ledger가 다시 사용됐습니다.")
+            result = await grade_p12_run(suite_id=suite, **P12_CONFIGURATION)
+    completed = result["task_completed"]
     return {
-        "lab_id": "07-rag-boundary",
-        "activity_id": "H12",
-        "execution_id": request.suite_id,
-        "execution_kind": "h12-application-pipeline-suite",
-        "started_at": request.started_at,
-        "status": "completed",
-        "course_verdict": verdict,
-        "verified_by": "guided-evidence-verifier",
-        "verified_at": datetime.now(timezone.utc).isoformat(),
-        "stage_calls": [
-            {"stage": "application_entry", "attempted": True, "outcome": outcome, "evidence_id": build["policy_digest"]},
-            {"stage": "protected_services", "attempted": True, "outcome": f"calls={len(ledger_calls)-1}", "evidence_id": evidence_digest},
-            {"stage": "direct_access", "attempted": True, "outcome": "401-no-side-effect", "evidence_id": request.suite_id},
-        ],
-        "evidence": [
-            {"source": "guided-h12-application-pipeline", "kind": "learner-suite", "id": request.suite_id, "observed_at": receipt["observed_at"]},
-            {"source": "guided-h12-stage-provider", "kind": "stage-ledger", "id": evidence_digest, "observed_at": ledger_calls[-1]["observed_at"]},
-        ],
-        "result": {
-            "source_digest": build["source_digest"],
-            "policy_digest": build["policy_digest"],
-            "declared_stage_order": receipt["declared_stage_order"],
-            "cases": cases,
-            "protected_call_count": len(ledger_calls) - 1,
-            "direct_access_status": 401,
-            "direct_side_effects": 0,
-        },
-        "reason": reason,
-        "next_check": "각 실패 Case의 마지막 stage와 그 뒤 Retrieval·Main 호출 부재를 확인합니다.",
+        "lab_id": "07-rag-boundary", "activity_id": "P12", "execution_id": suite,
+        "execution_kind": "p12-native-pipeline-suite", "contract_version": 2,
+        "status": "completed", "task_completed": completed,
+        "security_verdict": result["security_verdict"], "course_verdict": result["security_verdict"],
+        "verified_by": "guided-evidence-verifier", "verified_at": datetime.now(timezone.utc).isoformat(),
+        "stage_calls": [{"stage": case["case_id"], "attempted": True,
+                         "outcome": " → ".join(case["stages"])} for case in result["cases"]],
+        "result": result,
+        "reason": ("정상 요청과 각 중단 지점의 실제 제품 호출·전달값·정상 종료를 확인했습니다."
+                   if completed else "현재 실행의 필수 증거가 모두 확인되지 않아 과제는 미완료입니다."),
+        "next_check": result.get("next_check", "각 사례의 마지막 단계와 검색·모델 호출 수를 확인하세요."),
     }
 
 
@@ -4633,41 +3853,199 @@ def verify_h16(request: H13VerifyRequest, _authorized: None = Depends(require_co
     return {**tool_err("H16",request,"",result),"course_verdict":"PASS","stage_calls":[{"stage":"sandbox_regression","attempted":True,"outcome":"normal-and-risk-pass","evidence_id":data['sandbox_digest']},{"stage":"promotion_ledger","attempted":True,"outcome":"promote-rollback-promote","evidence_id":events[-1]['at']}],"evidence":[{"source":"h16-policy-store","kind":"audit-ledger","id":request.suite_id}],"reason":"정상 기능과 위험 차단을 Sandbox에서 함께 통과한 digest만 active가 되었고 rollback과 재승격 audit event까지 확인했습니다."}
 
 
-def verify_observability(activity: str, request: H13VerifyRequest) -> dict:
+def verify_p18_queries(request: H13VerifyRequest) -> dict:
+    result = {}
+    def outcome(reason, completed=False):
+        verdict = 'PASS' if completed else 'ERR'
+        return {**tool_err('H18', request, reason, result), 'activity_id': 'P18', 'lab_id': '11-raw-observability',
+                'internal_activity_id': 'H18', 'contract_version': 2, 'task_completed': completed,
+                'security_verdict': verdict, 'course_verdict': verdict,
+                'stage_calls': [{'stage': 'product_query', 'attempted': True, 'outcome': c['decision'],
+                                 'evidence_id': c['request_id']} for c in result.get('cases', [])],
+                'evidence': [{'source': 'tempo', 'kind': 'trace', 'id': c['trace_id']}
+                             for c in result.get('cases', [])],
+                'next_check': '현재 실행의 정상·거부 요청에 대한 조회문과 원시 저장소 응답을 확인합니다.'}
     try:
-        receipt_response=httpx.get(f"{OBSERVABILITY_URL}/v1/receipts/{activity}/{request.suite_id}",headers={"Authorization":f"Bearer {OBSERVABILITY_TOKEN}"},timeout=10)
-    except httpx.RequestError: return tool_err(activity,request,"관측 receipt endpoint에 연결할 수 없습니다.")
-    if receipt_response.status_code != 200: return tool_err(activity,request,"현재 관측 receipt가 없습니다.")
-    receipt=receipt_response.json(); result={"request_id":receipt.get('request_id'),"trace_id":receipt.get('trace_id'),"decision":receipt.get('decision'),"policy_rule":receipt.get('policy_rule'),"main_called":receipt.get('main_called'),"source_digest":receipt.get('source_digest')}
-    if receipt.get('started_at') != request.started_at or receipt.get('activity') != activity: return tool_err(activity,request,"다른 실행의 관측 receipt입니다.",result)
-    stored=False
-    for attempt in range(5):
-        now=int(datetime.now(timezone.utc).timestamp()*1_000_000_000); start=now-180_000_000_000
-        try:
-            loki=httpx.get(f"{LOKI_URL}/loki/api/v1/query_range",params={'query':'{service_name="guided-observability"}','start':start,'end':now,'limit':200},timeout=10)
-            tempo=httpx.get(f"{TEMPO_URL}/api/traces/{receipt['trace_id']}",timeout=10)
-            prom=httpx.get(f"{PROMETHEUS_URL}/api/v1/query",params={'query':f'guided_security_decisions_total{{hands_on="{activity}",decision="block"}}'},timeout=10)
-        except httpx.RequestError: return tool_err(activity,request,"Loki·Tempo·Prometheus 원시 API 중 하나에 연결할 수 없습니다.",result)
-        loki_text=loki.text; tempo_text=tempo.text; prom_data=prom.json() if prom.status_code==200 else {}
-        result|={'loki_status':loki.status_code,'tempo_status':tempo.status_code,'prometheus_status':prom.status_code,'prometheus_result':prom_data.get('data',{}).get('result',[])}
-        stored=receipt['request_id'] in loki_text and receipt['trace_id'] in loki_text and tempo.status_code==200 and receipt['request_id'] in tempo_text and bool(result['prometheus_result'])
-        if stored: break
-        if attempt < 4: time.sleep(1)
-    expected={'H17':'5229a1a165634d9bc695c401505af97736e2c37ff461653a385e9dc054d19c05','H18':'97b012410a7719c49915a0973283da45567933d4998d8816276c356e9c00c50c','H19':'a5daf21a61bad3aab8eabe60566b0565202af004dc2a5e7802ea86c875225440','H20':'ce78ed10765134fc2e062a9c3ffcaba00ef275448cbeb0b947ea085108e1e388'}
-    if receipt.get('source_digest') != expected[activity]: return tool_err(activity,request,f"{activity} learner 설정이 성공 계약과 일치하지 않습니다.",result)
-    if activity=='H18':
-        queries=receipt.get('queries',{}); result['queries']=queries
-        logql=queries.get('logql','').replace(' ',''); promql=queries.get('promql','').replace(' ','')
-        if queries.get('trace_lookup')!='exact_trace_id' or 'hands_on="H18"' not in logql or 'hands_on="H18"' not in promql: return tool_err(activity,request,"세 query가 H18 label과 정확한 trace ID로 범위를 좁히지 않았습니다.",result)
-    if activity=='H19':
-        result|={'join_key':receipt.get('join_key'),'stages':receipt.get('stages')}
-        if receipt.get('join_key')!='request_id' or receipt.get('main_called') is not False: return tool_err(activity,request,"동일 request ID join 또는 Main 부재 증거가 없습니다.",result)
-    if activity=='H20':
-        result|={'dashboard_query':receipt.get('dashboard_query'),'firing_snapshot':receipt.get('firing_snapshot'),'resolved_snapshot':receipt.get('resolved_snapshot')}
-        firing=json.dumps(receipt.get('firing_snapshot',{})); resolved=json.dumps(receipt.get('resolved_snapshot',{}))
-        if 'GuidedH20BlockedRequest' not in firing or 'firing' not in firing or ('firing' in resolved and 'GuidedH20BlockedRequest' in resolved): return tool_err(activity,request,"Prometheus rule의 firing→resolved 전환이 실측되지 않았습니다.",result)
-    if not stored: return tool_err(activity,request,"같은 request·trace·decision이 Loki·Tempo·Prometheus에 모두 저장되지 않았습니다.",result)
-    return {**tool_err(activity,request,"",result),"course_verdict":"PASS","stage_calls":[{"stage":"application_signal","attempted":True,"outcome":"blocked-before-main","evidence_id":receipt['request_id']},{"stage":"alloy_to_stores","attempted":True,"outcome":"log-trace-metric-stored","evidence_id":receipt['trace_id']}],"evidence":[{"source":"loki","kind":"structured-log","id":receipt['request_id']},{"source":"tempo","kind":"trace","id":receipt['trace_id']},{"source":"prometheus","kind":"metric-series","id":activity}],"reason":f"{activity} 전용 새 요청의 구조화 Log, Trace, Metric이 실제 제품 API에서 같은 결정으로 확인됐습니다."}
+        headers = {'Authorization': f'Bearer {H18_TOKEN}'}
+        response = httpx.get(f'{H18_URL}/v1/receipts/H18/{request.suite_id}', headers=headers, timeout=10)
+        if response.status_code != 200:
+            return outcome('현재 P18 실행 기록이 없습니다.')
+        receipt = response.json()
+        P18_RESULTS.require(receipt.get('suite_id') == request.suite_id and receipt.get('started_at') == request.started_at,
+                            'suite identity mismatch')
+        started = datetime.fromisoformat(request.started_at)
+        P18_RESULTS.require(started.tzinfo is not None and 0 <= (datetime.now(timezone.utc)-started).total_seconds() <= 180,
+                            'stale suite')
+        build_response = httpx.get(f'{H18_URL}/v1/h18/build-info', headers=headers, timeout=10)
+        P18_RESULTS.require(build_response.status_code == 200, 'build info unavailable')
+        build = build_response.json()
+        P18_RESULTS.require(build.get('runner_digests') == P18_RUNNER_DIGESTS, 'provided runner changed')
+        P18_RESULTS.require(isinstance(build.get('source_digest'), str)
+                            and re.fullmatch(r'[0-9a-f]{64}', build['source_digest'])
+                            and build['source_digest'] == receipt.get('source_digest')
+                            and build.get('queries') == receipt.get('queries'), 'query changed after execution')
+        result.update(source_digest=receipt['source_digest'], runner_digests=build['runner_digests'])
+        if receipt.get('query_error') or len(receipt.get('query_executions', [])) != 2:
+            result.update(queries=receipt.get('queries'), query_error=receipt.get('query_error'),
+                          request_cases=receipt.get('cases', []))
+            return outcome('정상·거부 요청의 학습자 조회문이 모두 실행되지 않았습니다.')
+        ledger_response = httpx.get(f'{H18_URL}/v1/h18/ledger/{request.suite_id}', headers=headers, timeout=10)
+        P18_RESULTS.require(ledger_response.status_code == 200, 'ledger unavailable')
+        cases = P18_RESULTS.check_ledger(receipt, ledger_response.json())
+        result.update(source_digest=receipt['source_digest'], runner_digests=build['runner_digests'],
+                      queries=receipt['queries'], cases=[], query_attempts=[])
+        for case, recorded in zip(cases, receipt['query_executions']):
+            start_ns = recorded['start_ns']
+            P18_RESULTS.require(start_ns <= case['started_ns'] <= case['finished_ns'] <= recorded['end_ns'],
+                                'case outside query interval')
+            current = P18_QUERIES.execute_queries(receipt['queries'], case['request_id'], case['trace_id'],
+                                                  start_ns, time.time_ns(), loki_url=LOKI_URL,
+                                                  tempo_url=TEMPO_URL, prometheus_url=PROMETHEUS_URL)
+            products = current['products']
+            result['query_attempts'].append({'request_id': case['request_id'], 'trace_id': case['trace_id'],
+                                             'products': products})
+            for product in ('loki', 'prometheus'):
+                P18_RESULTS.require(recorded['products'][product]['parameters']['query'] == products[product]['parameters']['query'],
+                                    'recorded learner query mismatch')
+            logs = P18_RESULTS.check_logs(products['loki']['response'], case)
+            spans = P18_RESULTS.check_trace(products['tempo']['response'], case)
+            baseline = httpx.get(f'{PROMETHEUS_URL}/api/v1/query', params={
+                'query': products['prometheus']['parameters']['query'], 'time': start_ns / 1_000_000_000}, timeout=10)
+            P18_RESULTS.require(baseline.status_code == 200, 'Counter baseline unavailable')
+            delta = P18_RESULTS.check_counter_change(baseline.json(), products['prometheus']['response'])
+            result['cases'].append({'request_id': case['request_id'], 'trace_id': case['trace_id'],
+                                    'decision': case['decision'], 'logs': logs, 'spans': spans, 'counter_delta': delta,
+                                    'products': products, 'counter_baseline': baseline.json()})
+        return outcome('작성한 조회문을 다시 실행해 정상 조회와 인가 거부의 Log·Trace·Counter 변화를 확인했습니다. 업무 저장소는 합성 fixture입니다.', True)
+    except P18_RESULTS.EvidenceMismatch as exc:
+        result['failed_requirement'] = str(exc)
+        hints = {
+            'Counter must increase once for each decision': '정상·거부 Counter가 이번 실행에서 각각 1씩 늘어나지 않았습니다.',
+            'log request_id differs from this request': '조회 결과에 다른 요청의 로그가 섞였습니다.',
+            'no current request log returned': '이번 요청의 로그가 조회 결과에 없습니다.',
+            'Trace stages do not match the actual decision': 'Trace의 실행 단계가 실제 정상·거부 처리 경로와 다릅니다.',
+            'query changed after execution': '실행 뒤 조회 설정이 바뀌었습니다. 현재 설정으로 새로 검증하세요.',
+            'provided runner changed': '제공된 실행 골격과 검증기의 버전이 다릅니다. 수정 대상인 조회 파일과 빌드 상태를 확인하세요.',
+        }
+        return outcome(hints.get(str(exc), '현재 요청과 조회 결과가 일치하지 않습니다. 실패한 요구사항을 확인하세요.'))
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError, AttributeError) as exc:
+        return outcome(f'P18 조회 증거를 확인하지 못했습니다: {type(exc).__name__}.')
+
+
+def verify_p19_incident(request: H13VerifyRequest) -> dict:
+    result = {}
+    def outcome(reason, completed=False):
+        verdict = 'PASS' if completed else 'ERR'
+        return {**tool_err('H19', request, reason, result), 'activity_id': 'P19',
+                'internal_activity_id': 'H19', 'lab_id': '12-incident-alert', 'contract_version': 2,
+                'task_completed': completed, 'security_verdict': verdict, 'course_verdict': verdict,
+                'next_check': ('정상 요청과 두 거부 요청의 중단 단계·저장소 호출 수를 원시 기록과 비교합니다.'
+                               if completed else '현재 요청의 원시 기록과 함수 실행 결과에서 실패한 요구사항을 확인합니다.')}
+    try:
+        with httpx.Client(timeout=20, trust_env=False) as client:
+            def fetch(path):
+                response = client.get(H19_URL + path, headers={'Authorization': f'Bearer {H19_TOKEN}'})
+                response.raise_for_status()
+                return response.json()
+            receipt = fetch('/v1/receipts/H19/' + request.suite_id)
+            P19_VERIFICATION.require(receipt.get('suite_id') == request.suite_id
+                                     and receipt.get('started_at') == request.started_at, 'execution identity mismatch')
+            started = datetime.fromisoformat(request.started_at)
+            P19_VERIFICATION.require(started.tzinfo is not None
+                and 0 <= (datetime.now(timezone.utc)-started).total_seconds() <= 180, 'stale execution')
+            result.update(analysis_executions=receipt.get('analysis_executions', []),
+                          execution_error=receipt.get('execution_error'))
+            if receipt.get('execution_error'):
+                return outcome('처리 또는 저장소 수집이 끝나지 않아 분석 결과를 채점하지 않았습니다.')
+            ledger = fetch('/v1/h19/ledger/' + request.suite_id)
+            build = fetch('/v1/h19/build-info')
+            observed = P19_COLLECTION.collect(ledger['cases'], ledger['downstream_calls'], client=client)
+            result['products'] = observed['products']
+            checked = P19_VERIFICATION.verify(receipt, ledger, build, observed,
+                suite_id=request.suite_id, started_at=request.started_at, runner_digests=P19_RUNNER_DIGESTS)
+            result.update(checked)
+            return outcome('작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다.', True)
+    except P19_VERIFICATION.RESULTS.EvidenceMismatch as exc:
+        result['failed_requirement'] = str(exc)
+        return outcome('분석 함수의 반환값 또는 현재 실행 증거가 과제 조건과 일치하지 않습니다.')
+    except (httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError, AttributeError, IndexError):
+        return outcome('현재 실행의 저장소 원문이나 처리 기록을 확인하지 못했습니다.')
+
+
+def verify_p17_signals(request: H13VerifyRequest) -> dict:
+    result = {}
+    def outcome(reason, completed=False):
+        verdict = 'PASS' if completed else 'ERR'
+        return {**tool_err('H17', request, reason, result), 'activity_id': 'P17',
+                'internal_activity_id': 'H17', 'lab_id': '11-raw-observability', 'contract_version': 2,
+                'task_completed': completed, 'course_verdict': verdict, 'security_verdict': verdict,
+                'stage_calls': [{'stage': 'telemetry_export', 'attempted': True,
+                                 'outcome': c['decision'], 'evidence_id': c['request_id']}
+                                for c in result.get('cases', [])],
+                'evidence': [{'source': 'tempo', 'kind': 'trace', 'id': c['trace_id']}
+                             for c in result.get('cases', [])],
+                'next_check': ('정상·거부 요청의 단계와 Counter 증가를 제품 원문과 비교합니다.' if completed
+                               else '현재 계측 함수의 실행 상태와 실패한 요구사항을 확인합니다.')}
+    try:
+        with httpx.Client(timeout=20, trust_env=False) as client:
+            def fetch(path):
+                response = client.get(H17_URL + path, headers={'Authorization': f'Bearer {H17_TOKEN}'})
+                response.raise_for_status()
+                return response.json()
+            receipt = fetch('/v1/receipts/H17/' + request.suite_id)
+            P17_VERIFICATION.identity(receipt, request.suite_id, request.started_at)
+            result['execution'] = receipt.get('execution', {})
+            result['execution_error'] = receipt.get('execution_error')
+            ledger = fetch('/v1/h17/ledger/' + request.suite_id)
+            build = fetch('/v1/h17/build-info')
+            P17_VERIFICATION.collect_and_verify(receipt, ledger, build, P17_RUNNER_DIGESTS,
+                client=client, loki_url=LOKI_URL, tempo_url=TEMPO_URL,
+                prometheus_url=PROMETHEUS_URL, result=result)
+            return outcome('작성한 계측 코드의 Log·Trace·Counter가 실제 정상·거부 요청과 일치합니다. 업무 저장소는 합성 fixture입니다.', True)
+    except P17_VERIFICATION.RESULTS.EvidenceMismatch as exc:
+        result['failed_requirement'] = str(exc)
+        return outcome('현재 실행의 계측 결과가 과제 조건과 일치하지 않습니다.')
+    except (httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError, AttributeError, IndexError):
+        return outcome('현재 실행의 처리 원장이나 제품 원문을 확인하지 못했습니다.')
+
+
+def verify_p20_products(request: H13VerifyRequest) -> dict:
+    result = {}
+    def outcome(reason, completed=False):
+        verdict = 'PASS' if completed else 'ERR'
+        return {**tool_err('H20', request, reason, result), 'activity_id': 'P20',
+                'internal_activity_id': 'H20', 'lab_id': '12-incident-alert', 'contract_version': 2,
+                'task_completed': completed, 'security_verdict': verdict, 'course_verdict': verdict,
+                'next_check': ('정상·거부 요청 수와 경보 발생·해제 시각을 제품 원문에서 확인합니다.' if completed
+                               else '현재 실행의 중단 단계와 실패한 요구사항을 확인합니다.')}
+    if not H20_TOKEN or not P20_GRAFANA_PASSWORD:
+        return outcome('P20 검증기의 전용 접속 정보가 준비되지 않았습니다.')
+    try:
+        with httpx.Client(timeout=10, trust_env=False, follow_redirects=False) as client:
+            P20_VERIFICATION.collect_and_verify(request.suite_id, request.started_at, client=client,
+                app_url=H20_URL, prometheus_url=P20_PROMETHEUS_URL, grafana_url=P20_GRAFANA_URL,
+                verifier_token=H20_TOKEN, grafana_auth=(P20_GRAFANA_USER, P20_GRAFANA_PASSWORD),
+                runner_digests=P20_RUNNER_DIGESTS, result=result)
+        P20_VERIFICATION.require(result['receipt'].get('execution_status') == 'complete',
+                                 'single execution endpoint did not complete')
+        return outcome('정상 조회와 권한 거부를 유지하면서 경보 발생·해제와 패널 수치가 실제 요청 기록에 맞았습니다. 업무 저장소는 합성 fixture입니다.', True)
+    except P20_VERIFICATION.RESULTS.EvidenceMismatch as exc:
+        result['failed_requirement'] = str(exc)
+        return outcome('현재 실행 기록·경보·패널 중 과제 조건과 일치하지 않는 항목이 있습니다.')
+    except (httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError, AttributeError, IndexError):
+        return outcome('현재 실행 기록이나 P20 제품 원문을 확인하지 못해 채점하지 않았습니다.')
+
+
+def verify_observability(activity: str, request: H13VerifyRequest) -> dict:
+    if activity == 'H17':
+        return verify_p17_signals(request)
+    if activity == 'H18':
+        return verify_p18_queries(request)
+    if activity == 'H19':
+        return verify_p19_incident(request)
+    if activity == 'H20':
+        return verify_p20_products(request)
+    raise HTTPException(404, 'unknown observability activity')
 
 @app.post('/v1/verify/h17')
 def verify_h17(request:H13VerifyRequest,_authorized:None=Depends(require_control))->dict:return verify_observability('H17',request)
@@ -4677,3 +4055,135 @@ def verify_h18(request:H13VerifyRequest,_authorized:None=Depends(require_control
 def verify_h19(request:H13VerifyRequest,_authorized:None=Depends(require_control))->dict:return verify_observability('H19',request)
 @app.post('/v1/verify/h20')
 def verify_h20(request:H13VerifyRequest,_authorized:None=Depends(require_control))->dict:return verify_observability('H20',request)
+
+
+class P02VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: UUID
+
+
+P02_LOCK = threading.Lock()
+
+
+@app.post("/v1/verify/p02")
+def verify_p02(request: P02VerifyRequest, _authorized: None = Depends(require_control)) -> dict:
+    from p02_verification import Verification
+    suite = str(request.suite_id)
+    if not P02_LOCK.acquire(blocking=False):
+        raise HTTPException(409, "P02 verification already running")
+    result, completed = {}, False
+    try:
+        root = Path(__file__).with_name("p02-runner")
+        if not root.exists():
+            root = Path(__file__).resolve().parents[1] / "guided-labs/h02-document-ingestion"
+        verification = Verification(root, LAB02_URL, GATEWAY_URL, LAB02_TOKEN, GATEWAY_TOKEN)
+        with httpx.Client(follow_redirects=False, trust_env=False) as client:
+            result = verification.collect(suite, client)
+        completed = result.get("case_contract_verified") is True
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError, IndexError, OSError):
+        result = {"case_contract_verified": False, "cases": []}
+    finally:
+        P02_LOCK.release()
+    verdict = "PASS" if completed else "ERR"
+    return {"lab_id": "02-embedding-kb", "activity_id": "P02", "execution_id": suite,
+            "execution_kind": "p02-document-suite", "contract_version": "p02-document-v1", "status": "completed",
+            "task_completed": completed, "security_verdict": verdict, "course_verdict": verdict,
+            "verified_by": "guided-evidence-verifier", "verified_at": datetime.now(timezone.utc).isoformat(),
+            "stage_calls": [{"stage": case["case_id"], "attempted": True,
+                             "outcome": "stored-and-embedded" if case["calls"] else "rejected-before-provider"}
+                            for case in result["cases"]],
+            "result": {**result, "task_completed": completed, "security_verdict": verdict,
+                       "embedding_dimension": 1024 if completed else None,
+                       "source_digest": result.get("build", {}).get("source_digest")},
+            "reason": ("정상 문서 4건의 저장·변환과 잘못된 입력 18건의 호출 전 거부를 확인했습니다."
+                       if completed else "현재 실행의 필수 기록을 확인하지 못해 과제는 미완료입니다."),
+            "next_check": "사례별 실행 코드와 Gateway의 저장·변환 기록을 확인하세요."}
+
+
+class P03VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: UUID
+
+
+P03_LOCK = threading.Lock()
+
+
+@app.post("/v1/verify/p03")
+def verify_p03(request: P03VerifyRequest, _authorized: None = Depends(require_control)) -> dict:
+    from p03_grading_api import grade_run, validate_roles
+    from p03_suite_verification import SuiteVerification
+    suite = str(request.suite_id)
+    if not P03_LOCK.acquire(blocking=False):
+        raise HTTPException(409, "P03 verification already running")
+    try:
+        try:
+            root = Path(__file__).with_name("p03-runner")
+            if not root.exists():
+                root = Path(__file__).resolve().parents[1] / "guided-labs/h03-ingestion-search"
+            verification = SuiteVerification(root, LAB03_URL, GATEWAY_URL, LAB03_TOKEN, GATEWAY_TOKEN)
+            validate_roles(verification, CONTROL_TOKEN)
+            result = grade_run(verification, suite)
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError, OSError):
+            result = {"practice_id": "P03", "activity_id": "H03", "contract_version": "p03-search-v1",
+                      "suite_id": suite, "case_contract_verified": False, "cases": [],
+                      "task_completed": False, "security_verdict": "ERR"}
+    finally:
+        P03_LOCK.release()
+    completed, verdict = result["task_completed"], result["security_verdict"]
+    return {"lab_id": "02-embedding-kb", "activity_id": "P03", "execution_id": suite,
+            "execution_kind": "p03-search-suite", "contract_version": "p03-search-v1", "status": "completed",
+            "task_completed": completed, "security_verdict": verdict, "course_verdict": verdict,
+            "verified_by": "guided-evidence-verifier", "verified_at": datetime.now(timezone.utc).isoformat(),
+            "stage_calls": [{"stage": case["case_id"], "attempted": True, "outcome": case["outcome"]}
+                            for case in result["cases"]],
+            "result": {**result, "source_digest": result.get("build", {}).get("source_digest")},
+            "reason": ("현재 작업 확인·검색·대기·잘못된 응답 처리의 필수 사례를 확인했습니다."
+                       if completed else "현재 실행의 필수 기록을 확인하지 못해 과제는 미완료입니다."),
+            "next_check": "사례별 실행 코드와 Gateway의 작업 상태·검색 기록을 확인하세요."}
+
+
+class P04VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: UUID
+
+
+P04_LOCK = threading.Lock()
+
+
+@app.post("/v1/verify/p04")
+def verify_p04(request: P04VerifyRequest, _authorized: None = Depends(require_control)) -> dict:
+    suite = str(request.suite_id)
+    if not P04_LOCK.acquire(blocking=False):
+        raise HTTPException(409, "P04 verification already running")
+    try:
+        try:
+            from p04_grading_api import grade_run, validate_roles
+            from p04_suite_verification import SuiteVerification
+            root = Path(__file__).with_name("p04-runner")
+            if not root.exists():
+                root = Path(__file__).resolve().parents[1] / "guided-labs/h04-bedrock-guardrail"
+            verification = SuiteVerification(root, LAB04_URL, GATEWAY_URL, LAB04_TOKEN, GATEWAY_TOKEN)
+            validate_roles(verification, CONTROL_TOKEN)
+            result = grade_run(verification, suite, expected_cases=tuple(case["case_id"] for case in verification.cases))
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError, OSError, ImportError):
+            result = {"practice_id": "P04", "activity_id": "H04", "contract_version": "p04-guardrail-v1",
+                      "suite_id": suite, "suite_contract_verified": False, "cases": [],
+                      "task_completed": False, "security_verdict": "ERR"}
+    finally:
+        P04_LOCK.release()
+    completed, verdict = result["task_completed"], result["security_verdict"]
+    return {"lab_id": "03-bedrock-guardrail", "activity_id": "P04", "execution_id": suite,
+            "execution_kind": "p04-guardrail-suite", "contract_version": "p04-guardrail-v1", "status": "completed",
+            "task_completed": completed, "security_verdict": verdict, "course_verdict": verdict,
+            "verified_by": "guided-evidence-verifier", "verified_at": datetime.now(timezone.utc).isoformat(),
+            "stage_calls": [{"stage": case["case_id"], "attempted": True,
+                             "outcome": (case["product"]["effect"] if case["product"] is not None else
+                                         "rejected-before-provider" if case["binding"]["call_count"] == 0 else
+                                         "service-error-propagated" if case["binding"]["response"] is None else
+                                         "returned-response")} for case in result["cases"]],
+            "result": {**result, "source_digest": result.get("build", {}).get("source_digest")},
+            "reason": ("합성 응답으로 27개 구현 사례를 확인했습니다. 실제 AWS 정책 집행 검증은 아닙니다."
+                       if completed and result["provider_mode"] == "contract" else
+                       "같은 Guardrail의 단독 검사·모델 연결과 정상 유지·이메일 비식별화를 확인했습니다."
+                       if completed else "현재 실행의 필수 기록을 확인하지 못해 과제는 미완료입니다."),
+            "next_check": "사례별 실행 코드와 Gateway의 호출·정책·응답 기록을 확인하세요."}

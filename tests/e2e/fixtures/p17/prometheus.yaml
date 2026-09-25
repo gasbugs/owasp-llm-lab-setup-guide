@@ -1,0 +1,6 @@
+# CUSTOM FILE
+# Format: https://prometheus.io/docs/prometheus/latest/configuration/configuration/ · Apache-2.0
+global: {scrape_interval: 1s}
+scrape_configs:
+  - job_name: p17
+    static_configs: [{targets: ["p17:8000"]}]

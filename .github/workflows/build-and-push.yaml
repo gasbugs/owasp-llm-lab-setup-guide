@@ -119,6 +119,9 @@ jobs:
       - name: Run unit and repository-hygiene tests
         run: python -m unittest discover -s tests/unit -p 'test_*.py' -v
 
+      - name: Check lossless JSON evidence rendering
+        run: node --test tests/unit/test_guided_raw_json.cjs
+
       - name: Check adjacent vulnerable and safe coding pairs
         run: python tools/check_secure_coding_pairs.py
 

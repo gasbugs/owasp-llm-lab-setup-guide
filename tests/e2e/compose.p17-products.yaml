@@ -1,0 +1,18 @@
+# CUSTOM FILE
+# Format: https://compose-spec.io/ · Apache-2.0
+# Merge with compose.p18-products.yaml; no P18 learner is started.
+services:
+  p17:
+    build:
+      context: ${P17_BUILD_CONTEXT:-../../llm-security-control-plane}
+      dockerfile: guided-labs/h17-telemetry/Containerfile
+    image: ${P17_TEST_IMAGE:-localhost/guided-p17-telemetry:check}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    tmpfs: [/tmp, "/state:uid=65532,gid=65532"]
+    environment:
+      GUIDED_CONTROL_H17_TOKEN: publisher-test-control
+      GUIDED_VERIFIER_H17_TOKEN: publisher-test-verifier
+  prometheus:
+    volumes: [./fixtures/p17/prometheus.yaml:/etc/prometheus/prometheus.yml:ro]

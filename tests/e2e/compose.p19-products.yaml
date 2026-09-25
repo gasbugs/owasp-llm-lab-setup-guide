@@ -1,0 +1,16 @@
+# CUSTOM FILE
+# Format: https://compose-spec.io/ · Apache-2.0
+# Merge with compose.p18-products.yaml; start only Loki, Tempo, Alloy and P19.
+services:
+  p19:
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h19-incident-investigation/Containerfile
+    image: localhost/guided-p19-investigation:check
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    tmpfs: [/tmp, "/state:uid=65532,gid=65532"]
+    environment:
+      GUIDED_CONTROL_H19_TOKEN: publisher-test-control
+      GUIDED_VERIFIER_H19_TOKEN: publisher-test-verifier

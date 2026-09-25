@@ -24,10 +24,9 @@ services:
     container_name: llm-security-guided-front-proxy
     depends_on:
       guided-control-center: {condition: service_healthy}
-      guided-nemo-ui: {condition: service_healthy}
     ports:
-      - 127.0.0.1:${GUIDED_HOST_PORT:-18097}:18097
-      - 127.0.0.1:${GUIDED_NEMO_HOST_PORT:-18192}:18192
+      - 127.0.0.1:${GUIDED_HOST_PORT:-28097}:18097
+      - 127.0.0.1:${GUIDED_NEMO_HOST_PORT:-28192}:18192
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:18097/proxy-healthz]
       interval: 2s
@@ -62,7 +61,11 @@ services:
       GUIDED_CONTROL_LAB15_TOKEN: ${GUIDED_CONTROL_LAB15_TOKEN:?Set GUIDED_CONTROL_LAB15_TOKEN}
       GUIDED_CONTROL_LAB16_TOKEN: ${GUIDED_CONTROL_LAB16_TOKEN:?Set GUIDED_CONTROL_LAB16_TOKEN}
       GUIDED_CONTROL_OBSERVABILITY_TOKEN: ${GUIDED_CONTROL_OBSERVABILITY_TOKEN:?Set GUIDED_CONTROL_OBSERVABILITY_TOKEN}
-      GUIDED_H12_PROVIDER_CONTROL_TOKEN: ${GUIDED_H12_PROVIDER_CONTROL_TOKEN:?Set GUIDED_H12_PROVIDER_CONTROL_TOKEN}
+      GUIDED_CONTROL_H18_TOKEN: ${GUIDED_CONTROL_H18_TOKEN:?Set GUIDED_CONTROL_H18_TOKEN}
+      GUIDED_CONTROL_H19_TOKEN: ${GUIDED_CONTROL_H19_TOKEN:?Set GUIDED_CONTROL_H19_TOKEN}
+      GUIDED_CONTROL_H17_TOKEN: ${GUIDED_CONTROL_H17_TOKEN:?Set GUIDED_CONTROL_H17_TOKEN}
+      GUIDED_CONTROL_H20_TOKEN: ${GUIDED_CONTROL_H20_TOKEN:?Set GUIDED_CONTROL_H20_TOKEN}
+      GUIDED_H20_URL: http://guided-h20-alerts:8000
       GUIDED_H06_PROVIDER_CONTROL_TOKEN: ${GUIDED_H06_PROVIDER_CONTROL_TOKEN:?Set GUIDED_H06_PROVIDER_CONTROL_TOKEN}
       GUIDED_H07_GATEWAY_CONTROL_TOKEN: ${GUIDED_H07_GATEWAY_CONTROL_TOKEN:?Set GUIDED_H07_GATEWAY_CONTROL_TOKEN}
       GUIDED_H08_GATEWAY_CONTROL_TOKEN: ${GUIDED_H08_GATEWAY_CONTROL_TOKEN:?Set GUIDED_H08_GATEWAY_CONTROL_TOKEN}
@@ -90,42 +93,21 @@ services:
       GUIDED_LAB15_URL: http://guided-h15-pyrit:8000
       GUIDED_LAB16_URL: http://guided-h16-policy-promotion:8000
       GUIDED_OBSERVABILITY_URL: http://guided-observability:8000
-      GUIDED_H12_PROVIDER_URL: http://guided-h12-stage-provider:8000
       GUIDED_H09_SINK_URL: http://guided-h09-delivery-sink:8000
       GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
       GUIDED_H22_HOST_URL: http://guided-h22-host:8000
       GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
       GUIDED_VERIFIER_URL: http://guided-evidence-verifier:8000
-      GUIDED_ALLOWED_HOSTS: 127.0.0.1:${GUIDED_HOST_PORT:-18097},localhost:${GUIDED_HOST_PORT:-18097}
-      GUIDED_ALLOWED_ORIGINS: http://127.0.0.1:${GUIDED_HOST_PORT:-18097},http://localhost:${GUIDED_HOST_PORT:-18097}
-      GUIDED_NEMO_BROWSER_URL: http://127.0.0.1:${GUIDED_NEMO_HOST_PORT:-18192}
-    depends_on:
-      guided-h01-gateway: {condition: service_healthy}
-      guided-h02-document-app: {condition: service_healthy}
-      guided-h03-sync-app: {condition: service_healthy}
-      guided-h04-guardrail-app: {condition: service_healthy}
-      guided-h05-nemo-dialog: {condition: service_healthy}
-      guided-h06-nemo-action: {condition: service_healthy}
-      guided-h06-action-provider: {condition: service_healthy}
-      guided-h07-content-safety: {condition: service_healthy}
-      guided-h08-self-check-input: {condition: service_healthy}
-      guided-h09-presidio-redaction: {condition: service_healthy}
-      guided-h09-delivery-sink: {condition: service_healthy}
-      guided-h10-self-check-output: {condition: service_healthy}
-      guided-h11-rag-provenance: {condition: service_healthy}
-      guided-h12-application-pipeline: {condition: service_healthy}
-      guided-h12-stage-provider: {condition: service_healthy}
-      guided-h13-promptfoo: {condition: service_healthy}
-      guided-h14-garak: {condition: service_healthy}
-      guided-h15-pyrit: {condition: service_healthy}
-      guided-h16-policy-promotion: {condition: service_healthy}
-      guided-observability: {condition: service_healthy}
-      guided-h21-host: {condition: service_healthy}
-      guided-h22-host: {condition: service_healthy}
-      guided-evidence-verifier: {condition: service_healthy}
+      GUIDED_ALLOWED_HOSTS: 127.0.0.1:${GUIDED_HOST_PORT:-28097},localhost:${GUIDED_HOST_PORT:-28097}
+      GUIDED_ALLOWED_ORIGINS: http://127.0.0.1:${GUIDED_HOST_PORT:-28097},http://localhost:${GUIDED_HOST_PORT:-28097}
+      GUIDED_NEMO_BROWSER_URL: http://127.0.0.1:${GUIDED_NEMO_HOST_PORT:-28192}
+      GUIDED_PROMPTFOO_BROWSER_URL: http://127.0.0.1:${GUIDED_PROMPTFOO_PORT:-25500}
+      GUIDED_PYRIT_BROWSER_URL: http://127.0.0.1:${GUIDED_PYRIT_PORT:-28098}
+      GUIDED_GRAFANA_BROWSER_URL: http://127.0.0.1:${GUIDED_GRAFANA_PORT:-23001}/explore
+      GUIDED_P20_GRAFANA_BROWSER_URL: http://127.0.0.1:${GUIDED_P20_GRAFANA_PORT:-23002}/d/guided-p20
     healthcheck:
-      test: [CMD, python, -c, "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host':'127.0.0.1:${GUIDED_HOST_PORT:-18097}'}); urllib.request.urlopen(r, timeout=2)"]
+      test: [CMD, python, -c, "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host':'127.0.0.1:${GUIDED_HOST_PORT:-28097}'}); urllib.request.urlopen(r, timeout=2)"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -181,13 +163,25 @@ services:
       GUIDED_VERIFIER_LAB15_TOKEN: ${GUIDED_VERIFIER_LAB15_TOKEN:?Set GUIDED_VERIFIER_LAB15_TOKEN}
       GUIDED_VERIFIER_LAB16_TOKEN: ${GUIDED_VERIFIER_LAB16_TOKEN:?Set GUIDED_VERIFIER_LAB16_TOKEN}
       GUIDED_VERIFIER_OBSERVABILITY_TOKEN: ${GUIDED_VERIFIER_OBSERVABILITY_TOKEN:?Set GUIDED_VERIFIER_OBSERVABILITY_TOKEN}
-      GUIDED_H12_PROVIDER_VERIFIER_TOKEN: ${GUIDED_H12_PROVIDER_VERIFIER_TOKEN:?Set GUIDED_H12_PROVIDER_VERIFIER_TOKEN}
+      GUIDED_VERIFIER_H18_TOKEN: ${GUIDED_VERIFIER_H18_TOKEN:?Set GUIDED_VERIFIER_H18_TOKEN}
+      GUIDED_VERIFIER_H19_TOKEN: ${GUIDED_VERIFIER_H19_TOKEN:?Set GUIDED_VERIFIER_H19_TOKEN}
+      GUIDED_VERIFIER_H17_TOKEN: ${GUIDED_VERIFIER_H17_TOKEN:?Set GUIDED_VERIFIER_H17_TOKEN}
+      GUIDED_VERIFIER_H20_TOKEN: ${GUIDED_VERIFIER_H20_TOKEN:?Set GUIDED_VERIFIER_H20_TOKEN}
+      GUIDED_H20_URL: http://guided-h20-alerts:8000
+      GUIDED_P20_PROMETHEUS_URL: http://guided-h20-prometheus:9090
+      GUIDED_P20_GRAFANA_URL: http://guided-h20-grafana:3000
+      GUIDED_P20_GRAFANA_USER: p20-reader
+      GUIDED_P20_GRAFANA_PASSWORD: ${GUIDED_P20_GRAFANA_PASSWORD:?Set GUIDED_P20_GRAFANA_PASSWORD}
       GUIDED_H06_PROVIDER_VERIFIER_TOKEN: ${GUIDED_H06_PROVIDER_VERIFIER_TOKEN:?Set GUIDED_H06_PROVIDER_VERIFIER_TOKEN}
       GUIDED_H07_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H07_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H07_GATEWAY_VERIFIER_TOKEN}
       GUIDED_H08_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H08_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H08_GATEWAY_VERIFIER_TOKEN}
       GUIDED_H09_SINK_VERIFIER_TOKEN: ${GUIDED_H09_SINK_VERIFIER_TOKEN:?Set GUIDED_H09_SINK_VERIFIER_TOKEN}
       GUIDED_H10_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H10_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H10_GATEWAY_VERIFIER_TOKEN}
       GUIDED_H11_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H11_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H11_GATEWAY_VERIFIER_TOKEN}
+      GUIDED_P12_CONTEXT_VERIFIER_TOKEN: ${GUIDED_P12_CONTEXT_VERIFIER_TOKEN:?Set GUIDED_P12_CONTEXT_VERIFIER_TOKEN}
+      GUIDED_P12_PRIVACY_VERIFIER_TOKEN: ${GUIDED_P12_PRIVACY_VERIFIER_TOKEN:?Set GUIDED_P12_PRIVACY_VERIFIER_TOKEN}
+      GUIDED_P12_NEMO_VERIFIER_TOKEN: ${GUIDED_P12_NEMO_VERIFIER_TOKEN:?Set GUIDED_P12_NEMO_VERIFIER_TOKEN}
+      GUIDED_P12_GATEWAY_VERIFIER_TOKEN: ${GUIDED_P12_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_P12_GATEWAY_VERIFIER_TOKEN}
       GUIDED_VERIFIER_H21_TOKEN: ${GUIDED_VERIFIER_H21_TOKEN:?Set GUIDED_VERIFIER_H21_TOKEN}
       GUIDED_VERIFIER_H22_TOKEN: ${GUIDED_VERIFIER_H22_TOKEN:?Set GUIDED_VERIFIER_H22_TOKEN}
       GUIDED_VERIFIER_GATEWAY_TOKEN: ${GUIDED_VERIFIER_GATEWAY_TOKEN:?Set GUIDED_VERIFIER_GATEWAY_TOKEN}
@@ -212,7 +206,6 @@ services:
       GUIDED_TEMPO_URL: http://tempo:3200
       GUIDED_PROMETHEUS_URL: http://prometheus:9090
       GUIDED_ALERTMANAGER_URL: http://alertmanager:9093
-      GUIDED_H12_PROVIDER_URL: http://guided-h12-stage-provider:8000
       GUIDED_H09_SINK_URL: http://guided-h09-delivery-sink:8000
       GUIDED_H06_PROVIDER_URL: http://guided-h06-action-provider:8000
       GUIDED_H21_HOST_URL: http://guided-h21-host:8000
@@ -223,37 +216,6 @@ services:
       GUIDED_H22_MCP_URL: http://guided-h22-mcp-server:8000/mcp
       GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
     volumes: [guided-verifier-state:/state:rw]
-    depends_on:
-      guided-h01-gateway: {condition: service_healthy}
-      guided-h02-document-app: {condition: service_healthy}
-      guided-h03-sync-app: {condition: service_healthy}
-      guided-h04-guardrail-app: {condition: service_healthy}
-      guided-h05-nemo-dialog: {condition: service_healthy}
-      guided-h06-nemo-action: {condition: service_healthy}
-      guided-h06-action-provider: {condition: service_healthy}
-      guided-h07-content-safety: {condition: service_healthy}
-      guided-h08-self-check-input: {condition: service_healthy}
-      guided-h09-presidio-redaction: {condition: service_healthy}
-      guided-h09-delivery-sink: {condition: service_healthy}
-      guided-h10-self-check-output: {condition: service_healthy}
-      guided-h11-rag-provenance: {condition: service_healthy}
-      guided-h12-application-pipeline: {condition: service_healthy}
-      guided-h12-stage-provider: {condition: service_healthy}
-      guided-h13-promptfoo: {condition: service_healthy}
-      guided-h14-garak: {condition: service_healthy}
-      guided-h15-pyrit: {condition: service_healthy}
-      guided-h16-policy-promotion: {condition: service_healthy}
-      guided-observability: {condition: service_healthy}
-      guided-loki: {condition: service_healthy}
-      guided-tempo: {condition: service_healthy}
-      guided-prometheus: {condition: service_healthy}
-      guided-h21-host: {condition: service_healthy}
-      guided-h21-provider: {condition: service_healthy}
-      guided-h21-trusted-mcp: {condition: service_healthy}
-      guided-h21-untrusted-mcp: {condition: service_healthy}
-      guided-h22-host: {condition: service_healthy}
-      guided-h22-mcp-server: {condition: service_healthy}
-      guided-bedrock-gateway: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 2s
@@ -296,6 +258,9 @@ services:
       GUIDED_H10_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H10_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H10_GATEWAY_VERIFIER_TOKEN}
       GUIDED_H11_GATEWAY_TOKEN: ${GUIDED_H11_GATEWAY_TOKEN:?Set GUIDED_H11_GATEWAY_TOKEN}
       GUIDED_H11_GATEWAY_VERIFIER_TOKEN: ${GUIDED_H11_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_H11_GATEWAY_VERIFIER_TOKEN}
+      GUIDED_P12_GATEWAY_CONTROL_TOKEN: ${GUIDED_P12_GATEWAY_CONTROL_TOKEN:?Set GUIDED_P12_GATEWAY_CONTROL_TOKEN}
+      GUIDED_P12_GATEWAY_VERIFIER_TOKEN: ${GUIDED_P12_GATEWAY_VERIFIER_TOKEN:?Set GUIDED_P12_GATEWAY_VERIFIER_TOKEN}
+      GUIDED_P12_GATEWAY_DATABASE: /state/p12-gateway.sqlite3
     volumes:
       - ${AWS_CREDENTIALS_DIR:-${HOME}/.aws}:/tmp/.aws:ro
       - ../../llm-security-control-plane/.state/guided-gateway:/state:rw
@@ -316,7 +281,7 @@ services:
     image: localhost/llm-security-guided-h02-document-app:${GUIDED_IMAGE_VERSION:-0.1.0}
     container_name: llm-security-guided-h02-document-app
     environment:
-      GUIDED_BEDROCK_GATEWAY_URL: http://guided-bedrock-gateway:8080
+      GUIDED_GATEWAY_URL: http://guided-bedrock-gateway:8080
       GUIDED_H02_GATEWAY_TOKEN: ${GUIDED_H02_GATEWAY_TOKEN:?Set GUIDED_H02_GATEWAY_TOKEN}
       GUIDED_CONTROL_LAB02_TOKEN: ${GUIDED_CONTROL_LAB02_TOKEN:?Set GUIDED_CONTROL_LAB02_TOKEN}
       GUIDED_VERIFIER_LAB02_TOKEN: ${GUIDED_VERIFIER_LAB02_TOKEN:?Set GUIDED_VERIFIER_LAB02_TOKEN}
@@ -340,6 +305,8 @@ services:
       GUIDED_H03_GATEWAY_TOKEN: ${GUIDED_H03_GATEWAY_TOKEN:?Set GUIDED_H03_GATEWAY_TOKEN}
       GUIDED_CONTROL_LAB03_TOKEN: ${GUIDED_CONTROL_LAB03_TOKEN:?Set GUIDED_CONTROL_LAB03_TOKEN}
       GUIDED_VERIFIER_LAB03_TOKEN: ${GUIDED_VERIFIER_LAB03_TOKEN:?Set GUIDED_VERIFIER_LAB03_TOKEN}
+      GUIDED_H03_DATABASE: /state/p03-receipts.sqlite3
+    volumes: [guided-h03-receipts:/state:rw]
     depends_on:
       guided-bedrock-gateway: {condition: service_healthy}
     healthcheck:
@@ -360,6 +327,8 @@ services:
       GUIDED_H04_GATEWAY_TOKEN: ${GUIDED_H04_GATEWAY_TOKEN:?Set GUIDED_H04_GATEWAY_TOKEN}
       GUIDED_CONTROL_LAB04_TOKEN: ${GUIDED_CONTROL_LAB04_TOKEN:?Set GUIDED_CONTROL_LAB04_TOKEN}
       GUIDED_VERIFIER_LAB04_TOKEN: ${GUIDED_VERIFIER_LAB04_TOKEN:?Set GUIDED_VERIFIER_LAB04_TOKEN}
+      GUIDED_H04_DATABASE: /state/p04-receipts.sqlite3
+    volumes: [guided-h04-receipts:/state:rw]
     depends_on:
       guided-bedrock-gateway: {condition: service_healthy}
     healthcheck:
@@ -560,25 +529,6 @@ services:
       timeout: 3s
       retries: 45
 
-  guided-h12-stage-provider:
-    <<: *guided-service
-    build:
-      context: ../../llm-security-control-plane
-      dockerfile: guided-labs/h12-stage-provider/Containerfile
-    image: localhost/llm-security-guided-h12-stage-provider:${GUIDED_IMAGE_VERSION:-0.1.0}
-    container_name: llm-security-guided-h12-stage-provider
-    environment:
-      GUIDED_H12_SERVICE_TOKEN: ${GUIDED_H12_SERVICE_TOKEN:?Set GUIDED_H12_SERVICE_TOKEN}
-      GUIDED_H12_PROVIDER_CONTROL_TOKEN: ${GUIDED_H12_PROVIDER_CONTROL_TOKEN:?Set GUIDED_H12_PROVIDER_CONTROL_TOKEN}
-      GUIDED_H12_PROVIDER_VERIFIER_TOKEN: ${GUIDED_H12_PROVIDER_VERIFIER_TOKEN:?Set GUIDED_H12_PROVIDER_VERIFIER_TOKEN}
-      GUIDED_H12_PROVIDER_DATABASE: /state/ledger.sqlite3
-    volumes: [guided-h12-provider-ledger:/state:rw]
-    healthcheck:
-      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
-
   guided-h12-application-pipeline:
     <<: *guided-service
     build:
@@ -589,12 +539,15 @@ services:
     environment:
       GUIDED_CONTROL_LAB12_TOKEN: ${GUIDED_CONTROL_LAB12_TOKEN:?Set GUIDED_CONTROL_LAB12_TOKEN}
       GUIDED_VERIFIER_LAB12_TOKEN: ${GUIDED_VERIFIER_LAB12_TOKEN:?Set GUIDED_VERIFIER_LAB12_TOKEN}
-      GUIDED_H12_PROVIDER_URL: http://guided-h12-stage-provider:8000
-      GUIDED_H12_SERVICE_TOKEN: ${GUIDED_H12_SERVICE_TOKEN:?Set GUIDED_H12_SERVICE_TOKEN}
+      GUIDED_P12_CONTEXT_CONTROL_TOKEN: ${GUIDED_P12_CONTEXT_CONTROL_TOKEN:?Set GUIDED_P12_CONTEXT_CONTROL_TOKEN}
+      GUIDED_P12_CONTEXT_SERVICE_TOKEN: ${GUIDED_P12_CONTEXT_SERVICE_TOKEN:?Set GUIDED_P12_CONTEXT_SERVICE_TOKEN}
+      GUIDED_P12_PRIVACY_CONTROL_TOKEN: ${GUIDED_P12_PRIVACY_CONTROL_TOKEN:?Set GUIDED_P12_PRIVACY_CONTROL_TOKEN}
+      GUIDED_P12_PRIVACY_SERVICE_TOKEN: ${GUIDED_P12_PRIVACY_SERVICE_TOKEN:?Set GUIDED_P12_PRIVACY_SERVICE_TOKEN}
+      GUIDED_P12_NEMO_CONTROL_TOKEN: ${GUIDED_P12_NEMO_CONTROL_TOKEN:?Set GUIDED_P12_NEMO_CONTROL_TOKEN}
+      GUIDED_P12_NEMO_SERVICE_TOKEN: ${GUIDED_P12_NEMO_SERVICE_TOKEN:?Set GUIDED_P12_NEMO_SERVICE_TOKEN}
+      GUIDED_P12_GATEWAY_CONTROL_TOKEN: ${GUIDED_P12_GATEWAY_CONTROL_TOKEN:?Set GUIDED_P12_GATEWAY_CONTROL_TOKEN}
       GUIDED_H12_DATABASE: /state/receipts.sqlite3
     volumes: [guided-h12-receipts:/state:rw]
-    depends_on:
-      guided-h12-stage-provider: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 2s
@@ -691,17 +644,16 @@ services:
     volumes: [guided-h16-policy:/state:rw]
     healthcheck: {test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz')"], interval: 2s, timeout: 3s, retries: 30}
 
-  guided-observability:
+  guided-h18-queries:
     <<: *guided-service
-    build: {context: ../../llm-security-control-plane, dockerfile: guided-labs/observability/Containerfile}
-    image: localhost/llm-security-guided-observability:${GUIDED_IMAGE_VERSION:-0.1.0}
-    container_name: llm-security-guided-observability
+    build: {context: ../../llm-security-control-plane, dockerfile: guided-labs/h18-product-queries/Containerfile}
+    image: localhost/llm-security-guided-h18-queries:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h18-queries
     environment:
-      GUIDED_CONTROL_OBSERVABILITY_TOKEN: ${GUIDED_CONTROL_OBSERVABILITY_TOKEN:?Set GUIDED_CONTROL_OBSERVABILITY_TOKEN}
-      GUIDED_VERIFIER_OBSERVABILITY_TOKEN: ${GUIDED_VERIFIER_OBSERVABILITY_TOKEN:?Set GUIDED_VERIFIER_OBSERVABILITY_TOKEN}
+      GUIDED_CONTROL_OBSERVABILITY_TOKEN: ${GUIDED_CONTROL_H18_TOKEN:?Set GUIDED_CONTROL_H18_TOKEN}
+      GUIDED_VERIFIER_OBSERVABILITY_TOKEN: ${GUIDED_VERIFIER_H18_TOKEN:?Set GUIDED_VERIFIER_H18_TOKEN}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
-    volumes: [guided-observability-state:/state:rw]
-    depends_on: {guided-alloy: {condition: service_started}}
+    volumes: [guided-h18-query-state:/state:rw]
     healthcheck: {test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz')"], interval: 2s, timeout: 3s, retries: 30}
 
   guided-alloy:
@@ -732,7 +684,7 @@ services:
     image: docker.io/prom/prometheus:v3.5.0
     container_name: llm-security-guided-prometheus
     command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --web.enable-lifecycle]
-    volumes: [../../llm-security-control-plane/guided-labs/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro, ../../llm-security-control-plane/guided-labs/h20-alert-dashboard/alert-rules.yml:/etc/prometheus/h20-rules.yml:ro, guided-prometheus-data:/prometheus]
+    volumes: [../../llm-security-control-plane/guided-labs/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro, guided-prometheus-data:/prometheus]
     networks: {guided: {aliases: [prometheus]}}
     depends_on: {guided-alertmanager: {condition: service_started}}
     healthcheck: {test: [CMD, wget, -q, -O-, http://127.0.0.1:9090/-/ready], interval: 3s, timeout: 3s, retries: 40}
@@ -748,7 +700,7 @@ services:
     image: docker.io/grafana/grafana:12.1.0
     container_name: llm-security-guided-grafana
     environment: {GF_SECURITY_ADMIN_USER: admin, GF_SECURITY_ADMIN_PASSWORD: "${GUIDED_GRAFANA_PASSWORD:?Set GUIDED_GRAFANA_PASSWORD}", GF_AUTH_ANONYMOUS_ENABLED: "false"}
-    ports: ["127.0.0.1:${GUIDED_GRAFANA_PORT:-3001}:3000"]
+    ports: ["127.0.0.1:${GUIDED_GRAFANA_PORT:-23001}:3000"]
     volumes: [../../llm-security-control-plane/guided-labs/observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/guided.yml:ro, guided-grafana-data:/var/lib/grafana]
     networks: {guided: {aliases: [grafana]}}
     depends_on: {guided-prometheus: {condition: service_healthy}, guided-loki: {condition: service_healthy}, guided-tempo: {condition: service_healthy}}
@@ -899,7 +851,7 @@ services:
     build: {context: ../../llm-security-control-plane, dockerfile: official-uis/promptfoo/Containerfile}
     image: localhost/llm-security-promptfoo-official-ui:0.121.20
     container_name: llm-security-guided-promptfoo-ui
-    ports: ["127.0.0.1:${GUIDED_PROMPTFOO_PORT:-15500}:15500"]
+    ports: ["127.0.0.1:${GUIDED_PROMPTFOO_PORT:-25500}:15500"]
     volumes: [guided-h13-promptfoo-artifacts:/work:rw]
 
   guided-pyrit-ui:
@@ -907,12 +859,169 @@ services:
     build: {context: ../../llm-security-control-plane, dockerfile: official-uis/pyrit/Containerfile}
     image: localhost/llm-security-pyrit-official-ui:1.0.1
     container_name: llm-security-guided-pyrit-ui
-    ports: ["127.0.0.1:${GUIDED_PYRIT_PORT:-18098}:8000"]
+    ports: ["127.0.0.1:${GUIDED_PYRIT_PORT:-28098}:8000"]
+
+  guided-h19-investigation:
+    <<: *guided-service
+    build: {context: ../../llm-security-control-plane, dockerfile: guided-labs/h19-incident-investigation/Containerfile}
+    image: localhost/llm-security-guided-h19-investigation:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h19-investigation
+    environment:
+      GUIDED_CONTROL_H19_TOKEN: ${GUIDED_CONTROL_H19_TOKEN:?Set GUIDED_CONTROL_H19_TOKEN}
+      GUIDED_VERIFIER_H19_TOKEN: ${GUIDED_VERIFIER_H19_TOKEN:?Set GUIDED_VERIFIER_H19_TOKEN}
+    volumes: [guided-h19-investigation-state:/state:rw]
+    healthcheck: {test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz')"], interval: 2s, timeout: 3s, retries: 30}
+
+  guided-h17-telemetry:
+    <<: *guided-service
+    cap_drop: [ALL]
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h17-telemetry/Containerfile
+    image: localhost/llm-security-guided-h17-telemetry:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-h17-telemetry
+    environment:
+      GUIDED_CONTROL_H17_TOKEN: ${GUIDED_CONTROL_H17_TOKEN:?Set GUIDED_CONTROL_H17_TOKEN}
+      GUIDED_VERIFIER_H17_TOKEN: ${GUIDED_VERIFIER_H17_TOKEN:?Set GUIDED_VERIFIER_H17_TOKEN}
+    volumes: [guided-h17-telemetry-state:/state:rw]
+    healthcheck: {test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz')"], interval: 2s, timeout: 3s, retries: 30}
+
+  guided-h20-alerts:
+    <<: *guided-service
+    container_name: llm-security-guided-h20-alerts
+    cap_drop: [ALL]
+    build: {context: ../../llm-security-control-plane, dockerfile: guided-labs/h20-alert-dashboard/Containerfile}
+    image: localhost/llm-security-guided-h20-alerts:${GUIDED_IMAGE_VERSION:-0.1.0}
+    environment:
+      GUIDED_CONTROL_H20_TOKEN: ${GUIDED_CONTROL_H20_TOKEN:?Set GUIDED_CONTROL_H20_TOKEN}
+      GUIDED_VERIFIER_H20_TOKEN: ${GUIDED_VERIFIER_H20_TOKEN:?Set GUIDED_VERIFIER_H20_TOKEN}
+      GUIDED_H20_WEBHOOK_TOKEN: ${GUIDED_H20_WEBHOOK_TOKEN:?Set GUIDED_H20_WEBHOOK_TOKEN}
+      GUIDED_P20_PROMETHEUS_URL: http://guided-h20-prometheus:9090
+      GUIDED_P20_ALERTMANAGER_URL: http://guided-h20-alertmanager:9093
+      GUIDED_P20_GRAFANA_URL: http://guided-h20-grafana:3000
+      GUIDED_P20_GRAFANA_USER: p20-reader
+      GUIDED_P20_GRAFANA_PASSWORD: ${GUIDED_P20_GRAFANA_PASSWORD:?Set GUIDED_P20_GRAFANA_PASSWORD}
+    volumes: [guided-h20-state:/state:rw]
+    healthcheck: {test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"], interval: 2s, timeout: 3s, retries: 30}
+
+  guided-h20-prometheus:
+    <<: *guided-service
+    container_name: llm-security-guided-h20-prometheus
+    cap_drop: [ALL]
+    build: {context: ../../llm-security-control-plane, dockerfile: guided-labs/h20-alert-dashboard/Containerfile.prometheus}
+    image: localhost/llm-security-guided-h20-prometheus:${GUIDED_IMAGE_VERSION:-0.1.0}
+    volumes: [guided-h20-prometheus-data:/prometheus:rw]
+
+  guided-h20-alertmanager:
+    <<: *guided-service
+    container_name: llm-security-guided-h20-alertmanager
+    cap_drop: [ALL]
+    build: {context: ../../llm-security-control-plane, dockerfile: guided-labs/h20-alert-dashboard/Containerfile.alertmanager}
+    image: localhost/llm-security-guided-h20-alertmanager:${GUIDED_IMAGE_VERSION:-0.1.0}
+    environment:
+      GUIDED_H20_WEBHOOK_TOKEN: ${GUIDED_H20_WEBHOOK_TOKEN:?Set GUIDED_H20_WEBHOOK_TOKEN}
+    tmpfs: ["/run/p20:rw,noexec,nosuid,size=1m,uid=65534,gid=65534,mode=0700"]
+    volumes: [guided-h20-alertmanager-data:/alertmanager:rw]
+
+  guided-h20-grafana:
+    <<: *guided-service
+    container_name: llm-security-guided-h20-grafana
+    cap_drop: [ALL]
+    build: {context: ../../llm-security-control-plane, dockerfile: guided-labs/h20-alert-dashboard/Containerfile.grafana}
+    image: localhost/llm-security-guided-h20-grafana:${GUIDED_IMAGE_VERSION:-0.1.0}
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GUIDED_P20_GRAFANA_ADMIN_PASSWORD:?Set GUIDED_P20_GRAFANA_ADMIN_PASSWORD}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED: "true"
+    ports: ["127.0.0.1:${GUIDED_P20_GRAFANA_PORT:-23002}:3000"]
+    volumes: [guided-h20-grafana-data:/var/lib/grafana:rw]
+
+  guided-h20-grafana-reader:
+    <<: *guided-service
+    container_name: llm-security-guided-h20-grafana-reader
+    restart: "no"
+    cap_drop: [ALL]
+    build: {context: ../../llm-security-control-plane, dockerfile: guided-labs/h20-alert-dashboard/Containerfile.reader}
+    image: localhost/llm-security-guided-h20-grafana-reader:${GUIDED_IMAGE_VERSION:-0.1.0}
+    environment:
+      GUIDED_P20_GRAFANA_URL: http://guided-h20-grafana:3000
+      GUIDED_P20_GRAFANA_ADMIN_PASSWORD: ${GUIDED_P20_GRAFANA_ADMIN_PASSWORD:?Set GUIDED_P20_GRAFANA_ADMIN_PASSWORD}
+      GUIDED_P20_GRAFANA_PASSWORD: ${GUIDED_P20_GRAFANA_PASSWORD:?Set GUIDED_P20_GRAFANA_PASSWORD}
+    depends_on: {guided-h20-grafana: {condition: service_started}}
+
+  guided-p12-context:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h12-protected-services/Containerfile.context
+    image: localhost/llm-security-guided-p12-context:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-p12-context
+    environment:
+      GUIDED_P12_CONTEXT_CONTROL_TOKEN: ${GUIDED_P12_CONTEXT_CONTROL_TOKEN:?Set GUIDED_P12_CONTEXT_CONTROL_TOKEN}
+      GUIDED_P12_CONTEXT_SERVICE_TOKEN: ${GUIDED_P12_CONTEXT_SERVICE_TOKEN:?Set GUIDED_P12_CONTEXT_SERVICE_TOKEN}
+      GUIDED_P12_CONTEXT_VERIFIER_TOKEN: ${GUIDED_P12_CONTEXT_VERIFIER_TOKEN:?Set GUIDED_P12_CONTEXT_VERIFIER_TOKEN}
+      GUIDED_P12_CONTEXT_DATABASE: /state/context.sqlite3
+    volumes: [guided-p12-context-state:/state:rw]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  guided-p12-privacy:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h12-protected-services/Containerfile.privacy
+    image: localhost/llm-security-guided-p12-privacy:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-p12-privacy
+    environment:
+      GUIDED_P12_PRIVACY_CONTROL_TOKEN: ${GUIDED_P12_PRIVACY_CONTROL_TOKEN:?Set GUIDED_P12_PRIVACY_CONTROL_TOKEN}
+      GUIDED_P12_PRIVACY_SERVICE_TOKEN: ${GUIDED_P12_PRIVACY_SERVICE_TOKEN:?Set GUIDED_P12_PRIVACY_SERVICE_TOKEN}
+      GUIDED_P12_PRIVACY_VERIFIER_TOKEN: ${GUIDED_P12_PRIVACY_VERIFIER_TOKEN:?Set GUIDED_P12_PRIVACY_VERIFIER_TOKEN}
+      GUIDED_P12_PRIVACY_DATABASE: /state/privacy.sqlite3
+    volumes: [guided-p12-privacy-state:/state:rw]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  guided-p12-nemo:
+    <<: *guided-service
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h12-protected-services/Containerfile.nemo
+    image: localhost/llm-security-guided-p12-nemo:${GUIDED_IMAGE_VERSION:-0.1.0}
+    container_name: llm-security-guided-p12-nemo
+    environment:
+      GUIDED_P12_NEMO_CONTROL_TOKEN: ${GUIDED_P12_NEMO_CONTROL_TOKEN:?Set GUIDED_P12_NEMO_CONTROL_TOKEN}
+      GUIDED_P12_NEMO_SERVICE_TOKEN: ${GUIDED_P12_NEMO_SERVICE_TOKEN:?Set GUIDED_P12_NEMO_SERVICE_TOKEN}
+      GUIDED_P12_NEMO_VERIFIER_TOKEN: ${GUIDED_P12_NEMO_VERIFIER_TOKEN:?Set GUIDED_P12_NEMO_VERIFIER_TOKEN}
+      GUIDED_P12_NEMO_DATABASE: /state/nemo.sqlite3
+      GUIDED_P12_GATEWAY_URL: http://guided-bedrock-gateway:8080
+    volumes: [guided-p12-nemo-state:/state:rw]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
 
 networks:
   guided: {name: llm-security-guided}
 
 volumes:
+  guided-h03-receipts:
+  guided-h04-receipts:
+  guided-p12-context-state:
+  guided-p12-privacy-state:
+  guided-p12-nemo-state:
   guided-verifier-state:
   guided-h08-receipts:
   guided-h09-receipts:
@@ -920,12 +1029,17 @@ volumes:
   guided-h10-receipts:
   guided-h11-receipts:
   guided-h12-receipts:
-  guided-h12-provider-ledger:
   guided-h13-promptfoo-artifacts:
   guided-h14-artifacts:
   guided-h15-artifacts:
   guided-h16-policy:
-  guided-observability-state:
+  guided-h18-query-state:
+  guided-h19-investigation-state:
+  guided-h17-telemetry-state:
+  guided-h20-state:
+  guided-h20-prometheus-data:
+  guided-h20-alertmanager-data:
+  guided-h20-grafana-data:
   guided-alloy-data:
   guided-loki-data:
   guided-tempo-data:

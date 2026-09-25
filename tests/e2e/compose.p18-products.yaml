@@ -1,0 +1,46 @@
+# CUSTOM FILE
+# Format: https://compose-spec.io/ · Apache-2.0
+services:
+  loki:
+    image: docker.io/grafana/loki:3.5.3
+    command: [-config.file=/etc/loki/config.yaml]
+    volumes: [../../examples/security-monitoring/loki-config.yaml:/etc/loki/config.yaml:ro]
+    tmpfs: ["/loki:uid=10001,gid=10001"]
+  tempo:
+    image: docker.io/grafana/tempo:3.0.2
+    command: [-target=all, -config.file=/etc/tempo/config.yaml]
+    volumes: [../../examples/security-monitoring/tempo.yaml:/etc/tempo/config.yaml:ro]
+    tmpfs: ["/var/tempo:uid=10001,gid=10001"]
+  alloy:
+    image: docker.io/grafana/alloy:v1.18.0
+    command: [run, /etc/alloy/config.alloy]
+    volumes: [../../examples/security-monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro]
+  prometheus:
+    image: docker.io/prom/prometheus:v3.5.0
+    command: [--config.file=/etc/prometheus/prometheus.yml, --web.enable-remote-write-receiver]
+    volumes: [./fixtures/p18/prometheus.yaml:/etc/prometheus/prometheus.yml:ro]
+    tmpfs: ["/prometheus:uid=65534,gid=65534"]
+  p18:
+    build:
+      context: ../../llm-security-control-plane
+      dockerfile: guided-labs/h18-product-queries/Containerfile
+    image: localhost/guided-p18-products:test
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    tmpfs: [/tmp, "/state:uid=65532,gid=65532"]
+    environment:
+      GUIDED_CONTROL_OBSERVABILITY_TOKEN: publisher-test-control
+      GUIDED_VERIFIER_OBSERVABILITY_TOKEN: publisher-test-verifier
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+    volumes: ["${P18_QUERY_FILE:-./fixtures/p18/queries.yaml}:/app/h18.yaml:ro"]
+  verify:
+    profiles: [verify]
+    image: localhost/guided-practice-tests:check
+    entrypoint: [python, -B, tests/e2e/run_guided_p18_products.py]
+    volumes: [../..:/workspace:ro]
+    read_only: true
+    tmpfs: [/tmp]
+networks:
+  default:
+    internal: true

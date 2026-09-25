@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import html as html_module
+import json
 import os
 import re
 import sys
@@ -31,7 +33,9 @@ os.environ.setdefault("GUIDED_CONTROL_LAB09_TOKEN", "unit-control-lab09")
 for number in range(10, 17):
     os.environ.setdefault(f"GUIDED_CONTROL_LAB{number}_TOKEN", f"unit-control-lab{number}")
 os.environ.setdefault("GUIDED_CONTROL_OBSERVABILITY_TOKEN", "unit-control-observability")
-os.environ.setdefault("GUIDED_H12_PROVIDER_CONTROL_TOKEN", "unit-h12-provider-control")
+os.environ.setdefault("GUIDED_CONTROL_H18_TOKEN", "unit-control-h18")
+os.environ.setdefault("GUIDED_CONTROL_H19_TOKEN", "unit-control-h19")
+os.environ.setdefault("GUIDED_CONTROL_H17_TOKEN", "unit-control-h17")
 os.environ.setdefault("GUIDED_H06_PROVIDER_CONTROL_TOKEN", "unit-h06-provider-control")
 os.environ.setdefault("GUIDED_H07_GATEWAY_CONTROL_TOKEN", "unit-h07-gateway-control")
 os.environ.setdefault("GUIDED_H08_GATEWAY_CONTROL_TOKEN", "unit-h08-gateway-control")
@@ -173,7 +177,8 @@ class FakeAsyncClient:
                 }
             )
         if url.endswith("/v1/chat"):
-            if not json["message"] or "model" in json:
+            message, tokens = json.get("message"), json.get("max_output_tokens")
+            if not isinstance(message, str) or not message.strip() or len(message) > 4000 or type(tokens) is not int or not 1 <= tokens <= 512 or "model" in json:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse(
                 {
@@ -193,10 +198,9 @@ class FakeAsyncClient:
             )
         if url.endswith("/v1/h02/provision"):
             return FakeResponse({"status": "READY", "knowledge_base_id": "TESTKB1234"})
-        if url.endswith("/v1/h03/provision"):
-            return FakeResponse({"status": "READY_FOR_SYNC", "knowledge_base_id": "TESTH03KB"})
-        if url.endswith("/v1/h04/provision"):
-            return FakeResponse({"status": "READY", "guardrail_id": "TESTH04GR"})
+        if url.endswith("/v1/p03/resources/prepare"):
+            return FakeResponse({"practice_id": "P03", "operation_id": json["operation_id"], "state": "ready",
+                                 "resources": {"provider_mode": "aws"}, "evidence": {"document": {}}})
         if url.endswith("/v1/sync"):
             return FakeResponse({"ingestion_job_id": "H03JOB", "status": "STARTING"})
         if url.endswith("/v1/search"):
@@ -208,6 +212,8 @@ class FakeAsyncClient:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse({"execution_id": json["execution_id"]})
         if url.endswith("/v1/run"):
+            if "guided-h02-document-app" in url or "guided-h03-sync-app" in url:
+                return FakeResponse({"suite_id": json["suite_id"]})
             if "cases" in json:
                 if json["cases"] and "content_safety_capability" in json["cases"][0]:
                     if self.h07_run_request_error:
@@ -216,12 +222,16 @@ class FakeAsyncClient:
                         return FakeResponse({"detail": "H07 learner failed"}, status_code=self.h07_run_status)
                 return FakeResponse({"suite_id": json["suite_id"], "source_digest": "a" * 64})
             return FakeResponse({"execution_id": json["execution_id"]})
-        activity_id = "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H09" if "/h09" in url else "H08" if "/h08" in url else "H07" if "/h07" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
+        activity_id = "P03" if "/verify/p03" in url else "P02" if "/verify/p02" in url else "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H09" if "/h09" in url else "H08" if "/h08" in url else "H07" if "/h07" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
                 "lab_id": "02-embedding-kb" if activity_id == "H02" else "01-nova",
                 "activity_id": activity_id,
                 "execution_id": json["suite_id"],
+                **({"contract_version": "p02-document-v1", "task_completed": True,
+                    "security_verdict": "PASS"} if activity_id == "P02" else {}),
+                **({"contract_version": "p03-search-v1", "task_completed": True,
+                    "security_verdict": "PASS"} if activity_id == "P03" else {}),
                 "course_verdict": "PASS",
                 "verified_by": "guided-evidence-verifier",
                 "stage_calls": [
@@ -298,7 +308,15 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
         self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
         self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], [f"H{number:02d}" for number in range(1, 23)])
-        self.assertNotIn("practices", self.bootstrap["course"])
+        self.assertEqual(self.bootstrap['workspace'], 'practice')
+        p02 = next(item for item in self.bootstrap["learner_apps"] if item["hands_on_id"] == "H02")
+        self.assertEqual(p02["source_path"], "llm-security-control-plane/guided-labs/h02-document-ingestion/learner.py")
+        self.assertEqual(self.bootstrap['course']['practices'], 22)
+        self.assertEqual(self.bootstrap['course']['practice_ids'], [f'P{n:02d}' for n in range(1, 23)])
+        self.assertEqual(self.bootstrap['course']['execution_ids'], {f'P{n:02d}': f'H{n:02d}' for n in range(1, 23)})
+        for item in self.bootstrap['learner_apps']:
+            self.assertEqual(item['practice_id'], 'P' + item['hands_on_id'][1:])
+            self.assertEqual(item['internal_activity_id'], item['hands_on_id'])
         self.assertNotIn("implemented_practices", self.bootstrap["course"])
         h05 = next(
             item
@@ -329,6 +347,74 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(h09["service"], "guided-h09-presidio-redaction")
         self.assertTrue(h09["source_path"].endswith("h09-presidio-redaction/policy.py"))
 
+    def test_common_pages_and_readiness_do_not_contact_learner_services(self):
+        with patch.object(self.server.httpx, "AsyncClient", side_effect=AssertionError("unexpected downstream connection")):
+            for path in ("/", "/livez", "/readyz", "/api/bootstrap", "/app.css", "/app.js"):
+                with self.subTest(path=path):
+                    self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_official_ui_defaults_use_tenant03_ports(self):
+        urls = {item["id"]: item.get("browser_url") for item in self.bootstrap["official_uis"]}
+        self.assertEqual(urls["nemo"], "http://127.0.0.1:28192")
+        self.assertEqual(urls["promptfoo"], "http://127.0.0.1:25500")
+        self.assertEqual(urls["pyrit"], "http://127.0.0.1:28098")
+        self.assertEqual(urls["grafana"], "http://127.0.0.1:23001/explore")
+        self.assertEqual(urls["p20-grafana"], "http://127.0.0.1:23002/d/guided-p20")
+
+    def test_practice_aliases_cover_exactly_the_existing_handlers(self):
+        routes = {route.path: route for route in self.server.app.routes}
+        legacy = {path: route for path, route in routes.items()
+                  if path.startswith("/api/hands-on/H")}
+        expected = {f"/api/practice/P{number:02d}/verify" for number in range(1, 23)}
+        expected.update(f"/api/practice/P{number:02d}/provision" for number in (2, 3, 4))
+        expected.add("/api/practice/P01/chat")
+        actual = {path for path in routes if path.startswith("/api/practice/")}
+        self.assertEqual(actual, expected)
+        self.assertEqual(len(legacy), len(expected))
+        for path, route in legacy.items():
+            alias = path.replace("/api/hands-on/H", "/api/practice/P", 1)
+            with self.subTest(alias=alias):
+                if alias.startswith('/api/practice/P04/'):
+                    self.assertIsNot(routes[alias].endpoint, route.endpoint)
+                else:
+                    self.assertIs(routes[alias].endpoint, route.endpoint)
+                self.assertEqual(routes[alias].methods, {"POST"})
+
+    def test_all_practice_routes_reject_missing_csrf_and_browser_verdicts(self):
+        anonymous = TestClient(self.server.app)
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            for route in self.server.app.routes:
+                if not route.path.startswith("/api/practice/"):
+                    continue
+                with self.subTest(path=route.path):
+                    self.assertEqual(anonymous.post(route.path, headers=self.headers).status_code, 401)
+                    self.assertEqual(self.client.post(route.path).status_code, 403)
+                    self.assertEqual(self.client.post(
+                        route.path, headers={**self.headers, "Origin": "https://evil.example"}
+                    ).status_code, 403)
+                    self.assertEqual(self.client.post(
+                        route.path, headers=self.headers,
+                        json={"task_completed": True, "security_verdict": "PASS"}
+                    ).status_code, 422)
+        self.assertEqual(FakeAsyncClient.calls, [])
+
+    def test_unknown_practice_ids_do_not_fall_back_to_another_activity(self):
+        for activity in ("P00", "P23", "P1", "H01", "p01"):
+            with self.subTest(activity=activity):
+                response = self.client.post(f"/api/practice/{activity}/verify", headers=self.headers)
+                self.assertEqual(response.status_code, 404)
+
+    def test_practice_alias_preserves_verdict_with_public_identity(self):
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            response = self.client.post("/api/practice/P01/verify", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "PASS")
+        self.assertEqual(response.json()["activity_id"], "P01")
+        self.assertEqual(response.json()["internal_activity_id"], "H01")
+        self.assertEqual(len(FakeAsyncClient.calls), 22)
+        self.assertEqual(FakeAsyncClient.calls[-1]["json"]["suite_kind"], "hands_on")
+        self.assertNotIn("unit-control-verifier", response.text)
+
     def test_origin_csrf_and_client_verdict_are_rejected(self):
         self.assertEqual(self.client.post("/api/hands-on/H01/verify").status_code, 403)
         self.assertEqual(
@@ -355,14 +441,15 @@ class GuidedControlCenterTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(len(FakeAsyncClient.calls), 5)
-        normal_call, risk_call, invalid_call, override_call, verifier_call = FakeAsyncClient.calls
+        self.assertEqual(len(FakeAsyncClient.calls), 22)
+        normal_call, risk_call = FakeAsyncClient.calls[:2]
+        invalid_call, override_call, verifier_call = FakeAsyncClient.calls[7], FakeAsyncClient.calls[20], FakeAsyncClient.calls[-1]
         self.assertEqual(normal_call["json"]["max_output_tokens"], 64)
         self.assertEqual(risk_call["json"]["max_output_tokens"], 512)
         self.assertEqual(invalid_call["json"]["message"], "")
-        self.assertEqual(override_call["json"]["model"], "attacker-selected-model")
+        self.assertEqual(override_call["json"]["model"], "client-selected-model")
         self.assertEqual(verifier_call["json"]["suite_kind"], "hands_on")
-        self.assertEqual(len(verifier_call["json"]["cases"]), 4)
+        self.assertEqual(len(verifier_call["json"]["cases"]), 21)
         self.assertNotIn("course_verdict", verifier_call["json"])
         self.assertNotIn("unit-control-lab", response.text)
         self.assertNotIn("unit-control-verifier", response.text)
@@ -400,14 +487,66 @@ class GuidedControlCenterTests(unittest.TestCase):
                 headers=self.headers,
             )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["activity_id"], "H02")
-        self.assertEqual(len(FakeAsyncClient.calls), 4)
-        normal, risk, invalid, verifier = FakeAsyncClient.calls
-        self.assertNotIn("object_key", normal["json"])
-        self.assertTrue(risk["json"]["object_key"].startswith("h02/untrusted/"))
-        self.assertEqual(invalid["json"]["body"], "")
-        self.assertEqual(len(verifier["json"]["cases"]), 3)
+        self.assertEqual(response.json()["activity_id"], "P02")
+        self.assertEqual(len(FakeAsyncClient.calls), 2)
+        runner, verifier = FakeAsyncClient.calls
+        self.assertTrue(runner["url"].endswith("/v1/run"))
+        self.assertEqual(set(runner["json"]), {"suite_id"})
+        self.assertEqual(runner["json"], verifier["json"])
+        self.assertTrue(verifier["url"].endswith("/v1/verify/p02"))
         self.assertNotIn("course_verdict", verifier["json"])
+
+    def test_p02_verifier_errors_and_mismatched_results_are_incomplete(self):
+        for fault in ("http", "network", "shape", "suite", "activity", "contract", "verdict", "completion"):
+            class FaultClient(FakeAsyncClient):
+                async def post(inner, url, **kwargs):
+                    response = await super().post(url, **kwargs)
+                    if not url.endswith("/v1/verify/p02"):
+                        return response
+                    if fault == "http":
+                        return FakeResponse({}, status_code=503)
+                    if fault == "network":
+                        raise httpx.ConnectError("unavailable")
+                    if fault == "shape":
+                        return FakeResponse([])
+                    changes = {"suite": {"execution_id": "another-run"},
+                               "activity": {"activity_id": "P01"},
+                               "contract": {"contract_version": "old"},
+                               "verdict": {"security_verdict": "ERR"},
+                               "completion": {"task_completed": "true"}}
+                    return FakeResponse({**response.json(), **changes[fault]})
+            with self.subTest(fault=fault), patch.object(self.server.httpx, "AsyncClient", FaultClient):
+                response = self.client.post("/api/practice/P02/verify", headers=self.headers)
+                self.assertEqual(response.status_code, 502)
+                self.assertIs(response.json()["detail"]["task_completed"], False)
+                self.assertEqual(response.json()["detail"]["security_verdict"], "ERR")
+                self.assertFalse(self.server.ACTIVE_SESSIONS)
+
+    def test_p03_verifier_errors_and_mismatched_results_are_incomplete(self):
+        for fault in ("http", "network", "shape", "suite", "activity", "contract", "verdict", "completion"):
+            class FaultClient(FakeAsyncClient):
+                async def post(inner, url, **kwargs):
+                    response = await super().post(url, **kwargs)
+                    if not url.endswith("/v1/verify/p03"):
+                        return response
+                    if fault == "http":
+                        return FakeResponse({}, status_code=503)
+                    if fault == "network":
+                        raise httpx.ConnectError("unavailable")
+                    if fault == "shape":
+                        return FakeResponse([])
+                    changes = {"suite": {"execution_id": "another-run"},
+                               "activity": {"activity_id": "P01"},
+                               "contract": {"contract_version": "old"},
+                               "verdict": {"security_verdict": "ERR"},
+                               "completion": {"task_completed": "true"}}
+                    return FakeResponse({**response.json(), **changes[fault]})
+            with self.subTest(fault=fault), patch.object(self.server.httpx, "AsyncClient", FaultClient):
+                response = self.client.post("/api/practice/P03/verify", headers=self.headers)
+                self.assertEqual(response.status_code, 502)
+                self.assertIs(response.json()["detail"]["task_completed"], False)
+                self.assertEqual(response.json()["detail"]["security_verdict"], "ERR")
+                self.assertFalse(self.server.ACTIVE_SESSIONS)
 
     def test_h02_provisioning_body_is_server_owned(self):
         rejected = self.client.post(
@@ -435,11 +574,13 @@ class GuidedControlCenterTests(unittest.TestCase):
                 "/api/hands-on/H03/verify", headers=self.headers
             )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["activity_id"], "H03")
-        sync_call = next(item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/sync"))
-        verifier_call = next(item for item in FakeAsyncClient.calls if "lab-03" in item["url"])
-        self.assertNotIn("ingestion_job_id", sync_call["json"])
-        self.assertNotIn("course_verdict", verifier_call["json"])
+        self.assertEqual(response.json()["activity_id"], "P03")
+        self.assertEqual(len(FakeAsyncClient.calls), 2)
+        run, verifier = FakeAsyncClient.calls
+        self.assertTrue(run["url"].endswith("/v1/run"))
+        self.assertTrue(verifier["url"].endswith("/v1/verify/p03"))
+        self.assertEqual(set(run["json"]), {"suite_id"})
+        self.assertEqual(run["json"], verifier["json"])
 
     def test_h03_provisioning_body_is_server_owned(self):
         rejected = self.client.post(
@@ -453,43 +594,80 @@ class GuidedControlCenterTests(unittest.TestCase):
                 "/api/hands-on/H03/provision", headers=self.headers
             )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["activity_id"], "H03")
+        self.assertFalse(response.json()["task_completed"])
+        self.assertTrue(response.json()["resource_ready"])
+        self.assertNotIn("security_verdict", response.json())
+        self.assertEqual(len(FakeAsyncClient.calls), 1)
+        self.assertTrue(FakeAsyncClient.calls[0]["url"].endswith("/v1/p03/resources/prepare"))
+        self.assertEqual(set(FakeAsyncClient.calls[0]["json"]), {"operation_id"})
 
-    def test_h04_suite_and_provisioning_inputs_are_server_owned(self):
-        rejected = self.client.post(
-            "/api/hands-on/H04/verify",
-            json={"guardrail_id": "attacker", "course_verdict": "PASS"},
-            headers=self.headers,
-        )
-        self.assertEqual(rejected.status_code, 422)
+    def test_p03_preparation_mismatch_is_error_and_releases_session(self):
+        for field, value in (("practice_id", "P02"), ("operation_id", "other"), ("state", "preparing"),
+                             ("resources", {"provider_mode": "contract"}), ("evidence", None)):
+            with self.subTest(field=field):
+                class BrokenPreparationClient(FakeAsyncClient):
+                    async def post(inner, url, **kwargs):
+                        response = await super().post(url, **kwargs)
+                        response.payload[field] = value
+                        return response
+                with patch.object(self.server.httpx, "AsyncClient", BrokenPreparationClient):
+                    result = self.client.post("/api/practice/P03/provision", headers=self.headers)
+                self.assertEqual(result.status_code, 502)
+                self.assertFalse(result.json()["detail"]["task_completed"])
+                self.assertEqual(result.json()["detail"]["activity_id"], "P03")
+                self.assertFalse(self.server.ACTIVE_SESSIONS)
+
+    def test_p03_preparation_timeout_does_not_claim_no_cloud_changes(self):
+        class TimedOutClient(FakeAsyncClient):
+            async def post(inner, url, **kwargs):
+                raise httpx.ReadTimeout("provider response unavailable")
+        with patch.object(self.server.httpx, "AsyncClient", TimedOutClient):
+            result = self.client.post("/api/practice/P03/provision", headers=self.headers)
+        self.assertEqual(result.status_code, 502)
+        self.assertIn("남아 있을 수", result.json()["detail"]["next_check"])
+        self.assertFalse(self.server.ACTIVE_SESSIONS)
+
+    def test_retired_h04_actions_never_start_work(self):
+        with patch.object(self.server.httpx, "AsyncClient") as downstream:
+            for action in ("verify", "provision"):
+                path = "/api/hands-on/H04/" + action
+                for body in ({}, {"guardrail_id": "caller", "task_completed": True}):
+                    response = self.client.post(path, json=body, headers=self.headers)
+                    self.assertEqual(response.status_code, 410)
+                    self.assertIn("/api/practice/P04", response.json()["detail"])
+                    self.assertNotIn("task_completed", response.json())
+                self.assertEqual(self.client.post(path).status_code, 403)
+                self.assertEqual(TestClient(self.server.app).post(path).status_code, 401)
+            downstream.assert_not_called()
+        self.assertFalse(self.server.ACTIVE_SESSIONS)
+
+    def test_practice_envelope_reuses_all_internal_ids_and_verdicts(self):
+        for number in range(1, 23):
+            for verdict in ("PASS", "HIT", "ERR"):
+                original = {"activity_id": f"H{number:02d}", "course_verdict": verdict,
+                            "result": {"receipt": "existing-evidence"}}
+                result = self.server.practice_envelope(original, f"P{number:02d}")
+                self.assertEqual(result["activity_id"], f"P{number:02d}")
+                self.assertEqual(result["internal_activity_id"], original["activity_id"])
+                self.assertEqual(result["security_verdict"], verdict)
+                self.assertEqual(result["task_completed"], verdict == "PASS")
+                self.assertEqual(result["result"], original["result"])
+
+    def test_practice_envelope_preserves_existing_completion_decision(self):
+        payload = {"activity_id": "H05", "course_verdict": "PASS", "task_completed": False}
+        self.assertFalse(self.server.practice_envelope(payload, "P05")["task_completed"])
+        native = {"activity_id": "P01", "task_completed": False, "security_verdict": "ERR"}
+        self.assertIs(self.server.practice_envelope(native, "P01"), native)
+
+    def test_p05_public_route_reuses_h05_verifier_and_execution(self):
         with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
-            response = self.client.post(
-                "/api/hands-on/H04/verify", headers=self.headers
-            )
+            response = self.client.post("/api/practice/P05/verify", headers=self.headers)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["activity_id"], "H04")
-        run_calls = [item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/run")]
-        self.assertEqual(
-            [item["json"]["case_id"] for item in run_calls],
-            ["apply-normal", "apply-risk", "converse-normal", "converse-risk"],
-        )
-        self.assertTrue(all("guardrail_id" not in item["json"] for item in run_calls))
-        verifier_call = next(item for item in FakeAsyncClient.calls if "lab-04" in item["url"])
-        self.assertNotIn("course_verdict", verifier_call["json"])
-
-        FakeAsyncClient.calls.clear()
-        rejected = self.client.post(
-            "/api/hands-on/H04/provision",
-            json={"policy": {"outputEnabled": False}},
-            headers=self.headers,
-        )
-        self.assertEqual(rejected.status_code, 422)
-        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
-            provisioned = self.client.post(
-                "/api/hands-on/H04/provision", headers=self.headers
-            )
-        self.assertEqual(provisioned.status_code, 200)
-        self.assertEqual(provisioned.json()["activity_id"], "H04")
+        self.assertEqual(response.json()["activity_id"], "P05")
+        self.assertEqual(response.json()["internal_activity_id"], "H05")
+        self.assertEqual(response.json()["security_verdict"], response.json()["course_verdict"])
+        self.assertIsInstance(response.json()["task_completed"], bool)
+        self.assertTrue(any("lab-05" in call["url"] for call in FakeAsyncClient.calls))
 
     def test_h05_suite_and_evaluation_inputs_are_server_owned(self):
         rejected = self.client.post(
@@ -787,9 +965,122 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIsNone(run_call["json"])
         self.assertNotIn("course_verdict", verifier_call["json"])
 
+    def test_p17_uses_dedicated_runtime_and_has_no_toggle_answer(self):
+        class P17Client(FakeAsyncClient):
+            async def post(self, url, *, json=None, headers):
+                self.calls.append({'url': url, 'json': json, 'headers': headers})
+                return FakeResponse({'activity_id': 'P17', 'task_completed': False, 'security_verdict': 'ERR'})
+        with patch.object(self.server.httpx, 'AsyncClient', P17Client):
+            rejected = self.client.post('/api/hands-on/H17/verify', headers=self.headers,
+                                        json={'task_completed': True})
+            self.assertEqual(rejected.status_code, 422)
+            self.assertEqual(FakeAsyncClient.calls, [])
+            response = self.client.post('/api/hands-on/H17/verify', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        run, verify = FakeAsyncClient.calls
+        self.assertEqual(run['url'], self.server.H17_URL + '/v1/run/H17')
+        self.assertEqual(run['headers'], {'Authorization': 'Bearer unit-control-h17'})
+        self.assertEqual(verify['url'], self.server.VERIFIER_URL + '/v1/verify/h17')
+        self.assertEqual(run['json'], verify['json'])
+        page = self.client.get('/').text
+        self.assertNotIn('EXPORT_TO_ALLOY', page)
+        self.assertIn('P17 현재 구현 검증', page)
+        self.assertIn('guided-h17-telemetry', page)
+        self.assertIn('aria-controls="h17-help"', page)
+
+    def test_p19_uses_dedicated_runtime_and_server_owned_verification(self):
+        result = {"activity_id": "P19", "task_completed": False,
+                  "security_verdict": "ERR", "result": {"failed_requirement": "unfinished"}}
+
+        class P19Client(FakeAsyncClient):
+            async def post(self, url, *, json=None, headers):
+                self.calls.append({"url": url, "json": json, "headers": headers})
+                return FakeResponse(result if url.endswith("/v1/verify/h19") else {"closed": True})
+
+        with patch.object(self.server.httpx, "AsyncClient", P19Client):
+            rejected = self.client.post("/api/hands-on/H19/verify", headers=self.headers,
+                                        json={"task_completed": True, "suite_id": "browser-selected"})
+            self.assertEqual(rejected.status_code, 422)
+            self.assertEqual(FakeAsyncClient.calls, [])
+            response = self.client.post("/api/hands-on/H19/verify", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), result)
+        run, verify = FakeAsyncClient.calls
+        self.assertEqual(run["url"], self.server.H19_URL + "/v1/run/H19")
+        self.assertEqual(run["headers"], {"Authorization": "Bearer unit-control-h19"})
+        self.assertNotEqual(self.server.H19_URL, self.server.OBSERVABILITY_URL)
+        self.assertEqual(verify["url"], self.server.VERIFIER_URL + "/v1/verify/h19")
+        self.assertEqual(verify["headers"], {"Authorization": "Bearer unit-control-verifier"})
+        self.assertEqual(run["json"], verify["json"])
+        self.assertEqual(set(run["json"]), {"suite_id", "started_at"})
+
     def test_unknown_host_is_rejected(self):
         response = self.client.get("/", headers={"Host": "attacker.example"})
         self.assertEqual(response.status_code, 421)
+
+    def test_p20_dedicated_runtime_and_problem_without_solution(self):
+        result = {'activity_id': 'P20', 'task_completed': False, 'security_verdict': 'ERR'}
+        class P20Client(FakeAsyncClient):
+            async def post(self, url, *, json=None, headers):
+                self.calls.append({'url': url, 'json': json, 'headers': headers})
+                return FakeResponse(result if url.endswith('/v1/verify/h20') else {'closed': False})
+        with patch.object(self.server, 'H20_TOKEN', 'p20-control'), patch.object(self.server.httpx, 'AsyncClient', P20Client):
+            self.assertEqual(self.client.post('/api/hands-on/H20/verify', headers=self.headers,
+                json={'task_completed': True}).status_code, 422)
+            self.assertEqual(FakeAsyncClient.calls, [])
+            response = self.client.post('/api/hands-on/H20/verify', headers=self.headers)
+        self.assertEqual(response.json(), result)
+        run, verify = FakeAsyncClient.calls
+        self.assertEqual(run['url'], self.server.H20_URL + '/v1/run/H20')
+        self.assertEqual(run['headers'], {'Authorization': 'Bearer p20-control'})
+        self.assertEqual(run['json'], verify['json'])
+        self.assertEqual(verify['url'], self.server.VERIFIER_URL + '/v1/verify/h20')
+        page = self.client.get('/').text
+        self.assertIn('P20 현재 구현 검증', page)
+        self.assertIn('aria-controls="h20-help"', page)
+        self.assertNotIn('guided_h20_risk_active', page)
+        self.assertNotIn('dashboard-query.txt', page)
+        self.assertIn('h20-alert-dashboard/rules.yaml', page)
+
+    def test_p20_missing_connection_does_not_call_shared_observability(self):
+        with patch.object(self.server, 'H20_TOKEN', ''), patch.object(self.server.httpx, 'AsyncClient', FakeAsyncClient):
+            response = self.client.post('/api/hands-on/H20/verify', headers=self.headers)
+        self.assertEqual(response.status_code, 502)
+        self.assertFalse(response.json()['detail']['task_completed'])
+        self.assertEqual(FakeAsyncClient.calls, [])
+        self.assertEqual(self.client.get('/readyz').status_code, 200)
+
+    def test_p19_transport_errors_are_incomplete_without_claiming_no_calls(self):
+        for failure_at in ('learner_execution', 'evidence_verification'):
+            for failure_type in ('connection', 'status', 'json'):
+                if failure_at == 'learner_execution' and failure_type == 'json':
+                    continue
+                FakeAsyncClient.calls.clear()
+
+                class BrokenClient(FakeAsyncClient):
+                    async def post(self, url, *, json=None, headers):
+                        self.calls.append(url)
+                        stage = 'evidence_verification' if '/v1/verify/' in url else 'learner_execution'
+                        if stage == failure_at:
+                            if failure_type == 'connection':
+                                raise httpx.ConnectError('unavailable')
+                            if failure_type == 'status':
+                                return FakeResponse({}, 503)
+                            return httpx.Response(200, text='not-json')
+                        return FakeResponse({})
+
+                with self.subTest(stage=failure_at, failure=failure_type), patch.object(
+                        self.server.httpx, 'AsyncClient', BrokenClient):
+                    response = self.client.post('/api/hands-on/H19/verify', headers=self.headers)
+                    self.assertEqual(response.status_code, 502)
+                    detail = response.json()['detail']
+                    self.assertEqual(detail['activity_id'], 'P19')
+                    self.assertFalse(detail['task_completed'])
+                    self.assertEqual(detail['security_verdict'], 'ERR')
+                    self.assertEqual(detail['stopped_stage'], failure_at)
+                    self.assertNotIn('downstream_called', detail)
+                    self.assertEqual(len(FakeAsyncClient.calls), 1 if failure_at == 'learner_execution' else 2)
+                    self.assertEqual(self.client.get('/readyz').status_code, 200)
 
     def test_session_store_evicts_idle_sessions_at_the_limit(self):
         with patch.object(self.server, "MAX_SESSIONS", 2):
@@ -800,8 +1091,10 @@ class GuidedControlCenterTests(unittest.TestCase):
 
     def test_rendering_uses_text_nodes_only(self):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
-        self.assertIn("effective_max_tokens = min(request.max_output_tokens, 128)", html)
-        self.assertIn('boto3.client("bedrock-runtime"', html)
+        self.assertNotIn("effective_max_tokens = min(request.max_output_tokens, 128)", html)
+        self.assertNotIn('result = boto3.client("bedrock-runtime"', html)
+        self.assertIn("h01-bedrock-gateway/learner.py", html)
+        self.assertIn("handle_request(body, client)", html)
         self.assertNotIn("강사와 함께", html)
         self.assertNotIn("비용 안내", html)
         self.assertIn("--env-file llm-security-control-plane/.state/guided-course.env", html)
@@ -832,9 +1125,10 @@ class GuidedControlCenterTests(unittest.TestCase):
             self.assertIn(f'id="{tooltip_id}" class="action-tooltip" role="tooltip"', html)
         self.assertIn("AWS 자격 증명과 모델 연결", html)
         self.assertIn("S3 Vector Index", html)
-        self.assertIn("복구 코드는 공개할 수 없습니다.", html)
+        self.assertIn("복구 코드 요청을 거부하는 Bot 응답", html)
+        self.assertNotIn('"복구 코드는 공개할 수 없습니다."', html)
         self.assertIn("NeMo Topical 평가", html)
-        self.assertIn("Return exactly Yes when the request must be blocked.", html)
+        self.assertIn("판정 응답은 차단 시", html)
         self.assertIn("다른 공격 문장까지 모두 막는다는 뜻은 아닙니다", html)
         self.assertIn("실제로 받은 digest", html)
         self.assertIn("Token 제한 코드가 맞다는 뜻은 아닙니다", html)
@@ -843,7 +1137,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("innerHTML", javascript)
         self.assertIn('matchMedia("(prefers-color-scheme: dark)")', javascript)
         self.assertIn('localStorage.setItem("guided-theme-mode", mode)', javascript)
-        self.assertIn('/api/hands-on/H01/chat', javascript)
+        self.assertIn('/api/practice/P01/chat', javascript)
         self.assertIn('querySelectorAll(".help-trigger")', javascript)
         self.assertIn('setAttribute("aria-expanded", String(open))', javascript)
         self.assertIn('event.key === "Escape"', javascript)
@@ -858,6 +1152,68 @@ class GuidedControlCenterTests(unittest.TestCase):
             ".actions:not(.single) > .action-control:last-child .action-tooltip",
             stylesheet,
         )
+
+    def test_only_named_public_assets_are_served_not_source_or_course_files(self):
+        paths = ("/server.py", "/p01.json", "/Containerfile", "/requirements.txt",
+                 "/solutions/p01.py", "/index.html", "/.state/guided-course.env",
+                 "/guided-labs/h01-bedrock-gateway/learner.py", "/api/solutions")
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+
+    def test_web_code_blocks_only_contain_apply_commands_and_resource_templates(self):
+        html = self.home.text
+        blocks = re.findall(r"<pre>([\s\S]*?)</pre>", html)
+        self.assertGreater(len(blocks), 20)
+        templates = []
+        for block in blocks:
+            text = html_module.unescape(block).strip()
+            if text.startswith("{"):
+                templates.append(json.loads(text))
+                continue
+            self.assertTrue(text.startswith("docker compose "), text[:120])
+            self.assertNotIn("cat >", text)
+            self.assertNotIn("python -c", text)
+        self.assertEqual(len(templates), 2)
+        self.assertEqual(templates[0]["embeddingModelId"], "amazon.titan-embed-text-v2:0")
+        self.assertEqual(templates[1]["piiType"], "EMAIL")
+
+    def test_served_assets_do_not_contain_removed_solution_fragments(self):
+        assets = "\n".join(self.client.get(path).text for path in ("/", "/app.js", "/app.css", "/api/bootstrap"))
+        forbidden = (
+            "def prepare_document", "return same_job and status",
+            "USE_GUARDRAIL_FOR_CONVERSE = True", "define bot refuse recovery code",
+            'ALLOWED_ACTIONS = frozenset({"get_account_balance"})',
+            "- content safety check input $model=content_safety",
+            "Return exactly Yes when the request must be blocked.",
+            "analyzer.registry.add_recognizer(", "Block synthetic recovery codes",
+            'roles = set(principal["roles"])', "def stage_order()",
+            "const r = JSON.parse(output);", "soft_probe_prompt_cap: 4",
+            "MAX_TURNS = 3", 'return "block" if "H16-OVERRIDE"',
+            'if model not in configured["models"]:', "nonce = verify_approval(",
+        )
+        for fragment in forbidden:
+            with self.subTest(fragment=fragment):
+                self.assertNotIn(fragment, html_module.unescape(assets))
+
+    def test_p18_problem_contains_contract_but_not_completed_queries(self):
+        html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
+        problem = html.split('<div id="h18-work"', 1)[1].split('<div id="h19-work"', 1)[0]
+        for required in ('P18 현재 구현 검증', 'guided-h18-queries', 'queries.yaml',
+                         'request_id', 'Counter', '--no-deps', 'aria-controls="h18-help"'):
+            self.assertIn(required, problem)
+        for solution in ('logql:', 'promql:', 'sum(', 'max by ('):
+            self.assertNotIn(solution, problem)
+        self.assertNotIn('build guided-observability', problem)
+
+    def test_p19_problem_has_function_contract_not_answer_constant(self):
+        html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
+        problem = html.split('<div id="h19-work"', 1)[1].split('<div id="h20-work"', 1)[0]
+        self.assertNotIn('JOIN_KEY', problem)
+        for required in ('P19 현재 구현 검증', 'analyze_incident', 'downstream_calls', 'ValueError',
+                         'build guided-h19-investigation', '--no-deps', '교육용 공지 저장소',
+                         'aria-controls="h19-help"', 'aria-expanded="false"'):
+            self.assertIn(required, problem)
 
     def test_rendering_only_updates_existing_dom_ids(self):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
@@ -884,13 +1240,14 @@ class GuidedControlCenterTests(unittest.TestCase):
         compose = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
         owners = [name for name, service in compose["services"].items() if "ports" in service]
         self.assertEqual(
-            owners,
-            [
+            set(owners),
+            {
                 "guided-front-proxy",
                 "guided-grafana",
+                "guided-h20-grafana",
                 "guided-promptfoo-ui",
                 "guided-pyrit-ui",
-            ],
+            },
         )
         self.assertEqual(len(compose["services"]["guided-front-proxy"]["ports"]), 2)
         for owner in owners:
@@ -958,9 +1315,11 @@ class GuidedControlCenterTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('@app.post("/v1/chat")', source)
-        self.assertIn('boto3.client("bedrock-runtime", region_name=REGION).converse(', source)
-        self.assertIn('model_config = ConfigDict(extra="forbid")', source)
-        self.assertIn("effective_max_tokens = request.max_output_tokens", source)
+        self.assertIn('boto3.client("bedrock-runtime", region_name=REGION)', source)
+        self.assertIn("learner.handle_request(body, recorder)", source)
+        learner_source = (CONTROL / "guided-labs/h01-bedrock-gateway/learner.py").read_text()
+        self.assertIn("raise NotImplementedError", learner_source)
+        self.assertNotIn("min(", learner_source)
 
         compose = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
         learner = compose["services"]["guided-h01-gateway"]
@@ -978,6 +1337,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(len(manifest["tabs"]), 13)
         self.assertEqual(len(hands_on), 22)
         self.assertEqual(len(set(hands_on)), 22)
+        self.assertEqual(manifest["workspace"], "practice")
+        self.assertEqual(manifest["execution_ids"],
+                         {f"P{i:02d}": f"H{i:02d}" for i in range(1, 23)})
         self.assertEqual(hands_on[0], "H01")
         self.assertTrue(all("practice" not in tab for tab in manifest["tabs"]))
         self.assertTrue(all("practice_status" not in tab for tab in manifest["tabs"]))

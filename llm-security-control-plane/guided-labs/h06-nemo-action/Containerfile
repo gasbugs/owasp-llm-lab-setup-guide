@@ -17,7 +17,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --chmod=0444 guided-labs/h06-nemo-action/Containerfile /app/learner/Containerfile
-COPY --chmod=0555 guided-labs/h06-nemo-action/config /app/learner/config
+COPY --chmod=0555 guided-labs/h06-nemo-action/config/config.yml guided-labs/h06-nemo-action/config/flows.co /app/learner/config/
 COPY --chmod=0555 guided-labs/h06-nemo-action/actions.py /app/learner/actions.py
 COPY --chmod=0555 guided-labs/h06-nemo-action/server.py /app/learner/server.py
 RUN chmod 0555 /app/learner /app/learner/config

@@ -7,6 +7,7 @@ const tabNames = [
 ];
 let csrfToken = "";
 let activeTab = 0;
+const rawResponses = new WeakMap();
 const themePreference = window.matchMedia("(prefers-color-scheme: dark)");
 const themeModes = ["system", "light", "dark"];
 
@@ -89,7 +90,7 @@ function renderTabs() {
     const strong = document.createElement("strong");
     strong.textContent = name;
     const small = document.createElement("small");
-    small.textContent = ["H01","H02·H03","H04","H05·H06","H07·H08","H09·H10","H11·H12","H13","H14·H15","H16","H17·H18","H19·H20","H21·H22"][index] + " · 직접 작성";
+    small.textContent = ["P01","P02·P03","P04","P05·P06","P07·P08","P09·P10","P11·P12","P13","P14·P15","P16","P17·P18","P19·P20","P21·P22"][index] + " · 직접 작성";
     copy.append(strong, small);
     button.append(number, copy);
     if (implemented) button.addEventListener("click", () => selectTab(index));
@@ -123,10 +124,12 @@ function selectTab(index) {
   const h09 = index === 5;
   const h22 = index === 12;
   setText("current-station", `${String(index + 1).padStart(2, "0")} / 13`);
-  const activityIds=["H01","H02·H03","H04","H05·H06","H07·H08","H09·H10","H11·H12","H13","H14·H15","H16","H17·H18","H19·H20","H21·H22"];
+  const activityIds=["P01","P02·P03","P04","P05·P06","P07·P08","P09·P10","P11·P12","P13","P14·P15","P16","P17·P18","P19·P20","P21·P22"];
+  byId("task-completion").hidden = true;
+  byId("task-completion").textContent = "";
   const stationNames=["Nova Lite 요청 경로","Embedding·Knowledge Base","Bedrock 관리형 Guardrail","NeMo Dialog Rail·Action","NeMo 입력 안전","Presidio·출력 Rail","RAG 인증·출처 경계","Promptfoo 회귀 Test","Garak·PyRIT 탐색","정책 승격","원시 관측","사고·경보","Agent·MCP 실행 경계"];
   const activityTitles=["Bedrock Gateway 만들기","원문 저장과 현재 검색 연결하기","관리형 Guardrail을 Nova Lite에 연결하기","한국어 Dialog Rail과 Python Action 만들기","위험 입력을 Main Model 전에 멈추기","개인정보와 위험한 출력이 밖으로 나가기 전에 멈추기","RAG 권한과 Application 단일 진입점 만들기","Promptfoo 회귀 Test 작성하기","Red Team 후보를 실제 영향으로 재확인하기","검증된 정책만 승격하기","Log·Trace·Metric 원시 신호 연결하기","사고 조사와 경보 수명주기 확인하기","Agent 실행 정책과 MCP 승인 만들기"];
-  setText("current-station-name",stationNames[index]); setText("activity-label",`HANDS-ON · ${activityIds[index]}`); setText("activity-title",activityTitles[index]);
+  setText("current-station-name",stationNames[index]); setText("activity-label",`PRACTICE · ${activityIds[index]}`); setText("activity-title",activityTitles[index]);
   setText("provider-label", h09 ? "SOURCE" : index === 0 ? "PROVIDER" : index === 1 ? "TITAN REQUEST" : index === 2 ? "AWS REQUEST" : index === 3 ? "EVALUATION" : "TOOL CATALOG");
   setText("model-label", h09 ? "FRAMEWORK" : index === 0 ? "MODEL" : index === 1 ? "EMBED MODEL" : index === 2 ? "GUARDRAIL" : index === 3 ? "FRAMEWORK" : "PROTOCOL");
   setText("requested-label", h09 ? "ENTITIES" : h22 ? "EFFECT ORDER" : index === 0 ? "REQUESTED" : index === 1 ? "OBJECT KEY" : index === 3 ? "SAMPLES" : "ACTION");
@@ -155,6 +158,28 @@ function renderOfficialUis(items) {
   });
 }
 
+function formatRawJson(text) {
+  // Keep number tokens intact: nanosecond timestamps exceed JS integer precision.
+  const tokens = text.match(/"(?:\\.|[^"\\])*"|[{}\[\],:]|[^\s{}\[\],:]+/g) || [];
+  let depth = 0;
+  let formatted = "";
+  const newline = () => "\n" + "  ".repeat(depth);
+  tokens.forEach((token, index) => {
+    if (token === "{" || token === "[") {
+      formatted += token;
+      depth += 1;
+      if (tokens[index + 1] !== (token === "{" ? "}" : "]")) formatted += newline();
+    } else if (token === "}" || token === "]") {
+      depth -= 1;
+      if (tokens[index - 1] !== (token === "}" ? "{" : "[")) formatted += newline();
+      formatted += token;
+    } else if (token === ",") formatted += token + newline();
+    else if (token === ":") formatted += ": ";
+    else formatted += token;
+  });
+  return formatted;
+}
+
 async function request(path, body = undefined) {
   const options = { method: "POST", headers: { "X-CSRF-Token": csrfToken } };
   if (body !== undefined) {
@@ -162,8 +187,14 @@ async function request(path, body = undefined) {
     options.body = JSON.stringify(body);
   }
   const response = await fetch(path, options);
-  const payload = await response.json();
-  if (!response.ok) throw new Error(JSON.stringify(payload));
+  const text = await response.text();
+  const payload = JSON.parse(text);
+  if (payload !== null && typeof payload === "object") rawResponses.set(payload, formatRawJson(text));
+  if (!response.ok) {
+    const error = new Error(JSON.stringify(payload));
+    error.detail = payload.detail;
+    throw error;
+  }
   return payload;
 }
 
@@ -200,7 +231,7 @@ async function sendChat(event) {
   byId("chat-send").disabled = true;
   setText("chat-meta", "현재 수강생 앱과 Nova Lite를 호출하는 중입니다.");
   try {
-    const payload = await request("/api/hands-on/H01/chat", { prompt });
+    const payload = await request("/api/practice/P01/chat", { prompt });
     appendChatMessage("assistant", payload.result.response_text);
     setText(
       "chat-meta",
@@ -214,22 +245,100 @@ async function sendChat(event) {
   }
 }
 
+function p03Summary(result) {
+  return {
+    provider: ['검사 방식', ({aws: 'AWS + 합성 경계 사례', contract: '합성 사례'})[result?.provider_mode]],
+    model: ['확인한 코드', result?.source_digest?.slice(0, 12)],
+    requested: ['대조한 사례', result?.case_contract_verified === true ? result?.cases?.length : undefined],
+    effective: ['검색 결과 확인', result?.case_contract_verified === true ? result?.cases?.filter(c => c.outcome === 'ready').length : undefined],
+    output: ['작업·검색 기록', result?.case_contract_verified === true ? '전체 대조됨' : '미확인'],
+  };
+}
+
+function p04Summary(result) {
+  const verified = result?.suite_contract_verified === true;
+  return {
+    provider: ['검사 방식', ({aws: 'AWS + 합성 경계 사례', contract: '합성 사례'})[result?.provider_mode]],
+    model: ['확인한 코드', result?.source_digest?.slice(0, 12)],
+    requested: ['대조한 사례', verified ? result?.cases?.length : undefined],
+    effective: ['출력 검사 경로', verified ? result?.cases?.filter(c => c.product?.product_result_verified === true).length : undefined],
+    output: ['정책·호출 기록', verified ? '전체 대조됨' : '미확인'],
+  };
+}
+
+function p12Summary(result) {
+  return {
+    provider: ['검사 묶음', result?.suite_id],
+    model: ['확인한 코드', result?.source_digest?.slice(0, 12)],
+    requested: ['대조한 사례', result?.cases?.length],
+    effective: ['확인한 모델 호출', result?.provider_call_count],
+    output: ['확인이 멈춘 사례', result?.failed_case ?? (result?.task_completed === true ? '없음' : '미확인')],
+  };
+}
+
+function p20Summary(result) {
+  const receipt = result?.receipt;
+  return {
+    provider: ['실행 상태', ({complete: '완료', running: '진행 중', error: '오류'})[receipt?.execution_status]],
+    model: ['요청 단계', ({prepare: '준비', normal: '정상 대조', risk: '거부 요청', recovery: '정상 조회 유지'})[receipt?.phase]],
+    requested: ['처리 요청', receipt?.cases?.length],
+    effective: ['관측 종료', receipt?.closed === true ? '종료' : receipt?.closed === false ? '미종료' : undefined],
+    output: ['경보 확인', result?.alert_identity ? '발생·해제 대조됨' : '미확인'],
+  };
+}
+
 function renderEnvelope(payload) {
-  setText("raw", JSON.stringify(payload, null, 2));
+  setText("raw", rawResponses.get(payload) ?? JSON.stringify(payload, null, 2));
+  if (['P03', 'P04'].includes(payload.activity_id) && payload.resource_ready === true) {
+    const preparation = payload.preparation;
+    const binding = preparation?.resources?.binding;
+    const rows = payload.activity_id === 'P04' ? [
+      ['provider', '준비 작업', payload.operation_id, 'provider-id'],
+      ['model', 'Guardrail', preparation?.resources?.guardrail?.guardrailIdentifier, 'model-id'],
+      ['requested', '설정 버전', preparation?.resources?.guardrail?.guardrailVersion, 'requested-max'],
+      ['effective', '준비 상태', preparation?.state, 'forwarded-max'],
+      ['output', '설정 식별값', preparation?.resources?.policy_digest?.slice(0, 12), 'output-tokens'],
+    ] : [
+      ['provider', '준비 작업', payload.operation_id, 'provider-id'],
+      ['model', '현재 동기화 작업', binding?.provider_ingestion_job_id, 'model-id'],
+      ['requested', 'Knowledge Base', binding?.knowledge_base_id, 'requested-max'],
+      ['effective', '동기화 상태', preparation?.evidence?.document?.status, 'forwarded-max'],
+      ['output', '원문 위치', preparation?.resources?.source_uris?.[0], 'output-tokens'],
+    ];
+    for (const [key, label, value, id] of rows) {
+      setText(key + '-label', label);
+      setText(id, value);
+    }
+    setText('execution-id', payload.operation_id);
+    setText('execution-state', '자원 준비 완료');
+    setText('source-digest', null);
+    setText('verified-by', '준비 기록 · 과제 미채점');
+    setText('reason', payload.activity_id === 'P04' ? '출력 이메일 정책을 준비했습니다. 작성한 함수는 아직 채점하지 않았습니다.' : '원문과 검색 저장소를 준비했습니다. 작성한 함수는 아직 채점하지 않았습니다.');
+    setText('next-check', payload.next_check);
+    const task = byId('task-completion');
+    task.hidden = false;
+    task.textContent = `${payload.activity_id} 과제: 미완료`;
+    const verdict = byId('verdict');
+    verdict.className = 'verdict';
+    verdict.querySelector('strong').textContent = '미판정';
+    verdict.querySelector('span').textContent = '자원 준비는 보안 판정이 아닙니다';
+    byId('belt').replaceChildren();
+    return;
+  }
   setText("execution-id", payload.execution_id);
-  const h02 = payload.activity_id === "H02";
-  const h03 = payload.activity_id === "H03";
-  const h04 = payload.activity_id === "H04";
-  const h05 = payload.activity_id === "H05";
-  const h06 = payload.activity_id === "H06";
-  const h07 = payload.activity_id === "H07";
-  const h08 = payload.activity_id === "H08";
-  const h09 = payload.activity_id === "H09";
-  const h10 = payload.activity_id === "H10";
-  const h11 = payload.activity_id === "H11";
-  const h12 = payload.activity_id === "H12";
-  const h21 = payload.activity_id === "H21";
-  const h22 = payload.activity_id === "H22";
+  const h02 = ["H02", "P02"].includes(payload.activity_id);
+  const h03 = ["H03", "P03"].includes(payload.activity_id);
+  const h04 = ["H04", "P04"].includes(payload.activity_id);
+  const h05 = ["H05", "P05"].includes(payload.activity_id);
+  const h06 = ["H06", "P06"].includes(payload.activity_id);
+  const h07 = ["H07", "P07"].includes(payload.activity_id);
+  const h08 = ["H08", "P08"].includes(payload.activity_id);
+  const h09 = ["H09", "P09"].includes(payload.activity_id);
+  const h10 = ["H10", "P10"].includes(payload.activity_id);
+  const h11 = ["H11", "P11"].includes(payload.activity_id);
+  const h12 = ["H12", "P12"].includes(payload.activity_id);
+  const h21 = ["H21", "P21"].includes(payload.activity_id);
+  const h22 = ["H22", "P22"].includes(payload.activity_id);
   if (h03) {
     setText("provider-label", "PROVIDER REQUEST");
     setText("model-label", "CURRENT JOB");
@@ -305,12 +414,37 @@ function renderEnvelope(payload) {
   setText("forwarded-max", h12 ? payload.result?.direct_access_status : h11 ? payload.result?.cases?.length : h10 ? payload.result?.output_check_calls : h09 ? payload.result?.delivery_count : h21 ? payload.result?.verified_trusted_calls?.length : h22 ? payload.result?.server_id : h07 || h08 ? payload.result?.main_calls : h06 ? payload.result?.effect_count ?? payload.result?.effects?.length : h05 ? `${h05Evaluation?.intent_errors ?? "—"}/${h05Evaluation?.bot_intent_errors ?? "—"}/${h05Evaluation?.bot_message_errors ?? "—"}` : h04 ? payload.result?.stop_reason || payload.result?.status : h03 ? payload.result?.job_status || payload.result?.status : h02 ? payload.result?.embedding_dimension || payload.result?.dimensions : payload.result?.forwarded_parameters?.maxTokens);
   setText("output-tokens", h12 ? payload.result?.direct_side_effects : h11 ? payload.result?.forbidden_candidate_cases?.length : h10 ? payload.result?.browser_released_risk_markers : h09 ? payload.result?.raw_risk_cases?.length : h21 ? payload.result?.verified_provider_calls?.length : h22 ? payload.result?.verified_effects?.effects : h08 ? payload.result?.risk?.stops : h07 ? payload.result?.risk?.stop : h06 ? payload.result?.balance : h05 ? h05Risk?.bot_message : h04 ? payload.result?.output_text || payload.result?.guardrail_version : h03 ? payload.result?.final?.source_uris?.[0] || payload.result?.current_source_uri : h02 ? payload.result?.data_source_id : payload.result?.usage?.outputTokens);
   setText("source-digest", payload.result?.source_digest?.slice(0, 12));
+  if (payload.activity_id === "P02" && payload.contract_version === "p02-document-v1") {
+    const connection = payload.result?.resource_evidence?.after?.binding;
+    setText("provider-label", "검사 묶음");
+    setText("provider-id", payload.execution_id);
+    setText("model-label", "임베딩 모델");
+    setText("model-id", connection?.embedding_model_id);
+    setText("requested-label", "확인한 사례");
+    setText("requested-max", payload.result?.case_contract_verified ? payload.result?.cases?.length : null);
+    setText("effective-label", "벡터 차원");
+    setText("forwarded-max", payload.result?.embedding_dimension);
+    setText("output-label", "연결한 Data Source");
+    setText("output-tokens", connection?.data_source_id);
+  }
+  if (['P20', 'P12', 'P03', 'P04'].includes(payload.activity_id)) {
+    const ids = {provider: 'provider-id', model: 'model-id', requested: 'requested-max',
+                 effective: 'forwarded-max', output: 'output-tokens'};
+    const summary = payload.activity_id === 'P04' ? p04Summary(payload.result) : payload.activity_id === 'P03' ? p03Summary(payload.result) : payload.activity_id === 'P12' ? p12Summary(payload.result) : p20Summary(payload.result);
+    for (const [key, [label, value]] of Object.entries(summary)) {
+      setText(key + '-label', label);
+      setText(ids[key], value);
+    }
+  }
   setText("verified-by", payload.verified_by);
   setText("reason", payload.reason);
   setText("next-check", `다음 확인: ${payload.next_check}`);
   setText("execution-state", payload.execution_id || "실행 실패");
 
   const verdict = byId("verdict");
+  const taskCompletion = byId("task-completion");
+  taskCompletion.hidden = typeof payload.task_completed !== "boolean";
+  taskCompletion.textContent = taskCompletion.hidden ? "" : `${payload.activity_id} 과제: ${payload.task_completed ? "완료" : "미완료"}`;
   verdict.className = `verdict ${(payload.course_verdict || "ERR").toLowerCase()}`;
   verdict.querySelector("strong").textContent = payload.course_verdict || "ERR";
   verdict.querySelector("span").textContent = payload.verified_by || "검증 실패";
@@ -320,7 +454,7 @@ function renderEnvelope(payload) {
     control_center: "Control Center", learner_gateway: "Learner Gateway", bedrock_main: "Bedrock Main",
     learner_document_app: "Learner Document App", bedrock_titan: "Titan Embeddings",
     s3_source: "S3 Source", s3_vector_index: "S3 Vector Index", knowledge_base: "Knowledge Base",
-    h03_s3_source: "H03 S3 Source", h03_knowledge_base: "H03 Knowledge Base",
+    h03_s3_source: "P03 S3 Source", h03_knowledge_base: "P03 Knowledge Base",
     learner_sync_app: "Learner Sync App", knowledge_base_ingestion: "KB Ingestion",
     early_retrieval: "Early Retrieval", current_retrieval: "Current Retrieval",
     learner_guardrail_app: "Learner Guardrail App", apply_guardrail: "ApplyGuardrail",
@@ -360,11 +494,15 @@ function renderEnvelope(payload) {
 
 function renderError(error) {
   const payload = { course_verdict: "ERR", reason: error.message, next_check: "서비스 상태와 원시 오류를 확인합니다.", stage_calls: [] };
+  if (/^P\d{2}$/.test(error.detail?.activity_id || "") && error.detail.task_completed === false) {
+    Object.assign(payload, error.detail, { course_verdict: "ERR", security_verdict: "ERR", task_completed: false });
+  }
   renderEnvelope(payload);
 }
 
 async function execute(path, body) {
   setBusy(true);
+  byId("task-completion").hidden = true;
   try {
     renderEnvelope(await request(path, body));
   } catch (error) {
@@ -386,25 +524,25 @@ async function bootstrap() {
 }
 
 byId("preflight").addEventListener("click", () => execute("/api/provider-preflight"));
-byId("verify").addEventListener("click", () => execute("/api/hands-on/H01/verify"));
-byId("h02-provision").addEventListener("click", () => execute("/api/hands-on/H02/provision"));
-byId("h02-verify").addEventListener("click", () => execute("/api/hands-on/H02/verify"));
-byId("h03-provision").addEventListener("click", () => execute("/api/hands-on/H03/provision"));
-byId("h03-verify").addEventListener("click", () => execute("/api/hands-on/H03/verify"));
-byId("h04-provision").addEventListener("click", () => execute("/api/hands-on/H04/provision"));
-byId("h04-verify").addEventListener("click", () => execute("/api/hands-on/H04/verify"));
-byId("h05-verify").addEventListener("click", () => execute("/api/hands-on/H05/verify"));
-byId("h06-verify").addEventListener("click", () => execute("/api/hands-on/H06/verify"));
-byId("h07-verify").addEventListener("click", () => execute("/api/hands-on/H07/verify"));
-byId("h08-verify").addEventListener("click", () => execute("/api/hands-on/H08/verify"));
-byId("h09-verify").addEventListener("click", () => execute("/api/hands-on/H09/verify"));
-byId("h10-verify").addEventListener("click", () => execute("/api/hands-on/H10/verify"));
-byId("h11-verify").addEventListener("click", () => execute("/api/hands-on/H11/verify"));
-byId("h12-verify").addEventListener("click", () => execute("/api/hands-on/H12/verify"));
-byId("h13-verify").addEventListener("click", () => execute("/api/hands-on/H13/verify"));
-for (let number = 14; number <= 20; number += 1) byId(`h${number}-verify`).addEventListener("click", () => execute(`/api/hands-on/H${number}/verify`));
-byId("h21-verify").addEventListener("click", () => execute("/api/hands-on/H21/verify"));
-byId("h22-verify").addEventListener("click", () => execute("/api/hands-on/H22/verify"));
+byId("verify").addEventListener("click", () => execute("/api/practice/P01/verify"));
+byId("h02-provision").addEventListener("click", () => execute("/api/practice/P02/provision"));
+byId("h02-verify").addEventListener("click", () => execute("/api/practice/P02/verify"));
+byId("h03-provision").addEventListener("click", () => execute("/api/practice/P03/provision"));
+byId("h03-verify").addEventListener("click", () => execute("/api/practice/P03/verify"));
+byId("h04-provision").addEventListener("click", () => execute("/api/practice/P04/provision"));
+byId("h04-verify").addEventListener("click", () => execute("/api/practice/P04/verify"));
+byId("h05-verify").addEventListener("click", () => execute("/api/practice/P05/verify"));
+byId("h06-verify").addEventListener("click", () => execute("/api/practice/P06/verify"));
+byId("h07-verify").addEventListener("click", () => execute("/api/practice/P07/verify"));
+byId("h08-verify").addEventListener("click", () => execute("/api/practice/P08/verify"));
+byId("h09-verify").addEventListener("click", () => execute("/api/practice/P09/verify"));
+byId("h10-verify").addEventListener("click", () => execute("/api/practice/P10/verify"));
+byId("h11-verify").addEventListener("click", () => execute("/api/practice/P11/verify"));
+byId("h12-verify").addEventListener("click", () => execute("/api/practice/P12/verify"));
+byId("h13-verify").addEventListener("click", () => execute("/api/practice/P13/verify"));
+for (let number = 14; number <= 20; number += 1) byId(`h${number}-verify`).addEventListener("click", () => execute(`/api/practice/P${number}/verify`));
+byId("h21-verify").addEventListener("click", () => execute("/api/practice/P21/verify"));
+byId("h22-verify").addEventListener("click", () => execute("/api/practice/P22/verify"));
 byId("chat-form").addEventListener("submit", sendChat);
 document.querySelectorAll(".theme-choice").forEach((choice) => {
   choice.addEventListener("click", () => {

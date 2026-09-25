@@ -35,7 +35,7 @@ def wait_for_result(page, timeout_ms: int, previous_id: str | None = None) -> di
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default="http://127.0.0.1:18097")
+    parser.add_argument("--url", default="http://127.0.0.1:28097")
     parser.add_argument("--timeout-seconds", type=int, default=300)
     parser.add_argument("--browser-channel", default="chromium")
     parser.add_argument("--screenshot", default="")

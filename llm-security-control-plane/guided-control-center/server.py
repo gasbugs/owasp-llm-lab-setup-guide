@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import json
 import os
 import secrets
 import uuid
@@ -18,6 +19,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 ROOT = Path(__file__).parent
+P01_PATH = ROOT / "p01.json"
+if not P01_PATH.exists():
+    P01_PATH = ROOT.parent / "guided-contracts/p01.json"
+P01_CONTRACT = json.loads(P01_PATH.read_text())
 APP_VERSION = os.getenv("RELEASE_VERSION", os.getenv("APP_VERSION", "dev"))
 SESSION_SECRET = os.environ["GUIDED_SESSION_SECRET"].encode()
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
@@ -32,12 +37,19 @@ LAB09_URL = os.getenv("GUIDED_LAB09_URL", "http://guided-h09-presidio-redaction:
 LAB10_URL = os.getenv("GUIDED_LAB10_URL", "http://guided-h10-self-check-output:8000")
 LAB11_URL = os.getenv("GUIDED_LAB11_URL", "http://guided-h11-rag-provenance:8000")
 LAB12_URL = os.getenv("GUIDED_LAB12_URL", "http://guided-h12-application-pipeline:8000")
-H12_PROVIDER_URL = os.getenv("GUIDED_H12_PROVIDER_URL", "http://guided-h12-stage-provider:8000")
 LAB13_URL = os.getenv("GUIDED_LAB13_URL", "http://guided-h13-promptfoo:8000")
 LAB14_URL = os.getenv("GUIDED_LAB14_URL", "http://guided-h14-garak:8000")
 LAB15_URL = os.getenv("GUIDED_LAB15_URL", "http://guided-h15-pyrit:8000")
 LAB16_URL = os.getenv("GUIDED_LAB16_URL", "http://guided-h16-policy-promotion:8000")
 OBSERVABILITY_URL = os.getenv("GUIDED_OBSERVABILITY_URL", "http://guided-observability:8000")
+H18_URL = os.getenv("GUIDED_H18_URL", "http://guided-h18-queries:8000")
+H18_TOKEN = os.environ["GUIDED_CONTROL_H18_TOKEN"]
+H19_URL = os.getenv("GUIDED_H19_URL", "http://guided-h19-investigation:8000")
+H19_TOKEN = os.environ["GUIDED_CONTROL_H19_TOKEN"]
+H20_URL = os.getenv("GUIDED_H20_URL", "http://guided-h20-alerts:8000")
+H20_TOKEN = os.getenv("GUIDED_CONTROL_H20_TOKEN", "")
+H17_URL = os.getenv("GUIDED_H17_URL", "http://guided-h17-telemetry:8000")
+H17_TOKEN = os.environ["GUIDED_CONTROL_H17_TOKEN"]
 H09_SINK_URL = os.getenv(
     "GUIDED_H09_SINK_URL", "http://guided-h09-delivery-sink:8000"
 )
@@ -62,7 +74,6 @@ LAB09_TOKEN = os.environ["GUIDED_CONTROL_LAB09_TOKEN"]
 LAB10_TOKEN = os.environ["GUIDED_CONTROL_LAB10_TOKEN"]
 LAB11_TOKEN = os.environ["GUIDED_CONTROL_LAB11_TOKEN"]
 LAB12_TOKEN = os.environ["GUIDED_CONTROL_LAB12_TOKEN"]
-H12_PROVIDER_CONTROL_TOKEN = os.environ["GUIDED_H12_PROVIDER_CONTROL_TOKEN"]
 LAB13_TOKEN = os.environ["GUIDED_CONTROL_LAB13_TOKEN"]
 LAB14_TOKEN = os.environ["GUIDED_CONTROL_LAB14_TOKEN"]
 LAB15_TOKEN = os.environ["GUIDED_CONTROL_LAB15_TOKEN"]
@@ -80,23 +91,24 @@ H04_PROVISION_TOKEN = os.environ["GUIDED_LAB04_PROVISION_TOKEN"]
 VERIFIER_TOKEN = os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"]
 ALLOWED_HOSTS = set(
     os.getenv(
-        "GUIDED_ALLOWED_HOSTS", "127.0.0.1:18097,localhost:18097,testserver"
+        "GUIDED_ALLOWED_HOSTS", "127.0.0.1:28097,localhost:28097,testserver"
     ).split(",")
 )
 ALLOWED_ORIGINS = set(
     os.getenv(
         "GUIDED_ALLOWED_ORIGINS",
-        "http://127.0.0.1:18097,http://localhost:18097,http://testserver",
+        "http://127.0.0.1:28097,http://localhost:28097,http://testserver",
     ).split(",")
 )
 TIMEOUT = httpx.Timeout(130.0, connect=3.0)
 PROVISION_TIMEOUT = httpx.Timeout(360.0, connect=3.0)
 H07_CLOSE_TIMEOUT = httpx.Timeout(3.0, connect=1.0)
 MODEL_ID = "us.amazon.nova-lite-v1:0"
-NEMO_BROWSER_URL = os.getenv("GUIDED_NEMO_BROWSER_URL", "http://127.0.0.1:18192")
-PROMPTFOO_BROWSER_URL = os.getenv("GUIDED_PROMPTFOO_BROWSER_URL", "http://127.0.0.1:15500")
-PYRIT_BROWSER_URL = os.getenv("GUIDED_PYRIT_BROWSER_URL", "http://127.0.0.1:18098")
-GRAFANA_BROWSER_URL = os.getenv("GUIDED_GRAFANA_BROWSER_URL", "http://127.0.0.1:3001/explore")
+NEMO_BROWSER_URL = os.getenv("GUIDED_NEMO_BROWSER_URL", "http://127.0.0.1:28192")
+PROMPTFOO_BROWSER_URL = os.getenv("GUIDED_PROMPTFOO_BROWSER_URL", "http://127.0.0.1:25500")
+PYRIT_BROWSER_URL = os.getenv("GUIDED_PYRIT_BROWSER_URL", "http://127.0.0.1:28098")
+GRAFANA_BROWSER_URL = os.getenv("GUIDED_GRAFANA_BROWSER_URL", "http://127.0.0.1:23001/explore")
+P20_GRAFANA_BROWSER_URL = os.getenv("GUIDED_P20_GRAFANA_BROWSER_URL", "http://127.0.0.1:23002/d/guided-p20")
 SESSIONS: dict[str, dict] = {}
 ACTIVE_SESSIONS: set[str] = set()
 MAX_SESSIONS = 256
@@ -157,6 +169,21 @@ def security_headers(response: Response) -> None:
 app = FastAPI(title="LLM Security Guided Control Center", docs_url=None, redoc_url=None)
 
 
+def practice_envelope(payload: dict, public_id: str) -> dict:
+    """Expose the existing verifier result under its public Practice identity."""
+    internal_id = "H" + public_id[1:]
+    if payload.get("activity_id") != internal_id:
+        return payload
+    verdict = payload.get("course_verdict", "ERR")
+    return {
+        **payload,
+        "activity_id": public_id,
+        "internal_activity_id": internal_id,
+        "security_verdict": verdict,
+        "task_completed": payload.get("task_completed", verdict == "PASS"),
+    }
+
+
 @app.middleware("http")
 async def boundary_middleware(request: Request, call_next):
     if request.headers.get("host", "") not in ALLOWED_HOSTS:
@@ -164,6 +191,16 @@ async def boundary_middleware(request: Request, call_next):
         security_headers(response)
         return response
     response = await call_next(request)
+    parts = request.url.path.strip("/").split("/")
+    if (len(parts) == 4 and parts[:2] == ["api", "practice"]
+            and parts[2] in {f"P{number:02d}" for number in range(1, 23)}
+            and parts[3] == "verify" and response.status_code == 200):
+        body = b"".join([chunk async for chunk in response.body_iterator])
+        payload = practice_envelope(json.loads(body), parts[2])
+        headers = {key: value for key, value in response.headers.items()
+                   if key.lower() != "content-length"}
+        response = JSONResponse(content=payload, status_code=200, headers=headers,
+                                background=response.background)
     security_headers(response)
     return response
 
@@ -219,10 +256,14 @@ def readyz() -> dict[str, str]:
 
 @app.get("/api/bootstrap")
 def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
-    return {
+    payload = {
         "csrf_token": session[1]["csrf"],
+        "workspace": "practice",
         "course": {
             "tabs": 13,
+            "practices": 22,
+            "practice_ids": [f"P{number:02d}" for number in range(1, 23)],
+            "execution_ids": {f"P{number:02d}": f"H{number:02d}" for number in range(1, 23)},
             "hands_on": 22,
             "implemented_hands_on": [f"H{number:02d}" for number in range(1, 23)],
         },
@@ -244,33 +285,34 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             {"id": "promptfoo", "name": "Promptfoo Viewer", "browser_url": PROMPTFOO_BROWSER_URL, "status": "ready", "boundary": "H13 native evaluation을 살펴보는 공식 UI이며 PASS 판정은 별도 verifier가 수행합니다."},
             {"id": "pyrit", "name": "PyRIT Frontend", "browser_url": PYRIT_BROWSER_URL, "status": "ready", "boundary": "PyRIT 대화를 탐색하는 공식 UI이며 실제 영향 재현은 H15 verifier가 수행합니다."},
             {"id": "grafana", "name": "Grafana Explore", "browser_url": GRAFANA_BROWSER_URL, "status": "ready", "boundary": "원시 제품 API를 먼저 확인한 뒤 같은 신호를 화면에서 비교합니다."},
+            {"id": "p20-grafana", "name": "P20 Grafana", "browser_url": P20_GRAFANA_BROWSER_URL, "status": "ready", "boundary": "P20 전용 대시보드입니다. p20-reader 계정으로 현재 적용한 패널을 확인합니다. 화면만 열었다고 과제가 완료되지는 않습니다."},
         ],
         "learner_app": {
             "hands_on_id": "H01",
             "service": "guided-h01-gateway",
-            "source_path": "llm-security-control-plane/guided-labs/h01-bedrock-gateway/server.py",
+            "source_path": "llm-security-control-plane/guided-labs/h01-bedrock-gateway/learner.py",
             "compose_path": "examples/security-monitoring/compose.guided.yaml",
         },
         "learner_apps": [
             {
                 "hands_on_id": "H01",
                 "service": "guided-h01-gateway",
-                "source_path": "llm-security-control-plane/guided-labs/h01-bedrock-gateway/server.py",
+                "source_path": "llm-security-control-plane/guided-labs/h01-bedrock-gateway/learner.py",
             },
             {
                 "hands_on_id": "H02",
                 "service": "guided-h02-document-app",
-                "source_path": "llm-security-control-plane/guided-labs/h02-document-ingestion/server.py",
+                "source_path": "llm-security-control-plane/guided-labs/h02-document-ingestion/learner.py",
             },
             {
                 "hands_on_id": "H03",
                 "service": "guided-h03-sync-app",
-                "source_path": "llm-security-control-plane/guided-labs/h03-ingestion-search/server.py",
+                "source_path": "llm-security-control-plane/guided-labs/h03-ingestion-search/learner.py",
             },
             {
                 "hands_on_id": "H04",
                 "service": "guided-h04-guardrail-app",
-                "source_path": "llm-security-control-plane/guided-labs/h04-bedrock-guardrail/server.py",
+                "source_path": "llm-security-control-plane/guided-labs/h04-bedrock-guardrail/learner.py",
             },
             {
                 "hands_on_id": "H05",
@@ -320,10 +362,10 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
             {"hands_on_id": "H14", "service": "guided-h14-garak", "source_path": "llm-security-control-plane/guided-labs/h14-garak/garak-config.yaml"},
             {"hands_on_id": "H15", "service": "guided-h15-pyrit", "source_path": "llm-security-control-plane/guided-labs/h15-pyrit/attack.py"},
             {"hands_on_id": "H16", "service": "guided-h16-policy-promotion", "source_path": "llm-security-control-plane/guided-labs/h16-policy-promotion/policy.py"},
-            {"hands_on_id": "H17", "service": "guided-observability", "source_path": "llm-security-control-plane/guided-labs/h17-telemetry/telemetry.py"},
-            {"hands_on_id": "H18", "service": "guided-observability", "source_path": "llm-security-control-plane/guided-labs/h18-product-queries/queries.yaml"},
-            {"hands_on_id": "H19", "service": "guided-observability", "source_path": "llm-security-control-plane/guided-labs/h19-incident-investigation/investigation.py"},
-            {"hands_on_id": "H20", "service": "guided-observability", "source_path": "llm-security-control-plane/guided-labs/h20-alert-dashboard/alert-rules.yml"},
+            {"hands_on_id": "H17", "service": "guided-h17-telemetry", "source_path": "llm-security-control-plane/guided-labs/h17-telemetry/instrumentation.py"},
+            {"hands_on_id": "H18", "service": "guided-h18-queries", "source_path": "llm-security-control-plane/guided-labs/h18-product-queries/queries.yaml"},
+            {"hands_on_id": "H19", "service": "guided-h19-investigation", "source_path": "llm-security-control-plane/guided-labs/h19-incident-investigation/investigation.py"},
+            {"hands_on_id": "H20", "service": "guided-h20-alerts", "source_path": "llm-security-control-plane/guided-labs/h20-alert-dashboard/rules.yaml"},
             {
                 "hands_on_id": "H21",
                 "service": "guided-h21-host",
@@ -338,56 +380,29 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
     }
 
 
+    for item in [payload['learner_app'], *payload['learner_apps']]:
+        item['internal_activity_id'] = item['hands_on_id']
+        item['practice_id'] = 'P' + item['hands_on_id'][1:]
+    return payload
+
+
 async def execute_suite(session_id: str, suite_kind: str) -> dict:
+    def incomplete(stage: str, reason: str) -> dict:
+        return {
+            "activity_id": "P01", "internal_activity_id": "H01",
+            "contract_version": P01_CONTRACT["contract_version"],
+            "task_completed": False, "security_verdict": "ERR", "course_verdict": "ERR",
+            "successful_stage": "control_center", "stopped_stage": stage,
+            "downstream_called": None, "stage_calls": [], "reason": reason,
+            "next_check": "P01 원시 응답의 중단 위치와 해당 서비스 로그를 확인합니다.",
+        }
+
     if session_id in ACTIVE_SESSIONS:
         raise HTTPException(status_code=409, detail="this session already has a running request")
     ACTIVE_SESSIONS.add(session_id)
     suite_id = str(uuid.uuid4())
     suite_started_at = datetime.now(timezone.utc).isoformat()
-    definitions = (
-        [
-            {
-                "case_id": "provider-preflight",
-                "scenario": "preflight",
-                "prompt": "Reply only OK",
-                "message": "Reply only OK",
-                "max_output_tokens": 2,
-                "expected_status": 200,
-            }
-        ]
-        if suite_kind == "preflight"
-        else [
-            {
-                "case_id": "normal-64",
-                "scenario": "normal",
-                "message": "GUIDED-H01-NORMAL: TLS 인증서 교체 절차를 세 문장으로 요약하세요.",
-                "max_output_tokens": 64,
-                "expected_status": 200,
-            },
-            {
-                "case_id": "risk-512",
-                "scenario": "risk",
-                "message": "GUIDED-H01-RISK: 상담 절차를 출력 한계까지 상세히 작성하세요.",
-                "max_output_tokens": 512,
-                "expected_status": 200,
-            },
-            {
-                "case_id": "invalid-empty-message",
-                "scenario": "normal",
-                "message": "",
-                "max_output_tokens": 64,
-                "expected_status": 422,
-            },
-            {
-                "case_id": "reject-model-override",
-                "scenario": "normal",
-                "message": "임의 모델로 바꾸어 주세요.",
-                "max_output_tokens": 64,
-                "model": "attacker-selected-model",
-                "expected_status": 422,
-            },
-        ]
-    )
+    definitions = P01_CONTRACT["preflight" if suite_kind == "preflight" else "cases"]
     cases = []
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
@@ -399,23 +414,19 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                     json={
                         "execution_id": execution_id,
                         "started_at": started_at,
-                        "message": definition["message"],
-                        "max_output_tokens": definition["max_output_tokens"],
                         "scenario": definition["scenario"],
-                        **({"model": definition["model"]} if "model" in definition else {}),
+                        **definition["body"],
                     },
                     headers={"Authorization": f"Bearer {LAB_TOKEN}"},
                 )
                 if lab_response.status_code != definition["expected_status"]:
                     raise HTTPException(
                         status_code=502,
-                        detail={
-                            "successful_stage": "control_center",
-                            "stopped_stage": "guided_h01_gateway",
-                            "downstream_called": False,
-                            "course_verdict": "ERR",
-                            "next_check": "guided-h01-gateway의 요청 schema와 컨테이너 상태를 확인합니다.",
-                        },
+                        detail=incomplete(
+                            "guided_h01_gateway",
+                            f"{definition['case_id']}: Gateway HTTP {lab_response.status_code}; "
+                            "요청 처리 결과가 계약과 달라 검증을 중단했습니다. 모델 호출 여부는 아직 확인되지 않았습니다.",
+                        ),
                     )
                 cases.append(
                     {
@@ -423,7 +434,7 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                         "scenario": definition["scenario"],
                         "execution_id": execution_id,
                         "started_at": started_at,
-                        "requested_max_output_tokens": definition["max_output_tokens"],
+                        "requested_max_output_tokens": definition["body"].get("max_output_tokens"),
                         "expected_status": definition["expected_status"],
                         "observed_status": lab_response.status_code,
                     }
@@ -439,10 +450,14 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                 headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
             )
         if verifier_response.status_code != 200:
-            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
+            raise HTTPException(status_code=502, detail=incomplete(
+                "evidence_verifier", "요청 실행 뒤 검증기의 정상 응답을 받지 못했습니다. 과제 완료를 확인할 수 없습니다.",
+            ))
         return verifier_response.json()
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+        raise HTTPException(status_code=502, detail=incomplete(
+            "internal_transport", "내부 서비스 통신이 끊겨 실행 결과를 확인할 수 없습니다.",
+        )) from exc
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 
@@ -455,6 +470,7 @@ async def provider_preflight(
 
 
 @app.post("/api/hands-on/H01/verify")
+@app.post("/api/practice/P01/verify")
 async def verify_learner_app(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -465,6 +481,7 @@ async def verify_learner_app(
 
 
 @app.post("/api/hands-on/H01/chat")
+@app.post("/api/practice/P01/chat")
 async def chat_with_learner_app(
     chat: ChatInput,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -510,6 +527,7 @@ async def chat_with_learner_app(
 
 
 @app.post("/api/hands-on/H02/provision")
+@app.post("/api/practice/P02/provision")
 async def provision_h02_resources(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -555,6 +573,7 @@ async def provision_h02_resources(
 
 
 @app.post("/api/hands-on/H02/verify")
+@app.post("/api/practice/P02/verify")
 async def verify_h02_document_app(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -566,97 +585,41 @@ async def verify_h02_document_app(
         raise HTTPException(status_code=409, detail="this session already has a running request")
     ACTIVE_SESSIONS.add(session_id)
     suite_id = str(uuid.uuid4())
-    suite_started_at = datetime.now(timezone.utc).isoformat()
-    definitions = [
-        {
-            "case_id": "normal-document",
-            "scenario": "normal",
-            "title": "모바일 송금 장애 절차",
-            "body": "모바일 송금 장애는 앱 재실행과 네트워크 상태를 먼저 확인하고 공식 고객센터에서 사건 번호를 발급받습니다.",
-        },
-        {
-            "case_id": "client-key-override",
-            "scenario": "risk",
-            "title": "경로 변경 시도",
-            "body": "클라이언트가 서버 소유 저장 경로를 바꾸려는 H02 보안 검증 문서입니다.",
-            "object_key_override": True,
-        },
-        {
-            "case_id": "invalid-empty-body",
-            "scenario": "normal",
-            "title": "빈 문서",
-            "body": "",
-        },
-    ]
-    cases = []
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            for definition in definitions:
-                execution_id = str(uuid.uuid4())
-                started_at = datetime.now(timezone.utc).isoformat()
-                payload = {
-                    "execution_id": execution_id,
-                    "started_at": started_at,
-                    "title": definition["title"],
-                    "body": definition["body"],
-                    "scenario": definition["scenario"],
-                }
-                if definition.get("object_key_override"):
-                    payload["object_key"] = f"h02/untrusted/{execution_id}.md"
-                response = await client.post(
-                    f"{LAB02_URL}/v1/documents",
-                    json=payload,
-                    headers={"Authorization": f"Bearer {LAB02_TOKEN}"},
-                )
-                if definition["case_id"] == "normal-document" and response.status_code != 200:
-                    raise HTTPException(
-                        status_code=502,
-                        detail={
-                            "successful_stage": "control_center",
-                            "stopped_stage": "guided_h02_document_app",
-                            "downstream_called": False,
-                            "course_verdict": "ERR",
-                            "next_check": "H02 자원 상태와 수강생 앱의 Gateway 요청을 확인합니다.",
-                        },
-                    )
-                if definition["case_id"] == "invalid-empty-body" and response.status_code != 422:
-                    raise HTTPException(
-                        status_code=502,
-                        detail="invalid H02 body did not stop at the HTTP schema",
-                    )
-                if definition["case_id"] == "client-key-override" and response.status_code not in {200, 422}:
-                    raise HTTPException(
-                        status_code=502,
-                        detail="H02 risk case returned an unexpected HTTP status",
-                    )
-                cases.append(
-                    {
-                        "case_id": definition["case_id"],
-                        "scenario": definition["scenario"],
-                        "execution_id": execution_id,
-                        "started_at": started_at,
-                        "observed_status": response.status_code,
-                    }
-                )
+        async with httpx.AsyncClient(timeout=210, follow_redirects=False, trust_env=False) as client:
+            response = await client.post(
+                f"{LAB02_URL}/v1/run", json={"suite_id": suite_id},
+                headers={"Authorization": f"Bearer {LAB02_TOKEN}"},
+            )
+            if response.status_code != 200 or response.json().get("suite_id") != suite_id:
+                raise ValueError("P02 runner response unavailable")
             verifier_response = await client.post(
-                f"{VERIFIER_URL}/v1/verify/lab-02",
-                json={
-                    "suite_id": suite_id,
-                    "started_at": suite_started_at,
-                    "cases": cases,
-                },
+                f"{VERIFIER_URL}/v1/verify/p02",
+                json={"suite_id": suite_id},
                 headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
             )
         if verifier_response.status_code != 200:
-            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
-        return verifier_response.json()
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+            raise ValueError("P02 verifier unavailable")
+        result = verifier_response.json()
+        if (result.get("activity_id") != "P02"
+                or result.get("execution_id") != suite_id
+                or result.get("contract_version") != "p02-document-v1"
+                or result.get("verified_by") != "guided-evidence-verifier"
+                or type(result.get("task_completed")) is not bool
+                or result.get("security_verdict") not in {"PASS", "ERR"}
+                or result.get("course_verdict") != result["security_verdict"]
+                or result["task_completed"] != (result["security_verdict"] == "PASS")):
+            raise ValueError("P02 verifier response mismatch")
+        return result
+    except (httpx.RequestError, ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(status_code=502, detail={"task_completed": False, "security_verdict": "ERR",
+            "course_verdict": "ERR", "next_check": "P02 실행 서버와 Gateway 기록을 확인하세요. 통신 오류만으로 호출이 없었다고 판단할 수 없습니다."}) from exc
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 
 
 @app.post("/api/hands-on/H03/provision")
+@app.post("/api/practice/P03/provision")
 async def provision_h03_baseline(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -667,41 +630,33 @@ async def provision_h03_baseline(
     if session_id in ACTIVE_SESSIONS:
         raise HTTPException(status_code=409, detail="this session already has a running request")
     ACTIVE_SESSIONS.add(session_id)
-    execution_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
+    operation_id = str(uuid.uuid4())
     try:
-        async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=480, follow_redirects=False, trust_env=False) as client:
             response = await client.post(
-                f"{GATEWAY_URL}/v1/h03/provision",
-                json={"execution_id": execution_id},
+                f"{GATEWAY_URL}/v1/p03/resources/prepare", json={"operation_id": operation_id},
                 headers={"Authorization": f"Bearer {H03_PROVISION_TOKEN}"},
             )
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=502,
-                    detail={
-                        "successful_stage": "control_center",
-                        "stopped_stage": "h03_baseline_provisioning",
-                        "downstream_called": True,
-                        "course_verdict": "ERR",
-                        "next_check": "H03 Gateway 원시 오류와 전용 AWS 자원 상태를 확인합니다.",
-                    },
-                )
-            verified = await client.post(
-                f"{VERIFIER_URL}/v1/verify/lab-03-resources",
-                json={"suite_id": execution_id, "started_at": started_at},
-                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
-            )
-        if verified.status_code != 200:
-            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
-        return verified.json()
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+        result = response.json()
+        if (response.status_code != 200 or result.get("practice_id") != "P03"
+                or result.get("operation_id") != operation_id or result.get("state") != "ready"
+                or not isinstance(result.get("resources"), dict)
+                or result["resources"].get("provider_mode") != "aws"
+                or not isinstance(result.get("evidence"), dict)):
+            raise ValueError("P03 preparation response mismatch")
+        return {"activity_id": "P03", "operation_id": operation_id, "resource_ready": True,
+                "task_completed": False, "preparation": result,
+                "next_check": "P03 전용 문서의 동기화가 끝났습니다. 함수를 작성·빌드한 뒤 구현 검증을 실행하세요. 자원 준비는 과제 통과가 아닙니다."}
+    except (httpx.RequestError, ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(status_code=502, detail={"task_completed": False, "security_verdict": "ERR",
+            "course_verdict": "ERR", "activity_id": "P03", "operation_id": operation_id,
+            "next_check": "P03 준비 기록과 AWS 자원 상태를 확인하세요. 오류가 나도 일부 자원이나 동기화 작업이 남아 있을 수 있습니다."}) from exc
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 
 
 @app.post("/api/hands-on/H03/verify")
+@app.post("/api/practice/P03/verify")
 async def verify_h03_sync_app(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -713,69 +668,42 @@ async def verify_h03_sync_app(
         raise HTTPException(status_code=409, detail="this session already has a running request")
     ACTIVE_SESSIONS.add(session_id)
     suite_id = str(uuid.uuid4())
-    execution_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
     try:
-        async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
-            started = await client.post(
-                f"{LAB03_URL}/v1/sync",
-                json={"execution_id": execution_id, "started_at": started_at},
+        async with httpx.AsyncClient(timeout=210, follow_redirects=False, trust_env=False) as client:
+            response = await client.post(
+                f"{LAB03_URL}/v1/run", json={"suite_id": suite_id},
                 headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
             )
-            if started.status_code != 200:
-                raise HTTPException(status_code=502, detail="H03 current ingestion did not start")
-            early = await client.post(
-                f"{LAB03_URL}/v1/search",
-                json={"execution_id": execution_id, "phase": "early"},
-                headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
-            )
-            if early.status_code not in {200, 409}:
-                raise HTTPException(status_code=502, detail="H03 early search returned an unexpected status")
-
-            job_status = "STARTING"
-            for _ in range(20):
-                status_response = await client.get(
-                    f"{LAB03_URL}/v1/status/{execution_id}",
-                    headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
-                )
-                if status_response.status_code != 200:
-                    raise HTTPException(status_code=502, detail="H03 current job status is unavailable")
-                job_status = status_response.json().get("status", "")
-                if job_status == "COMPLETE":
-                    break
-                if job_status in {"FAILED", "STOPPED"}:
-                    raise HTTPException(status_code=502, detail=f"H03 ingestion entered {job_status}")
-                await asyncio.sleep(2)
-            if job_status != "COMPLETE":
-                raise HTTPException(status_code=504, detail="H03 ingestion did not complete in 40 seconds")
-
-            final = await client.post(
-                f"{LAB03_URL}/v1/search",
-                json={"execution_id": execution_id, "phase": "final"},
-                headers={"Authorization": f"Bearer {LAB03_TOKEN}"},
-            )
-            if final.status_code != 200:
-                raise HTTPException(status_code=502, detail="H03 final search did not preserve normal retrieval")
-            verified = await client.post(
-                f"{VERIFIER_URL}/v1/verify/lab-03",
-                json={
-                    "suite_id": suite_id,
-                    "execution_id": execution_id,
-                    "started_at": started_at,
-                },
+            if response.status_code != 200 or response.json().get("suite_id") != suite_id:
+                raise ValueError("P03 runner response unavailable")
+            verifier_response = await client.post(
+                f"{VERIFIER_URL}/v1/verify/p03",
+                json={"suite_id": suite_id},
                 headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
             )
-        if verified.status_code != 200:
-            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
-        return verified.json()
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+        if verifier_response.status_code != 200:
+            raise ValueError("P03 verifier unavailable")
+        result = verifier_response.json()
+        if (result.get("activity_id") != "P03"
+                or result.get("execution_id") != suite_id
+                or result.get("contract_version") != "p03-search-v1"
+                or result.get("verified_by") != "guided-evidence-verifier"
+                or type(result.get("task_completed")) is not bool
+                or result.get("security_verdict") not in {"PASS", "ERR"}
+                or result.get("course_verdict") != result["security_verdict"]
+                or result["task_completed"] != (result["security_verdict"] == "PASS")):
+            raise ValueError("P03 verifier response mismatch")
+        return result
+    except (httpx.RequestError, ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(status_code=502, detail={"task_completed": False, "security_verdict": "ERR",
+            "course_verdict": "ERR", "next_check": "P03 실행 서버와 Gateway 기록을 확인하세요. 통신 오류만으로 호출이 없었다고 판단할 수 없습니다."}) from exc
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 
 
-@app.post("/api/hands-on/H04/provision")
-async def provision_h04_guardrail(
+
+@app.post("/api/practice/P04/provision")
+async def provision_p04_baseline(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
 ) -> dict:
@@ -785,42 +713,33 @@ async def provision_h04_guardrail(
     if session_id in ACTIVE_SESSIONS:
         raise HTTPException(status_code=409, detail="this session already has a running request")
     ACTIVE_SESSIONS.add(session_id)
-    execution_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
+    operation_id = str(uuid.uuid4())
     try:
-        async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=480, follow_redirects=False, trust_env=False) as client:
             response = await client.post(
-                f"{GATEWAY_URL}/v1/h04/provision",
-                json={"execution_id": execution_id},
+                f"{GATEWAY_URL}/v1/p04/resources/prepare", json={"operation_id": operation_id},
                 headers={"Authorization": f"Bearer {H04_PROVISION_TOKEN}"},
             )
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=502,
-                    detail={
-                        "successful_stage": "control_center",
-                        "stopped_stage": "h04_guardrail_provisioning",
-                        "downstream_called": True,
-                        "course_verdict": "ERR",
-                        "next_check": "H04 Gateway 원시 오류와 전용 Guardrail 상태를 확인합니다.",
-                    },
-                )
-            verified = await client.post(
-                f"{VERIFIER_URL}/v1/verify/lab-04-resources",
-                json={"suite_id": execution_id, "started_at": started_at},
-                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
-            )
-        if verified.status_code != 200:
-            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
-        return verified.json()
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+        result = response.json()
+        if (response.status_code != 200 or result.get("practice_id") != "P04"
+                or result.get("operation_id") != operation_id or result.get("state") != "ready"
+                or not isinstance(result.get("resources"), dict)
+                or result["resources"].get("provider_mode") != "aws"
+                or not isinstance(result.get("evidence"), dict)):
+            raise ValueError("P04 preparation response mismatch")
+        return {"activity_id": "P04", "operation_id": operation_id, "resource_ready": True,
+                "task_completed": False, "preparation": result,
+                "next_check": "P04 전용 출력 이메일 정책이 준비됐습니다. 함수를 작성·빌드한 뒤 구현 검증을 실행하세요. 자원 준비는 과제 통과가 아닙니다."}
+    except (httpx.RequestError, ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(status_code=502, detail={"task_completed": False, "security_verdict": "ERR",
+            "course_verdict": "ERR", "activity_id": "P04", "operation_id": operation_id,
+            "next_check": "P04 준비 기록과 AWS 자원 상태를 확인하세요. 오류가 나도 일부 Guardrail 자원이 남아 있을 수 있습니다."}) from exc
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 
 
-@app.post("/api/hands-on/H04/verify")
-async def verify_h04_guardrail_app(
+@app.post("/api/practice/P04/verify")
+async def verify_p04_guardrail_app(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
 ) -> dict:
@@ -831,60 +750,49 @@ async def verify_h04_guardrail_app(
         raise HTTPException(status_code=409, detail="this session already has a running request")
     ACTIVE_SESSIONS.add(session_id)
     suite_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
-    cases = []
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            for case_id in (
-                "apply-normal",
-                "apply-risk",
-                "converse-normal",
-                "converse-risk",
-            ):
-                execution_id = str(uuid.uuid4())
-                case_started_at = datetime.now(timezone.utc).isoformat()
-                response = await client.post(
-                    f"{LAB04_URL}/v1/run",
-                    json={
-                        "execution_id": execution_id,
-                        "started_at": case_started_at,
-                        "case_id": case_id,
-                    },
-                    headers={"Authorization": f"Bearer {LAB04_TOKEN}"},
-                )
-                if response.status_code != 200:
-                    raise HTTPException(
-                        status_code=502,
-                        detail={
-                            "successful_stage": "control_center",
-                            "stopped_stage": "guided_h04_guardrail_app",
-                            "downstream_called": False,
-                            "course_verdict": "ERR",
-                            "next_check": "H04 Guardrail 상태와 수강생 앱의 Gateway 요청을 확인합니다.",
-                        },
-                    )
-                cases.append(
-                    {
-                        "case_id": case_id,
-                        "execution_id": execution_id,
-                        "started_at": case_started_at,
-                    }
-                )
-            verified = await client.post(
-                f"{VERIFIER_URL}/v1/verify/lab-04",
-                json={"suite_id": suite_id, "started_at": started_at, "cases": cases},
+        async with httpx.AsyncClient(timeout=210, follow_redirects=False, trust_env=False) as client:
+            response = await client.post(
+                f"{LAB04_URL}/v1/run", json={"suite_id": suite_id},
+                headers={"Authorization": f"Bearer {LAB04_TOKEN}"},
+            )
+            if response.status_code != 200 or response.json().get("suite_id") != suite_id:
+                raise ValueError("P04 runner response unavailable")
+            verifier_response = await client.post(
+                f"{VERIFIER_URL}/v1/verify/p04",
+                json={"suite_id": suite_id},
                 headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
             )
-        if verified.status_code != 200:
-            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
-        return verified.json()
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail="internal guided service unavailable") from exc
+        if verifier_response.status_code != 200:
+            raise ValueError("P04 verifier unavailable")
+        result = verifier_response.json()
+        if (result.get("activity_id") != "P04"
+                or result.get("execution_id") != suite_id
+                or result.get("contract_version") != "p04-guardrail-v1"
+                or result.get("verified_by") != "guided-evidence-verifier"
+                or type(result.get("task_completed")) is not bool
+                or result.get("security_verdict") not in {"PASS", "ERR"}
+                or result.get("course_verdict") != result["security_verdict"]
+                or result["task_completed"] != (result["security_verdict"] == "PASS")):
+            raise ValueError("P04 verifier response mismatch")
+        return result
+    except (httpx.RequestError, ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(status_code=502, detail={"task_completed": False, "security_verdict": "ERR",
+            "course_verdict": "ERR", "next_check": "P04 실행 서버와 Gateway의 정책·호출 기록을 확인하세요. 통신 오류만으로 호출이 없었다고 판단할 수 없습니다."}) from exc
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 
 
+@app.post("/api/hands-on/H04/provision")
+@app.post("/api/hands-on/H04/verify")
+async def retired_h04_action(
+    session: tuple[str, dict] = Depends(require_csrf),
+) -> dict:
+    raise HTTPException(status_code=410, detail="H04 retired; use /api/practice/P04")
+
+
 @app.post("/api/hands-on/H05/verify")
+@app.post("/api/practice/P05/verify")
 async def verify_h05_dialog_rail(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -976,6 +884,7 @@ async def verify_h05_dialog_rail(
 
 
 @app.post("/api/hands-on/H06/verify")
+@app.post("/api/practice/P06/verify")
 async def verify_h06_python_action(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1125,6 +1034,7 @@ async def close_h09_sink_suite(suite_id: str) -> bool:
 
 
 @app.post("/api/hands-on/H07/verify")
+@app.post("/api/practice/P07/verify")
 async def verify_h07_content_safety(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1268,6 +1178,7 @@ async def verify_h07_content_safety(
 
 
 @app.post("/api/hands-on/H08/verify")
+@app.post("/api/practice/P08/verify")
 async def verify_h08_self_check_input(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1412,6 +1323,7 @@ async def verify_h08_self_check_input(
 
 
 @app.post("/api/hands-on/H09/verify")
+@app.post("/api/practice/P09/verify")
 async def verify_h09_presidio_delivery(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1527,6 +1439,7 @@ async def verify_h09_presidio_delivery(
 
 
 @app.post("/api/hands-on/H10/verify")
+@app.post("/api/practice/P10/verify")
 async def verify_h10_output_rail(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1585,6 +1498,7 @@ async def verify_h10_output_rail(
 
 
 @app.post("/api/hands-on/H11/verify")
+@app.post("/api/practice/P11/verify")
 async def verify_h11_rag_provenance(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1629,7 +1543,26 @@ async def verify_h11_rag_provenance(
         ACTIVE_SESSIONS.discard(session_id)
 
 
+async def p12_post_json(client, url, token, suite_id, deadline):
+    async def receive():
+        async with client.stream("POST", url, json={"suite_id": suite_id},
+                headers={"Authorization": f"Bearer {token}"}) as response:
+            if response.status_code != 200:
+                raise ValueError("P12 service response unavailable")
+            raw = bytearray()
+            async for chunk in response.aiter_bytes():
+                raw.extend(chunk)
+                if len(raw) > 2097152:
+                    raise ValueError("oversized P12 response")
+            value = json.loads(raw)
+            if not isinstance(value, dict):
+                raise ValueError("invalid P12 response")
+            return value
+    return await asyncio.wait_for(receive(), timeout=deadline)
+
+
 @app.post("/api/hands-on/H12/verify")
+@app.post("/api/practice/P12/verify")
 async def verify_h12_application_pipeline(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1641,48 +1574,49 @@ async def verify_h12_application_pipeline(
         raise HTTPException(status_code=409, detail="this session already has a running request")
     ACTIVE_SESSIONS.add(session_id)
     suite_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
+    stopped = "p12_runner"
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            prepared = await client.post(
-                f"{H12_PROVIDER_URL}/v1/suites",
-                json={"suite_id": suite_id, "started_at": started_at},
-                headers={"Authorization": f"Bearer {H12_PROVIDER_CONTROL_TOKEN}"},
-            )
-            if prepared.status_code != 200:
-                raise HTTPException(status_code=502, detail="H12 stage provider did not prepare the suite")
-            executed = await client.post(
-                f"{LAB12_URL}/v1/run",
-                json={"suite_id": suite_id, "started_at": started_at},
-                headers={"Authorization": f"Bearer {LAB12_TOKEN}"},
-            )
-            direct = await client.post(f"{H12_PROVIDER_URL}/v1/protected/{suite_id}")
-            if executed.status_code != 200 or direct.status_code != 401:
-                raise HTTPException(
-                    status_code=502,
-                    detail={
-                        "successful_stage": "h12_provider_prepare",
-                        "stopped_stage": "h12_application_or_protected_boundary",
-                        "downstream_called": True,
-                        "course_verdict": "ERR",
-                        "next_check": "H12 pipeline과 내부 서비스 Token 경계를 확인합니다.",
-                    },
-                )
-            verified = await client.post(
-                f"{VERIFIER_URL}/v1/verify/h12",
-                json={"suite_id": suite_id, "started_at": started_at},
-                headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"},
-            )
-        if verified.status_code != 200:
-            raise HTTPException(status_code=502, detail="evidence verifier unavailable")
-        return verified.json()
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail="H12 internal service unavailable") from exc
+        async with httpx.AsyncClient(timeout=httpx.Timeout(770.0, connect=3.0),
+                follow_redirects=False, trust_env=False) as client:
+            executed = await p12_post_json(client, f"{LAB12_URL}/v1/run",
+                                           LAB12_TOKEN, suite_id, 780)
+            if executed.get("suite_id") != suite_id or executed.get("run_state") not in {"finished", "error"}:
+                raise ValueError("P12 execution identity mismatch")
+            stopped = "p12_verifier"
+            verified = await p12_post_json(client, f"{VERIFIER_URL}/v1/verify/p12",
+                                           VERIFIER_TOKEN, suite_id, 190)
+        result = verified.get("result")
+        if (verified.get("activity_id") != "P12" or verified.get("execution_id") != suite_id
+                or type(verified.get("contract_version")) is not int or verified["contract_version"] != 2
+                or verified.get("verified_by") != "guided-evidence-verifier"
+                or not isinstance(result, dict) or result.get("suite_id") != suite_id
+                or result.get("practice_id") != "P12" or result.get("execution_id") != "H12"
+                or type(result.get("contract_version")) is not int or result["contract_version"] != 2
+                or type(verified.get("task_completed")) is not bool
+                or type(result.get("task_completed")) is not bool
+                or verified["task_completed"] != result["task_completed"]
+                or verified.get("security_verdict") not in {"PASS", "ERR"}
+                or verified["security_verdict"] != result.get("security_verdict")
+                or verified.get("course_verdict") != verified["security_verdict"]
+                or verified["task_completed"] != (verified["security_verdict"] == "PASS")
+                or (executed["run_state"] == "error" and verified["task_completed"])):
+            raise ValueError("P12 verification identity or outcome mismatch")
+        return verified
+    except (httpx.HTTPError, ValueError, TimeoutError):
+        return {
+            "lab_id": "07-rag-boundary", "activity_id": "P12", "execution_id": suite_id,
+            "contract_version": 2, "task_completed": False,
+            "security_verdict": "ERR", "course_verdict": "ERR", "stage_calls": [],
+            "stopped_stage": stopped, "downstream_called": None,
+            "reason": "P12 실행 또는 검증 응답을 확인하지 못했습니다. 뒤 서비스 호출 여부도 확정할 수 없습니다.",
+            "next_check": "같은 실행 ID의 P12 원문 기록과 중단된 서비스의 로그를 확인하세요.",
+        }
     finally:
         ACTIVE_SESSIONS.discard(session_id)
 
 
 @app.post("/api/hands-on/H13/verify")
+@app.post("/api/practice/P13/verify")
 async def verify_h13_promptfoo(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1730,47 +1664,73 @@ async def run_tool_activity(activity: str, lab_url: str, lab_token: str) -> dict
     return verified.json()
 
 @app.post("/api/hands-on/H14/verify")
+@app.post("/api/practice/P14/verify")
 async def verify_h14(request: Request, session: tuple[str, dict] = Depends(require_csrf)) -> dict:
     if await request.body(): raise HTTPException(422, "verification inputs are server-owned")
     return await run_tool_activity("H14", LAB14_URL, LAB14_TOKEN)
 
 @app.post("/api/hands-on/H15/verify")
+@app.post("/api/practice/P15/verify")
 async def verify_h15(request: Request, session: tuple[str, dict] = Depends(require_csrf)) -> dict:
     if await request.body(): raise HTTPException(422, "verification inputs are server-owned")
     return await run_tool_activity("H15", LAB15_URL, LAB15_TOKEN)
 
 @app.post("/api/hands-on/H16/verify")
+@app.post("/api/practice/P16/verify")
 async def verify_h16(request: Request, session: tuple[str, dict] = Depends(require_csrf)) -> dict:
     if await request.body(): raise HTTPException(422, "verification inputs are server-owned")
     return await run_tool_activity("H16", LAB16_URL, LAB16_TOKEN)
 
 async def run_observability_activity(activity: str) -> dict:
     suite_id=str(uuid.uuid4()); started_at=datetime.now(timezone.utc).isoformat()
-    async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
-        executed=await client.post(f"{OBSERVABILITY_URL}/v1/run/{activity}",json={"suite_id":suite_id,"started_at":started_at},headers={"Authorization":f"Bearer {OBSERVABILITY_TOKEN}"})
-        if executed.status_code != 200: raise HTTPException(502,f"{activity} signal generation failed")
-        verified=await client.post(f"{VERIFIER_URL}/v1/verify/{activity.lower()}",json={"suite_id":suite_id,"started_at":started_at},headers={"Authorization":f"Bearer {VERIFIER_TOKEN}"})
-    if verified.status_code != 200: raise HTTPException(502,"evidence verifier unavailable")
-    return verified.json()
+    url,token={'H17': (H17_URL,H17_TOKEN), 'H18': (H18_URL,H18_TOKEN), 'H19': (H19_URL,H19_TOKEN),
+               'H20': (H20_URL,H20_TOKEN)}[activity]
+    stopped_stage = 'learner_execution'
+    try:
+        if not token:
+            raise ValueError('activity connection is not configured')
+        async with httpx.AsyncClient(timeout=PROVISION_TIMEOUT) as client:
+            executed=await client.post(f"{url}/v1/run/{activity}",json={"suite_id":suite_id,"started_at":started_at},headers={"Authorization":f"Bearer {token}"})
+            if executed.status_code != 200:
+                raise ValueError('learner response unavailable')
+            stopped_stage = 'evidence_verification'
+            verified=await client.post(f"{VERIFIER_URL}/v1/verify/{activity.lower()}",json={"suite_id":suite_id,"started_at":started_at},headers={"Authorization":f"Bearer {VERIFIER_TOKEN}"})
+        if verified.status_code != 200:
+            raise ValueError('verifier response unavailable')
+        return verified.json()
+    except (httpx.HTTPError, ValueError):
+        raise HTTPException(502, detail={
+            'activity_id': activity.replace('H', 'P', 1), 'internal_activity_id': activity,
+            'task_completed': False, 'security_verdict': 'ERR', 'course_verdict': 'ERR',
+            'stopped_stage': stopped_stage,
+            'reason': '실행 또는 검증 응답을 받지 못했습니다. 기록을 확인하기 전에는 뒤 호출 여부를 단정할 수 없습니다.',
+            'next_check': ('해당 문제 컨테이너의 실행 상태를 확인합니다.' if stopped_stage == 'learner_execution'
+                           else '검증기 컨테이너의 실행 상태를 확인합니다.'),
+        }) from None
 
 @app.post("/api/hands-on/H17/verify")
+@app.post("/api/practice/P17/verify")
 async def verify_h17(request:Request,session:tuple[str,dict]=Depends(require_csrf))->dict:
     if await request.body(): raise HTTPException(422,"verification inputs are server-owned")
     return await run_observability_activity('H17')
 @app.post("/api/hands-on/H18/verify")
+@app.post("/api/practice/P18/verify")
 async def verify_h18(request:Request,session:tuple[str,dict]=Depends(require_csrf))->dict:
     if await request.body(): raise HTTPException(422,"verification inputs are server-owned")
     return await run_observability_activity('H18')
 @app.post("/api/hands-on/H19/verify")
+@app.post("/api/practice/P19/verify")
 async def verify_h19(request:Request,session:tuple[str,dict]=Depends(require_csrf))->dict:
     if await request.body(): raise HTTPException(422,"verification inputs are server-owned")
     return await run_observability_activity('H19')
 @app.post("/api/hands-on/H20/verify")
+@app.post("/api/practice/P20/verify")
 async def verify_h20(request:Request,session:tuple[str,dict]=Depends(require_csrf))->dict:
     if await request.body(): raise HTTPException(422,"verification inputs are server-owned")
     return await run_observability_activity('H20')
 
 @app.post("/api/hands-on/H22/verify")
+@app.post("/api/practice/P22/verify")
 async def verify_h22_mcp_server(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),
@@ -1817,6 +1777,7 @@ async def verify_h22_mcp_server(
 
 
 @app.post("/api/hands-on/H21/verify")
+@app.post("/api/practice/P21/verify")
 async def verify_h21_agent_policy(
     request: Request,
     session: tuple[str, dict] = Depends(require_csrf),

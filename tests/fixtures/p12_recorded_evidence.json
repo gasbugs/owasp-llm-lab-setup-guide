@@ -1,0 +1,1332 @@
+{
+  "builds": {
+    "context": {
+      "component": "p12-context",
+      "source_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+      "current_source_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc"
+    },
+    "privacy": {
+      "component": "p12-privacy",
+      "source_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8",
+      "current_source_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8"
+    },
+    "nemo": {
+      "component": "p12-nemo",
+      "source_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1",
+      "current_source_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1"
+    }
+  },
+  "cases": [
+    {
+      "name": "normal",
+      "attempt": {
+        "case_id": "normal",
+        "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+        "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+        "started_at": 1790288241.7400694,
+        "finished_at": 1790288243.1924,
+        "lifecycle": {
+          "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+          "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+          "lifecycle_status": "finished",
+          "execution": {
+            "execution_status": "returned",
+            "result": {
+              "status": 200,
+              "text_digest": "9c83cb462a9fee75a3b838ec0a470e3c0cb166038bbb62989dfa468cc5d5d351",
+              "text_bytes": 26
+            },
+            "calls": [
+              {
+                "sequence": 1,
+                "stage": "authenticate",
+                "started_at": 1790288242.047094,
+                "finished_at": 1790288242.132742,
+                "state": "completed",
+                "input_digest": "27db2cda6d68be99c21307f7cc916e7fb37bf7bdb5555b4fdb5d014851d87353",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "authenticate",
+                  "input_digest": "27db2cda6d68be99c21307f7cc916e7fb37bf7bdb5555b4fdb5d014851d87353",
+                  "backend": "synthetic-sqlite-fts",
+                  "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                  "authenticated": true,
+                  "subject": "reader"
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 2,
+                "stage": "authorize",
+                "started_at": 1790288242.1328604,
+                "finished_at": 1790288242.146061,
+                "state": "completed",
+                "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "authorize",
+                  "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                  "backend": "synthetic-sqlite-fts",
+                  "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                  "authorized": true,
+                  "subject": "reader",
+                  "requested_tenant": "team-a",
+                  "required_scope": "knowledge:read"
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 3,
+                "stage": "input_privacy",
+                "started_at": 1790288242.1460783,
+                "finished_at": 1790288242.1691513,
+                "state": "completed",
+                "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "input_privacy",
+                  "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                  "output_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                  "input_bytes": 13,
+                  "output_bytes": 13,
+                  "framework": "microsoft-presidio",
+                  "operator": "replace",
+                  "versions": {
+                    "presidio-analyzer": "2.2.362",
+                    "presidio-anonymizer": "2.2.362"
+                  },
+                  "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8",
+                  "entity_counts": {}
+                },
+                "output_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60"
+              },
+              {
+                "sequence": 4,
+                "stage": "input_rail",
+                "started_at": 1790288242.1691706,
+                "finished_at": 1790288242.4694858,
+                "state": "completed",
+                "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "input_rail",
+                  "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                  "version": "0.22.0",
+                  "classifier_answer": "No",
+                  "native_stop": false,
+                  "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1",
+                  "gateway": {
+                    "provider_request_id": "68cec98c-7b16-4ebb-9155-969836f7e08a",
+                    "request_digest": "2064e66d155a27d6f90332791ca102c61de06dc55371e121b3ea833b9945a825",
+                    "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                    "capability_digest": "cb060c47ef31fd71ef970664c7a750f31e4af38444de49c4434e5ff64e1463be"
+                  }
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 5,
+                "stage": "retrieval",
+                "started_at": 1790288242.469508,
+                "finished_at": 1790288242.4947064,
+                "state": "completed",
+                "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "retrieval",
+                  "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                  "backend": "synthetic-sqlite-fts",
+                  "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                  "authorized_tenant": "team-a",
+                  "query_executed": true,
+                  "output_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216",
+                  "output_bytes": 54,
+                  "hits": [
+                    {
+                      "document_id": "account",
+                      "tenant": "team-a",
+                      "text_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216"
+                    }
+                  ]
+                },
+                "output_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216"
+              },
+              {
+                "sequence": 6,
+                "stage": "retrieval_rail",
+                "started_at": 1790288242.4947274,
+                "finished_at": 1790288242.7545345,
+                "state": "completed",
+                "input_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "retrieval_rail",
+                  "input_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216",
+                  "version": "0.22.0",
+                  "classifier_answer": "No",
+                  "native_stop": false,
+                  "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1",
+                  "gateway": {
+                    "provider_request_id": "ef3b3a55-a89f-4ba3-8c80-ac7df2fb2e6d",
+                    "request_digest": "7e1478532763b035b2488670546fe684916e88ac69006dabd00ea05cd904755c",
+                    "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                    "capability_digest": "fb057f2cf835a0b36fd29abd3f65b1b1e2728bd596f68c1439bf3a4581a4c0bd"
+                  }
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 7,
+                "stage": "main",
+                "started_at": 1790288242.7546427,
+                "finished_at": 1790288242.7767003,
+                "state": "completed",
+                "input_digest": "8b10840029391aad122e38b766019e7011dca437a79103a9ed8c8888797ecebe",
+                "http_status": 200,
+                "evidence": {
+                  "provider_request_id": "c10b3b02-11a8-4889-bcb8-ab9719003670",
+                  "actual_model_id": "us.amazon.nova-lite-v1:0",
+                  "request_digest": "f0066ed437725fdcbd685b00cad8aede1edb3dc000d3fbcf8dd2ab96aeca7847",
+                  "response_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+                  "response_bytes": 30,
+                  "capability_digest": "47b055a1dc2639cf35b9613318d6466360996195eae307292726520028e2df54"
+                },
+                "output_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020"
+              },
+              {
+                "sequence": 8,
+                "stage": "output_rail",
+                "started_at": 1790288242.7767253,
+                "finished_at": 1790288242.9632416,
+                "state": "completed",
+                "input_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "output_rail",
+                  "input_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+                  "version": "0.22.0",
+                  "classifier_answer": "No",
+                  "native_stop": false,
+                  "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1",
+                  "gateway": {
+                    "provider_request_id": "66bce4fa-6626-4961-99ca-2b3273feedbe",
+                    "request_digest": "f52a5ad51a1ec280a4da4c0574da8fb95a15d60ea24d7c45d20c1ca11cbafa70",
+                    "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                    "capability_digest": "4e81357e723b6391f1ac8f99026ec7488107019a2a802c975e0e42858a5e1dd9"
+                  }
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 9,
+                "stage": "output_privacy",
+                "started_at": 1790288242.9632616,
+                "finished_at": 1790288243.071985,
+                "state": "completed",
+                "input_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "output_privacy",
+                  "input_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+                  "output_digest": "9c83cb462a9fee75a3b838ec0a470e3c0cb166038bbb62989dfa468cc5d5d351",
+                  "input_bytes": 30,
+                  "output_bytes": 26,
+                  "framework": "microsoft-presidio",
+                  "operator": "replace",
+                  "versions": {
+                    "presidio-analyzer": "2.2.362",
+                    "presidio-anonymizer": "2.2.362"
+                  },
+                  "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8",
+                  "entity_counts": {
+                    "EMAIL_ADDRESS": 1
+                  }
+                },
+                "output_digest": "9c83cb462a9fee75a3b838ec0a470e3c0cb166038bbb62989dfa468cc5d5d351"
+              }
+            ],
+            "source_digest": "b1e59447ef64d03f10bc1ae06fdeee5d4d5894e1369cdd0b675f137050ed338e"
+          },
+          "registration_attempts": [
+            "context",
+            "privacy",
+            "nemo",
+            "gateway"
+          ],
+          "closures": {
+            "context": {
+              "state": "closed",
+              "closed_at": 1790288243.153929
+            },
+            "privacy": {
+              "state": "closed",
+              "closed_at": 1790288243.1647263
+            },
+            "nemo": {
+              "state": "closed",
+              "closed_at": 1790288243.1795382
+            },
+            "gateway": {
+              "state": "closed",
+              "closed_at": 1790288243.1913104
+            }
+          }
+        }
+      },
+      "ledgers": {
+        "context": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "component": "p12-context",
+          "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+          "created_at": 1790288241.773118,
+          "closed_at": 1790288243.153929,
+          "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+          "execution_ids": [
+            "03044e6d-16e9-49ce-a497-ed4726cf84d5"
+          ],
+          "retrieval_count": 1,
+          "calls": [
+            {
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "stage": "authenticate",
+              "started": 1790288242.129109,
+              "finished": 1790288242.1295877,
+              "state": "completed",
+              "input_digest": "27db2cda6d68be99c21307f7cc916e7fb37bf7bdb5555b4fdb5d014851d87353",
+              "evidence": {
+                "authenticated": true,
+                "subject": "reader",
+                "stage": "authenticate",
+                "input_digest": "27db2cda6d68be99c21307f7cc916e7fb37bf7bdb5555b4fdb5d014851d87353",
+                "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                "backend": "synthetic-sqlite-fts"
+              }
+            },
+            {
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "stage": "authorize",
+              "started": 1790288242.1436145,
+              "finished": 1790288242.1440744,
+              "state": "completed",
+              "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+              "evidence": {
+                "authorized": true,
+                "subject": "reader",
+                "requested_tenant": "team-a",
+                "required_scope": "knowledge:read",
+                "stage": "authorize",
+                "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                "backend": "synthetic-sqlite-fts"
+              }
+            },
+            {
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "stage": "retrieval",
+              "started": 1790288242.4892013,
+              "finished": 1790288242.490961,
+              "state": "completed",
+              "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+              "evidence": {
+                "query_executed": true,
+                "authorized_tenant": "team-a",
+                "hits": [
+                  {
+                    "document_id": "account",
+                    "tenant": "team-a",
+                    "text_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216"
+                  }
+                ],
+                "output_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216",
+                "output_bytes": 54,
+                "stage": "retrieval",
+                "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                "backend": "synthetic-sqlite-fts"
+              }
+            }
+          ]
+        },
+        "privacy": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+          "component": "p12-privacy",
+          "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8",
+          "created_at": 1790288241.7866614,
+          "closed_at": 1790288243.1647263,
+          "execution_ids": [
+            "03044e6d-16e9-49ce-a497-ed4726cf84d5"
+          ],
+          "calls": [
+            {
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "stage": "input_privacy",
+              "started": 1790288242.1584487,
+              "finished": 1790288242.1668174,
+              "state": "completed",
+              "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+              "evidence": {
+                "stage": "input_privacy",
+                "framework": "microsoft-presidio",
+                "versions": {
+                  "presidio-analyzer": "2.2.362",
+                  "presidio-anonymizer": "2.2.362"
+                },
+                "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                "output_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                "input_bytes": 13,
+                "output_bytes": 13,
+                "entity_counts": {},
+                "operator": "replace",
+                "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8"
+              }
+            },
+            {
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "stage": "output_privacy",
+              "started": 1790288242.9738276,
+              "finished": 1790288243.0687902,
+              "state": "completed",
+              "input_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+              "evidence": {
+                "stage": "output_privacy",
+                "framework": "microsoft-presidio",
+                "versions": {
+                  "presidio-analyzer": "2.2.362",
+                  "presidio-anonymizer": "2.2.362"
+                },
+                "input_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+                "output_digest": "9c83cb462a9fee75a3b838ec0a470e3c0cb166038bbb62989dfa468cc5d5d351",
+                "input_bytes": 30,
+                "output_bytes": 26,
+                "entity_counts": {
+                  "EMAIL_ADDRESS": 1
+                },
+                "operator": "replace",
+                "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8"
+              }
+            }
+          ]
+        },
+        "nemo": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+          "component": "p12-nemo",
+          "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1",
+          "created_at": 1790288241.799774,
+          "closed_at": 1790288243.1795382,
+          "execution_ids": [
+            "03044e6d-16e9-49ce-a497-ed4726cf84d5"
+          ],
+          "calls": [
+            {
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "stage": "input_rail",
+              "started": 1790288242.1851943,
+              "finished": 1790288242.46727,
+              "state": "completed",
+              "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+              "evidence": {
+                "stage": "input_rail",
+                "framework": "nemo-guardrails",
+                "version": "0.22.0",
+                "input_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                "classifier_answer": "No",
+                "native_stop": false,
+                "rail": "self check input",
+                "actions": [
+                  "self_check_input"
+                ],
+                "llm_call": {
+                  "id": "d6a8d311-2e15-4efb-99d0-72aa3d7c12a6",
+                  "task": "self_check_input",
+                  "model": "us.amazon.nova-lite-v1:0#p12-input_rail",
+                  "provider": "p12-bedrock-gateway"
+                },
+                "gateway": {
+                  "provider_request_id": "68cec98c-7b16-4ebb-9155-969836f7e08a",
+                  "request_digest": "2064e66d155a27d6f90332791ca102c61de06dc55371e121b3ea833b9945a825",
+                  "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                  "capability_digest": "cb060c47ef31fd71ef970664c7a750f31e4af38444de49c4434e5ff64e1463be"
+                },
+                "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1"
+              }
+            },
+            {
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "stage": "retrieval_rail",
+              "started": 1790288242.5160491,
+              "finished": 1790288242.7510161,
+              "state": "completed",
+              "input_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216",
+              "evidence": {
+                "stage": "retrieval_rail",
+                "framework": "nemo-guardrails",
+                "version": "0.22.0",
+                "input_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216",
+                "classifier_answer": "No",
+                "native_stop": false,
+                "rail": "p12 inspect retrieved text",
+                "source": "already-retrieved-text",
+                "actions": [
+                  "retrieve_relevant_chunks",
+                  "inspect_p12_chunks",
+                  "generate_bot_message",
+                  "create_event"
+                ],
+                "action_uid": "5c2536b4-544f-435d-bab5-95131cf08581",
+                "llm_call": {
+                  "id": "83721f08-b1db-4ce2-a7b6-b231c0cb407a",
+                  "task": "p12_retrieval_check",
+                  "model": "us.amazon.nova-lite-v1:0#p12-retrieval_rail",
+                  "provider": "p12-bedrock-gateway"
+                },
+                "gateway": {
+                  "provider_request_id": "ef3b3a55-a89f-4ba3-8c80-ac7df2fb2e6d",
+                  "request_digest": "7e1478532763b035b2488670546fe684916e88ac69006dabd00ea05cd904755c",
+                  "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                  "capability_digest": "fb057f2cf835a0b36fd29abd3f65b1b1e2728bd596f68c1439bf3a4581a4c0bd"
+                },
+                "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1"
+              }
+            },
+            {
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "stage": "output_rail",
+              "started": 1790288242.7900074,
+              "finished": 1790288242.9610243,
+              "state": "completed",
+              "input_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+              "evidence": {
+                "stage": "output_rail",
+                "framework": "nemo-guardrails",
+                "version": "0.22.0",
+                "input_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+                "classifier_answer": "No",
+                "native_stop": false,
+                "rail": "self check output",
+                "actions": [
+                  "self_check_output"
+                ],
+                "llm_call": {
+                  "id": "e7811905-395f-4789-b976-5ba0bb6ad972",
+                  "task": "self_check_output",
+                  "model": "us.amazon.nova-lite-v1:0#p12-output_rail",
+                  "provider": "p12-bedrock-gateway"
+                },
+                "gateway": {
+                  "provider_request_id": "66bce4fa-6626-4961-99ca-2b3273feedbe",
+                  "request_digest": "f52a5ad51a1ec280a4da4c0574da8fb95a15d60ea24d7c45d20c1ca11cbafa70",
+                  "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                  "capability_digest": "4e81357e723b6391f1ac8f99026ec7488107019a2a802c975e0e42858a5e1dd9"
+                },
+                "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1"
+              }
+            }
+          ]
+        },
+        "gateway": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+          "created": 1790288241.8137457,
+          "closed": 1790288243.1913104,
+          "grants": [
+            {
+              "token_digest": "cb060c47ef31fd71ef970664c7a750f31e4af38444de49c4434e5ff64e1463be",
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "role": "input_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-input_rail",
+              "issued": 1790288241.8137457,
+              "expires": 1790288421.8137457,
+              "state": "completed",
+              "reserved": 1790288242.4518676,
+              "finished": 1790288242.4528964,
+              "request_digest": "2064e66d155a27d6f90332791ca102c61de06dc55371e121b3ea833b9945a825",
+              "evidence": {
+                "provider_request_id": "68cec98c-7b16-4ebb-9155-969836f7e08a",
+                "actual_model_id": "us.amazon.nova-lite-v1:0",
+                "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                "response_bytes": 2,
+                "usage": {
+                  "inputTokens": 10,
+                  "outputTokens": 1,
+                  "totalTokens": 11
+                },
+                "stop_reason": "end_turn",
+                "classifier_schema_valid": true,
+                "classifier_answer": "No"
+              }
+            },
+            {
+              "token_digest": "47b055a1dc2639cf35b9613318d6466360996195eae307292726520028e2df54",
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "role": "main",
+              "model": "us.amazon.nova-lite-v1:0#p12-main",
+              "issued": 1790288241.8137457,
+              "expires": 1790288421.8137457,
+              "state": "completed",
+              "reserved": 1790288242.7724836,
+              "finished": 1790288242.7735672,
+              "request_digest": "f0066ed437725fdcbd685b00cad8aede1edb3dc000d3fbcf8dd2ab96aeca7847",
+              "evidence": {
+                "provider_request_id": "c10b3b02-11a8-4889-bcb8-ab9719003670",
+                "actual_model_id": "us.amazon.nova-lite-v1:0",
+                "response_digest": "e149dafb98c56b8f4bdd4c14e10db3463489ccd58a0c46cff07521a981411020",
+                "response_bytes": 30,
+                "usage": {
+                  "inputTokens": 10,
+                  "outputTokens": 1,
+                  "totalTokens": 11
+                },
+                "stop_reason": "end_turn",
+                "main_input": {
+                  "schema_valid": true,
+                  "prompt_digest": "8b10840029391aad122e38b766019e7011dca437a79103a9ed8c8888797ecebe",
+                  "context_digest": "270a77d70ec0bbb28f217ce1587ce0664725afdf09492e34ddca73bcb18ec216",
+                  "question_digest": "136591076b750506628768790385a94fe5b31cd66efdce009db6e7e14a6f7f60",
+                  "context_bytes": 54,
+                  "question_bytes": 13
+                }
+              }
+            },
+            {
+              "token_digest": "4e81357e723b6391f1ac8f99026ec7488107019a2a802c975e0e42858a5e1dd9",
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "role": "output_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-output_rail",
+              "issued": 1790288241.8137457,
+              "expires": 1790288421.8137457,
+              "state": "completed",
+              "reserved": 1790288242.9486175,
+              "finished": 1790288242.949173,
+              "request_digest": "f52a5ad51a1ec280a4da4c0574da8fb95a15d60ea24d7c45d20c1ca11cbafa70",
+              "evidence": {
+                "provider_request_id": "66bce4fa-6626-4961-99ca-2b3273feedbe",
+                "actual_model_id": "us.amazon.nova-lite-v1:0",
+                "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                "response_bytes": 2,
+                "usage": {
+                  "inputTokens": 10,
+                  "outputTokens": 1,
+                  "totalTokens": 11
+                },
+                "stop_reason": "end_turn",
+                "classifier_schema_valid": true,
+                "classifier_answer": "No"
+              }
+            },
+            {
+              "token_digest": "fb057f2cf835a0b36fd29abd3f65b1b1e2728bd596f68c1439bf3a4581a4c0bd",
+              "suite_id": "99730124-067e-48b9-8455-50a2bbbca96d",
+              "execution_id": "03044e6d-16e9-49ce-a497-ed4726cf84d5",
+              "role": "retrieval_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-retrieval_rail",
+              "issued": 1790288241.8137457,
+              "expires": 1790288421.8137457,
+              "state": "completed",
+              "reserved": 1790288242.7340548,
+              "finished": 1790288242.734469,
+              "request_digest": "7e1478532763b035b2488670546fe684916e88ac69006dabd00ea05cd904755c",
+              "evidence": {
+                "provider_request_id": "ef3b3a55-a89f-4ba3-8c80-ac7df2fb2e6d",
+                "actual_model_id": "us.amazon.nova-lite-v1:0",
+                "response_digest": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d",
+                "response_bytes": 2,
+                "usage": {
+                  "inputTokens": 10,
+                  "outputTokens": 1,
+                  "totalTokens": 11
+                },
+                "stop_reason": "end_turn",
+                "classifier_schema_valid": true,
+                "classifier_answer": "No"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "input-block",
+      "attempt": {
+        "case_id": "input-block",
+        "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+        "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+        "started_at": 1790288245.3655012,
+        "finished_at": 1790288246.0141668,
+        "lifecycle": {
+          "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+          "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+          "lifecycle_status": "finished",
+          "execution": {
+            "execution_status": "returned",
+            "result": {
+              "status": 403,
+              "text_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "text_bytes": 0
+            },
+            "calls": [
+              {
+                "sequence": 1,
+                "stage": "authenticate",
+                "started_at": 1790288245.6152282,
+                "finished_at": 1790288245.6999629,
+                "state": "completed",
+                "input_digest": "03abecb65e85fa2b8c2f11e8164f8f93f8d7d001db425ac48b41fba708184cd0",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "authenticate",
+                  "input_digest": "03abecb65e85fa2b8c2f11e8164f8f93f8d7d001db425ac48b41fba708184cd0",
+                  "backend": "synthetic-sqlite-fts",
+                  "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                  "authenticated": true,
+                  "subject": "reader"
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 2,
+                "stage": "authorize",
+                "started_at": 1790288245.7001133,
+                "finished_at": 1790288245.7134497,
+                "state": "completed",
+                "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "authorize",
+                  "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                  "backend": "synthetic-sqlite-fts",
+                  "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                  "authorized": true,
+                  "subject": "reader",
+                  "requested_tenant": "team-a",
+                  "required_scope": "knowledge:read"
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 3,
+                "stage": "input_privacy",
+                "started_at": 1790288245.7134662,
+                "finished_at": 1790288245.7316942,
+                "state": "completed",
+                "input_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "input_privacy",
+                  "input_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+                  "output_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+                  "input_bytes": 32,
+                  "output_bytes": 32,
+                  "framework": "microsoft-presidio",
+                  "operator": "replace",
+                  "versions": {
+                    "presidio-analyzer": "2.2.362",
+                    "presidio-anonymizer": "2.2.362"
+                  },
+                  "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8",
+                  "entity_counts": {}
+                },
+                "output_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c"
+              },
+              {
+                "sequence": 4,
+                "stage": "input_rail",
+                "started_at": 1790288245.7317104,
+                "finished_at": 1790288245.9248009,
+                "state": "completed",
+                "input_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "input_rail",
+                  "input_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+                  "version": "0.22.0",
+                  "classifier_answer": "Yes",
+                  "native_stop": true,
+                  "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1",
+                  "gateway": {
+                    "provider_request_id": "1bb97cba-4a1f-4bd9-98dc-f23e85fbd36b",
+                    "request_digest": "3e74e1026741deb223647b8a82882e4d31367f9d16aae64f0f194b947d1d88c9",
+                    "response_digest": "85a39ab345d672ff8ca9b9c6876f3adcacf45ee7c1e2dbd2408fd338bd55e07e",
+                    "capability_digest": "e1a531e495f9f54098a3a73f698b1cdc08b46a0f78562d131e7cd331c1051c83"
+                  }
+                },
+                "allowed": false
+              }
+            ],
+            "source_digest": "b1e59447ef64d03f10bc1ae06fdeee5d4d5894e1369cdd0b675f137050ed338e"
+          },
+          "registration_attempts": [
+            "context",
+            "privacy",
+            "nemo",
+            "gateway"
+          ],
+          "closures": {
+            "context": {
+              "state": "closed",
+              "closed_at": 1790288245.981188
+            },
+            "privacy": {
+              "state": "closed",
+              "closed_at": 1790288245.990872
+            },
+            "nemo": {
+              "state": "closed",
+              "closed_at": 1790288246.0010304
+            },
+            "gateway": {
+              "state": "closed",
+              "closed_at": 1790288246.01276
+            }
+          }
+        }
+      },
+      "ledgers": {
+        "context": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "component": "p12-context",
+          "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+          "created_at": 1790288245.374709,
+          "closed_at": 1790288245.981188,
+          "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+          "execution_ids": [
+            "22fdf01e-0d0a-4370-afcf-7f8561ce440c"
+          ],
+          "retrieval_count": 0,
+          "calls": [
+            {
+              "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+              "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+              "stage": "authenticate",
+              "started": 1790288245.6967516,
+              "finished": 1790288245.6971638,
+              "state": "completed",
+              "input_digest": "03abecb65e85fa2b8c2f11e8164f8f93f8d7d001db425ac48b41fba708184cd0",
+              "evidence": {
+                "authenticated": true,
+                "subject": "reader",
+                "stage": "authenticate",
+                "input_digest": "03abecb65e85fa2b8c2f11e8164f8f93f8d7d001db425ac48b41fba708184cd0",
+                "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                "backend": "synthetic-sqlite-fts"
+              }
+            },
+            {
+              "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+              "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+              "stage": "authorize",
+              "started": 1790288245.711232,
+              "finished": 1790288245.7116482,
+              "state": "completed",
+              "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+              "evidence": {
+                "authorized": true,
+                "subject": "reader",
+                "requested_tenant": "team-a",
+                "required_scope": "knowledge:read",
+                "stage": "authorize",
+                "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                "backend": "synthetic-sqlite-fts"
+              }
+            }
+          ]
+        },
+        "privacy": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+          "component": "p12-privacy",
+          "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8",
+          "created_at": 1790288245.3845286,
+          "closed_at": 1790288245.990872,
+          "execution_ids": [
+            "22fdf01e-0d0a-4370-afcf-7f8561ce440c"
+          ],
+          "calls": [
+            {
+              "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+              "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+              "stage": "input_privacy",
+              "started": 1790288245.7245243,
+              "finished": 1790288245.7291832,
+              "state": "completed",
+              "input_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+              "evidence": {
+                "stage": "input_privacy",
+                "framework": "microsoft-presidio",
+                "versions": {
+                  "presidio-analyzer": "2.2.362",
+                  "presidio-anonymizer": "2.2.362"
+                },
+                "input_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+                "output_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+                "input_bytes": 32,
+                "output_bytes": 32,
+                "entity_counts": {},
+                "operator": "replace",
+                "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8"
+              }
+            }
+          ]
+        },
+        "nemo": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+          "component": "p12-nemo",
+          "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1",
+          "created_at": 1790288245.3939424,
+          "closed_at": 1790288246.0010304,
+          "execution_ids": [
+            "22fdf01e-0d0a-4370-afcf-7f8561ce440c"
+          ],
+          "calls": [
+            {
+              "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+              "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+              "stage": "input_rail",
+              "started": 1790288245.741591,
+              "finished": 1790288245.9225342,
+              "state": "completed",
+              "input_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+              "evidence": {
+                "stage": "input_rail",
+                "framework": "nemo-guardrails",
+                "version": "0.22.0",
+                "input_digest": "0cef1c68644f308e0010f48ffa072acca5caefcce1f14afef199a15bc1fe234c",
+                "classifier_answer": "Yes",
+                "native_stop": true,
+                "rail": "self check input",
+                "actions": [
+                  "self_check_input",
+                  "retrieve_relevant_chunks",
+                  "generate_bot_message"
+                ],
+                "llm_call": {
+                  "id": "8374b231-b998-4e72-b445-201d44972ace",
+                  "task": "self_check_input",
+                  "model": "us.amazon.nova-lite-v1:0#p12-input_rail",
+                  "provider": "p12-bedrock-gateway"
+                },
+                "gateway": {
+                  "provider_request_id": "1bb97cba-4a1f-4bd9-98dc-f23e85fbd36b",
+                  "request_digest": "3e74e1026741deb223647b8a82882e4d31367f9d16aae64f0f194b947d1d88c9",
+                  "response_digest": "85a39ab345d672ff8ca9b9c6876f3adcacf45ee7c1e2dbd2408fd338bd55e07e",
+                  "capability_digest": "e1a531e495f9f54098a3a73f698b1cdc08b46a0f78562d131e7cd331c1051c83"
+                },
+                "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1"
+              }
+            }
+          ]
+        },
+        "gateway": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+          "created": 1790288245.4029553,
+          "closed": 1790288246.01276,
+          "grants": [
+            {
+              "token_digest": "e1a531e495f9f54098a3a73f698b1cdc08b46a0f78562d131e7cd331c1051c83",
+              "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+              "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+              "role": "input_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-input_rail",
+              "issued": 1790288245.4029553,
+              "expires": 1790288425.4029553,
+              "state": "completed",
+              "reserved": 1790288245.906619,
+              "finished": 1790288245.9075205,
+              "request_digest": "3e74e1026741deb223647b8a82882e4d31367f9d16aae64f0f194b947d1d88c9",
+              "evidence": {
+                "provider_request_id": "1bb97cba-4a1f-4bd9-98dc-f23e85fbd36b",
+                "actual_model_id": "us.amazon.nova-lite-v1:0",
+                "response_digest": "85a39ab345d672ff8ca9b9c6876f3adcacf45ee7c1e2dbd2408fd338bd55e07e",
+                "response_bytes": 3,
+                "usage": {
+                  "inputTokens": 10,
+                  "outputTokens": 1,
+                  "totalTokens": 11
+                },
+                "stop_reason": "end_turn",
+                "classifier_schema_valid": true,
+                "classifier_answer": "Yes"
+              }
+            },
+            {
+              "token_digest": "6f8e21503138759639bc1552521a61a7337a89322af1c36140ff6a74ea0d9205",
+              "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+              "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+              "role": "main",
+              "model": "us.amazon.nova-lite-v1:0#p12-main",
+              "issued": 1790288245.4029553,
+              "expires": 1790288425.4029553,
+              "state": "closed_unused",
+              "reserved": null,
+              "finished": null,
+              "request_digest": null,
+              "evidence": null
+            },
+            {
+              "token_digest": "cb1cccb4af7bd32815ee6eafb6a620f6a852d848075189ec4172ccfc02d46039",
+              "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+              "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+              "role": "output_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-output_rail",
+              "issued": 1790288245.4029553,
+              "expires": 1790288425.4029553,
+              "state": "closed_unused",
+              "reserved": null,
+              "finished": null,
+              "request_digest": null,
+              "evidence": null
+            },
+            {
+              "token_digest": "b40ac28f16e6b8404b70cd46827e481a94d634c908bfca4520166e7a5b772fc4",
+              "suite_id": "1815ca2b-4539-4a56-b2d9-4839b5eac065",
+              "execution_id": "22fdf01e-0d0a-4370-afcf-7f8561ce440c",
+              "role": "retrieval_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-retrieval_rail",
+              "issued": 1790288245.4029553,
+              "expires": 1790288425.4029553,
+              "state": "closed_unused",
+              "reserved": null,
+              "finished": null,
+              "request_digest": null,
+              "evidence": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "classifier-error",
+      "attempt": {
+        "case_id": "classifier-error",
+        "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+        "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+        "started_at": 1790288247.9570591,
+        "finished_at": 1790288248.5900512,
+        "lifecycle": {
+          "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+          "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+          "lifecycle_status": "finished",
+          "execution": {
+            "execution_status": "service_error",
+            "calls": [
+              {
+                "sequence": 1,
+                "stage": "authenticate",
+                "started_at": 1790288248.1986408,
+                "finished_at": 1790288248.2654474,
+                "state": "completed",
+                "input_digest": "26abcc71429e46db5747a832cc895047bea25a1e69fe928b4a8e7f6dfc6e083b",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "authenticate",
+                  "input_digest": "26abcc71429e46db5747a832cc895047bea25a1e69fe928b4a8e7f6dfc6e083b",
+                  "backend": "synthetic-sqlite-fts",
+                  "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                  "authenticated": true,
+                  "subject": "reader"
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 2,
+                "stage": "authorize",
+                "started_at": 1790288248.265536,
+                "finished_at": 1790288248.2775939,
+                "state": "completed",
+                "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "authorize",
+                  "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                  "backend": "synthetic-sqlite-fts",
+                  "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                  "authorized": true,
+                  "subject": "reader",
+                  "requested_tenant": "team-a",
+                  "required_scope": "knowledge:read"
+                },
+                "allowed": true
+              },
+              {
+                "sequence": 3,
+                "stage": "input_privacy",
+                "started_at": 1790288248.27761,
+                "finished_at": 1790288248.2938383,
+                "state": "completed",
+                "input_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79",
+                "http_status": 200,
+                "evidence": {
+                  "stage": "input_privacy",
+                  "input_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79",
+                  "output_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79",
+                  "input_bytes": 37,
+                  "output_bytes": 37,
+                  "framework": "microsoft-presidio",
+                  "operator": "replace",
+                  "versions": {
+                    "presidio-analyzer": "2.2.362",
+                    "presidio-anonymizer": "2.2.362"
+                  },
+                  "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8",
+                  "entity_counts": {}
+                },
+                "output_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79"
+              },
+              {
+                "sequence": 4,
+                "stage": "input_rail",
+                "started_at": 1790288248.293855,
+                "finished_at": 1790288248.464245,
+                "state": "error",
+                "input_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79",
+                "http_status": 503
+              }
+            ],
+            "source_digest": "b1e59447ef64d03f10bc1ae06fdeee5d4d5894e1369cdd0b675f137050ed338e"
+          },
+          "registration_attempts": [
+            "context",
+            "privacy",
+            "nemo",
+            "gateway"
+          ],
+          "closures": {
+            "context": {
+              "state": "closed",
+              "closed_at": 1790288248.542231
+            },
+            "privacy": {
+              "state": "closed",
+              "closed_at": 1790288248.5592568
+            },
+            "nemo": {
+              "state": "closed",
+              "closed_at": 1790288248.5752914
+            },
+            "gateway": {
+              "state": "closed",
+              "closed_at": 1790288248.5888238
+            }
+          }
+        }
+      },
+      "ledgers": {
+        "context": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "component": "p12-context",
+          "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+          "created_at": 1790288247.9657404,
+          "closed_at": 1790288248.542231,
+          "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+          "execution_ids": [
+            "cd572aad-3250-4b4b-8a77-a33c4402d0c5"
+          ],
+          "retrieval_count": 0,
+          "calls": [
+            {
+              "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+              "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+              "stage": "authenticate",
+              "started": 1790288248.2631931,
+              "finished": 1790288248.2635207,
+              "state": "completed",
+              "input_digest": "26abcc71429e46db5747a832cc895047bea25a1e69fe928b4a8e7f6dfc6e083b",
+              "evidence": {
+                "authenticated": true,
+                "subject": "reader",
+                "stage": "authenticate",
+                "input_digest": "26abcc71429e46db5747a832cc895047bea25a1e69fe928b4a8e7f6dfc6e083b",
+                "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                "backend": "synthetic-sqlite-fts"
+              }
+            },
+            {
+              "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+              "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+              "stage": "authorize",
+              "started": 1790288248.275349,
+              "finished": 1790288248.275719,
+              "state": "completed",
+              "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+              "evidence": {
+                "authorized": true,
+                "subject": "reader",
+                "requested_tenant": "team-a",
+                "required_scope": "knowledge:read",
+                "stage": "authorize",
+                "input_digest": "96c2886c51d1dfb4901d9feccff66213ce3e27406282ff6f602a4258a33dacec",
+                "service_digest": "42055b5909ce6f394145b3c283866eb707293512e3c33caa5d7694871cda79fc",
+                "backend": "synthetic-sqlite-fts"
+              }
+            }
+          ]
+        },
+        "privacy": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+          "component": "p12-privacy",
+          "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8",
+          "created_at": 1790288247.9773934,
+          "closed_at": 1790288248.5592568,
+          "execution_ids": [
+            "cd572aad-3250-4b4b-8a77-a33c4402d0c5"
+          ],
+          "calls": [
+            {
+              "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+              "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+              "stage": "input_privacy",
+              "started": 1790288248.2875843,
+              "finished": 1790288248.2919908,
+              "state": "completed",
+              "input_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79",
+              "evidence": {
+                "stage": "input_privacy",
+                "framework": "microsoft-presidio",
+                "versions": {
+                  "presidio-analyzer": "2.2.362",
+                  "presidio-anonymizer": "2.2.362"
+                },
+                "input_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79",
+                "output_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79",
+                "input_bytes": 37,
+                "output_bytes": 37,
+                "entity_counts": {},
+                "operator": "replace",
+                "service_digest": "afe562aa079a8c193ecf81102d76a2773676f01688963665ea369d2afba8d5f8"
+              }
+            }
+          ]
+        },
+        "nemo": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+          "component": "p12-nemo",
+          "service_digest": "9addf0aa84bb1dd54acdda86093701d7743addecd4d8451840f26083a2c959d1",
+          "created_at": 1790288247.990123,
+          "closed_at": 1790288248.5752914,
+          "execution_ids": [
+            "cd572aad-3250-4b4b-8a77-a33c4402d0c5"
+          ],
+          "calls": [
+            {
+              "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+              "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+              "stage": "input_rail",
+              "started": 1790288248.3039908,
+              "finished": 1790288248.4621904,
+              "state": "error",
+              "input_digest": "5dc08ce9992e9a8c1942ebdc35d18b222b62929d498c859dd00a0713c7682d79",
+              "evidence": null
+            }
+          ]
+        },
+        "gateway": {
+          "practice_id": "P12",
+          "contract_version": 2,
+          "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+          "created": 1790288247.9989023,
+          "closed": 1790288248.5888238,
+          "grants": [
+            {
+              "token_digest": "0378615fe09d642128828ec7604913a3bdf98049c5c08aed4edd2abc81f53f91",
+              "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+              "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+              "role": "input_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-input_rail",
+              "issued": 1790288247.9989023,
+              "expires": 1790288427.9989023,
+              "state": "completed",
+              "reserved": 1790288248.4472482,
+              "finished": 1790288248.4476416,
+              "request_digest": "2562e2d61814bb3d0e8fc61160dfdc38e72bb8358ec6d8bd8895526658529365",
+              "evidence": {
+                "provider_request_id": "be968b0f-b407-4c1f-8a0f-6ddb64f98c72",
+                "actual_model_id": "us.amazon.nova-lite-v1:0",
+                "response_digest": "32ffa590173889d59a386af216f9a19674cce921cf41b79e382b351342f021f9",
+                "response_bytes": 26,
+                "usage": {
+                  "inputTokens": 10,
+                  "outputTokens": 1,
+                  "totalTokens": 11
+                },
+                "stop_reason": "end_turn",
+                "classifier_schema_valid": false,
+                "classifier_answer": null
+              }
+            },
+            {
+              "token_digest": "bae26823f95cc13c4559ec38727e736f0913097e48e874225280a1c50eb7207e",
+              "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+              "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+              "role": "main",
+              "model": "us.amazon.nova-lite-v1:0#p12-main",
+              "issued": 1790288247.9989023,
+              "expires": 1790288427.9989023,
+              "state": "closed_unused",
+              "reserved": null,
+              "finished": null,
+              "request_digest": null,
+              "evidence": null
+            },
+            {
+              "token_digest": "79dd94d77253de0351eab067a7e9d7889c60b1db6f0cc26a93ce7c7b19558a9e",
+              "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+              "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+              "role": "output_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-output_rail",
+              "issued": 1790288247.9989023,
+              "expires": 1790288427.9989023,
+              "state": "closed_unused",
+              "reserved": null,
+              "finished": null,
+              "request_digest": null,
+              "evidence": null
+            },
+            {
+              "token_digest": "1e16e0807bea471234a3f5efdb3fdf35eccc189bf94af0ff046f8029f4df1979",
+              "suite_id": "a42e9f85-a622-4ec4-b6dc-1b6df74bf339",
+              "execution_id": "cd572aad-3250-4b4b-8a77-a33c4402d0c5",
+              "role": "retrieval_rail",
+              "model": "us.amazon.nova-lite-v1:0#p12-retrieval_rail",
+              "issued": 1790288247.9989023,
+              "expires": 1790288427.9989023,
+              "state": "closed_unused",
+              "reserved": null,
+              "finished": null,
+              "request_digest": null,
+              "evidence": null
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "notice": "Recorded actual product run with synthetic SDK and Context fixtures; not AWS evidence. Source: p12-main-binding-alternative-20260925.json"
+}

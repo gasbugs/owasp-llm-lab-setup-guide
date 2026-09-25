@@ -17,7 +17,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --chmod=0444 guided-labs/h08-self-check-input/Containerfile /app/learner/Containerfile
-COPY --chmod=0555 guided-labs/h08-self-check-input/config /app/learner/config
+COPY --chmod=0555 guided-labs/h08-self-check-input/config/config.yml guided-labs/h08-self-check-input/config/prompts.yml /app/learner/config/
 COPY --chmod=0555 guided-labs/h08-self-check-input/server.py /app/learner/server.py
 RUN install -d -o 65532 -g 65532 -m 0700 /state \
     && chmod 0555 /app/learner /app/learner/config

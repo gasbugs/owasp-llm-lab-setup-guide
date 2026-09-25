@@ -9,8 +9,9 @@ import os
 import sys
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -84,6 +85,8 @@ class FakeMcpClient:
 class GuidedEvidenceVerifierTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.environment = patch.dict(os.environ)
+        cls.environment.start()
         cls.temp = tempfile.TemporaryDirectory()
         os.environ["GUIDED_CONTROL_VERIFIER_TOKEN"] = "control-verifier"
         os.environ["GUIDED_VERIFIER_LAB01_TOKEN"] = "verifier-lab"
@@ -98,7 +101,9 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         for number in range(10, 17):
             os.environ[f"GUIDED_VERIFIER_LAB{number}_TOKEN"] = f"verifier-lab{number}"
         os.environ["GUIDED_VERIFIER_OBSERVABILITY_TOKEN"] = "verifier-observability"
-        os.environ["GUIDED_H12_PROVIDER_VERIFIER_TOKEN"] = "verifier-h12-provider"
+        os.environ["GUIDED_VERIFIER_H18_TOKEN"] = "verifier-h18"
+        os.environ["GUIDED_VERIFIER_H19_TOKEN"] = "verifier-h19"
+        os.environ["GUIDED_VERIFIER_H17_TOKEN"] = "verifier-h17"
         os.environ["GUIDED_H10_GATEWAY_VERIFIER_TOKEN"] = "verifier-h10-gateway"
         os.environ["GUIDED_H11_GATEWAY_VERIFIER_TOKEN"] = "verifier-h11-gateway"
         os.environ["GUIDED_H09_SINK_VERIFIER_TOKEN"] = "verifier-h09-sink"
@@ -121,93 +126,333 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.temp.cleanup()
+        try:
+            cls.client.close()
+            cls.temp.cleanup()
+        finally:
+            cls.environment.stop()
 
     def setUp(self):
         with self.server.connect() as database:
             database.execute("DELETE FROM used_evidence")
 
+    def test_p12_missing_configuration_is_problem_local(self):
+        with patch.object(self.server, 'P12_CONFIGURATION', None):
+            self.assertEqual(self.client.get('/readyz').status_code, 200)
+            response = self.client.post('/v1/verify/p12', json={'suite_id': str(uuid.uuid4())},
+                                        headers={'Authorization': 'Bearer control-verifier'})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()['task_completed'])
+        self.assertEqual(response.json()['security_verdict'], 'ERR')
+
+    def test_p02_authentication_and_server_owned_contract(self):
+        body = {"suite_id": str(uuid.uuid4())}
+        self.assertEqual(self.client.post("/v1/verify/p02", json=body).status_code, 401)
+        for change in ({"task_completed": True}, {"cases": []}, {"source_digest": "a" * 64},
+                       {"gateway_url": "http://other"}, {"suite_id": "invalid"}):
+            with self.subTest(change=change):
+                response = self.client.post("/v1/verify/p02", json={**body, **change},
+                    headers={"Authorization": "Bearer control-verifier"})
+                self.assertEqual(response.status_code, 422)
+
+    def test_p03_authentication_and_no_caller_grading_fields(self):
+        body = {"suite_id": str(uuid.uuid4())}
+        self.assertEqual(self.client.post("/v1/verify/p03", json=body).status_code, 401)
+        with patch("p03_suite_verification.SuiteVerification.collect") as collect:
+            for change in ({"task_completed": True}, {"cases": []}, {"source_digest": "a" * 64},
+                           {"gateway_url": "http://private-address"}, {"suite_id": "private-invalid"}):
+                response = self.client.post("/v1/verify/p03", json={**body, **change},
+                    headers={"Authorization": "Bearer control-verifier"})
+                self.assertEqual(response.status_code, 422)
+                self.assertNotIn("private", response.text)
+            collect.assert_not_called()
+
+    def test_p03_route_uses_full_contract_and_preserves_raw_evidence(self):
+        from p03_suite_verification import SuiteVerification
+        verification = SuiteVerification(CONTROL / "guided-labs/h03-ingestion-search", self.server.LAB03_URL,
+                                        self.server.GATEWAY_URL, self.server.LAB03_TOKEN, self.server.GATEWAY_TOKEN)
+        suite = str(uuid.uuid4())
+        result = {"case_contract_verified": True, "provider_mode": "contract", "root": {"suite_id": suite},
+                  "cases": [{"case_id": case["case_id"], "outcome": case["outcome"], "case_verified": True}
+                            for case in verification.cases], "build": {"source_digest": "a" * 64},
+                  "provider_evidence": [{"raw-fixture": "preserved"}]}
+        with patch("p03_suite_verification.SuiteVerification.collect", return_value=result) as collect:
+            response = self.client.post("/v1/verify/p03", json={"suite_id": suite},
+                headers={"Authorization": "Bearer control-verifier"})
+            payload = response.json()
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(payload["activity_id"], "P03")
+            self.assertEqual(payload["execution_id"], suite)
+            self.assertTrue(payload["task_completed"])
+            self.assertEqual(payload["result"]["activity_id"], "H03")
+            self.assertEqual(payload["result"]["source_digest"], "a" * 64)
+            self.assertEqual(payload["result"]["provider_evidence"], result["provider_evidence"])
+            self.assertEqual(len(payload["stage_calls"]), 19)
+            collect.assert_called_once_with(suite)
+            result["cases"].pop()
+            failed = self.client.post("/v1/verify/p03", json={"suite_id": suite},
+                headers={"Authorization": "Bearer control-verifier"}).json()
+            self.assertFalse(failed["task_completed"])
+            self.assertEqual(failed["security_verdict"], "ERR")
+
+    def test_p03_collection_or_configuration_failure_is_problem_local(self):
+        for target, failure in (("p03_suite_verification.SuiteVerification.collect", ValueError("private proof")),
+                                ("p03_suite_verification.SuiteVerification", OSError("private file"))):
+            with self.subTest(target=target), patch(target, side_effect=failure):
+                self.assertEqual(self.client.get("/readyz").status_code, 200)
+                response = self.client.post("/v1/verify/p03", json={"suite_id": str(uuid.uuid4())},
+                    headers={"Authorization": "Bearer control-verifier"})
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertFalse(payload["task_completed"])
+            self.assertEqual(payload["security_verdict"], "ERR")
+            self.assertEqual(payload["stage_calls"], [])
+            self.assertNotIn("private", response.text)
+            self.assertFalse(self.server.P03_LOCK.locked())
+
+    def test_p03_control_cannot_double_as_reader(self):
+        with patch.object(self.server, "LAB03_TOKEN", self.server.CONTROL_TOKEN), patch(
+                "p03_suite_verification.SuiteVerification.collect") as collect:
+            response = self.client.post("/v1/verify/p03", json={"suite_id": str(uuid.uuid4())},
+                headers={"Authorization": "Bearer control-verifier"})
+            self.assertFalse(response.json()["task_completed"])
+            collect.assert_not_called()
+
+    def test_p03_concurrent_grading_does_not_block_health(self):
+        self.server.P03_LOCK.acquire()
+        try:
+            response = self.client.post("/v1/verify/p03", json={"suite_id": str(uuid.uuid4())},
+                headers={"Authorization": "Bearer control-verifier"})
+            self.assertEqual(response.status_code, 409)
+            self.assertEqual(self.client.get("/readyz").status_code, 200)
+        finally:
+            self.server.P03_LOCK.release()
+
+    def p04_roles(self):
+        return patch.multiple(self.server, CONTROL_TOKEN="c" * 32, LAB04_TOKEN="r" * 32, GATEWAY_TOKEN="g" * 32)
+
+    def p04_request(self, body):
+        return self.client.post("/v1/verify/p04", json=body, headers={"Authorization": "Bearer " + "c" * 32})
+
+    def test_p04_authentication_and_no_caller_grading_fields(self):
+        body = {"suite_id": str(uuid.uuid4())}
+        with self.p04_roles(), patch("p04_suite_verification.SuiteVerification.collect") as collect:
+            self.assertEqual(self.client.post("/v1/verify/p04", json=body).status_code, 401)
+            for change in ({"task_completed": True}, {"security_verdict": "PASS"}, {"cases": []},
+                           {"gateway_url": "http://private-address"}, {"suite_id": "private-invalid"}):
+                response = self.p04_request({**body, **change})
+                self.assertEqual(response.status_code, 422)
+                self.assertNotIn("private", response.text)
+            collect.assert_not_called()
+
+    def test_p04_route_uses_full_contract_and_preserves_raw_evidence(self):
+        from p04_suite_verification import SuiteVerification
+        verification = SuiteVerification(CONTROL / "guided-labs/h04-bedrock-guardrail", self.server.LAB04_URL,
+                                        self.server.GATEWAY_URL, "r" * 32, "g" * 32)
+        suite = str(uuid.uuid4())
+        result = {"suite_contract_verified": True, "suite_id": suite, "provider_mode": "contract",
+            "root": {"suite_id": suite}, "build": {"source_digest": "a" * 64},
+            "provider_evidence": [{"raw-fixture": "preserved"}], "cases": [
+                {"case_id": case["case_id"], "binding": {"execution_verified": True,
+                    "call_count": 0 if case["expected"] == "rejected" else 1,
+                    "response": None if case["expected"] == "service_error" else {}},
+                 "product": {"product_result_verified": True, "effect": "unchanged"}
+                    if case["backend"] == "provider" else None} for case in verification.cases]}
+        with self.p04_roles(), patch("p04_suite_verification.SuiteVerification.collect", return_value=result) as collect:
+            response = self.p04_request({"suite_id": suite})
+            payload = response.json()
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(payload["activity_id"], "P04")
+            self.assertEqual(payload["lab_id"], "03-bedrock-guardrail")
+            self.assertEqual(payload["execution_id"], suite)
+            self.assertTrue(payload["task_completed"])
+            self.assertEqual(payload["result"]["activity_id"], "H04")
+            self.assertEqual(payload["result"]["source_digest"], "a" * 64)
+            self.assertEqual(payload["result"]["provider_evidence"], result["provider_evidence"])
+            self.assertEqual(len(payload["stage_calls"]), 27)
+            self.assertIn("합성", payload["reason"])
+            collect.assert_called_once_with(suite)
+            result["cases"].pop()
+            failed = self.p04_request({"suite_id": suite}).json()
+            self.assertFalse(failed["task_completed"])
+            self.assertEqual(failed["security_verdict"], "ERR")
+            self.assertEqual(failed["stage_calls"], [])
+
+    def test_p04_collection_or_configuration_failure_is_problem_local(self):
+        for target, failure in (("p04_suite_verification.SuiteVerification.collect", ValueError("private proof")),
+                                ("p04_suite_verification.SuiteVerification", OSError("private file"))):
+            with self.p04_roles(), patch(target, side_effect=failure):
+                self.assertEqual(self.client.get("/readyz").status_code, 200)
+                response = self.p04_request({"suite_id": str(uuid.uuid4())})
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(response.json()["task_completed"])
+            self.assertEqual(response.json()["security_verdict"], "ERR")
+            self.assertEqual(response.json()["stage_calls"], [])
+            self.assertNotIn("private", response.text)
+            self.assertFalse(self.server.P04_LOCK.locked())
+
+    def test_p04_control_cannot_double_as_reader(self):
+        with self.p04_roles(), patch.object(self.server, "LAB04_TOKEN", "c" * 32), patch(
+                "p04_suite_verification.SuiteVerification.collect") as collect:
+            self.assertFalse(self.p04_request({"suite_id": str(uuid.uuid4())}).json()["task_completed"])
+            collect.assert_not_called()
+
+    def test_p04_concurrent_grading_does_not_block_health(self):
+        self.server.P04_LOCK.acquire()
+        try:
+            with self.p04_roles():
+                self.assertEqual(self.p04_request({"suite_id": str(uuid.uuid4())}).status_code, 409)
+                self.assertEqual(self.client.get("/readyz").status_code, 200)
+        finally:
+            self.server.P04_LOCK.release()
+
+    def test_p02_route_preserves_verified_completion_and_source(self):
+        suite = str(uuid.uuid4())
+        result = {"case_contract_verified": True, "provider_mode": "contract",
+                  "cases": [{"case_id": "normal", "calls": 2},
+                            {"case_id": "invalid", "calls": 0}],
+                  "build": {"source_digest": "a" * 64}}
+        with patch("p02_verification.Verification.collect", return_value=result) as collect:
+            response = self.client.post("/v1/verify/p02", json={"suite_id": suite},
+                headers={"Authorization": "Bearer control-verifier"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["execution_id"], suite)
+        self.assertEqual(payload["activity_id"], "P02")
+        self.assertEqual(payload["contract_version"], "p02-document-v1")
+        self.assertIs(payload["task_completed"], True)
+        self.assertEqual(payload["security_verdict"], "PASS")
+        self.assertEqual(payload["result"]["provider_mode"], "contract")
+        self.assertEqual(payload["result"]["source_digest"], "a" * 64)
+        self.assertEqual(collect.call_args.args[0], suite)
+        self.assertEqual([item["outcome"] for item in payload["stage_calls"]],
+                         ["stored-and-embedded", "rejected-before-provider"])
+
+    def test_p02_collection_failure_is_incomplete_without_zero_call_claim(self):
+        for failure in (ValueError("private diagnostic"), OSError("private path"),
+                        self.server.httpx.ConnectError("private address")):
+            with self.subTest(failure=type(failure).__name__), patch(
+                    "p02_verification.Verification.collect", side_effect=failure):
+                response = self.client.post("/v1/verify/p02", json={"suite_id": str(uuid.uuid4())},
+                    headers={"Authorization": "Bearer control-verifier"})
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertIs(payload["task_completed"], False)
+            self.assertEqual(payload["security_verdict"], "ERR")
+            self.assertEqual(payload["stage_calls"], [])
+            self.assertIsNone(payload["result"]["embedding_dimension"])
+            self.assertNotIn("private", response.text)
+            self.assertFalse(self.server.P02_LOCK.locked())
+
+    def test_p02_concurrent_verification_is_rejected(self):
+        self.server.P02_LOCK.acquire()
+        try:
+            response = self.client.post("/v1/verify/p02", json={"suite_id": str(uuid.uuid4())},
+                headers={"Authorization": "Bearer control-verifier"})
+            self.assertEqual(response.status_code, 409)
+            self.assertEqual(self.client.get("/readyz").status_code, 200)
+        finally:
+            self.server.P02_LOCK.release()
+
+    def test_p12_authentication_and_server_owned_fields(self):
+        body = {'suite_id': str(uuid.uuid4())}
+        self.assertEqual(self.client.post('/v1/verify/p12', json=body).status_code, 401)
+        for field in ('started_at', 'task_completed', 'documents', 'specifications'):
+            response = self.client.post('/v1/verify/p12', json={**body, field: 'browser-value'},
+                                        headers={'Authorization': 'Bearer control-verifier'})
+            self.assertEqual(response.status_code, 422)
+
+    def test_p12_common_route_calls_read_only_grader(self):
+        suite = str(uuid.uuid4())
+        grade = {'practice_id': 'P12', 'execution_id': 'H12', 'suite_id': suite,
+                 'contract_version': 2, 'task_completed': True, 'security_verdict': 'PASS',
+                 'cases': [{'case_id': 'normal', 'stages': ['authenticate', 'authorize']}]}
+        configuration = {'origin': 'http://runner', 'token': 'read-only'}
+        with patch.object(self.server, 'P12_CONFIGURATION', configuration), \
+                patch.object(self.server, 'grade_p12_run', new_callable=AsyncMock, return_value=grade) as grader:
+            for route in ('/v1/verify/p12', '/v1/verify/h12'):
+                response = self.client.post(route, json={'suite_id': suite},
+                                            headers={'Authorization': 'Bearer control-verifier'})
+                self.assertEqual(response.status_code, 200)
+                result = response.json()
+                self.assertEqual(result['activity_id'], 'P12')
+                self.assertEqual(result['execution_id'], suite)
+                self.assertEqual(result['result'], grade)
+                self.assertTrue(result['task_completed'])
+            grader.assert_awaited_with(suite_id=suite, **configuration)
+
     def body(self) -> dict:
+        original_ids = {
+            "normal-64": "11111111-1111-1111-1111-111111111111",
+            "risk-512": "22222222-2222-2222-2222-222222222222",
+            "invalid-empty-message": "33333333-3333-3333-3333-333333333333",
+            "reject-model-override": "44444444-4444-4444-4444-444444444444",
+        }
         return {
             "suite_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             "started_at": "2026-09-22T10:00:00+00:00",
             "suite_kind": "hands_on",
             "cases": [
                 {
-                    "case_id": "normal-64",
-                    "scenario": "normal",
-                    "execution_id": "11111111-1111-1111-1111-111111111111",
+                    "case_id": case["case_id"], "scenario": case["scenario"],
+                    "execution_id": original_ids.get(case["case_id"], str(uuid.UUID(int=index + 100))),
                     "started_at": "2026-09-22T10:00:00+00:00",
-                    "requested_max_output_tokens": 64,
-                    "expected_status": 200,
-                    "observed_status": 200,
-                },
-                {
-                    "case_id": "risk-512",
-                    "scenario": "risk",
-                    "execution_id": "22222222-2222-2222-2222-222222222222",
-                    "started_at": "2026-09-22T10:00:00+00:00",
-                    "requested_max_output_tokens": 512,
-                    "expected_status": 200,
-                    "observed_status": 200,
-                },
-                {
-                    "case_id": "invalid-empty-message",
-                    "scenario": "normal",
-                    "execution_id": "33333333-3333-3333-3333-333333333333",
-                    "started_at": "2026-09-22T10:00:00+00:00",
-                    "requested_max_output_tokens": 64,
-                    "expected_status": 422,
-                    "observed_status": 422,
-                },
-                {
-                    "case_id": "reject-model-override",
-                    "scenario": "normal",
-                    "execution_id": "44444444-4444-4444-4444-444444444444",
-                    "started_at": "2026-09-22T10:00:00+00:00",
-                    "requested_max_output_tokens": 64,
-                    "expected_status": 422,
-                    "observed_status": 422,
-                },
+                    "requested_max_output_tokens": case["body"].get("max_output_tokens"),
+                    "expected_status": case["expected_status"], "observed_status": case["expected_status"],
+                }
+                for index, case in enumerate(self.server.P01_CONTRACT["cases"])
             ],
         }
 
     def fake_get(self, risk_effective: int):
-        cases = {
-            "11111111-1111-1111-1111-111111111111": ("normal", 64, 64, 40),
-            "22222222-2222-2222-2222-222222222222": (
-                "risk",
-                512,
-                risk_effective,
-                risk_effective,
-            ),
-        }
+        definitions = {item["case_id"]: item for item in self.server.P01_CONTRACT["cases"]}
+        expected_cases = {item["execution_id"]: item for item in self.body()["cases"]}
+        cases = {}
+        for execution_id, expected in expected_cases.items():
+            if expected["expected_status"] == 200:
+                effective = risk_effective if expected["case_id"] == "risk-512" else definitions[expected["case_id"]]["effective_max_tokens"]
+                cases[execution_id] = (expected["scenario"], expected["requested_max_output_tokens"], effective, effective)
 
         def get(url, **_kwargs):
             if url.endswith("/v1/build-info"):
-                return FakeResponse({"component": "guided-h01-gateway", "source_digest": "b" * 64})
+                return FakeResponse({"component": "guided-h01-gateway", "source_digest": "b" * 64,
+                                     "runner_digests": self.server.P01_RUNNER_DIGESTS})
             execution_id = url.rsplit("/", 1)[-1]
-            if execution_id in {
-                "33333333-3333-3333-3333-333333333333",
-                "44444444-4444-4444-4444-444444444444",
-            }:
+            if "/v1/executions/" in url:
+                expected = next(item for item in self.body()["cases"] if item["execution_id"] == execution_id)
+                called = expected["expected_status"] == 200
+                effective = cases[execution_id][2] if called else None
+                return FakeResponse({
+                    "execution_id": execution_id, "started_at": expected["started_at"],
+                    "scenario": expected["scenario"], "source_digest": "b" * 64,
+                    "runner_digests": self.server.P01_RUNNER_DIGESTS,
+                    "activity_id": "P01", "internal_activity_id": "H01", "contract_version": 2,
+                    "closed": True, "http_status": expected["expected_status"], "provider_mode": "contract",
+                    "invocation_attempts": int(called), "provider_attempts": int(called), "provider_results": int(called),
+                    "provider_request_ids": [f"request-{execution_id}-{effective}"] if called else [],
+                    "request_digest": hashlib.sha256(json.dumps(definitions[expected["case_id"]]["body"], sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest(),
+                })
+            if expected_cases[execution_id]["expected_status"] == 422:
                 return FakeResponse({"detail": "receipt not found"}, status_code=404)
             scenario, requested, effective, output = cases[execution_id]
-            provider_id = f"request-{execution_id[:8]}-{effective}"
+            provider_id = f"request-{execution_id}-{effective}"
             return FakeResponse(
                 {
                     "execution_id": execution_id,
                     "started_at": "2026-09-22T10:00:00+00:00",
+                    "activity_id": "P01", "internal_activity_id": "H01", "contract_version": 2,
                     "scenario": scenario,
                     "requested_max_output_tokens": requested,
                     "effective_max_output_tokens": effective,
                     "source_digest": "b" * 64,
+                    "runner_digests": self.server.P01_RUNNER_DIGESTS,
                     "provider_request_id": provider_id,
                     "provider_mode": "contract",
                     "observed_at": "2026-09-22T10:00:01+00:00",
                     "model_id": "us.amazon.nova-lite-v1:0",
                     "region": "us-east-1",
                     "forwarded_parameters": {"maxTokens": effective, "temperature": 0.0},
+                    "forwarded_messages": [{"role": "user", "content": [{"text": definitions[expected_cases[execution_id]["case_id"]]["body"]["message"]}]}],
                     "usage": {"inputTokens": 10, "outputTokens": output, "totalTokens": 10 + output},
                     "stop_reason": "max_tokens",
                     "response_text": "검증된 응답",
@@ -229,15 +474,70 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             response = self.verify(self.body())
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(len(response.json()["result"]["cases"]), 4)
+        self.assertEqual(len(response.json()["result"]["cases"]), 21)
+        self.assertTrue(response.json()["task_completed"])
+        self.assertEqual(response.json()["security_verdict"], "PASS")
 
-    def test_unbounded_gateway_starter_is_hit(self):
+    def test_p01_runner_binding_is_required_on_every_evidence_surface(self):
+        for surface in ("/v1/build-info", "/v1/executions/", "/v1/receipts/"):
+            with self.subTest(surface=surface):
+                original = self.fake_get(128)
+
+                def missing(url, **kwargs):
+                    response = original(url, **kwargs)
+                    if surface in url and response.status_code == 200:
+                        payload = dict(response.json())
+                        payload.pop("runner_digests", None)
+                        return FakeResponse(payload)
+                    return response
+
+                with patch.object(self.server.httpx, "get", missing):
+                    result = self.verify(self.body()).json()
+                self.assertEqual(result["security_verdict"], "ERR", result)
+                self.assertFalse(result["task_completed"])
+
+    def test_p01_build_is_rechecked_after_receipts(self):
+        original = self.fake_get(128)
+        builds = 0
+
+        def changed(url, **kwargs):
+            nonlocal builds
+            response = original(url, **kwargs)
+            if url.endswith("/v1/build-info"):
+                builds += 1
+                if builds == 2:
+                    return FakeResponse({**response.json(), "source_digest": "c" * 64})
+            return response
+
+        with patch.object(self.server.httpx, "get", changed):
+            result = self.verify(self.body()).json()
+        self.assertEqual(builds, 2)
+        self.assertEqual(result["security_verdict"], "ERR", result)
+        self.assertFalse(result["task_completed"])
+
+    def test_p01_malformed_evidence_is_err_not_server_failure(self):
+        for malformed in ([], None, {"runner_digests": self.server.P01_RUNNER_DIGESTS}):
+            with self.subTest(payload=malformed), patch.object(
+                self.server.httpx, "get", return_value=FakeResponse(malformed)
+            ):
+                response = self.verify(self.body())
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["security_verdict"], "ERR")
+                self.assertFalse(response.json()["task_completed"])
+
+    def test_implementation_without_limit_is_hit_when_impact_is_observed(self):
         body = self.body()
         body["suite_id"] = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
         with patch.object(self.server.httpx, "get", self.fake_get(512)):
             response = self.verify(body)
         self.assertEqual(response.json()["course_verdict"], "HIT")
+        self.assertFalse(response.json()["task_completed"])
         self.assertEqual(response.json()["result"]["effective_max_output_tokens"], 512)
+
+    def test_overrestrictive_implementation_is_not_pass(self):
+        with patch.object(self.server.httpx, "get", self.fake_get(1)):
+            response = self.verify(self.body())
+        self.assertEqual(response.json()["course_verdict"], "ERR")
 
     def test_incomplete_server_suite_is_err(self):
         body = self.body()
@@ -246,9 +546,60 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         response = self.verify(body)
         self.assertEqual(response.json()["course_verdict"], "ERR")
 
+    def test_missing_or_open_execution_cannot_prove_no_provider_call(self):
+        baseline = self.fake_get(128)
+        for alteration in (None, {"closed": False}, {"provider_attempts": 1}, {"source_digest": "c" * 64}, {"contract_version": 1}):
+            with self.subTest(alteration=alteration):
+                def get(url, **kwargs):
+                    response = baseline(url, **kwargs)
+                    if "/v1/executions/33333333" in url:
+                        if alteration is None:
+                            return FakeResponse({}, status_code=404)
+                        response.payload.update(alteration)
+                    return response
+                with patch.object(self.server.httpx, "get", get):
+                    result = self.verify(self.body()).json()
+                self.assertEqual(result["course_verdict"], "ERR")
+
+    def test_provider_receipt_must_match_closed_execution_record(self):
+        baseline = self.fake_get(128)
+        for alteration in ({"provider_request_ids": ["different"]}, {"provider_results": 0}, {"invocation_attempts": 2}, {"activity_id": "P02"}):
+            with self.subTest(alteration=alteration):
+                def get(url, **kwargs):
+                    response = baseline(url, **kwargs)
+                    if "/v1/executions/11111111" in url:
+                        response.payload.update(alteration)
+                    return response
+                with patch.object(self.server.httpx, "get", get):
+                    self.assertEqual(self.verify(self.body()).json()["course_verdict"], "ERR")
+
     def test_provider_receipt_cannot_move_to_another_execution(self):
         self.assertTrue(self.server.reserve_provider_evidence("stale-request", "execution-one"))
         self.assertFalse(self.server.reserve_provider_evidence("stale-request", "execution-two"))
+
+    def test_duplicate_case_or_changed_contract_cannot_pass(self):
+        for mutation in ("duplicate", "scenario", "expected_status", "type"):
+            body = self.body()
+            if mutation == "duplicate":
+                body["cases"].append(dict(body["cases"][0]))
+            elif mutation == "type":
+                body["cases"][0]["requested_max_output_tokens"] = "64"
+            else:
+                body["cases"][0][mutation] = "risk" if mutation == "scenario" else 422
+            result = self.verify(body).json()
+            self.assertEqual(result["security_verdict"], "ERR")
+            self.assertFalse(result["task_completed"])
+
+    def test_case_content_or_actual_forwarded_message_cannot_change(self):
+        baseline = self.fake_get(128)
+        for location in ("request_digest", "forwarded_messages"):
+            def get(url, **kwargs):
+                response = baseline(url, **kwargs)
+                if location in response.payload:
+                    response.payload[location] = "changed"
+                return response
+            with patch.object(self.server.httpx, "get", get):
+                self.assertEqual(self.verify(self.body()).json()["security_verdict"], "ERR")
 
     def test_browser_or_executor_verdict_field_is_rejected(self):
         response = self.verify({**self.body(), "course_verdict": "PASS"})
@@ -362,465 +713,63 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         response = self.verify_h22(receipt, effects)
         self.assertEqual(response.json()["course_verdict"], "ERR")
 
-    def h02_body(self, risk_status: int) -> dict:
-        return {
-            "suite_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-            "started_at": "2026-09-22T10:00:00+00:00",
-            "cases": [
-                {
-                    "case_id": "normal-document",
-                    "scenario": "normal",
-                    "execution_id": "55555555-5555-5555-5555-555555555555",
-                    "started_at": "2026-09-22T10:00:00+00:00",
-                    "observed_status": 200,
-                },
-                {
-                    "case_id": "client-key-override",
-                    "scenario": "risk",
-                    "execution_id": "66666666-6666-6666-6666-666666666666",
-                    "started_at": "2026-09-22T10:00:00+00:00",
-                    "observed_status": risk_status,
-                },
-                {
-                    "case_id": "invalid-empty-body",
-                    "scenario": "normal",
-                    "execution_id": "77777777-7777-7777-7777-777777777777",
-                    "started_at": "2026-09-22T10:00:00+00:00",
-                    "observed_status": 422,
-                },
-            ],
-        }
-
-    def fake_h02_get(self, risk_status: int):
-        state = {
-            "status": "READY",
-            "provider_mode": "contract",
-            "observed_at": "2026-09-22T10:00:01+00:00",
-            "account_id": "000000000000",
-            "region": "us-east-1",
-            "template_digest": "c" * 64,
-            "source_bucket": "owasp-llm-03-000000000000-source",
-            "source_prefix": "h02/knowledge/",
-            "index_arn": "arn:aws:s3vectors:us-east-1:000000000000:bucket/test/index/course-knowledge",
-            "knowledge_base_id": "CONTRACTKB",
-            "data_source_id": "CONTRACTDS",
-            "embedding_model_id": "amazon.titan-embed-text-v2:0",
-            "dimensions": 1024,
-        }
-
-        def get(url, **_kwargs):
-            if url.endswith("/v1/h02/resources"):
-                return FakeResponse(state)
-            if url.endswith("/v1/build-info"):
-                return FakeResponse(
-                    {"component": "guided-h02-document-app", "source_digest": "d" * 64}
-                )
-            execution_id = url.rsplit("/", 1)[-1]
-            if execution_id == "77777777-7777-7777-7777-777777777777" or (
-                execution_id == "66666666-6666-6666-6666-666666666666"
-                and risk_status == 422
-            ):
-                return FakeResponse({"detail": "not found"}, status_code=404)
-            scenario = "normal" if execution_id.startswith("5555") else "risk"
-            prefix = "knowledge" if scenario == "normal" else "untrusted"
-            object_key = f"h02/{prefix}/{execution_id}.md"
-            if "guided-h02-document-app" in url:
-                return FakeResponse(
-                    {
-                        "execution_id": execution_id,
-                        "source_digest": "d" * 64,
-                        "gateway_evidence_id": execution_id,
-                        "object_key": object_key,
-                    }
-                )
-            return FakeResponse(
-                {
-                    "execution_id": execution_id,
-                    "scenario": scenario,
-                    "observed_at": "2026-09-22T10:00:01+00:00",
-                    "provider_mode": "contract",
-                    "provider_request_id": f"titan-{execution_id[:8]}",
-                    "s3_request_id": f"s3-{execution_id[:8]}",
-                    "model_id": "amazon.titan-embed-text-v2:0",
-                    "region": "us-east-1",
-                    "object_key": object_key,
-                    "object_uri": f"s3://bucket/{object_key}",
-                    "object_exists": True,
-                    "embedding_dimension": 1024,
-                    "embedding_norm": 1.0,
-                    "knowledge_base_id": "CONTRACTKB",
-                    "data_source_id": "CONTRACTDS",
-                    "template_digest": "c" * 64,
-                    "upstream_called": True,
-                }
-            )
-
-        return get
-
-    def test_h02_fixed_document_app_is_pass(self):
-        with patch.object(self.server.httpx, "get", self.fake_h02_get(422)):
+    def test_retired_h02_verifier_cannot_award_completion(self):
+        with patch.object(self.server.httpx, "get") as downstream:
             response = self.client.post(
                 "/v1/verify/lab-02",
-                json=self.h02_body(422),
+                json={"course_verdict": "PASS", "task_completed": True, "cases": []},
                 headers={"Authorization": "Bearer control-verifier"},
             )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(response.json()["result"]["embedding_dimension"], 1024)
+        self.assertEqual(response.status_code, 410)
+        self.assertIn("/v1/verify/p02", response.json()["detail"])
+        self.assertNotIn("task_completed", response.json())
+        downstream.assert_not_called()
 
-    def test_h02_client_owned_path_starter_is_hit(self):
-        with patch.object(self.server.httpx, "get", self.fake_h02_get(200)):
-            response = self.client.post(
-                "/v1/verify/lab-02",
-                json=self.h02_body(200),
-                headers={"Authorization": "Bearer control-verifier"},
-            )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "HIT")
+    def test_retired_h02_verifier_still_requires_authentication(self):
+        with patch.object(self.server.httpx, "get") as downstream:
+            response = self.client.post("/v1/verify/lab-02", json={})
+        self.assertEqual(response.status_code, 401)
+        downstream.assert_not_called()
 
-    def h03_body(self, suite_id: str) -> dict:
-        return {
-            "suite_id": suite_id,
-            "execution_id": "88888888-8888-8888-8888-888888888888",
-            "started_at": "2026-09-22T10:00:00+00:00",
-        }
+    def test_retired_h03_verifiers_cannot_award_completion(self):
+        for path in ("/v1/verify/lab-03", "/v1/verify/lab-03-resources"):
+            with self.subTest(path=path), patch.object(self.server.httpx, "get") as downstream:
+                response = self.client.post(path,
+                    json={"course_verdict": "PASS", "task_completed": True},
+                    headers={"Authorization": "Bearer control-verifier"})
+                self.assertEqual(response.status_code, 410)
+                self.assertIn("/v1/verify/p03", response.json()["detail"])
+                self.assertNotIn("task_completed", response.json())
+                downstream.assert_not_called()
 
-    def fake_h03_get(self, *, early_called: bool, mismatched_job: bool = False):
-        execution_id = "88888888-8888-8888-8888-888888888888"
-        job_id = "H03CURRENTJOB"
-        old_uri = "s3://owasp-llm-03-h03-000000000000-source/h03/knowledge/revoked-policy.md"
-        current_uri = "s3://owasp-llm-03-h03-000000000000-source/h03/knowledge/current-policy.md"
-        digest = "3" * 64
-        state = {
-            "status": "CURRENT",
-            "provider_mode": "contract",
-            "observed_at": "2026-09-22T10:00:05+00:00",
-            "account_id": "000000000000",
-            "region": "us-east-1",
-            "source_prefix": "h03/knowledge/",
-            "template_digest": "4" * 64,
-            "knowledge_base_id": "CONTRACTH03KB",
-            "data_source_id": "CONTRACTH03DS",
-            "old_source_uri": old_uri,
-            "current_source_uri": current_uri,
-            "old_source_exists": False,
-            "current_source_exists": True,
-            "indexed_documents": [
-                {"status": "INDEXED", "source_uri": current_uri}
-            ],
-        }
-        receipts = {
-            "start": {
-                "execution_id": execution_id,
-                "observed_at": "2026-09-22T10:00:01+00:00",
-                "source_digest": digest,
-                "ingestion_job_id": job_id,
-            },
-            "early": {
-                "execution_id": execution_id,
-                "observed_at": "2026-09-22T10:00:02+00:00",
-                "source_digest": digest,
-                "ingestion_job_id": job_id,
-                "observed_job_id": "ANOTHERJOB" if mismatched_job else job_id,
-                "job_status": "IN_PROGRESS",
-                "decision": "retrieve" if early_called else "wait",
-                "retrieval_called": early_called,
-                "retrieval_request_id": "h03-early-provider" if early_called else None,
-            },
-            "final": {
-                "execution_id": execution_id,
-                "observed_at": "2026-09-22T10:00:04+00:00",
-                "source_digest": digest,
-                "ingestion_job_id": job_id,
-                "observed_job_id": job_id,
-                "job_status": "COMPLETE",
-                "decision": "retrieve",
-                "retrieval_called": True,
-                "retrieval_request_id": "h03-final-provider",
-            },
-        }
-        final = {
-            "execution_id": execution_id,
-            "phase": "final",
-            "provider_mode": "contract",
-            "provider_request_id": "h03-final-provider",
-            "observed_at": "2026-09-22T10:00:04+00:00",
-            "ingestion_job_id": job_id,
-            "job_status_at_retrieval": "COMPLETE",
-            "knowledge_base_id": "CONTRACTH03KB",
-            "data_source_id": "CONTRACTH03DS",
-            "template_digest": "4" * 64,
-            "source_uris": [current_uri],
-            "document_ids": ["current-document"],
-        }
-        early = {
-            "execution_id": execution_id,
-            "phase": "early",
-            "provider_mode": "contract",
-            "provider_request_id": "h03-early-provider",
-            "observed_at": "2026-09-22T10:00:02+00:00",
-            "ingestion_job_id": job_id,
-            "job_status_at_retrieval": "IN_PROGRESS",
-            "knowledge_base_id": "CONTRACTH03KB",
-            "data_source_id": "CONTRACTH03DS",
-            "template_digest": "4" * 64,
-            "source_uris": [old_uri],
-            "document_ids": ["revoked-document"],
-        }
+    def test_retired_h03_verifiers_still_require_authentication(self):
+        for path in ("/v1/verify/lab-03", "/v1/verify/lab-03-resources"):
+            with self.subTest(path=path), patch.object(self.server.httpx, "get") as downstream:
+                response = self.client.post(path, json={})
+                self.assertEqual(response.status_code, 401)
+                downstream.assert_not_called()
 
-        def get(url, **_kwargs):
-            if url.endswith("/v1/build-info"):
-                return FakeResponse(
-                    {"component": "guided-h03-sync-app", "source_digest": digest}
-                )
-            if url.endswith("/v1/h03/resources"):
-                return FakeResponse(state)
-            if "/v1/receipts/" in url:
-                return FakeResponse(receipts[url.rsplit("/", 1)[-1]])
-            if url.endswith(f"/v1/h03/jobs/{job_id}"):
-                return FakeResponse(
-                    {"ingestion_job_id": job_id, "status": "COMPLETE"}
-                )
-            if url.endswith(f"/v1/h03/retrievals/{execution_id}/final"):
-                return FakeResponse(final)
-            if url.endswith(f"/v1/h03/retrievals/{execution_id}/early"):
-                return FakeResponse(early) if early_called else FakeResponse({}, 404)
-            raise AssertionError(f"unexpected H03 URL: {url}")
+    def test_retired_h04_verifiers_cannot_award_completion(self):
+        with self.server.connect() as database:
+            before = list(database.iterdump())
+        for path in ("/v1/verify/lab-04", "/v1/verify/lab-04-resources"):
+            with self.subTest(path=path), patch.object(self.server.httpx, "get") as downstream:
+                response = self.client.post(path,
+                    json={"course_verdict": "PASS", "task_completed": True},
+                    headers={"Authorization": "Bearer control-verifier"})
+                self.assertEqual(response.status_code, 410)
+                self.assertIn("/v1/verify/p04", response.json()["detail"])
+                self.assertNotIn("task_completed", response.json())
+                downstream.assert_not_called()
+        with self.server.connect() as database:
+            self.assertEqual(list(database.iterdump()), before)
 
-        return get
-
-    def verify_h03(self, suite_id: str, *, early_called: bool, mismatched_job: bool = False):
-        with patch.object(
-            self.server.httpx,
-            "get",
-            self.fake_h03_get(
-                early_called=early_called, mismatched_job=mismatched_job
-            ),
-        ):
-            return self.client.post(
-                "/v1/verify/lab-03",
-                json=self.h03_body(suite_id),
-                headers={"Authorization": "Bearer control-verifier"},
-            )
-
-    def test_h03_starter_retrieves_revoked_document_as_hit(self):
-        response = self.verify_h03(
-            "03000000-0000-0000-0000-000000000001", early_called=True
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "HIT")
-        self.assertEqual(
-            response.json()["stage_calls"][2]["outcome"], "revoked-source-hit"
-        )
-
-    def test_h03_current_job_complete_gate_is_pass(self):
-        response = self.verify_h03(
-            "03000000-0000-0000-0000-000000000002", early_called=False
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(
-            response.json()["stage_calls"][2]["outcome"],
-            "blocked-before-retrieval",
-        )
-
-    def test_h03_mismatched_observed_job_is_err(self):
-        response = self.verify_h03(
-            "03000000-0000-0000-0000-000000000003",
-            early_called=False,
-            mismatched_job=True,
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "ERR")
-
-    def h04_body(self, suite_id: str) -> dict:
-        case_ids = ["apply-normal", "apply-risk", "converse-normal", "converse-risk"]
-        return {
-            "suite_id": suite_id,
-            "started_at": "2026-09-23T10:00:00+00:00",
-            "cases": [
-                {
-                    "case_id": case_id,
-                    "execution_id": f"04000000-0000-0000-0000-{index:012d}",
-                    "started_at": "2026-09-23T10:00:00+00:00",
-                }
-                for index, case_id in enumerate(case_ids, 1)
-            ],
-        }
-
-    def fake_h04_get(
-        self,
-        *,
-        protected: bool,
-        include_trace: bool = True,
-        normal_connected: bool | None = None,
-        risk_model_called: bool = True,
-    ):
-        digest = "4" * 64
-        state = {
-            "status": "READY",
-            "provider_mode": "contract",
-            "observed_at": "2026-09-23T10:00:01+00:00",
-            "account_id": "000000000000",
-            "region": "us-east-1",
-            "guardrail_id": "CONTRACTH04GR",
-            "guardrail_version": "DRAFT",
-            "guardrail_name": "owasp-llm-03-h04-000000000000",
-            "template_digest": "a" * 64,
-            "pii_type": "EMAIL",
-            "input_enabled": False,
-            "output_enabled": True,
-            "output_action": "ANONYMIZE",
-        }
-        case_ids = ["apply-normal", "apply-risk", "converse-normal", "converse-risk"]
-        execution_to_case = {
-            f"04000000-0000-0000-0000-{index:012d}": case_id
-            for index, case_id in enumerate(case_ids, 1)
-        }
-
-        def provider(case_id: str, execution_id: str) -> dict:
-            common = {
-                "execution_id": execution_id,
-                "case_id": case_id,
-                "provider_mode": "contract",
-                "provider_request_id": f"h04-{case_id}",
-                "observed_at": "2026-09-23T10:00:01+00:00",
-                "template_digest": "a" * 64,
-            }
-            if case_id == "apply-normal":
-                return {**common, "operation": "apply_guardrail", "guardrail_id": "CONTRACTH04GR", "guardrail_version": "DRAFT", "action": "NONE", "outputs": [], "pii_actions": [], "model_called": False}
-            if case_id == "apply-risk":
-                return {
-                    **common,
-                    "operation": "apply_guardrail",
-                    "guardrail_id": "CONTRACTH04GR",
-                    "guardrail_version": "DRAFT",
-                    "action": "GUARDRAIL_INTERVENED",
-                    "outputs": [{"text": "담당자 이메일은 {EMAIL} 입니다."}],
-                    "pii_actions": [{"type": "EMAIL", "action": "ANONYMIZED"}],
-                    "model_called": False,
-                }
-            if case_id == "converse-normal":
-                return {
-                    **common,
-                    "operation": "converse",
-                    "model_id": "us.amazon.nova-lite-v1:0",
-                    "model_called": True,
-                    "output_text": "고객지원 운영 시간 안내",
-                    "usage": {"outputTokens": 12},
-                    "guardrail_config": {"guardrailIdentifier": "CONTRACTH04GR", "guardrailVersion": "DRAFT"} if (protected if normal_connected is None else normal_connected) else None,
-                    "pii_actions": [],
-                    "stop_reason": "end_turn",
-                }
-            return {
-                **common,
-                "operation": "converse",
-                "model_id": "us.amazon.nova-lite-v1:0",
-                "model_called": risk_model_called,
-                "output_text": "담당자 이메일은 {EMAIL} 입니다." if protected else "담당자 이메일은 learner@example.com 입니다.",
-                "usage": {"outputTokens": 12},
-                "guardrail_config": {"guardrailIdentifier": "CONTRACTH04GR", "guardrailVersion": "DRAFT"} if protected else None,
-                "pii_actions": ([{"type": "EMAIL", "action": "ANONYMIZED"}] if protected and include_trace else []),
-                "stop_reason": "end_turn",
-            }
-
-        def get(url, **_kwargs):
-            if url.endswith("/v1/h04/resources"):
-                return FakeResponse(state)
-            if url.endswith("/v1/build-info"):
-                return FakeResponse({"component": "guided-h04-guardrail-app", "source_digest": digest})
-            execution_id = url.rsplit("/", 1)[-1]
-            case_id = execution_to_case[execution_id]
-            record = provider(case_id, execution_id)
-            if "/v1/receipts/" in url:
-                return FakeResponse(
-                    {
-                        "execution_id": execution_id,
-                        "case_id": case_id,
-                        "source_digest": digest,
-                        "gateway_evidence_id": execution_id,
-                        "provider_request_id": record["provider_request_id"],
-                    }
-                )
-            return FakeResponse(record)
-
-        return get
-
-    def verify_h04(
-        self,
-        suite_id: str,
-        *,
-        protected: bool,
-        include_trace: bool = True,
-        normal_connected: bool | None = None,
-        risk_model_called: bool = True,
-    ):
-        with patch.object(
-            self.server.httpx,
-            "get",
-            self.fake_h04_get(
-                protected=protected,
-                include_trace=include_trace,
-                normal_connected=normal_connected,
-                risk_model_called=risk_model_called,
-            ),
-        ):
-            return self.client.post(
-                "/v1/verify/lab-04",
-                json=self.h04_body(suite_id),
-                headers={"Authorization": "Bearer control-verifier"},
-            )
-
-    def test_h04_starter_raw_email_is_hit(self):
-        response = self.verify_h04(
-            "04000000-0000-0000-0001-000000000001", protected=False
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "HIT")
-        self.assertEqual(response.json()["stage_calls"][2]["outcome"], "raw-email-exposed")
-
-    def test_h04_connected_guardrail_is_pass(self):
-        response = self.verify_h04(
-            "04000000-0000-0000-0001-000000000002", protected=True
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertIn("{EMAIL}", response.json()["result"]["output_text"])
-
-    def test_h04_missing_guardrail_trace_is_err(self):
-        response = self.verify_h04(
-            "04000000-0000-0000-0001-000000000003",
-            protected=True,
-            include_trace=False,
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "ERR")
-
-    def test_h04_risk_only_connection_is_err(self):
-        response = self.verify_h04(
-            "04000000-0000-0000-0001-000000000005",
-            protected=True,
-            normal_connected=False,
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "ERR")
-
-    def test_h04_fake_model_call_is_not_hit(self):
-        response = self.verify_h04(
-            "04000000-0000-0000-0001-000000000006",
-            protected=False,
-            risk_model_called=False,
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["course_verdict"], "ERR")
-
-    def test_h04_browser_verdict_field_is_rejected(self):
-        response = self.client.post(
-            "/v1/verify/lab-04",
-            json={**self.h04_body("04000000-0000-0000-0001-000000000004"), "course_verdict": "PASS"},
-            headers={"Authorization": "Bearer control-verifier"},
-        )
-        self.assertEqual(response.status_code, 422)
+    def test_retired_h04_verifiers_still_require_authentication(self):
+        for path in ("/v1/verify/lab-04", "/v1/verify/lab-04-resources"):
+            with self.subTest(path=path), patch.object(self.server.httpx, "get") as downstream:
+                response = self.client.post(path, json={})
+                self.assertEqual(response.status_code, 401)
+                downstream.assert_not_called()
 
     def h05_body(self, suite_id: str) -> dict:
         case_ids = [
@@ -2215,6 +2164,263 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         )
         self.assertEqual(delivery.json()["course_verdict"], "ERR")
         self.assertEqual(recognizer.json()["course_verdict"], "ERR")
+
+
+    def test_h18_does_not_grade_when_learner_queries_were_not_executed(self):
+        from datetime import datetime, timezone
+        request = self.server.H13VerifyRequest(
+            suite_id="18000000-0000-4000-8000-000000000001", started_at=datetime.now(timezone.utc).isoformat())
+        for extra in ({}, {"query_error": "syntax"},
+                      {"query_execution": {"products": {"loki": {}}}}):
+            receipt = {"activity": "H18", "suite_id": request.suite_id,
+                       "started_at": request.started_at, "queries": {"logql": "unfinished"},
+                       "source_digest": "a" * 64,
+                       "cases": [{"decision": "allow"}], **extra}
+            build = {'queries': receipt['queries'], 'source_digest': receipt['source_digest'],
+                     'runner_digests': self.server.P18_RUNNER_DIGESTS}
+            with self.subTest(extra=extra), patch.object(self.server.httpx, "get", side_effect=[FakeResponse(receipt), FakeResponse(build)]) as get:
+                result = self.server.verify_observability("H18", request)
+                self.assertEqual(result["course_verdict"], "ERR")
+                self.assertEqual(get.call_count, 2)
+                self.assertEqual(result['result']['source_digest'], receipt['source_digest'])
+                self.assertEqual(result['result']['queries'], receipt['queries'])
+                self.assertEqual(result['result']['request_cases'], receipt['cases'])
+                self.assertEqual(result['result']['query_error'], receipt.get('query_error'))
+                self.assertFalse(result['task_completed'])
+
+    def test_p18_error_receipt_cannot_expose_unbound_source(self):
+        from datetime import datetime, timezone
+        request = self.server.H13VerifyRequest(suite_id=str(uuid.uuid4()),
+                                              started_at=datetime.now(timezone.utc).isoformat())
+        receipt = {'suite_id': request.suite_id, 'started_at': request.started_at,
+                   'source_digest': 'a' * 64, 'queries': {'logql': 'unfinished'},
+                   'query_error': 'syntax', 'cases': []}
+        for digest in ('b' * 64, None, 'invalid'):
+            build = {'source_digest': digest, 'queries': receipt['queries'],
+                     'runner_digests': self.server.P18_RUNNER_DIGESTS}
+            with self.subTest(digest=digest), patch.object(self.server.httpx, 'get',
+                    side_effect=[FakeResponse(receipt), FakeResponse(build)]), \
+                    patch.object(self.server.P18_QUERIES, 'execute_queries') as execute:
+                result = self.server.verify_observability('H18', request)
+                self.assertFalse(result['task_completed'])
+                self.assertEqual(result['security_verdict'], 'ERR')
+                self.assertEqual(result['result']['failed_requirement'], 'query changed after execution')
+                self.assertNotIn('source_digest', result['result'])
+                self.assertNotIn('queries', result['result'])
+                execute.assert_not_called()
+
+    def test_p18_rejects_foreign_or_stale_error_receipt_before_exposing_details(self):
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        for foreign in (True, False):
+            started_at = (now if foreign else now - timedelta(minutes=4)).isoformat()
+            request = self.server.H13VerifyRequest(suite_id=str(uuid.uuid4()), started_at=started_at)
+            receipt = {'suite_id': str(uuid.uuid4()) if foreign else request.suite_id,
+                       'started_at': started_at, 'query_error': 'syntax',
+                       'queries': {'logql': 'old query'}, 'cases': [{'decision': 'allow'}]}
+            with self.subTest(foreign=foreign), patch.object(self.server.httpx, 'get', return_value=FakeResponse(receipt)):
+                result = self.server.verify_observability('H18', request)
+                self.assertFalse(result['task_completed'])
+                self.assertEqual(result['security_verdict'], 'ERR')
+                self.assertEqual(result['result']['failed_requirement'],
+                                 'suite identity mismatch' if foreign else 'stale suite')
+                self.assertNotIn('queries', result['result'])
+                self.assertNotIn('request_cases', result['result'])
+
+    def test_p18_semantic_route_accepts_distinct_source_digests(self):
+        from datetime import datetime, timezone
+        import time
+        import test_guided_p18_results as fixtures
+        helper = fixtures.P18ResultsTests()
+        helper.setUp()
+        now = time.time_ns()
+        started_at = datetime.now(timezone.utc).isoformat()
+        cases = []
+        for index, decision in enumerate(('allow', 'block')):
+            cases.append({'request_id': str(uuid.uuid4()), 'trace_id': ('a' if index == 0 else 'b') * 32,
+                          'decision': decision, 'closed': True, 'started_ns': now - 1000,
+                          'finished_ns': now, 'downstream_called': index == 0,
+                          'result': {'notice_id': 'training-notice'} if index == 0 else None})
+        queries = {'logql': 'learner-log-query', 'promql': 'learner-counter-query', 'trace_lookup': 'exact_trace_id'}
+        def replay(_queries, request_id, trace_id, start, end, **kwargs):
+            case = next(c for c in cases if c['request_id'] == request_id)
+            logs = {'status': 'success', 'data': {'resultType': 'streams', 'result': [{
+                'stream': {'service_name': 'guided-h18-queries'}, 'values': [[str(now - 500), 'security_decision', {
+                    'request_id': request_id, 'trace_id': trace_id, 'decision': case['decision'], 'policy_rule': 'notice-read-only'}]]}]}}
+            trace = helper.trace(case['decision'])
+            for span in trace['batches'][0]['scopeSpans'][0]['spans']:
+                span['traceId'] = trace_id
+                span['attributes'][0]['value']['stringValue'] = request_id
+            return {'products': {
+                'loki': {'parameters': {'query': queries['logql']}, 'response': logs},
+                'tempo': {'response': trace},
+                'prometheus': {'parameters': {'query': queries['promql']}, 'response': helper.metric(1, 1)}}}
+        for digest in ('a' * 64, 'c' * 64):
+            suite = str(uuid.uuid4())
+            recorded = [{'start_ns': now - 2000, 'end_ns': now + 1000, **replay(queries, c['request_id'], c['trace_id'], 0, 1)} for c in cases]
+            receipt = {'activity_id': 'P18', 'contract_version': 2, 'suite_id': suite,
+                       'started_at': started_at, 'source_digest': digest, 'queries': queries,
+                       'cases': cases, 'query_executions': recorded}
+            ledger = {'closed': True, 'suite_id': suite, 'started_at': started_at, 'cases': cases,
+                      'downstream_calls': [{'operation': 'notice_lookup', 'request_id': cases[0]['request_id'],
+                                            'trace_id': cases[0]['trace_id'], 'result': cases[0]['result']}]}
+            def get(url, **kwargs):
+                if '/receipts/' in url:
+                    return FakeResponse(receipt)
+                if '/ledger/' in url:
+                    return FakeResponse(ledger)
+                if '/build-info' in url:
+                    return FakeResponse({'source_digest': digest, 'queries': queries,
+                                         'runner_digests': self.server.P18_RUNNER_DIGESTS})
+                self.assertTrue(url.endswith('/api/v1/query'))
+                return FakeResponse(helper.metric(0, 0))
+            with self.subTest(digest=digest), patch.object(self.server.httpx, 'get', side_effect=get), patch.object(self.server.P18_QUERIES, 'execute_queries', side_effect=replay):
+                response = self.server.verify_observability('H18', self.server.H13VerifyRequest(suite_id=suite, started_at=started_at))
+                self.assertEqual(response['security_verdict'], 'PASS', response)
+                self.assertTrue(response['task_completed'])
+                self.assertEqual(response['lab_id'], '11-raw-observability')
+                self.assertEqual(len(response['stage_calls']), 2)
+                self.assertEqual(len(response['evidence']), 2)
+                self.assertIn('counter_baseline', response['result']['cases'][0])
+
+            for violation in ('mixed-log', 'constant-counter'):
+                def wrong_replay(*args, **kwargs):
+                    data = replay(*args, **kwargs)
+                    if violation == 'mixed-log':
+                        data['products']['loki']['response']['data']['result'][0]['values'][0][2]['request_id'] = 'foreign'
+                    else:
+                        data['products']['prometheus']['response'] = helper.metric(0, 0)
+                    return data
+                with self.subTest(violation=violation), patch.object(self.server.httpx, 'get', side_effect=get), \
+                        patch.object(self.server.P18_QUERIES, 'execute_queries', side_effect=wrong_replay):
+                    failed = self.server.verify_observability('H18', self.server.H13VerifyRequest(suite_id=suite, started_at=started_at))
+                    self.assertFalse(failed['task_completed'])
+                    self.assertEqual(failed['security_verdict'], 'ERR')
+                    self.assertIn('failed_requirement', failed['result'])
+                    self.assertIn('products', failed['result']['query_attempts'][0])
+
+            def modified_runner(url, **kwargs):
+                if '/build-info' in url:
+                    return FakeResponse({'source_digest': digest, 'queries': queries, 'runner_digests': {}})
+                return get(url, **kwargs)
+            with patch.object(self.server.httpx, 'get', side_effect=modified_runner), \
+                    patch.object(self.server.P18_QUERIES, 'execute_queries') as execute:
+                failed = self.server.verify_observability('H18', self.server.H13VerifyRequest(suite_id=suite, started_at=started_at))
+                self.assertFalse(failed['task_completed'])
+                self.assertEqual(failed['result']['failed_requirement'], 'provided runner changed')
+                execute.assert_not_called()
+
+
+    def test_p19_http_route_rechecks_evidence_and_rejects_incomplete_analysis(self):
+        import httpx
+        import test_guided_p19_verification as fixtures
+        fixture = fixtures.P19VerificationTests()
+        fixture.setUp()
+        fixture.build['runner_digests'] = self.server.P19_RUNNER_DIGESTS
+        def get(url, **kwargs):
+            self.assertEqual(kwargs['headers']['Authorization'], 'Bearer verifier-h19')
+            data = fixture.receipt if '/receipts/' in url else fixture.ledger if '/ledger/' in url else fixture.build
+            return httpx.Response(200, request=httpx.Request('GET', url), json=data)
+        request = {'suite_id': fixture.suite, 'started_at': fixture.started}
+        for broken in (False, True):
+            if broken:
+                fixture.receipt['analysis_executions'][0]['execution_status'] = 'not_implemented'
+            with patch.object(self.server.httpx, 'Client') as client, \
+                    patch.object(self.server.P19_COLLECTION, 'collect', return_value={'bundle': fixture.bundle, 'products': []}) as collect:
+                client.return_value.__enter__.return_value.get.side_effect = get
+                response = self.client.post('/v1/verify/h19', json=request,
+                    headers={'Authorization': 'Bearer control-verifier'})
+            self.assertEqual(response.status_code, 200)
+            value = response.json()
+            self.assertEqual(value['task_completed'], not broken)
+            self.assertEqual(value['security_verdict'], 'ERR' if broken else 'PASS')
+            self.assertEqual(value['activity_id'], 'P19')
+            self.assertEqual(value['lab_id'], '12-incident-alert')
+            self.assertEqual('실패한 요구사항' in value['next_check'], broken)
+            collect.assert_called_once()
+            self.assertIn('products', value['result'])
+
+    def test_p19_foreign_receipt_is_rejected_before_products_are_queried(self):
+        import httpx
+        from datetime import datetime, timezone
+        request = {'suite_id': str(uuid.uuid4()), 'started_at': datetime.now(timezone.utc).isoformat()}
+        response = httpx.Response(200, request=httpx.Request('GET', 'http://p19'),
+                                 json={**request, 'suite_id': str(uuid.uuid4()), 'analysis_executions': ['foreign']})
+        with patch.object(self.server.httpx, 'Client') as client, \
+                patch.object(self.server.P19_COLLECTION, 'collect') as collect:
+            client.return_value.__enter__.return_value.get.return_value = response
+            result = self.client.post('/v1/verify/h19', json=request,
+                        headers={'Authorization': 'Bearer control-verifier'}).json()
+        self.assertFalse(result['task_completed'])
+        self.assertNotIn('analysis_executions', result['result'])
+        collect.assert_not_called()
+
+
+    def p20_fixture(self):
+        spec = importlib.util.spec_from_file_location('p20_contract_fixture',
+            ROOT / 'tests/unit/test_guided_p20_verification.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        fixture = module.P20VerificationTests()
+        fixture.setUp()
+        fixture.receipt['execution_status'] = 'complete'
+        return fixture
+
+    def p20_verify(self, fixture):
+        import httpx
+        client = httpx.Client(transport=httpx.MockTransport(fixture.transport))
+        self.addCleanup(client.close)
+        with patch.multiple(self.server, H20_URL='http://app', H20_TOKEN='reader-token',
+                P20_PROMETHEUS_URL='http://prometheus', P20_GRAFANA_URL='http://grafana',
+                P20_GRAFANA_USER='reader', P20_GRAFANA_PASSWORD='test-only', P20_RUNNER_DIGESTS=fixture.runners):
+            with patch.object(self.server.httpx, 'Client', return_value=client):
+                return self.client.post('/v1/verify/h20', json={
+                    'suite_id': fixture.suite, 'started_at': fixture.started},
+                    headers={'Authorization': 'Bearer control-verifier'})
+
+    def test_p20_http_verifier_owns_completion_and_uses_native_products(self):
+        fixture = self.p20_fixture()
+        response = self.p20_verify(fixture)
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result['activity_id'], 'P20')
+        self.assertEqual(result['internal_activity_id'], 'H20')
+        self.assertTrue(result['task_completed'])
+        self.assertEqual(result['security_verdict'], 'PASS')
+        self.assertEqual(result['result']['source_digest'], fixture.build['source_digest'])
+        self.assertTrue(result['result']['configuration_continuity']['unchanged'])
+
+    def test_p20_http_verifier_rejects_manual_failed_or_mismatched_runs(self):
+        for fault in ('manual', 'error', 'panel', 'foreign'):
+            fixture = self.p20_fixture()
+            if fault == 'manual': fixture.receipt['execution_status'] = 'manual'
+            if fault == 'error': fixture.receipt['execution_error'] = 'TimeoutError'
+            if fault == 'panel': fixture.receipt['product_snapshots']['before']['body']['dashboard']['dashboard']['panels'] = []
+            if fault == 'foreign': fixture.receipt['suite_id'] = str(uuid.uuid4())
+            result = self.p20_verify(fixture).json()
+            with self.subTest(fault=fault):
+                self.assertFalse(result['task_completed'])
+                self.assertEqual(result['security_verdict'], 'ERR')
+                if fault == 'foreign': self.assertNotIn('receipt', result['result'])
+
+    def test_p20_verifier_auth_and_verdict_submission(self):
+        fixture = self.p20_fixture()
+        body = {'suite_id': fixture.suite, 'started_at': fixture.started}
+        self.assertEqual(self.client.post('/v1/verify/h20', json=body).status_code, 401)
+        for key in ('task_completed', 'security_verdict', 'prometheus_url'):
+            self.assertEqual(self.client.post('/v1/verify/h20', json={**body, key: True},
+                headers={'Authorization': 'Bearer control-verifier'}).status_code, 422)
+
+    def test_p20_missing_configuration_is_local_error_without_network_calls(self):
+        fixture = self.p20_fixture()
+        with patch.object(self.server, 'H20_TOKEN', ''), patch.object(self.server.httpx, 'Client') as client:
+            result = self.client.post('/v1/verify/h20', json={
+                'suite_id': fixture.suite, 'started_at': fixture.started},
+                headers={'Authorization': 'Bearer control-verifier'}).json()
+            self.assertFalse(result['task_completed'])
+            self.assertEqual(result['security_verdict'], 'ERR')
+            client.assert_not_called()
+            self.assertEqual(self.client.get('/readyz').status_code, 200)
 
 
 if __name__ == "__main__":

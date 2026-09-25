@@ -1,0 +1,4 @@
+# CUSTOM FILE: publisher-only equivalent query implementation.
+logql: '{service_name="guided-h18-queries"} | request_id = "{request_id}" | trace_id = "{trace_id}"'
+promql: 'max by (decision) (guided_security_decisions_total{hands_on="H18"})'
+trace_lookup: exact_trace_id

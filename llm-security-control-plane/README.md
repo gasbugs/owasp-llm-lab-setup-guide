@@ -111,6 +111,14 @@ GUIDED_CONTROL_LAB14_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_LAB15_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_LAB16_TOKEN=$(openssl rand -hex 32)
 GUIDED_CONTROL_OBSERVABILITY_TOKEN=$(openssl rand -hex 32)
+GUIDED_CONTROL_H18_TOKEN=$(openssl rand -hex 32)
+GUIDED_CONTROL_H19_TOKEN=$(openssl rand -hex 32)
+GUIDED_CONTROL_H17_TOKEN=$(openssl rand -hex 32)
+GUIDED_CONTROL_H20_TOKEN=$(openssl rand -hex 32)
+GUIDED_VERIFIER_H20_TOKEN=$(openssl rand -hex 32)
+GUIDED_H20_WEBHOOK_TOKEN=$(openssl rand -hex 32)
+GUIDED_P20_GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 18)
+GUIDED_P20_GRAFANA_PASSWORD=$(openssl rand -hex 18)
 GUIDED_H06_PROVIDER_CONTROL_TOKEN=$(openssl rand -hex 32)
 GUIDED_H06_PROVIDER_ACTION_TOKEN=$(openssl rand -hex 32)
 GUIDED_H06_PROVIDER_VERIFIER_TOKEN=$(openssl rand -hex 32)
@@ -128,9 +136,17 @@ GUIDED_H10_GATEWAY_TOKEN=$(openssl rand -hex 32)
 GUIDED_H10_GATEWAY_VERIFIER_TOKEN=$(openssl rand -hex 32)
 GUIDED_H11_GATEWAY_TOKEN=$(openssl rand -hex 32)
 GUIDED_H11_GATEWAY_VERIFIER_TOKEN=$(openssl rand -hex 32)
-GUIDED_H12_SERVICE_TOKEN=$(openssl rand -hex 32)
-GUIDED_H12_PROVIDER_CONTROL_TOKEN=$(openssl rand -hex 32)
-GUIDED_H12_PROVIDER_VERIFIER_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_GATEWAY_CONTROL_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_GATEWAY_VERIFIER_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_CONTEXT_CONTROL_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_CONTEXT_SERVICE_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_CONTEXT_VERIFIER_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_PRIVACY_CONTROL_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_PRIVACY_SERVICE_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_PRIVACY_VERIFIER_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_NEMO_CONTROL_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_NEMO_SERVICE_TOKEN=$(openssl rand -hex 32)
+GUIDED_P12_NEMO_VERIFIER_TOKEN=$(openssl rand -hex 32)
 GUIDED_H13_TARGET_TOKEN=$(openssl rand -hex 32)
 GUIDED_H14_TARGET_TOKEN=$(openssl rand -hex 32)
 GUIDED_H15_TARGET_TOKEN=$(openssl rand -hex 32)
@@ -166,6 +182,9 @@ GUIDED_VERIFIER_LAB14_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_LAB15_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_LAB16_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_OBSERVABILITY_TOKEN=$(openssl rand -hex 32)
+GUIDED_VERIFIER_H18_TOKEN=$(openssl rand -hex 32)
+GUIDED_VERIFIER_H19_TOKEN=$(openssl rand -hex 32)
+GUIDED_VERIFIER_H17_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_H21_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_H22_TOKEN=$(openssl rand -hex 32)
 GUIDED_VERIFIER_GATEWAY_TOKEN=$(openssl rand -hex 32)
@@ -183,11 +202,14 @@ docker compose \
 
 | Front Proxy 주소 | 연결되는 내부 서비스 | 역할 |
 |---|---|---|
-| `http://127.0.0.1:18097` | Guided Control Center | 구현된 Hands-on 실행·단계·검증 영수증 |
-| `http://127.0.0.1:18192` | NeMo Chat UI | 공식 Dialog Rail 화면의 proxy 호환성 확인 |
-| `http://127.0.0.1:15500` | Promptfoo UI | H13에서 실행한 native evaluation 확인 |
-| `http://127.0.0.1:18098` | PyRIT UI | H15의 conversation 기록 확인 |
-| `http://127.0.0.1:3001` | Grafana | H17~H20에서 원시 신호 확인 뒤 Dashboard 비교 |
+| `http://127.0.0.1:28097` | Guided Control Center | 구현된 Hands-on 실행·단계·검증 영수증 |
+| `http://127.0.0.1:28192` | NeMo Chat UI | 공식 Dialog Rail 화면의 proxy 호환성 확인 |
+| `http://127.0.0.1:25500` | Promptfoo UI | H13에서 실행한 native evaluation 확인 |
+| `http://127.0.0.1:28098` | PyRIT UI | H15의 conversation 기록 확인 |
+| `http://127.0.0.1:23001` | Grafana | P17~P19 원시 신호 확인 |
+| `http://127.0.0.1:23002/d/guided-p20` | P20 전용 Grafana | P20의 현재 패널 확인 |
+
+P20은 전용 Prometheus·Alertmanager·Grafana와 별도 저장 공간을 사용한다. `guided-h20-grafana-reader`는 조회용 계정을 준비한 뒤 종료하므로 `docker compose ps --all`의 `Exited (0)`은 정상이다. P20 Grafana 로그인은 `p20-reader`와 환경 파일의 `GUIDED_P20_GRAFANA_PASSWORD`를 사용한다. 이 계정은 패널을 확인하지만 대시보드 설정을 저장할 수 없다. 관리자 비밀번호는 Grafana와 초기 계정 준비 서비스만 사용하고, 실행 앱과 verifier에는 전달하지 않는다. 이 구분은 제품 권한이며 Host 관리자에 의한 변경까지 막는 장치는 아니다.
 
 Control Center와 NeMo는 Front Proxy가 받고, Promptfoo·PyRIT·Grafana의 공식 UI는 각 제품이 요구하는 root 경로를 유지하도록 loopback 전용 Host port를 따로 연다. H01 수강생 Gateway와 제공 Bedrock Gateway만 `~/.aws`를 읽기 전용으로 확인한다. H05는 AWS 자격 증명 없이 로컬 NeMo intent·flow와 공식 Topical 평가를 실행한다. H06은 H05와 분리된 NeMo 서비스와 합성 Action Provider에서 호출 수와 실제 상태 변경을 확인한다. H07은 일반 위해, H08은 계정 복구 앱의 업무 규칙을 서로 다른 NeMo 서비스와 역할별 일회 capability로 검사한다. 두 검증 모두 suite를 닫은 뒤 위험 요청의 Main Model 미호출을 원장에서 확인한다. H09는 로컬 Presidio가 만든 비식별화 결과가 실제 Delivery Sink까지 전달됐는지 별도 원장으로 확인하며 AWS와 Main Model을 사용하지 않는다. H21·H22는 외부 부작용 대신 전용 로컬 Provider·MCP Server로 정책 경계를 검증한다. 별도 evidence verifier는 AWS 자격 증명·상태 변경 Token·Docker socket 없이 각 learner app의 영수증을 다시 대조한다.
 

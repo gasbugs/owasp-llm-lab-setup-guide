@@ -1,0 +1,17 @@
+# CUSTOM FILE: isolated publisher fixture credentials, never used by course deployment.
+# Format: https://prometheus.io/docs/alerting/latest/configuration/ · Apache-2.0
+route:
+  receiver: p20
+  group_by: [alertname, practice]
+  group_wait: 0s
+  group_interval: 1s
+  repeat_interval: 1h
+receivers:
+  - name: p20
+    webhook_configs:
+      - url: http://p20:8000/v1/notifications
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: publisher-test-webhook

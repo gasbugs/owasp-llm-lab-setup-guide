@@ -23,9 +23,9 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --chmod=0444 guided-labs/h05-nemo-dialog/Containerfile /app/learner/Containerfile
-COPY --chmod=0555 guided-labs/h05-nemo-dialog/config /app/learner/config
+COPY --chmod=0555 guided-labs/h05-nemo-dialog/config/config.yml guided-labs/h05-nemo-dialog/config/flows.co /app/learner/config/
 COPY --chmod=0555 guided-labs/h05-nemo-dialog/server.py /app/learner/server.py
-RUN chmod 0555 /app/learner /app/learner/config
+RUN mkdir -p /state && chown 65532:65532 /state && chmod 0555 /app/learner /app/learner/config
 
 USER 65532:65532
 EXPOSE 8000

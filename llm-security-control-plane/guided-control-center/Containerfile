@@ -6,6 +6,7 @@ ENV APP_VERSION=${APP_VERSION} \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
+COPY --chmod=0444 guided-contracts/p01.json /app/p01.json
 COPY --chmod=0444 guided-control-center/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chmod=0444 guided-control-center/server.py guided-control-center/index.html \
