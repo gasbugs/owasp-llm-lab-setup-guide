@@ -173,9 +173,22 @@ def main():
         def tenant02(*arguments):
             subprocess.run(tenant02_command + list(arguments), env=env, check=True)
 
+        def verify_tenant02():
+            code = '''import json, os, urllib.request
+request = urllib.request.Request('http://127.0.0.1:8013/api/analyze',
+    data=json.dumps({'stage': 'input', 'text': 'Hello world', 'request_id': 'coexist-normal'}).encode(),
+    headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + os.environ['PRESIDIO_INTERNAL_TOKEN']})
+result = json.load(urllib.request.urlopen(request, timeout=30))
+assert result['valid'] is True and result['detections'] == [], result
+print(json.dumps(result))'''
+            result = json.loads(subprocess.check_output(["docker", "exec",
+                project + "-tenant02-presidio", "python", "-c", code], text=True))
+            records.append({"tenant02_normal": result})
+
         try:
             if tenant02_command:
                 tenant02("up", "-d", "--build", "--wait", "--wait-timeout", "120")
+                verify_tenant02()
             compose("build")
             if args.startup_only:
                 compose("up", "-d")
@@ -202,8 +215,10 @@ def main():
                         "guided-control-center", "guided-evidence-verifier")
                 verify(activities[1], "starter")
                 assert subprocess.check_output(tenant02_command + ["ps", "-q", "presidio"], text=True).strip() == tenant02_id
+                verify_tenant02()
                 tenant02("down")
                 tenant02("up", "-d", "--wait", "--wait-timeout", "120")
+                verify_tenant02()
                 verify(activities[1], "starter")
                 compose("up", "-d", "--wait", "--wait-timeout", "120", *ACTIVITIES[activities[0]]["services"])
                 records.append({"isolation": "Tenant 02 Presidio starts before/after Tenant 03; common restart with stopped learner; other learner remains usable"})
