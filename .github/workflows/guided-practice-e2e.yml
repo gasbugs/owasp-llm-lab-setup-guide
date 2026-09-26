@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["llm-security-control-plane/**", "examples/security-monitoring/**", "tests/**", ".github/workflows/guided-practice-e2e.yml"]
+    paths: ["llm-security-control-plane/**", "examples/security-monitoring/**", "tests/**", "tools/practice_workspace.py", ".github/workflows/guided-practice-e2e.yml"]
   pull_request:
-    paths: ["llm-security-control-plane/**", "examples/security-monitoring/**", "tests/**", ".github/workflows/guided-practice-e2e.yml"]
+    paths: ["llm-security-control-plane/**", "examples/security-monitoring/**", "tests/**", "tools/practice_workspace.py", ".github/workflows/guided-practice-e2e.yml"]
 
 permissions:
   contents: read
