@@ -204,7 +204,10 @@ def main():
                 for width in (1440, 1280, 1024, 800, 760, 390, 320):
                     page.set_viewport_size({"width": width, "height": 1000})
                     for index in range(13):
-                        page.locator(f'.tab[data-tab-index="{index}"]').click()
+                        tab = page.locator(f'.tab[data-tab-index="{index}"]')
+                        tab.hover()
+                        assert tab.evaluate('el => getComputedStyle(el).transform') == 'none', (width, index)
+                        tab.click()
                         assert page.locator(".lab-workspace:visible").count() >= 1
                         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (width, index)
                         for help_button in page.locator(".lab-workspace:visible .action-control > button[aria-describedby]").all():

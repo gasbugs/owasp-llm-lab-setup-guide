@@ -72,6 +72,7 @@ h1 { margin: 8px 0 12px; font: 900 clamp(32px, 5vw, 64px)/.92 var(--display); le
 .live-chip { padding: 6px 8px; color: var(--green); border: 1px solid var(--green); background: var(--green-soft); font: 800 10px var(--mono); white-space: nowrap; }
 .tabs { max-height: calc(100vh - 180px); overflow: auto; padding: 8px; }
 .tab { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 9px; width: 100%; margin-bottom: 5px; padding: 9px; border: 1px solid transparent; background: transparent; text-align: left; }
+.tab:hover { transform: none; box-shadow: none; background: var(--blue-soft); }
 .tab span { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); font: 800 10px var(--mono); }
 .tab strong, .tab small { display: block; }
 .tab strong { font-size: 12px; }
