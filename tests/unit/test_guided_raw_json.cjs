@@ -6,6 +6,22 @@ const vm = require("node:vm");
 const { test } = require("node:test");
 const source = fs.readFileSync(path.join(__dirname, "../../llm-security-control-plane/guided-control-center/app.js"), "utf8");
 const context = {};
+const learning = {};
+vm.runInNewContext(source.slice(source.indexOf('function verificationSummary('), source.indexOf('function renderLearningSupport(')), learning);
+test('comparison requires a graded execution and never includes response text', () => {
+  const sample = {activity_id: 'P01', execution_id: 'a', verified_by: 'verifier', task_completed: true, course_verdict: 'PASS', prompt: 'private'};
+  assert.equal(learning.verificationSummary({...sample, execution_id: undefined}), null);
+  assert.equal(learning.verificationSummary({...sample, resource_ready: true}), null);
+  assert.equal(learning.verificationSummary({...sample, course_verdict: 'ERR'}).completed, '미완료');
+  assert.equal(learning.verificationSummary(sample).prompt, undefined);
+  assert.equal(learning.verificationSummary(sample).digest, '미확인');
+});
+test('failure guidance does not infer causes from arbitrary text', () => {
+  assert.equal(learning.failureCategory({http_status: 422}), '입력');
+  assert.equal(learning.failureCategory({http_status: 501}), '구현');
+  assert.equal(learning.failureCategory({failure_category: 'evidence'}), '증거');
+  assert.match(learning.failureCategory({error: 'AWS access denied'}), /미분류/);
+});
 vm.runInNewContext(source.slice(source.indexOf("function formatRawJson("), source.indexOf("async function request(")), context);
 
 test("transport failure is ERR without invented downstream evidence", () => {

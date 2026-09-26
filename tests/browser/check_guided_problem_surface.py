@@ -60,6 +60,30 @@ def main():
                 assert page.title() == "클씨랩 LLM 보안 실습실"
                 assert "TENANT 03" not in page.locator("body").inner_text()
                 assert page.locator(".help-trigger").count() == 0
+                tabs = page.get_by_role('tab')
+                tabs.first.focus()
+                tabs.first.press('End')
+                assert tabs.last.evaluate('el => el === document.activeElement')
+                tabs.last.press('Home')
+                tabs.first.press('ArrowRight')
+                assert tabs.nth(1).get_attribute('aria-selected') == 'true'
+                assert page.get_by_role('tabpanel').get_attribute('aria-labelledby') == tabs.nth(1).get_attribute('id')
+                assert page.locator('[role="tab"][tabindex="0"]').count() == 1
+                assert 'tab' in page.get_by_role('tablist').aria_snapshot()
+                # Synthetic display records only: no learner/provider/verifier calls.
+                sample = {'activity_id': 'P01', 'execution_id': 'first', 'verified_by': 'display-test',
+                          'task_completed': True, 'course_verdict': 'PASS'}
+                page.evaluate('(p) => renderLearningSupport(p, "P01")', sample)
+                sample.update(execution_id='second', task_completed=False, course_verdict='ERR')
+                page.evaluate('(p) => renderLearningSupport(p, "P01")', sample)
+                assert 'PASS' in page.locator('#comparison-rows').inner_text()
+                assert 'ERR' in page.locator('#comparison-rows').inner_text()
+                sample.update(activity_id='P02', execution_id='third')
+                page.evaluate('(p) => renderLearningSupport(p, "P02")', sample)
+                assert 'PASS' not in page.locator('#comparison-rows').inner_text()
+                page.evaluate('renderLearningSupport({course_verdict:"ERR"}, "P01")')
+                assert page.locator('#comparison-rows').inner_text() == ''
+                assert '이전 완료는 이번 결과를 대신하지 않습니다' in page.locator('#comparison-note').inner_text()
                 tooltip_checks = 0
                 for width in (1440, 760, 390, 320):
                     page.set_viewport_size({"width": width, "height": 1000})
@@ -101,6 +125,7 @@ def main():
                 touch.close()
                 args.output.write_text(json.dumps({"scope": "problem surface rendering only; no grading or AWS",
                     "tabs_checked": evidence, "tooltip_checks": tooltip_checks,
+                    "keyboard_and_accessibility_tree": True, "isolated_result_comparison": True,
                     "touch_help_actions": 0, "touch_button_intercepted_actions": len(touch_posts),
                     "post_requests": requests, "page_errors": errors}, indent=2))
                 print(json.dumps({"views": len(evidence), "tooltip_checks": tooltip_checks,

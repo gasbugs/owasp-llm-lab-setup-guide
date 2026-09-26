@@ -8,6 +8,7 @@ const tabNames = [
 let csrfToken = "";
 let activeTab = 0;
 const rawResponses = new WeakMap();
+const recentVerifications = new Map();
 const themePreference = window.matchMedia("(prefers-color-scheme: dark)");
 const themeModes = ["system", "light", "dark"];
 
@@ -81,6 +82,21 @@ function renderTabs() {
     button.className = index === 0 ? "tab active" : implemented ? "tab" : "tab locked";
     button.disabled = !implemented;
     button.dataset.tabIndex = String(index);
+    button.id = `practice-tab-${index}`;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-controls", "practice-workbench");
+    button.setAttribute("aria-selected", String(index === 0));
+    button.tabIndex = index === 0 ? 0 : -1;
+    button.addEventListener("keydown", (event) => {
+      const steps = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1};
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabNames.length - 1
+        : event.key in steps ? (index + steps[event.key] + tabNames.length) % tabNames.length : null;
+      if (next !== null) {
+        event.preventDefault();
+        selectTab(next);
+        byId(`practice-tab-${next}`).focus();
+      }
+    });
     const number = document.createElement("span");
     number.textContent = String(index + 1).padStart(2, "0");
     const copy = document.createElement("div");
@@ -99,8 +115,14 @@ function selectTab(index) {
   closeActionTips();
   activeTab = index;
   document.querySelectorAll(".tab").forEach((tab) => {
-    tab.classList.toggle("active", Number(tab.dataset.tabIndex) === index);
+    const selected = Number(tab.dataset.tabIndex) === index;
+    tab.classList.toggle("active", selected);
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
   });
+  byId("practice-workbench").setAttribute("aria-labelledby", `practice-tab-${index}`);
+  byId("comparison").hidden = true;
+  byId("failure-help").hidden = true;
   byId("h01-work").hidden = index !== 0;
   byId("h02-work").hidden = index !== 1;
   byId("h04-work").hidden = index !== 2;
@@ -190,6 +212,7 @@ async function request(path, body = undefined) {
   if (!response.ok) {
     const error = new Error(JSON.stringify(payload));
     error.detail = payload.detail;
+    error.httpStatus = response.status;
     throw error;
   }
   return payload;
@@ -489,6 +512,54 @@ function renderEnvelope(payload) {
   });
 }
 
+function verificationSummary(payload) {
+  if (!/^P\d{2}$/.test(payload.activity_id || "") || !payload.execution_id || !payload.verified_by
+      || payload.resource_ready || typeof payload.task_completed !== "boolean"
+      || !["HIT", "PASS", "ERR"].includes(payload.course_verdict)) return null;
+  const value = payload.source_digest || payload.result?.source_digest || payload.result?.receipt?.source_digest;
+  return {problem: payload.activity_id, execution: payload.execution_id,
+    digest: typeof value === "string" && /^[a-f0-9]{64}$/.test(value) ? value : "미확인",
+    completed: payload.task_completed && payload.course_verdict !== "ERR" ? "완료" : "미완료",
+    verdict: payload.course_verdict, stage: payload.stage_calls?.at(-1)?.stage || "미확인"};
+}
+
+function failureCategory(payload) {
+  const labels = {input: "입력", implementation: "구현", environment: "환경", evidence: "증거"};
+  if (Object.hasOwn(labels, payload.failure_category)) return labels[payload.failure_category];
+  if (payload.http_status === 422) return "입력";
+  if (payload.http_status === 501) return "구현";
+  if (["credentials_missing", "credentials_invalid", "access_denied", "model_unavailable", "provider_error"].includes(payload.provider_error)) return "환경";
+  return "미분류 — 응답만으로 원인을 확정하지 못했습니다";
+}
+
+function renderLearningSupport(payload, problem) {
+  byId("failure-help").hidden = payload.course_verdict !== "ERR";
+  setText("failure-category", `확인할 범위: ${failureCategory(payload)}. 아래에서 해당 항목을 확인하세요.`);
+  const current = verificationSummary(payload);
+  const panel = byId("comparison");
+  panel.hidden = false;
+  const rows = byId("comparison-rows");
+  rows.replaceChildren();
+  if (!current || current.problem !== problem) {
+    setText("comparison-note", "이번 실행의 검증 기록이 없어 비교하지 않습니다. 이전 완료는 이번 결과를 대신하지 않습니다.");
+    return;
+  }
+  const history = recentVerifications.get(problem) || [];
+  if (history.at(-1)?.execution !== current.execution) history.push(current);
+  recentVerifications.set(problem, history.slice(-2));
+  const previous = history.length > 1 ? history.at(-2) : null;
+  setText("comparison-note", previous ? `${problem}: 실행 순서에 따른 비교입니다. 파일 변경의 효과는 코드 지문과 실제 기록을 함께 보고 판단합니다.`
+    : `${problem}: 첫 검증입니다. 같은 문제를 다시 검증하면 두 결과를 비교합니다. 새로고침하면 이 비교 목록은 사라집니다.`);
+  for (const [label, key] of [["실행 ID", "execution"], ["코드 지문", "digest"], ["과제 상태", "completed"], ["보안 판정", "verdict"], ["마지막 기록 단계", "stage"]]) {
+    const row = document.createElement("tr");
+    const heading = document.createElement("th"); heading.scope = "row"; heading.textContent = label; row.append(heading);
+    for (const summary of [previous, current]) {
+      const cell = document.createElement("td"); cell.textContent = summary?.[key] || "없음"; row.append(cell);
+    }
+    rows.append(row);
+  }
+}
+
 function renderError(error) {
   const payload = { course_verdict: "ERR", client_error: true,
     reason: "검증 응답을 확인하지 못했습니다. 뒤 서비스의 실행 여부는 아직 알 수 없습니다.",
@@ -503,10 +574,16 @@ function renderError(error) {
 async function execute(path, body) {
   setBusy(true);
   byId("task-completion").hidden = true;
+  byId("comparison").hidden = true;
+  byId("failure-help").hidden = true;
+  const problem = path.match(/^\/api\/practice\/(P\d{2})\/verify$/)?.[1];
   try {
-    renderEnvelope(await request(path, body));
+    const payload = await request(path, body);
+    renderEnvelope(payload);
+    if (problem) renderLearningSupport(payload, problem);
   } catch (error) {
     renderError(error);
+    if (problem) renderLearningSupport({...error.detail, http_status: error.httpStatus, course_verdict: "ERR"}, problem);
   } finally {
     setBusy(false);
   }

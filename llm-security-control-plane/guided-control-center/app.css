@@ -125,6 +125,13 @@ textarea { min-height: 112px; resize: vertical; }
 .chat-meta { margin: 9px 0 0; color: var(--muted); font: 10px/1.5 var(--mono); }
 
 .inspection { margin-top: 20px; }
+.result-comparison { margin-top: 20px; min-width: 0; }
+.result-comparison table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
+.result-comparison th, .result-comparison td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; overflow-wrap: anywhere; vertical-align: top; }
+.result-comparison caption { text-align: left; margin-bottom: 8px; }
+.result-comparison p, #failure-help dd { font-size: 12px; line-height: 1.6; }
+#failure-help dd { margin: 4px 0 12px; }
+[role="tabpanel"]:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .inspection-head { display: flex; justify-content: space-between; gap: 12px; align-items: end; margin-bottom: 8px; }
 .inspection h3 { margin: 3px 0 0; font: 850 19px var(--display); }
 .inspection-head > span { color: var(--muted); font: 10px var(--mono); }

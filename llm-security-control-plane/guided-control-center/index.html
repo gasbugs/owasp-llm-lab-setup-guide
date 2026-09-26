@@ -39,10 +39,10 @@
   <div class="layout">
     <aside class="panel route-panel" aria-label="13개 실습 탭">
       <div class="panel-head"><p class="label">INSPECTION ROUTE</p><h2>실습 탭</h2></div>
-      <nav id="tabs" class="tabs"></nav>
+      <nav id="tabs" class="tabs" role="tablist" aria-label="실습 선택"></nav>
     </aside>
 
-    <section class="panel workbench">
+    <section class="panel workbench" id="practice-workbench" role="tabpanel" aria-labelledby="practice-tab-0" tabindex="0">
       <div class="panel-head split"><div><p id="activity-label" class="label">PRACTICE · P01</p><h2 id="activity-title">Bedrock Gateway 만들기</h2></div><span class="live-chip">직접 작성</span></div>
       <div class="work-body">
         <div id="h01-work" class="lab-workspace">
@@ -652,6 +652,21 @@ docker compose \
           </div>
         </section>
 
+        <section class="result-comparison" aria-labelledby="comparison-title" hidden id="comparison">
+          <h3 id="comparison-title">이전 검증과 이번 검증</h3>
+          <p id="comparison-note"></p>
+          <table><caption>같은 문제의 최근 검증 두 건</caption><thead><tr><th scope="col">항목</th><th scope="col">이전 검증</th><th scope="col">이번 검증</th></tr></thead><tbody id="comparison-rows"></tbody></table>
+        </section>
+        <details id="failure-help" class="raw" hidden>
+          <summary>오류 확인 순서</summary>
+          <p id="failure-category" role="status"></p>
+          <dl>
+            <dt>입력</dt><dd>요청 필드·자료형·범위가 문제 계약에 맞는지 확인합니다. 검증용 잘못된 입력은 호출 전에 거부되어야 합니다.</dd>
+            <dt>구현</dt><dd>작성한 함수·설정의 문법과 반환 형식을 확인합니다. 편집 후 해당 서비스만 빌드·적용했는지도 확인합니다.</dd>
+            <dt>환경</dt><dd>오류가 난 서비스의 실행 상태와 연결·권한을 확인합니다. 요청이 실패했다고 뒤 호출이 0회였다고 단정하지 않습니다.</dd>
+            <dt>증거</dt><dd>현재 실행 ID·코드 지문·종료 기록이 같은 실행을 가리키는지 확인합니다. 이전 PASS로 이번 ERR을 대신하지 않습니다.</dd>
+          </dl>
+        </details>
         <details class="raw" open><summary>원시 응답 전체</summary><pre id="raw">실행 뒤 보안 판정에 사용한 전체 응답이 여기에 표시됩니다.</pre></details>
       </div>
     </section>
