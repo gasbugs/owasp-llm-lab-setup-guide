@@ -435,7 +435,7 @@ function renderEnvelope(payload) {
   }
   setText("verified-by", payload.verified_by);
   setText("reason", payload.reason);
-  setText("next-check", `다음 확인: ${payload.next_check}`);
+  setText("next-check", `다음 확인: ${payload.next_check || "원시 응답에서 실패한 단계와 현재 실행 ID를 확인합니다."}`);
   setText("execution-state", payload.execution_id || "실행 실패");
 
   const verdict = byId("verdict");
@@ -446,7 +446,7 @@ function renderEnvelope(payload) {
   verdict.querySelector("strong").textContent = payload.course_verdict || "ERR";
   verdict.querySelector("span").textContent = payload.verified_by || "검증 실패";
 
-  const stages = [{ stage: "control_center", outcome: "completed" }, ...(payload.stage_calls || [])];
+  const stages = [{ stage: "control_center", outcome: payload.client_error ? "응답 확인 실패" : "completed" }, ...(payload.stage_calls || [])];
   const labels = {
     control_center: "Control Center", learner_gateway: "Learner Gateway", bedrock_main: "Bedrock Main",
     learner_document_app: "Learner Document App", bedrock_titan: "Titan Embeddings",
@@ -490,9 +490,12 @@ function renderEnvelope(payload) {
 }
 
 function renderError(error) {
-  const payload = { course_verdict: "ERR", reason: error.message, next_check: "서비스 상태와 원시 오류를 확인합니다.", stage_calls: [] };
+  const payload = { course_verdict: "ERR", client_error: true,
+    reason: "검증 응답을 확인하지 못했습니다. 뒤 서비스의 실행 여부는 아직 알 수 없습니다.",
+    next_check: "원시 오류를 먼저 확인합니다. 연결 오류라면 해당 문제의 컨테이너 상태를 확인합니다.",
+    error: error.message, stage_calls: [] };
   if (/^P\d{2}$/.test(error.detail?.activity_id || "") && error.detail.task_completed === false) {
-    Object.assign(payload, error.detail, { course_verdict: "ERR", security_verdict: "ERR", task_completed: false });
+    Object.assign(payload, error.detail, { course_verdict: "ERR", security_verdict: "ERR", task_completed: false, client_error: true });
   }
   renderEnvelope(payload);
 }

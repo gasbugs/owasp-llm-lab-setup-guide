@@ -8,6 +8,31 @@ const source = fs.readFileSync(path.join(__dirname, "../../llm-security-control-
 const context = {};
 vm.runInNewContext(source.slice(source.indexOf("function formatRawJson("), source.indexOf("async function request(")), context);
 
+test("transport failure is ERR without invented downstream evidence", () => {
+  let result;
+  const ctx = { renderEnvelope: value => { result = value; } };
+  vm.runInNewContext(source.slice(source.indexOf("function renderError("), source.indexOf("async function execute(")), ctx);
+  ctx.renderError(new Error("Failed to fetch"));
+  assert.equal(result.course_verdict, "ERR");
+  assert.equal(result.client_error, true);
+  assert.equal(result.stage_calls.length, 0);
+  assert.equal(result.task_completed, undefined);
+  assert.match(result.reason, /아직 알 수 없습니다/);
+  assert.equal(result.error, "Failed to fetch");
+});
+
+test("verified failure retains its specific next check but cannot become PASS", () => {
+  let result;
+  const ctx = { renderEnvelope: value => { result = value; } };
+  vm.runInNewContext(source.slice(source.indexOf("function renderError("), source.indexOf("async function execute(")), ctx);
+  ctx.renderError({ message: "HTTP error", detail: {activity_id: "P01", task_completed: false,
+    course_verdict: "PASS", reason: "AWS 접근 거부", next_check: "Gateway의 AWS 권한을 확인합니다."} });
+  assert.equal(result.course_verdict, "ERR");
+  assert.equal(result.task_completed, false);
+  assert.equal(result.reason, "AWS 접근 거부");
+  assert.equal(result.next_check, "Gateway의 AWS 권한을 확인합니다.");
+});
+
 test("large integers, decimals and exponent spelling are preserved", () => {
   const text = '{"ns":1790268749899188247,"negative":-9007199254740993,"n":1.2300e+25}';
   const rendered = context.formatRawJson(text);
