@@ -9,6 +9,8 @@ let csrfToken = "";
 let activeTab = 0;
 const rawResponses = new WeakMap();
 const recentVerifications = new Map();
+let executionPending = false;
+let executionTimer = null;
 const themePreference = window.matchMedia("(prefers-color-scheme: dark)");
 const themeModes = ["system", "light", "dark"];
 
@@ -219,14 +221,17 @@ async function request(path, body = undefined) {
 }
 
 function setBusy(busy) {
+  executionPending = busy;
+  byId("practice-workbench").setAttribute("aria-busy", String(busy));
+  document.querySelectorAll(".tab").forEach(tab => { tab.disabled = busy; });
   ["preflight", "verify", "chat-send", "h02-provision", "h02-verify", "h03-provision", "h03-verify", "h04-provision", "h04-verify", "h05-verify", "h06-verify", "h07-verify", "h08-verify", "h09-verify", "h10-verify", "h11-verify", "h12-verify", "h13-verify", "h14-verify", "h15-verify", "h16-verify", "h17-verify", "h18-verify", "h19-verify", "h20-verify", "h21-verify", "h22-verify"].forEach((id) => {
     if (byId(id)) byId(id).disabled = busy;
   });
   if (busy) {
-    setText("execution-state", "새 실행을 기다리는 중");
+    setText("execution-state", "응답 대기 · 실제 실행 단계는 아직 미확인");
     document.querySelectorAll(".gate").forEach((gate) => {
-      gate.className = "gate running";
-      gate.querySelector("small").textContent = "실행 중";
+      gate.className = "gate";
+      gate.querySelector("small").textContent = "미확인";
     });
   }
 }
@@ -572,19 +577,36 @@ function renderError(error) {
 }
 
 async function execute(path, body) {
+  if (executionPending) return;
   setBusy(true);
+  const started = Date.now();
+  setText("request-status", "요청을 보냈습니다. 서버 응답을 기다립니다. 다시 누르지 않아도 됩니다.");
+  byId("request-elapsed").hidden = false;
+  const updateElapsed = () => setText("request-elapsed", `대기 ${Math.floor((Date.now() - started) / 1000)}초 · 경과 시간은 진행률이 아닙니다. 창을 닫아도 서버 작업이 취소되지는 않습니다.`);
+  updateElapsed();
+  executionTimer = setInterval(updateElapsed, 1000);
   byId("task-completion").hidden = true;
   byId("comparison").hidden = true;
   byId("failure-help").hidden = true;
   const problem = path.match(/^\/api\/practice\/(P\d{2})\/verify$/)?.[1];
+  byId("verdict").className = "verdict empty";
+  byId("verdict").querySelector("strong").textContent = "—";
+  byId("verdict").querySelector("span").textContent = "응답 대기";
+  for (const id of ["execution-id", "source-digest", "verified-by", "provider-id", "model-id", "requested-max", "forwarded-max", "output-tokens", "reason", "next-check"]) setText(id, null);
+  setText("raw", "이번 요청의 응답을 기다립니다. 이전 응답은 이번 실행의 증거가 아닙니다.");
   try {
     const payload = await request(path, body);
     renderEnvelope(payload);
+    setText("request-status", "응답을 받았습니다. 준비 결과와 과제 완료·보안 판정은 아래 기록에서 구분해 확인하세요.");
     if (problem) renderLearningSupport(payload, problem);
   } catch (error) {
     renderError(error);
+    setText("request-status", "응답 오류로 결과를 확정하지 못했습니다. 원시 오류를 확인하세요. 서버 작업이 끝났는지는 별도로 확인해야 합니다.");
     if (problem) renderLearningSupport({...error.detail, http_status: error.httpStatus, course_verdict: "ERR"}, problem);
   } finally {
+    clearInterval(executionTimer);
+    executionTimer = null;
+    byId("request-elapsed").hidden = true;
     setBusy(false);
   }
 }

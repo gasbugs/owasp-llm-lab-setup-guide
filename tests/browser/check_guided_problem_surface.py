@@ -60,6 +60,33 @@ def main():
                 assert page.title() == "클씨랩 LLM 보안 실습실"
                 assert "TENANT 03" not in page.locator("body").inner_text()
                 assert page.locator(".help-trigger").count() == 0
+                pending = []
+                page.route('**/api/practice/P01/verify', lambda route: pending.append(route))
+                page.locator('#verify').click()
+                page.wait_for_function('executionPending === true')
+                page.wait_for_timeout(1100)
+                assert page.locator('#request-elapsed').is_visible()
+                assert '응답 대기' in page.locator('#execution-state').inner_text()
+                assert page.locator('.gate.running').count() == 0
+                assert page.locator('#verdict strong').inner_text() == '—'
+                assert page.locator('#verify').is_disabled()
+                page.evaluate('execute("/api/practice/P01/verify")')
+                assert len(pending) == 1
+                pending[0].fulfill(status=503, content_type='application/json', body='{"detail":"display-only unavailable"}')
+                page.wait_for_function('executionPending === false')
+                assert page.locator('#verdict strong').inner_text() == 'ERR'
+                assert page.locator('#request-elapsed').is_hidden()
+                assert not page.locator('#verify').is_disabled()
+                page.reload(wait_until='networkidle')
+                assert page.locator('#task-completion').is_hidden()
+                assert page.locator('#comparison').is_hidden()
+                assert page.locator('#verdict strong').inner_text() == '—'
+                fresh = browser.new_context()
+                resumed = fresh.new_page()
+                resumed.goto(origin, wait_until='networkidle')
+                assert resumed.locator('#task-completion').is_hidden()
+                assert resumed.locator('#verdict strong').inner_text() == '—'
+                fresh.close()
                 tabs = page.get_by_role('tab')
                 tabs.first.focus()
                 tabs.first.press('End')
@@ -126,6 +153,8 @@ def main():
                 args.output.write_text(json.dumps({"scope": "problem surface rendering only; no grading or AWS",
                     "tabs_checked": evidence, "tooltip_checks": tooltip_checks,
                     "keyboard_and_accessibility_tree": True, "isolated_result_comparison": True,
+                    "pending_without_invented_stages": True, "duplicate_request_blocked": True,
+                    "reload_does_not_restore_completion": True,
                     "touch_help_actions": 0, "touch_button_intercepted_actions": len(touch_posts),
                     "post_requests": requests, "page_errors": errors}, indent=2))
                 print(json.dumps({"views": len(evidence), "tooltip_checks": tooltip_checks,
