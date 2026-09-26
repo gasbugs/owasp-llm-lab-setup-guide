@@ -244,3 +244,14 @@ pre { margin: 0; max-height: 360px; overflow: auto; padding: 14px; white-space: 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
+
+@media (max-width: 760px), (hover: none) {
+  .action-control { align-content: start; }
+  .action-control .action-tooltip {
+    position: static; width: 100%; max-width: 100%; margin-top: 6px;
+    padding: 6px 2px; border: 0; background: transparent; box-shadow: none;
+    color: var(--muted); opacity: 1; visibility: visible; transform: none;
+    transition: none; overflow-wrap: anywhere; pointer-events: auto;
+  }
+  .action-tooltip::after { display: none; }
+}

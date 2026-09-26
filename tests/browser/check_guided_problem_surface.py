@@ -68,21 +68,40 @@ def main():
                         assert page.locator(".lab-workspace:visible").count() >= 1
                         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (width, index)
                         for help_button in page.locator(".lab-workspace:visible .action-control > button[aria-describedby]").all():
-                            help_button.focus()
                             tooltip = help_button.locator("..").locator(".action-tooltip")
+                            if width <= 760:
+                                tooltip.wait_for(state="visible")
+                                assert tooltip.evaluate("el => getComputedStyle(el).position") == "static"
+                            help_button.focus()
                             tooltip.wait_for(state="visible")
                             box = tooltip.bounding_box()
                             assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, (width, index, box)
                             tooltip_checks += 1
                             help_button.press("Escape")
-                            tooltip.wait_for(state="hidden")
+                            tooltip.wait_for(state="visible" if width <= 760 else "hidden")
                         for text in page.locator(".lab-workspace:visible pre").all_inner_texts():
                             assert text.startswith("docker compose ") or text.lstrip().startswith("{"), text[:80]
                         evidence.append({"width": width, "tab": index + 1})
                     page.screenshot(path=str(args.output.with_suffix(f".{width}.png")))
                 assert not requests and not errors
+                touch = browser.new_page(viewport={"width": 390, "height": 1000}, is_mobile=True, has_touch=True)
+                touch.goto(origin, wait_until="networkidle")
+                touch_posts = []
+                def intercept_action(route):
+                    touch_posts.append(route.request.url)
+                    route.fulfill(status=503, content_type="application/json", body='{"detail":"touch-test-only"}')
+                touch.route("**/api/provider-preflight", intercept_action)
+                tip = touch.locator("#preflight").locator("..").locator(".action-tooltip")
+                tip.wait_for(state="visible")
+                tip.tap()
+                assert not touch_posts and not requests
+                touch.locator("#preflight").tap()
+                touch.wait_for_timeout(100)
+                assert len(touch_posts) == 1 and not requests
+                touch.close()
                 args.output.write_text(json.dumps({"scope": "problem surface rendering only; no grading or AWS",
                     "tabs_checked": evidence, "tooltip_checks": tooltip_checks,
+                    "touch_help_actions": 0, "touch_button_intercepted_actions": len(touch_posts),
                     "post_requests": requests, "page_errors": errors}, indent=2))
                 print(json.dumps({"views": len(evidence), "tooltip_checks": tooltip_checks,
                     "post_requests": len(requests), "page_errors": errors}))

@@ -420,13 +420,28 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                     headers={"Authorization": f"Bearer {LAB_TOKEN}"},
                 )
                 if lab_response.status_code != definition["expected_status"]:
+                    failure = incomplete(
+                        "guided_h01_gateway",
+                        f"{definition['case_id']}: Gateway HTTP {lab_response.status_code}; "
+                        "요청 처리 결과가 계약과 달라 검증을 중단했습니다. 모델 호출 여부는 아직 확인되지 않았습니다.",
+                    )
+                    try:
+                        detail = lab_response.json().get("detail")
+                        code = detail.get("provider_error") if isinstance(detail, dict) else None
+                    except (ValueError, AttributeError):
+                        code = None
+                    guidance = {
+                        "credentials_missing": ("Gateway가 AWS 로그인 정보를 찾지 못했습니다.", "Gateway의 AWS 설정 파일 연결과 AWS_PROFILE을 확인합니다."),
+                        "credentials_invalid": ("AWS가 로그인 정보를 받아들이지 않았습니다.", "연결한 AWS 프로필의 자격 증명이 유효한지 확인합니다."),
+                        "access_denied": ("AWS가 모델 호출 권한을 거부했습니다.", "현재 AWS 계정의 Bedrock 호출 권한과 모델 사용 권한을 확인합니다."),
+                        "model_unavailable": ("요청한 모델을 현재 사용할 수 없습니다.", "Gateway의 리전과 모델 ID, 해당 모델의 사용 가능 상태를 확인합니다."),
+                    }
+                    if lab_response.status_code == 502 and isinstance(code, str) and code in guidance:
+                        reason, next_check = guidance[code]
+                        failure.update(provider_error=code, reason=reason + " 연결 확인을 완료하지 못했습니다. 모델 실행 완료 여부는 확인되지 않았습니다.", next_check=next_check)
                     raise HTTPException(
                         status_code=502,
-                        detail=incomplete(
-                            "guided_h01_gateway",
-                            f"{definition['case_id']}: Gateway HTTP {lab_response.status_code}; "
-                            "요청 처리 결과가 계약과 달라 검증을 중단했습니다. 모델 호출 여부는 아직 확인되지 않았습니다.",
-                        ),
+                        detail=failure,
                     )
                 cases.append(
                     {

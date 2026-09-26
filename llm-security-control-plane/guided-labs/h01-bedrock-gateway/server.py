@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Literal
 
 import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError, PartialCredentialsError, ProfileNotFound
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -167,7 +167,19 @@ def chat(request: ChatRequest, _authorized: None = Depends(require_control)) -> 
         raise HTTPException(status_code=422, detail="invalid chat request") from exc
     except (BotoCoreError, ClientError, InvocationError) as exc:
         close_execution(record, recorder, 502)
-        raise HTTPException(status_code=502, detail="provider invocation failed or evidence is incomplete") from exc
+        code = "provider_error"
+        if isinstance(exc, (NoCredentialsError, PartialCredentialsError, ProfileNotFound)):
+            code = "credentials_missing"
+        elif isinstance(exc, ClientError):
+            code = {
+                "AccessDeniedException": "access_denied",
+                "ResourceNotFoundException": "model_unavailable",
+                "ModelNotReadyException": "model_unavailable",
+                "UnrecognizedClientException": "credentials_invalid",
+                "InvalidClientTokenId": "credentials_invalid",
+                "ExpiredTokenException": "credentials_invalid",
+            }.get(exc.response.get("Error", {}).get("Code"), code)
+        raise HTTPException(status_code=502, detail={"provider_error": code}) from exc
     except Exception as exc:
         close_execution(record, recorder, 502)
         raise HTTPException(status_code=502, detail="learner implementation failed") from exc

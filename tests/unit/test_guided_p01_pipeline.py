@@ -12,6 +12,7 @@ from unittest.mock import patch
 from urllib.parse import urlsplit
 
 import httpx
+from botocore.exceptions import NoCredentialsError, ClientError
 from fastapi.testclient import TestClient
 
 import test_guided_control_center as control_fixture
@@ -129,6 +130,29 @@ class P01PipelineTests(unittest.TestCase):
         result = response.json()
         self.assertEqual(result["security_verdict"], "PASS", result)
         self.assertFalse(result["task_completed"])
+
+    def test_provider_errors_have_safe_specific_guidance(self):
+        faults = [(NoCredentialsError(), "credentials_missing")]
+        for aws_code, public_code in (("AccessDeniedException", "access_denied"),
+                                      ("ResourceNotFoundException", "model_unavailable"),
+                                      ("UnrecognizedClientException", "credentials_invalid"),
+                                      ("UnknownError", None)):
+            faults.append((ClientError({"Error": {"Code": aws_code, "Message": "SECRET-SENTINEL"}}, "Converse"), public_code))
+        messages = set()
+        for error, code in faults:
+            with self.subTest(code=code), patch.object(self.gateway, "PROVIDER_MODE", "aws"), \
+                 patch.object(self.gateway.boto3, "client", side_effect=error), \
+                 patch.object(self.gateway.learner, "handle_request", gateway_fixture.valid):
+                response = self.client.post("/api/provider-preflight", headers=self.headers)
+                self.assertEqual(response.status_code, 502)
+                result = response.json()["detail"]
+                self.assertEqual(result.get("provider_error"), code)
+                self.assertFalse(result["task_completed"])
+                self.assertEqual(result["security_verdict"], "ERR")
+                self.assertIsNone(result["downstream_called"])
+                self.assertNotIn("SECRET-SENTINEL", response.text)
+                messages.add(result["next_check"])
+        self.assertEqual(len(messages), 5)
 
     def test_changed_message_is_rejected_by_actual_verifier(self):
         # Keep invalid requests invalid; only change otherwise valid model input.
