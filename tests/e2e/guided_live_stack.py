@@ -7,13 +7,14 @@ import sys
 
 
 class LiveStack:
-    def __init__(self, root, project, activity, learner_url, additional_activities=None):
+    def __init__(self, root, project, activity, learner_url, additional_activities=None, no_cache=False):
         if not re.fullmatch(r'guided-p\d+-check-[a-f0-9]{10}', project):
             raise ValueError('only a generated publisher project may be managed')
         if not re.fullmatch(r'H\d{2}', activity):
             raise ValueError('invalid activity')
         self.root, self.project, self.activity = root, project, activity
         self.learner_url = learner_url
+        self.no_cache = no_cache
         self.activities = {activity: learner_url, **(additional_activities or {})}
         if any(not re.fullmatch(r'H\d{2}', name) for name in self.activities):
             raise ValueError('invalid additional activity')
@@ -62,7 +63,7 @@ class LiveStack:
         origin = f'http://127.0.0.1:{port}'
         for role in ('control-center', 'front-proxy'):
             image = 'localhost/' + self.project + '-' + role + ':test'
-            subprocess.run(['docker', 'build', '-f', f'guided-{role}/Containerfile', '-t', image, '.'],
+            subprocess.run(['docker', 'build', *(['--no-cache'] if self.no_cache else []), '-f', f'guided-{role}/Containerfile', '-t', image, '.'],
                            cwd=self.root / 'llm-security-control-plane', check=True)
             if role == 'control-center':
                 env = self.required_env(role)

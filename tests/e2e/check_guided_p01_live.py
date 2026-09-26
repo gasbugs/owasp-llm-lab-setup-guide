@@ -42,9 +42,9 @@ def markdown_source(path):
     return blocks[0].encode()
 
 
-def build(role, recipe, context, project):
+def build(role, recipe, context, project, no_cache=False):
     image = f'localhost/{project}-{role}:test'
-    subprocess.run(['docker', 'build', '-f', str(recipe), '-t', image, str(context)], check=True)
+    subprocess.run(['docker', 'build', *(['--no-cache'] if no_cache else []), '-f', str(recipe), '-t', image, str(context)], check=True)
     return image
 
 
@@ -77,6 +77,7 @@ def main():
     parser.add_argument('--aws-profile', default='default')
     parser.add_argument('--browser-python', type=Path)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--no-cache', action='store_true', help='Rebuild project layers; existing base images may be reused')
     args = parser.parse_args()
     if args.output.exists():
         parser.error('output already exists; preserve previous evidence')
@@ -95,6 +96,7 @@ def main():
     source_digest = identity.hexdigest()
     project = 'guided-p01-check-' + uuid.uuid4().hex[:10]
     proof = {'scope': 'selected packaged Docker services; not full operational Compose',
+             'project_build_cache_disabled': args.no_cache, 'fresh_application_state': True,
              'project': project, 'provider_mode': mode, 'source_digest': source_digest,
              'learner_sha256': hashlib.sha256(source).hexdigest(),
              'markdown_sha256': hashlib.sha256(args.markdown.read_bytes()).hexdigest() if args.markdown else None}
@@ -106,12 +108,12 @@ def main():
             for name in ('server.py', 'provider.py', 'requirements.txt', 'Containerfile'):
                 shutil.copyfile(LAB / name, target / name)
             (target / 'learner.py').write_bytes(source)
-            gateway_image = build('gateway', target / 'Containerfile', temporary, project)
-            verifier_image = build('verifier', CONTROL / 'guided-evidence-verifier/Containerfile', CONTROL, project)
+            gateway_image = build('gateway', target / 'Containerfile', temporary, project, args.no_cache)
+            verifier_image = build('verifier', CONTROL / 'guided-evidence-verifier/Containerfile', CONTROL, project, args.no_cache)
             network = project + '_default'
             subprocess.run(['docker', 'network', 'create', *([] if mode == 'aws' else ['--internal']), network], check=True)
             cleanup.callback(subprocess.run, ['docker', 'network', 'rm', network], check=True)
-            live = LiveStack(ROOT, project, 'H01', 'http://gateway:8000')
+            live = LiveStack(ROOT, project, 'H01', 'http://gateway:8000', no_cache=args.no_cache)
             cleanup.callback(live.close)
             gateway_env = {'GUIDED_CONTROL_LAB01_TOKEN': 'publisher-test-control',
                            'GUIDED_VERIFIER_LAB01_TOKEN': 'publisher-test-verifier', 'GUIDED_PROVIDER_MODE': mode}
