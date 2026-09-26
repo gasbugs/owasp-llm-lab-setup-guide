@@ -67,10 +67,10 @@ async function main() {
           && document.documentElement.scrollWidth <= innerWidth;
       });
       assert(fits, `tooltip or page overflows at ${width}px`);
-      await page.locator('[aria-controls="h18-help"]').click();
-      assert.equal(await page.locator('[aria-controls="h18-help"]').getAttribute('aria-expanded'), 'true');
-      await page.locator('[aria-controls="h18-help"]').press('Escape');
-      assert.equal(await page.locator('[aria-controls="h18-help"]').getAttribute('aria-expanded'), 'false');
+      await page.locator('[aria-describedby="h18-help"]').focus();
+      assert.equal(await page.locator('[aria-describedby="h18-help"]').evaluate(el => el.closest(".action-control").classList.contains("tip-dismissed")), false);
+      await page.locator('[aria-describedby="h18-help"]').press('Escape');
+      assert.equal(await page.locator('[aria-describedby="h18-help"]').evaluate(el => el.closest(".action-control").classList.contains("tip-dismissed")), true);
     }
     await page.locator('[data-theme-choice="light"]').click();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');

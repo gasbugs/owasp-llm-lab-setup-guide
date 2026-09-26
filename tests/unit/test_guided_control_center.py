@@ -986,7 +986,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn('EXPORT_TO_ALLOY', page)
         self.assertIn('P17 현재 구현 검증', page)
         self.assertIn('guided-h17-telemetry', page)
-        self.assertIn('aria-controls="h17-help"', page)
+        self.assertIn('aria-describedby="h17-help"', page)
 
     def test_p19_uses_dedicated_runtime_and_server_owned_verification(self):
         result = {"activity_id": "P19", "task_completed": False,
@@ -1037,7 +1037,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(verify['url'], self.server.VERIFIER_URL + '/v1/verify/h20')
         page = self.client.get('/').text
         self.assertIn('P20 현재 구현 검증', page)
-        self.assertIn('aria-controls="h20-help"', page)
+        self.assertIn('aria-describedby="h20-help"', page)
         self.assertNotIn('guided_h20_risk_active', page)
         self.assertNotIn('dashboard-query.txt', page)
         self.assertIn('h20-alert-dashboard/rules.yaml', page)
@@ -1138,8 +1138,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn('matchMedia("(prefers-color-scheme: dark)")', javascript)
         self.assertIn('localStorage.setItem("guided-theme-mode", mode)', javascript)
         self.assertIn('/api/practice/P01/chat', javascript)
-        self.assertIn('querySelectorAll(".help-trigger")', javascript)
-        self.assertIn('setAttribute("aria-expanded", String(open))', javascript)
+        self.assertNotIn('class="help-trigger"', html)
+        self.assertIn('<title>클씨랩 LLM 보안 실습실</title>', html)
+        self.assertNotIn("TENANT 03", html)
         self.assertIn('event.key === "Escape"', javascript)
         stylesheet = (CONTROL / "guided-control-center/app.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 760px)", stylesheet)
@@ -1147,7 +1148,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn(':root[data-theme="dark"]', stylesheet)
         self.assertIn("@media (prefers-color-scheme: dark)", stylesheet)
         self.assertIn("prefers-reduced-motion", stylesheet)
-        self.assertIn(".action-control.tip-open .action-tooltip", stylesheet)
+        self.assertIn(".action-control:not(.tip-dismissed):focus-within .action-tooltip", stylesheet)
         self.assertIn(
             ".actions:not(.single) > .action-control:last-child .action-tooltip",
             stylesheet,
@@ -1200,7 +1201,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         problem = html.split('<div id="h18-work"', 1)[1].split('<div id="h19-work"', 1)[0]
         for required in ('P18 현재 구현 검증', 'guided-h18-queries', 'queries.yaml',
-                         'request_id', 'Counter', '--no-deps', 'aria-controls="h18-help"'):
+                         'request_id', 'Counter', '--no-deps', 'aria-describedby="h18-help"'):
             self.assertIn(required, problem)
         for solution in ('logql:', 'promql:', 'sum(', 'max by ('):
             self.assertNotIn(solution, problem)
@@ -1212,7 +1213,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn('JOIN_KEY', problem)
         for required in ('P19 현재 구현 검증', 'analyze_incident', 'downstream_calls', 'ValueError',
                          'build guided-h19-investigation', '--no-deps', '교육용 공지 저장소',
-                         'aria-controls="h19-help"', 'aria-expanded="false"'):
+                         'aria-describedby="h19-help"', 'role="tooltip"'):
             self.assertIn(required, problem)
 
     def test_rendering_only_updates_existing_dom_ids(self):

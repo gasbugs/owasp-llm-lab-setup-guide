@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     requests = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -56,20 +57,35 @@ def main():
                            if route.request.url.startswith(origin + "/") else route.abort())
                 page.goto(origin, wait_until="networkidle")
                 assert page.locator(".tab").count() == 13
-                for width in (1440, 390):
+                assert page.title() == "클씨랩 LLM 보안 실습실"
+                assert "TENANT 03" not in page.locator("body").inner_text()
+                assert page.locator(".help-trigger").count() == 0
+                tooltip_checks = 0
+                for width in (1440, 760, 390, 320):
                     page.set_viewport_size({"width": width, "height": 1000})
                     for index in range(13):
                         page.locator(f'.tab[data-tab-index="{index}"]').click()
                         assert page.locator(".lab-workspace:visible").count() >= 1
                         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (width, index)
+                        for help_button in page.locator(".lab-workspace:visible .action-control > button[aria-describedby]").all():
+                            help_button.focus()
+                            tooltip = help_button.locator("..").locator(".action-tooltip")
+                            tooltip.wait_for(state="visible")
+                            box = tooltip.bounding_box()
+                            assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, (width, index, box)
+                            tooltip_checks += 1
+                            help_button.press("Escape")
+                            tooltip.wait_for(state="hidden")
                         for text in page.locator(".lab-workspace:visible pre").all_inner_texts():
                             assert text.startswith("docker compose ") or text.lstrip().startswith("{"), text[:80]
                         evidence.append({"width": width, "tab": index + 1})
                     page.screenshot(path=str(args.output.with_suffix(f".{width}.png")))
                 assert not requests and not errors
                 args.output.write_text(json.dumps({"scope": "problem surface rendering only; no grading or AWS",
-                    "tabs_checked": evidence, "post_requests": requests, "page_errors": errors}, indent=2))
-                print(json.dumps({"views": len(evidence), "post_requests": len(requests), "page_errors": errors}))
+                    "tabs_checked": evidence, "tooltip_checks": tooltip_checks,
+                    "post_requests": requests, "page_errors": errors}, indent=2))
+                print(json.dumps({"views": len(evidence), "tooltip_checks": tooltip_checks,
+                    "post_requests": len(requests), "page_errors": errors}))
             finally:
                 browser.close()
     finally:

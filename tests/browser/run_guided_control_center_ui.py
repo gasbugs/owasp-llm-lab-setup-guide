@@ -90,13 +90,13 @@ def main() -> int:
         page.locator("#preflight").focus()
         page.locator("#preflight-help").wait_for(state="visible")
         preflight_focus_visible = page.locator("#preflight-help").is_visible()
-        page.locator('[aria-controls="preflight-help"]').click()
+        page.locator('[aria-describedby="preflight-help"]').focus()
         preflight_tip = page.locator("#preflight-help")
         preflight_tip.wait_for(state="visible")
         preflight_tip_visible = preflight_tip.is_visible()
         preflight_tip_text = preflight_tip.inner_text()
-        page.locator('[aria-controls="preflight-help"]').press("Escape")
-        preflight_tip_collapsed = page.locator('[aria-controls="preflight-help"]').get_attribute("aria-expanded") == "false"
+        page.locator('[aria-describedby="preflight-help"]').press("Escape")
+        preflight_tip_collapsed = page.locator("#preflight").evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')")
         h02_tip_text = page.locator("#h02-provision-help").inner_text()
         h04_tip_text = page.locator("#h04-provision-help").inner_text()
         h05_tip_text = page.locator("#h05-verify-help").inner_text()
@@ -114,7 +114,7 @@ def main() -> int:
         }
         page.set_viewport_size({"width": 1181, "height": 900})
         page.locator('.tab[data-tab-index="3"]').click()
-        page.locator('[aria-controls="h05-verify-help"]').click()
+        page.locator('[aria-describedby="h05-verify-help"]').focus()
         page.locator("#h05-verify-help").wait_for(state="visible")
         desktop_tip_inside = page.evaluate(
             """() => {
@@ -123,9 +123,9 @@ def main() -> int:
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
-        page.locator('[aria-controls="h05-verify-help"]').press("Escape")
+        page.locator('[aria-describedby="h05-verify-help"]').press("Escape")
         page.locator('.tab[data-tab-index="4"]').click()
-        page.locator('[aria-controls="h07-verify-help"]').click()
+        page.locator('[aria-describedby="h07-verify-help"]').focus()
         page.locator("#h07-verify-help").wait_for(state="visible")
         h07_desktop_tip_inside = page.evaluate(
             """() => {
@@ -134,8 +134,8 @@ def main() -> int:
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
-        page.locator('[aria-controls="h07-verify-help"]').press("Escape")
-        page.locator('[aria-controls="h08-verify-help"]').click()
+        page.locator('[aria-describedby="h07-verify-help"]').press("Escape")
+        page.locator('[aria-describedby="h08-verify-help"]').focus()
         page.locator("#h08-verify-help").wait_for(state="visible")
         h08_desktop_tip_inside = page.evaluate(
             """() => {
@@ -144,9 +144,9 @@ def main() -> int:
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
-        page.locator('[aria-controls="h08-verify-help"]').press("Escape")
+        page.locator('[aria-describedby="h08-verify-help"]').press("Escape")
         page.locator('.tab[data-tab-index="5"]').click()
-        page.locator('[aria-controls="h09-verify-help"]').click()
+        page.locator('[aria-describedby="h09-verify-help"]').focus()
         page.locator("#h09-verify-help").wait_for(state="visible")
         h09_desktop_tip_inside = page.evaluate(
             """() => {
@@ -155,7 +155,7 @@ def main() -> int:
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
-        page.locator('[aria-controls="h09-verify-help"]').press("Escape")
+        page.locator('[aria-describedby="h09-verify-help"]').press("Escape")
         page.set_viewport_size({"width": 1440, "height": 1100})
 
         answer_controls = page.locator("select, input[type=checkbox], #hint, #reset").count()
@@ -281,7 +281,7 @@ def main() -> int:
             "() => document.documentElement.scrollWidth > document.documentElement.clientWidth"
         )
         page.locator('.tab[data-tab-index="4"]').click()
-        page.locator('[aria-controls="h07-verify-help"]').click()
+        page.locator('[aria-describedby="h07-verify-help"]').focus()
         page.locator("#h07-verify-help").wait_for(state="visible")
         mobile_tip_inside = page.evaluate(
             """() => {
@@ -290,8 +290,8 @@ def main() -> int:
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
-        page.locator('[aria-controls="h07-verify-help"]').press("Escape")
-        page.locator('[aria-controls="h08-verify-help"]').click()
+        page.locator('[aria-describedby="h07-verify-help"]').press("Escape")
+        page.locator('[aria-describedby="h08-verify-help"]').focus()
         page.locator("#h08-verify-help").wait_for(state="visible")
         h08_mobile_tip_inside = page.evaluate(
             """() => {
@@ -300,9 +300,9 @@ def main() -> int:
                 return tooltip.left >= workbench.left && tooltip.right <= workbench.right;
             }"""
         )
-        page.locator('[aria-controls="h08-verify-help"]').press("Escape")
+        page.locator('[aria-describedby="h08-verify-help"]').press("Escape")
         page.locator('.tab[data-tab-index="5"]').click()
-        page.locator('[aria-controls="h09-verify-help"]').click()
+        page.locator('[aria-describedby="h09-verify-help"]').focus()
         page.locator("#h09-verify-help").wait_for(state="visible")
         h09_mobile_tip_inside = page.evaluate(
             """() => {

@@ -69,11 +69,11 @@ def main():
                         && tip.right <= Math.min(innerWidth, work.right) + 1
                         && document.documentElement.scrollWidth <= innerWidth;
                 }'''), f'overflow at {width}px'
-                help_button = page.locator('[aria-controls="verify-help"]')
-                help_button.click()
-                assert help_button.get_attribute('aria-expanded') == 'true'
+                help_button = page.locator('[aria-describedby="verify-help"]')
+                help_button.focus()
+                assert help_button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is False
                 help_button.press('Escape')
-                assert help_button.get_attribute('aria-expanded') == 'false'
+                assert help_button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is True
                 page.locator('#h01-work').scroll_into_view_if_needed()
                 page.screenshot(path=str(args.output.with_suffix(f'.{width}.png')))
             page.locator('[data-theme-choice="light"]').click()

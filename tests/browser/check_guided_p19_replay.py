@@ -91,11 +91,11 @@ def main():
                           && box.right <= Math.min(innerWidth, work.right) + 1
                           && document.documentElement.scrollWidth <= innerWidth;
                     }''')
-                    help_button = page.locator('[aria-controls="h19-help"]')
-                    help_button.click()
-                    assert help_button.get_attribute('aria-expanded') == 'true'
+                    help_button = page.locator('[aria-describedby="h19-help"]')
+                    help_button.focus()
+                    assert help_button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is False
                     help_button.press('Escape')
-                    assert help_button.get_attribute('aria-expanded') == 'false'
+                    assert help_button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is True
                 page.locator('[data-theme-choice="light"]').click()
                 assert page.locator('html').get_attribute('data-theme') == 'light'
                 page.locator('#h19-work').scroll_into_view_if_needed()

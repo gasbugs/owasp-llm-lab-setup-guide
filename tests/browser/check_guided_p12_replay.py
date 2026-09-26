@@ -91,11 +91,11 @@ def main():
                           && box.right <= Math.min(innerWidth, work.right) + 1
                           && document.documentElement.scrollWidth <= innerWidth;
                     }''')
-                    trigger = page.locator('[aria-controls="h12-verify-help"]')
-                    trigger.click()
-                    assert trigger.get_attribute('aria-expanded') == 'true'
+                    trigger = page.locator('[aria-describedby="h12-verify-help"]')
+                    trigger.focus()
+                    assert trigger.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is False
                     trigger.press('Escape')
-                    assert trigger.get_attribute('aria-expanded') == 'false'
+                    assert trigger.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is True
                     page.screenshot(path=str(args.output.with_suffix(f'.{width}.png')))
                 page.locator('[data-theme-choice="light"]').click()
                 assert page.locator('html').get_attribute('data-theme') == 'light'

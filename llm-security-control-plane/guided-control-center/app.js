@@ -45,28 +45,25 @@ function setText(id, value) {
 }
 
 function closeActionTips(except = null) {
-  document.querySelectorAll(".action-control.tip-open").forEach((control) => {
+  document.querySelectorAll(".action-control").forEach((control) => {
     if (control !== except) {
-      control.classList.remove("tip-open");
-      control.querySelector(".help-trigger")?.setAttribute("aria-expanded", "false");
+      control.classList.add("tip-dismissed");
     }
   });
 }
 
 function bindActionTips() {
-  document.querySelectorAll(".help-trigger").forEach((trigger) => {
-    trigger.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const control = trigger.closest(".action-control");
-      const open = !control.classList.contains("tip-open");
+  document.querySelectorAll(".action-control > button[aria-describedby]").forEach((trigger) => {
+    const control = trigger.closest(".action-control");
+    const show = () => {
       closeActionTips(control);
-      control.classList.toggle("tip-open", open);
-      trigger.setAttribute("aria-expanded", String(open));
-    });
+      control.classList.remove("tip-dismissed");
+    };
+    trigger.addEventListener("focus", show);
+    control.addEventListener("mouseenter", show);
     trigger.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         closeActionTips();
-        trigger.focus();
       }
     });
   });

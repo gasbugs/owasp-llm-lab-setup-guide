@@ -75,11 +75,11 @@ def main():
                             && tip.right <= Math.min(innerWidth, work.right) + 1
                             && document.documentElement.scrollWidth <= innerWidth;
                     }''', action + '-help')
-                    button = page.locator('[aria-controls="' + action + '-help"]')
-                    button.click()
-                    assert button.get_attribute('aria-expanded') == 'true'
+                    button = page.locator('[aria-describedby="' + action + '-help"]')
+                    button.focus()
+                    assert button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is False
                     button.press('Escape')
-                    assert button.get_attribute('aria-expanded') == 'false'
+                    assert button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is True
                 page.locator('#h04-code-title').scroll_into_view_if_needed()
                 page.screenshot(path=str(args.output.with_suffix(f'.{width}.png')))
             for theme in ('light', 'dark'):
