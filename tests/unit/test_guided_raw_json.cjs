@@ -10,7 +10,7 @@ const learning = {};
 vm.runInNewContext(source.slice(source.indexOf('function verificationSummary('), source.indexOf('function renderLearningSupport(')), learning);
 function completionHarness() {
   const celebrated = [];
-  const ctx = {practiceGroups: [['P01'], ['P02', 'P03']], completedPractices: new Map(), celebratedPractices: new Set(),
+  const ctx = {practiceGroups: [['P01'], ['P02', 'P03']], completedPractices: new Map(), recheckPractices: new Map(), celebratedPractices: new Set(),
     verificationSummary: learning.verificationSummary, renderPracticeProgress: () => {},
     celebratePractice: id => celebrated.push(id)};
   vm.runInNewContext(source.slice(source.indexOf('function recordPracticeCompletion('), source.indexOf('function selectTab(')), ctx);
@@ -51,6 +51,19 @@ test('comparison requires a graded execution and never includes response text', 
   assert.equal(learning.verificationSummary({...sample, course_verdict: 'ERR'}).completed, '미완료');
   assert.equal(learning.verificationSummary(sample).prompt, undefined);
   assert.equal(learning.verificationSummary(sample).digest, '미확인');
+});
+test('unavailable progress demotes old marks and a late refresh cannot overwrite a new attempt', async () => {
+  const state = {progressRequest: 0, executionPending: false, completedPractices: new Map([['P01', 'saved']]),
+    recheckPractices: new Map(), renderPracticeProgress: () => {}, setText: () => {},
+    fetch: async () => ({ok: false})};
+  vm.runInNewContext(source.slice(source.indexOf('async function restorePracticeProgress('), source.indexOf('function dismissCelebration(')), state);
+  await state.restorePracticeProgress();
+  assert.equal(state.completedPractices.size, 0);
+  assert.equal(state.recheckPractices.has('P01'), true);
+  state.completedPractices.set('P02', 'new');
+  state.fetch = async () => {state.progressRequest++; return {ok: false};};
+  await state.restorePracticeProgress();
+  assert.equal(state.completedPractices.has('P02'), true);
 });
 test('failure guidance does not infer causes from arbitrary text', () => {
   assert.equal(learning.failureCategory({http_status: 422}), '입력');

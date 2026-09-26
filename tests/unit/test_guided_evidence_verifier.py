@@ -132,6 +132,34 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         finally:
             cls.environment.stop()
 
+    def test_progress_identity_uses_read_only_existing_routes(self):
+        import httpx
+        calls = []
+        def respond(request):
+            calls.append(request)
+            return httpx.Response(200, json={'source_digest': 'a' * 64, 'queries': 'must-not-leak'})
+        real_client = httpx.Client
+        with patch.object(self.server.httpx, 'Client', side_effect=lambda **kw:
+                          real_client(transport=httpx.MockTransport(respond), **kw)):
+            for number in (*range(1, 13), *range(17, 21)):
+                result = self.server.progress_build(f'P{number:02d}', None)
+                self.assertEqual(result, {'problem': f'P{number:02d}', 'source_digest': 'a' * 64})
+            for number in (13, 14, 15, 16, 21, 22):
+                self.assertIsNone(self.server.progress_build(f'P{number}', None)['source_digest'])
+        self.assertEqual(len(calls), 16)
+        self.assertTrue(all(request.method == 'GET' for request in calls))
+        self.assertEqual(calls[-1].url.path, '/v1/buildinfo')
+        self.assertEqual(self.client.get('/v1/progress/P01/build').status_code, 401)
+
+    def test_progress_identity_error_does_not_return_old_identity_or_source(self):
+        import httpx
+        real_client = httpx.Client
+        for response in (httpx.Response(503), httpx.Response(200, json={'source_digest': 'invalid'}),
+                         httpx.Response(200, content=b'x' * 262145)):
+            with patch.object(self.server.httpx, 'Client', side_effect=lambda **kw:
+                              real_client(transport=httpx.MockTransport(lambda req: response), **kw)):
+                self.assertIsNone(self.server.progress_build('P01', None)['source_digest'])
+
     def setUp(self):
         with self.server.connect() as database:
             database.execute("DELETE FROM used_evidence")

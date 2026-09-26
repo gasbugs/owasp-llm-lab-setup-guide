@@ -90,6 +90,10 @@ def main():
             assert page.locator('html').get_attribute('data-theme') == 'light'
             page.locator('[data-theme-choice="dark"]').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
+            page.reload(wait_until='networkidle')
+            assert page.locator('#practice-progress-count').inner_text() == ('1 / 22' if complete else '0 / 22')
+            assert page.locator('#completion-toast').is_hidden()
+            assert page.locator('#task-completion').is_hidden()
             assert errors == []
             args.output.write_text(json.dumps({'http_status': response.status, 'response': body,
                 'submitted_verdict_status': rejected, 'page_errors': errors, 'viewports': [1440, 390],

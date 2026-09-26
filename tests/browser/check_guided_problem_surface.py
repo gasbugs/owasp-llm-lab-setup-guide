@@ -25,7 +25,12 @@ def main():
             files = {"/": ("index.html", "text/html; charset=utf-8"),
                      "/app.js": ("app.js", "text/javascript"), "/app.css": ("app.css", "text/css")}
             if self.path == "/api/bootstrap":
-                body = json.dumps({"csrf_token": "render-only", "official_uis": []}).encode()
+                body = json.dumps({"csrf_token": "render-only", "official_uis": [
+                    {'id': key, 'name': name, 'browser_url': origin, 'status': 'ready', 'boundary': '제품 화면'}
+                    for key, name in [('grafana', 'Grafana Explore'), ('p20-grafana', 'P20 Grafana')]]}).encode()
+                kind = "application/json"
+            elif self.path == "/api/progress":
+                body = b'{"records": []}'
                 kind = "application/json"
             elif self.path in files:
                 name, kind = files[self.path]
@@ -171,6 +176,30 @@ def main():
                 assert page.locator('#practice-progress-count').inner_text() == '0 / 22'
                 assert page.locator('#completion-toast').is_hidden()
                 page.emulate_media(reduced_motion='no-preference')
+                # Saved server metadata, not localStorage, restores the menu without celebration.
+                saved = {'records': [{'problem': 'P01', 'execution': 'saved-suite', 'state': 'completed'},
+                                     {'problem': 'P02', 'execution': 'old-suite', 'state': 'recheck',
+                                      'reason': '실행본이 바뀌었습니다.'}]}
+                page.route('**/api/progress', lambda route: route.fulfill(
+                    status=200, content_type='application/json', body=json.dumps(saved)))
+                page.reload(wait_until='networkidle')
+                assert page.locator('#practice-progress-count').inner_text() == '1 / 22'
+                assert 'P01 완료' in page.locator('#practice-tab-0').get_attribute('aria-label')
+                assert '재검증 필요' in page.locator('#practice-history').inner_text()
+                assert page.locator('#completion-toast').is_hidden()
+                assert page.locator('#task-completion').is_hidden()
+                assert page.locator('#verdict strong').inner_text() == '—'
+                assert page.locator('.login-help').count() == 2
+                for width in (1440, 390, 320):
+                    page.set_viewport_size({'width': width, 'height': 1000})
+                    for help_panel in page.locator('.login-help').all():
+                        help_panel.evaluate('(el) => el.open = true')
+                    assert 'GUIDED_P20_GRAFANA_PASSWORD' in page.locator('#official-uis').inner_text()
+                    assert 'p20-reader' in page.locator('#official-uis').inner_text()
+                    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                    page.locator('#official-uis').scroll_into_view_if_needed()
+                    page.screenshot(path=str(args.output.with_suffix(f'.login-progress-{width}.png')))
+                page.locator('.login-help').evaluate_all('(items) => items.forEach(el => el.open = false)')
                 tooltip_checks = 0
                 for width in (1440, 1280, 1024, 800, 760, 390, 320):
                     page.set_viewport_size({"width": width, "height": 1000})

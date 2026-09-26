@@ -9,8 +9,9 @@ WORKDIR /app
 COPY --chmod=0444 guided-contracts/p01.json /app/p01.json
 COPY --chmod=0444 guided-control-center/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY --chmod=0444 guided-control-center/server.py guided-control-center/index.html \
+COPY --chmod=0444 guided-control-center/server.py guided-control-center/progress.py guided-control-center/index.html \
     guided-control-center/app.css guided-control-center/app.js ./
+RUN install -d -o 65532 -g 65532 -m 0700 /state
 
 USER 65532:65532
 EXPOSE 8000

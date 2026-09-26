@@ -8,6 +8,7 @@ import hmac
 import json
 import os
 import secrets
+import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 ROOT = Path(__file__).parent
+sys.path.insert(0, str(ROOT))
+from progress import ProgressStore
+
+PROGRESS = ProgressStore(os.getenv("GUIDED_PROGRESS_DATABASE", ":memory:"))
 P01_PATH = ROOT / "p01.json"
 if not P01_PATH.exists():
     P01_PATH = ROOT.parent / "guided-contracts/p01.json"
@@ -190,13 +195,26 @@ async def boundary_middleware(request: Request, call_next):
         response = JSONResponse(status_code=421, content={"detail": "host is not allowed"})
         security_headers(response)
         return response
-    response = await call_next(request)
     parts = request.url.path.strip("/").split("/")
+    attempt = None
+    if (request.method == "POST" and len(parts) == 4 and parts[:2] == ["api", "practice"]
+            and parts[2] in {f"P{number:02d}" for number in range(1, 23)}
+            and (parts[3] == "verify" or (parts[3] == "provision" and parts[2] in {"P02", "P03", "P04"}))):
+        try:
+            session = session_from_cookie(request.cookies.get("guided_session"))
+            require_csrf(request, request.headers.get("x-csrf-token"), session)
+            if not await request.body():
+                attempt = PROGRESS.begin(parts[2])
+        except HTTPException:
+            pass
+    response = await call_next(request)
     if (len(parts) == 4 and parts[:2] == ["api", "practice"]
             and parts[2] in {f"P{number:02d}" for number in range(1, 23)}
             and parts[3] == "verify" and response.status_code == 200):
         body = b"".join([chunk async for chunk in response.body_iterator])
         payload = practice_envelope(json.loads(body), parts[2])
+        if attempt:
+            PROGRESS.finish(parts[2], attempt, payload)
         headers = {key: value for key, value in response.headers.items()
                    if key.lower() != "content-length"}
         response = JSONResponse(content=payload, status_code=200, headers=headers,
@@ -252,6 +270,32 @@ def livez() -> dict[str, str]:
 @app.get("/readyz")
 def readyz() -> dict[str, str]:
     return {"status": "ready", "provider_check": "not-run"}
+
+
+@app.get("/api/progress")
+async def progress(session: tuple[str, dict] = Depends(require_session)) -> dict:
+    records = PROGRESS.history()
+    async with httpx.AsyncClient(timeout=3, follow_redirects=False, trust_env=False) as client:
+        async def inspect(record):
+            state = "recheck"
+            reason = "새 검증이나 준비를 시작했습니다. 다시 검증하세요."
+            if not record['needs_check']:
+                reason = "현재 실행본을 확인하지 못했습니다. 다시 검증하세요."
+                try:
+                    response = await client.get(
+                        f"{VERIFIER_URL}/v1/progress/{record['problem']}/build",
+                        headers={"Authorization": f"Bearer {VERIFIER_TOKEN}"})
+                    current = response.json().get('source_digest') if response.status_code == 200 else None
+                    if record['digest'] and current == record['digest']:
+                        state, reason = "completed", "통과한 코드와 현재 실행본이 같습니다."
+                    elif current and record['digest']:
+                        reason = "실행본이 바뀌었습니다. 현재 구현을 다시 검증하세요."
+                        PROGRESS.mark_changed(record['problem'], record['execution'])
+                except (httpx.HTTPError, ValueError, AttributeError):
+                    pass
+            return {**{key: record[key] for key in ('problem', 'execution', 'completed_at')},
+                    'state': state, 'reason': reason}
+        return {'scope': 'installation', 'records': await asyncio.gather(*(inspect(r) for r in records))}
 
 
 @app.get("/api/bootstrap")

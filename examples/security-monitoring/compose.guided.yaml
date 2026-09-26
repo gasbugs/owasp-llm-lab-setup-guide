@@ -41,7 +41,9 @@ services:
       args: {APP_VERSION: "${GUIDED_IMAGE_VERSION:-0.1.0}"}
     image: localhost/llm-security-guided-control-center:${GUIDED_IMAGE_VERSION:-0.1.0}
     container_name: llm-security-guided-control-center
+    volumes: [guided-control-progress:/state:rw]
     environment:
+      GUIDED_PROGRESS_DATABASE: /state/progress.sqlite3
       RELEASE_VERSION: ${GUIDED_IMAGE_VERSION:-0.1.0}
       GUIDED_SESSION_SECRET: ${GUIDED_SESSION_SECRET:?Set GUIDED_SESSION_SECRET}
       GUIDED_CONTROL_LAB01_TOKEN: ${GUIDED_CONTROL_LAB01_TOKEN:?Set GUIDED_CONTROL_LAB01_TOKEN}
@@ -1017,6 +1019,7 @@ networks:
   guided: {name: llm-security-guided}
 
 volumes:
+  guided-control-progress:
   guided-h03-receipts:
   guided-h04-receipts:
   guided-p12-context-state:

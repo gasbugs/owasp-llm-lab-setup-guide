@@ -39,9 +39,10 @@
   <div class="layout">
     <aside class="panel route-panel" aria-label="13개 실습 탭">
       <div class="panel-head"><p class="label">INSPECTION ROUTE</p><h2>실습 탭</h2>
-        <div class="practice-progress-heading"><label for="practice-progress">이번 접속의 완료 기록</label><strong id="practice-progress-count">0 / 22</strong></div>
+        <div class="practice-progress-heading"><label for="practice-progress">구현 완료</label><strong id="practice-progress-count">0 / 22</strong></div>
         <progress id="practice-progress" max="22" value="0">0 / 22</progress>
-        <p class="practice-progress-note">새로고침하면 표시가 초기화됩니다.</p>
+        <p id="progress-status" class="practice-progress-note">저장된 완료 기록을 확인합니다.</p>
+        <div id="practice-history" class="practice-progress-note" aria-live="polite"></div>
       </div>
       <nav id="tabs" class="tabs" role="tablist" aria-label="실습 선택"></nav>
     </aside>

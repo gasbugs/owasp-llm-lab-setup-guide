@@ -78,6 +78,7 @@ def main():
     parser.add_argument('--browser-python', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--no-cache', action='store_true', help='Rebuild project layers; existing base images may be reused')
+    parser.add_argument('--progress-restart', action='store_true', help='Check saved completion after Control Center restart')
     args = parser.parse_args()
     if args.output.exists():
         parser.error('output already exists; preserve previous evidence')
@@ -175,6 +176,25 @@ def main():
                 assert all(r['closed'] and r['source_digest'] == source_digest for r in records)
                 assert all(r['provider_mode'] == mode for r in receipts)
                 assert len({r['provider_request_id'] for r in receipts}) == 7
+            if args.progress_restart:
+                subprocess.run(['docker', 'restart', project + '-control-center'], check=True)
+                deadline = time.monotonic() + 30
+                while True:
+                    try:
+                        with opener.open(origin + '/', timeout=3) as index:
+                            assert index.status == 200
+                        saved_status, saved = request(opener, origin + '/api/progress')
+                        assert saved_status == 200
+                        break
+                    except (URLError, TimeoutError, AssertionError, json.JSONDecodeError):
+                        if time.monotonic() >= deadline:
+                            raise
+                        time.sleep(.5)
+                assert len(saved['records']) == (0 if args.starter else 1)
+                if not args.starter:
+                    assert saved['records'][0]['state'] == 'completed'
+                    assert saved['records'][0]['execution'] == response['execution_id']
+                proof['progress_after_control_restart'] = saved
             proof['verified'] = True
     finally:
         remaining = subprocess.check_output(['docker', 'ps', '-a', '--format', '{{.Names}}'], text=True).splitlines()

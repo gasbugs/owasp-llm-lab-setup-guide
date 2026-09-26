@@ -7,8 +7,10 @@ const tabNames = [
 ];
 const practiceGroups = ["P01", "P02·P03", "P04", "P05·P06", "P07·P08", "P09·P10", "P11·P12", "P13", "P14·P15", "P16", "P17·P18", "P19·P20", "P21·P22"].map(group => group.split("·"));
 const completedPractices = new Map();
+const recheckPractices = new Map();
 const celebratedPractices = new Set();
 let celebrationTimer = null;
+let progressRequest = 0;
 let csrfToken = "";
 let activeTab = 0;
 const rawResponses = new WeakMap();
@@ -124,12 +126,47 @@ function renderPracticeProgress() {
     tab.classList.toggle("is-complete", count === group.length);
     tab.classList.toggle("is-partial", count > 0 && count < group.length);
     tab.querySelector("span").textContent = count === group.length ? "✓" : String(index + 1).padStart(2, "0");
-    tab.querySelector("small").textContent = count ? group.map(id => `${id}${completedPractices.has(id) ? " ✓" : ""}`).join(" · ")
+    tab.querySelector("small").textContent = count || group.some(id => recheckPractices.has(id)) ? group.map(id => `${id}${completedPractices.has(id) ? " ✓" : recheckPractices.has(id) ? " ↻" : ""}`).join(" · ")
       : group.join("·") + " · 직접 작성";
-    tab.setAttribute("aria-label", `${tabNames[index]}, ${group.map(id => `${id} ${completedPractices.has(id) ? "완료" : "미완료"}`).join(", ")}`);
+    tab.setAttribute("aria-label", `${tabNames[index]}, ${group.map(id => `${id} ${completedPractices.has(id) ? "완료" : recheckPractices.has(id) ? "완료 기록 있음, 재검증 필요" : "미완료"}`).join(", ")}`);
   });
   setText("practice-progress-count", `${completedPractices.size} / 22`);
   byId("practice-progress").value = completedPractices.size;
+  const history = byId("practice-history");
+  history.replaceChildren();
+  for (const [problem, reason] of recheckPractices) {
+    const row = document.createElement("p");
+    row.textContent = `${problem} ↻ 재검증 필요 · ${reason}`;
+    history.append(row);
+  }
+}
+
+async function restorePracticeProgress() {
+  const revision = ++progressRequest;
+  try {
+    const response = await fetch("/api/progress");
+    if (!response.ok) throw new Error("progress unavailable");
+    const payload = await response.json();
+    if (revision !== progressRequest || executionPending) return;
+    completedPractices.clear();
+    recheckPractices.clear();
+    for (const record of payload.records || []) {
+      if (!practiceGroups.some(group => group.includes(record.problem))) continue;
+      celebratedPractices.add(record.problem);
+      if (record.state === "completed") completedPractices.set(record.problem, record.execution);
+      else recheckPractices.set(record.problem, record.reason);
+    }
+    renderPracticeProgress();
+    setText("progress-status", "이 실습 환경에 저장됩니다. ✓ 통과한 실행본 · ↻ 재검증 필요. PC 파일만 고친 상태는 Build·적용 후 확인합니다. 실행본 조회가 없는 문제도 완료 이력은 남지만 재검증이 필요합니다.");
+  } catch {
+    if (revision !== progressRequest || executionPending) return;
+    for (const problem of completedPractices.keys()) {
+      recheckPractices.set(problem, "현재 실행본을 확인하지 못했습니다.");
+    }
+    completedPractices.clear();
+    renderPracticeProgress();
+    setText("progress-status", "저장된 완료 기록을 불러오지 못했습니다. 기록이 삭제된 것은 아닙니다. 새로고침해 다시 확인하세요.");
+  }
 }
 
 function dismissCelebration() {
@@ -144,8 +181,8 @@ function celebratePractice(problem) {
   const allDone = completedPractices.size === 22;
   setText("completion-problem", allDone ? "22 / 22" : problem);
   setText("completion-title", allDone ? "22개 문제, 모두 해냈습니다." : `${problem}, 직접 완성했습니다.`);
-  setText("completion-message", allDone ? "이번 접속에서 모든 문제의 완료를 확인했습니다. 수고하셨습니다!"
-    : `직접 작성한 구현이 검증을 통과했습니다. 이번 접속에서 ${completedPractices.size}개 완료!`);
+  setText("completion-message", allDone ? "모든 문제의 완료를 확인했습니다. 수고하셨습니다!"
+    : `직접 작성한 구현이 검증을 통과했습니다. ${completedPractices.size}개 완료!`);
   byId("completion-toast").hidden = false;
   if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     for (let index = 0; index < 18; index++) {
@@ -163,6 +200,7 @@ function recordPracticeCompletion(payload, problem) {
   const summary = verificationSummary(payload);
   if (!payload.client_error && summary?.problem === problem && summary.completed === "완료") {
     completedPractices.set(problem, summary.execution);
+    recheckPractices.delete(problem);
     renderPracticeProgress();
     if (!celebratedPractices.has(problem)) {
       celebratedPractices.add(problem);
@@ -237,7 +275,24 @@ function renderOfficialUis(items) {
     const boundary = document.createElement("small");
     boundary.textContent = item.boundary;
     link.append(status, name, boundary);
-    nav.append(link);
+    if (item.id === "grafana" || item.id === "p20-grafana") {
+      const card = document.createElement("div");
+      card.className = "official-card";
+      const help = document.createElement("details");
+      help.className = "login-help";
+      const summary = document.createElement("summary");
+      summary.textContent = "로그인 방법";
+      const user = document.createElement("p");
+      const p20 = item.id === "p20-grafana";
+      user.textContent = `아이디: ${p20 ? "p20-reader (조회 전용)" : "admin"}. 실행에 사용한 setup 폴더에서 아래 명령으로 비밀번호를 확인하세요.`;
+      const command = document.createElement("pre");
+      command.textContent = `grep '^${p20 ? "GUIDED_P20_GRAFANA_PASSWORD" : "GUIDED_GRAFANA_PASSWORD"}=' llm-security-control-plane/.state/guided-course.env`;
+      const note = document.createElement("p");
+      note.textContent = "출력의 = 뒤가 비밀번호입니다. 환경 파일을 다시 만들지 말고 기존 값을 사용하세요. 비밀번호는 이 화면으로 전송하지 않습니다.";
+      help.append(summary, user, command, note);
+      card.append(link, help);
+      nav.append(card);
+    } else nav.append(link);
   });
 }
 
@@ -640,6 +695,7 @@ function renderError(error) {
 
 async function execute(path, body) {
   if (executionPending) return;
+  progressRequest++;
   dismissCelebration();
   setBusy(true);
   const started = Date.now();
@@ -654,6 +710,7 @@ async function execute(path, body) {
   const problem = path.match(/^\/api\/practice\/(P\d{2})\/verify$/)?.[1];
   const affectedProblem = path.match(/^\/api\/practice\/(P\d{2})\/(?:verify|provision)$/)?.[1];
   if (affectedProblem) {
+    if (completedPractices.has(affectedProblem)) recheckPractices.set(affectedProblem, "새 검증이나 준비를 시작했습니다.");
     completedPractices.delete(affectedProblem);
     renderPracticeProgress();
   }
@@ -692,6 +749,7 @@ async function bootstrap() {
   csrfToken = payload.csrf_token;
   renderOfficialUis(payload.official_uis);
   selectTab(0);
+  await restorePracticeProgress();
 }
 
 byId("completion-dismiss").addEventListener("click", dismissCelebration);
@@ -729,6 +787,9 @@ document.querySelectorAll(".theme-choice").forEach((choice) => {
 });
 themePreference.addEventListener("change", () => {
   if (document.documentElement.dataset.themeMode === "system") applyTheme("system");
+});
+window.addEventListener("focus", () => {
+  if (csrfToken && !executionPending) restorePracticeProgress();
 });
 
 applyTheme(readThemeMode());

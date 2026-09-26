@@ -549,6 +549,38 @@ def reserve_provider_evidence_batch(reservations: list[tuple[str, str]]) -> bool
 app = FastAPI(title="Tenant 03 Evidence Verifier", docs_url=None, redoc_url=None)
 
 
+@app.get("/v1/progress/{problem}/build")
+def progress_build(problem: str, _authorized: None = Depends(require_control)) -> dict:
+    """Read the existing runtime identity, not a new grade or learner source."""
+    if problem not in {f"P{n:02d}" for n in range(1, 23)}:
+        raise HTTPException(404, "unknown practice")
+    number = int(problem[1:])
+    if number <= 12:
+        url = LAB_URL if number == 1 else globals()[f"LAB{number:02d}_URL"]
+        token = LAB_TOKEN if number == 1 else globals()[f"LAB{number:02d}_TOKEN"]
+        path = '/v1/build-info'
+    elif 17 <= number <= 20:
+        url, token = globals()[f'H{number}_URL'], globals()[f'H{number}_TOKEN']
+        path = '/v1/buildinfo' if number == 20 else f'/v1/h{number}/build-info'
+    else:
+        return {'problem': problem, 'source_digest': None}
+    try:
+        with httpx.Client(timeout=2, follow_redirects=False, trust_env=False) as client:
+            with client.stream('GET', url + path, headers={'Authorization': f'Bearer {token}'}) as response:
+                response.raise_for_status()
+                content = bytearray()
+                for chunk in response.iter_bytes():
+                    content.extend(chunk)
+                    if len(content) > 262144:
+                        raise ValueError('oversized build identity')
+        digest = json.loads(content).get('source_digest')
+        if not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest):
+            raise ValueError('missing build identity')
+        return {'problem': problem, 'source_digest': digest}
+    except (httpx.HTTPError, ValueError, AttributeError):
+        return {'problem': problem, 'source_digest': None}
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error(request, error):
     if request.url.path in {"/v1/verify/p03", "/v1/verify/p04"}:

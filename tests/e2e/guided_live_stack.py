@@ -68,13 +68,17 @@ class LiveStack:
             if role == 'control-center':
                 env = self.required_env(role)
                 env.update(GUIDED_CONTROL_VERIFIER_TOKEN='publisher-test-control',
+                           GUIDED_PROGRESS_DATABASE='/state/progress.sqlite3',
                            GUIDED_VERIFIER_URL='http://verifier:8000',
                            GUIDED_ALLOWED_HOSTS=f'127.0.0.1:{port}', GUIDED_ALLOWED_ORIGINS=origin)
                 for activity, url in self.activities.items():
                     env['GUIDED_CONTROL_' + activity + '_TOKEN'] = 'publisher-test-control'
                     env['GUIDED_' + activity + '_URL'] = url
                 env.update(extra_env or {})
-                extra = ['--network-alias', 'guided-control-center']
+                volume = self.project + '-progress'
+                subprocess.run(['docker', 'volume', 'create', volume], check=True)
+                self.cleanup.callback(subprocess.run, ['docker', 'volume', 'rm', volume], check=True)
+                extra = ['--network-alias', 'guided-control-center', '-v', volume + ':/state:rw']
             else:
                 env = {}
                 # Only the proxy joins a non-internal network for loopback publishing.
