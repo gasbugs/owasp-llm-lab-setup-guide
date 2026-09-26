@@ -8,6 +8,42 @@ const source = fs.readFileSync(path.join(__dirname, "../../llm-security-control-
 const context = {};
 const learning = {};
 vm.runInNewContext(source.slice(source.indexOf('function verificationSummary('), source.indexOf('function renderLearningSupport(')), learning);
+function completionHarness() {
+  const celebrated = [];
+  const ctx = {practiceGroups: [['P01'], ['P02', 'P03']], completedPractices: new Map(), celebratedPractices: new Set(),
+    verificationSummary: learning.verificationSummary, renderPracticeProgress: () => {},
+    celebratePractice: id => celebrated.push(id)};
+  vm.runInNewContext(source.slice(source.indexOf('function recordPracticeCompletion('), source.indexOf('function selectTab(')), ctx);
+  return {ctx, celebrated};
+}
+
+test('completion celebration needs the requested problem and a verified completed result', () => {
+  const {ctx, celebrated} = completionHarness();
+  const sample = {activity_id: 'P01', execution_id: 'a', verified_by: 'verifier', task_completed: true, course_verdict: 'PASS'};
+  for (const change of [{resource_ready: true}, {verified_by: ''}, {execution_id: ''}, {task_completed: false},
+                        {course_verdict: 'ERR'}, {client_error: true}, {activity_id: 'P02'}]) {
+    ctx.recordPracticeCompletion({...sample, ...change}, 'P01');
+    assert.equal(ctx.completedPractices.size, 0);
+  }
+  ctx.recordPracticeCompletion(sample, 'P99');
+  assert.equal(celebrated.length, 0);
+  ctx.recordPracticeCompletion(sample, 'P01');
+  assert.deepEqual(celebrated, ['P01']);
+  assert.equal(ctx.completedPractices.get('P01'), 'a');
+});
+
+test('repeat verification does not replay celebration and an incomplete result removes its own mark', () => {
+  const {ctx, celebrated} = completionHarness();
+  const sample = {activity_id: 'P01', execution_id: 'a', verified_by: 'verifier', task_completed: true, course_verdict: 'PASS'};
+  ctx.recordPracticeCompletion(sample, 'P01');
+  ctx.recordPracticeCompletion({...sample, execution_id: 'b'}, 'P01');
+  ctx.recordPracticeCompletion({...sample, activity_id: 'P02', course_verdict: 'HIT'}, 'P02');
+  assert.deepEqual(celebrated, ['P01', 'P02']);
+  ctx.recordPracticeCompletion({...sample, task_completed: false, course_verdict: 'ERR'}, 'P01');
+  assert.equal(ctx.completedPractices.has('P01'), false);
+  assert.equal(ctx.completedPractices.has('P02'), true);
+});
+
 test('comparison requires a graded execution and never includes response text', () => {
   const sample = {activity_id: 'P01', execution_id: 'a', verified_by: 'verifier', task_completed: true, course_verdict: 'PASS', prompt: 'private'};
   assert.equal(learning.verificationSummary({...sample, execution_id: undefined}), null);

@@ -38,6 +38,15 @@ def main():
             assert result['security_verdict'] == ('PASS' if complete else 'ERR')
             label = 'P01 과제: ' + ('완료' if complete else '미완료')
             page.wait_for_function('(label) => document.querySelector("#task-completion").textContent === label', arg=label)
+            page.wait_for_function('executionPending === false')
+            assert page.locator('#practice-progress-count').inner_text() == ('1 / 22' if complete else '0 / 22')
+            assert ('is-complete' in page.locator('#practice-tab-0').get_attribute('class')) is complete
+            if complete:
+                page.locator('#completion-toast').wait_for(state='visible')
+                assert 'P01' in page.locator('#completion-title').inner_text()
+                page.screenshot(path=str(args.output.with_suffix('.completion.png')))
+            else:
+                assert page.locator('#completion-toast').is_hidden()
             rendered = json.loads(page.locator('#raw').inner_text())
             # Error rendering adds a next-check default but must preserve every
             # server-provided field; successful evidence is byte-value complete.
@@ -84,7 +93,8 @@ def main():
             assert errors == []
             args.output.write_text(json.dumps({'http_status': response.status, 'response': body,
                 'submitted_verdict_status': rejected, 'page_errors': errors, 'viewports': [1440, 390],
-                'keyboard_mobile_tooltip': True, 'system_manual_theme': True}, ensure_ascii=False, indent=2))
+                'keyboard_mobile_tooltip': True, 'system_manual_theme': True,
+                'completion_celebration_matches_verified_result': True}, ensure_ascii=False, indent=2))
             print(json.dumps({'task_completed': complete, 'source_digest': args.source_digest}), flush=True)
         finally:
             browser.close()

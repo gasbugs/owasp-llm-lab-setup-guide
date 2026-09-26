@@ -111,6 +111,66 @@ def main():
                 page.evaluate('renderLearningSupport({course_verdict:"ERR"}, "P01")')
                 assert page.locator('#comparison-rows').inner_text() == ''
                 assert '이전 완료는 이번 결과를 대신하지 않습니다' in page.locator('#comparison-note').inner_text()
+                # Intercepted display fixtures, never real grading or cloud requests.
+                completed = {'activity_id': 'P02', 'execution_id': 'display-complete-1',
+                             'verified_by': 'display-fixture', 'task_completed': True,
+                             'course_verdict': 'PASS', 'stage_calls': [], 'result': {}}
+                def completion_response(route):
+                    route.fulfill(status=200, content_type='application/json', body=json.dumps(completed))
+                page.route('**/api/practice/*/verify', completion_response)
+                page.locator('.tab[data-tab-index="1"]').click()
+                page.locator('#h02-verify').click()
+                page.wait_for_function('executionPending === false')
+                page.locator('#completion-toast').wait_for(state='visible')
+                assert page.locator('#practice-progress-count').inner_text() == '1 / 22'
+                assert 'is-partial' in page.locator('#practice-tab-1').get_attribute('class')
+                assert 'P02 완료, P03 미완료' in page.locator('#practice-tab-1').get_attribute('aria-label')
+                assert page.locator('#completion-toast').evaluate('el => !el.contains(document.activeElement)')
+                assert page.locator('#completion-confetti i').count() == 18
+                for width in (1440, 390, 320):
+                    page.set_viewport_size({'width': width, 'height': 900})
+                    for theme in ('light', 'dark'):
+                        page.evaluate('(theme) => applyTheme(theme)', theme)
+                        box = page.locator('#completion-toast').bounding_box()
+                        assert box and box['x'] >= 0 and box['x'] + box['width'] <= width
+                        assert box['y'] >= 0 and box['y'] + box['height'] <= 900
+                        page.screenshot(path=str(args.output.with_suffix(f'.completion-{width}-{theme}.png')))
+                page.locator('#completion-dismiss').click()
+                page.locator('#completion-toast').wait_for(state='hidden')
+                page.locator('#h02-verify').click()
+                page.wait_for_function('executionPending === false')
+                assert page.locator('#completion-toast').is_hidden()
+                page.route('**/api/practice/P02/provision', lambda route: route.fulfill(
+                    status=200, content_type='application/json', body=json.dumps({
+                        'activity_id': 'P02', 'resource_ready': True, 'task_completed': False,
+                        'course_verdict': 'PASS', 'result': {}})))
+                page.locator('#h02-provision').click()
+                page.wait_for_function('executionPending === false')
+                assert page.locator('#practice-progress-count').inner_text() == '0 / 22'
+                assert page.locator('#completion-toast').is_hidden()
+                page.locator('#h02-verify').click()
+                page.wait_for_function('executionPending === false')
+                assert page.locator('#practice-progress-count').inner_text() == '1 / 22'
+                assert page.locator('#completion-toast').is_hidden()
+                page.emulate_media(reduced_motion='reduce')
+                completed.update(activity_id='P03', execution_id='display-complete-2')
+                page.locator('#h03-verify').click()
+                page.wait_for_function('executionPending === false')
+                assert 'is-complete' in page.locator('#practice-tab-1').get_attribute('class')
+                assert page.locator('#practice-progress-count').inner_text() == '2 / 22'
+                assert page.locator('#completion-confetti i').count() == 0
+                page.keyboard.press('Escape')
+                assert page.locator('#completion-toast').is_hidden()
+                completed.update(task_completed=False, course_verdict='ERR', execution_id='display-incomplete')
+                page.locator('#h03-verify').click()
+                page.wait_for_function('executionPending === false')
+                assert page.locator('#practice-progress-count').inner_text() == '1 / 22'
+                assert 'is-partial' in page.locator('#practice-tab-1').get_attribute('class')
+                assert page.locator('#completion-toast').is_hidden()
+                page.reload(wait_until='networkidle')
+                assert page.locator('#practice-progress-count').inner_text() == '0 / 22'
+                assert page.locator('#completion-toast').is_hidden()
+                page.emulate_media(reduced_motion='no-preference')
                 tooltip_checks = 0
                 for width in (1440, 1280, 1024, 800, 760, 390, 320):
                     page.set_viewport_size({"width": width, "height": 1000})
@@ -168,6 +228,8 @@ def main():
                     "tabs_checked": evidence, "tooltip_checks": tooltip_checks,
                     "keyboard_and_accessibility_tree": True, "isolated_result_comparison": True,
                     "tooltip_clipping_ancestors_checked": True,
+                    "completion_display_fixtures": True,
+                    "completion_grouping_repeat_failure_reload_and_reduced_motion": True,
                     "pending_without_invented_stages": True, "duplicate_request_blocked": True,
                     "reload_does_not_restore_completion": True,
                     "touch_help_actions": 0, "touch_button_intercepted_actions": len(touch_posts),

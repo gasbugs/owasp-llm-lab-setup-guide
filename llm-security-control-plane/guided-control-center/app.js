@@ -5,6 +5,10 @@ const tabNames = [
   "입력 안전", "개인정보·출력", "RAG 경계", "Promptfoo 회귀",
   "Garak·PyRIT", "정책 승격", "원시 관측", "사고·경보", "Gateway·Agent"
 ];
+const practiceGroups = ["P01", "P02·P03", "P04", "P05·P06", "P07·P08", "P09·P10", "P11·P12", "P13", "P14·P15", "P16", "P17·P18", "P19·P20", "P21·P22"].map(group => group.split("·"));
+const completedPractices = new Map();
+const celebratedPractices = new Set();
+let celebrationTimer = null;
 let csrfToken = "";
 let activeTab = 0;
 const rawResponses = new WeakMap();
@@ -105,7 +109,7 @@ function renderTabs() {
     const strong = document.createElement("strong");
     strong.textContent = name;
     const small = document.createElement("small");
-    small.textContent = ["P01","P02·P03","P04","P05·P06","P07·P08","P09·P10","P11·P12","P13","P14·P15","P16","P17·P18","P19·P20","P21·P22"][index] + " · 직접 작성";
+    small.textContent = practiceGroups[index].join("·") + " · 직접 작성";
     copy.append(strong, small);
     button.append(number, copy);
     if (implemented) button.addEventListener("click", () => selectTab(index));
@@ -113,8 +117,66 @@ function renderTabs() {
   });
 }
 
+function renderPracticeProgress() {
+  document.querySelectorAll(".tab").forEach((tab, index) => {
+    const group = practiceGroups[index];
+    const count = group.filter(id => completedPractices.has(id)).length;
+    tab.classList.toggle("is-complete", count === group.length);
+    tab.classList.toggle("is-partial", count > 0 && count < group.length);
+    tab.querySelector("span").textContent = count === group.length ? "✓" : String(index + 1).padStart(2, "0");
+    tab.querySelector("small").textContent = count ? group.map(id => `${id}${completedPractices.has(id) ? " ✓" : ""}`).join(" · ")
+      : group.join("·") + " · 직접 작성";
+    tab.setAttribute("aria-label", `${tabNames[index]}, ${group.map(id => `${id} ${completedPractices.has(id) ? "완료" : "미완료"}`).join(", ")}`);
+  });
+  setText("practice-progress-count", `${completedPractices.size} / 22`);
+  byId("practice-progress").value = completedPractices.size;
+}
+
+function dismissCelebration() {
+  clearTimeout(celebrationTimer);
+  celebrationTimer = null;
+  byId("completion-toast").hidden = true;
+  byId("completion-confetti").replaceChildren();
+}
+
+function celebratePractice(problem) {
+  dismissCelebration();
+  const allDone = completedPractices.size === 22;
+  setText("completion-problem", allDone ? "22 / 22" : problem);
+  setText("completion-title", allDone ? "22개 문제, 모두 해냈습니다." : `${problem}, 직접 완성했습니다.`);
+  setText("completion-message", allDone ? "이번 접속에서 모든 문제의 완료를 확인했습니다. 수고하셨습니다!"
+    : `직접 작성한 구현이 검증을 통과했습니다. 이번 접속에서 ${completedPractices.size}개 완료!`);
+  byId("completion-toast").hidden = false;
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    for (let index = 0; index < 18; index++) {
+      const piece = document.createElement("i");
+      piece.style.setProperty("--piece", index);
+      piece.style.setProperty("--drift", `${(index % 2 ? 1 : -1) * (30 + index * 7)}px`);
+      byId("completion-confetti").append(piece);
+    }
+  }
+  celebrationTimer = setTimeout(dismissCelebration, 6500);
+}
+
+function recordPracticeCompletion(payload, problem) {
+  if (!practiceGroups.some(group => group.includes(problem))) return;
+  const summary = verificationSummary(payload);
+  if (!payload.client_error && summary?.problem === problem && summary.completed === "완료") {
+    completedPractices.set(problem, summary.execution);
+    renderPracticeProgress();
+    if (!celebratedPractices.has(problem)) {
+      celebratedPractices.add(problem);
+      celebratePractice(problem);
+    }
+  } else {
+    completedPractices.delete(problem);
+    renderPracticeProgress();
+  }
+}
+
 function selectTab(index) {
   closeActionTips();
+  dismissCelebration();
   activeTab = index;
   document.querySelectorAll(".tab").forEach((tab) => {
     const selected = Number(tab.dataset.tabIndex) === index;
@@ -578,6 +640,7 @@ function renderError(error) {
 
 async function execute(path, body) {
   if (executionPending) return;
+  dismissCelebration();
   setBusy(true);
   const started = Date.now();
   setText("request-status", "요청을 보냈습니다. 서버 응답을 기다립니다. 다시 누르지 않아도 됩니다.");
@@ -589,6 +652,11 @@ async function execute(path, body) {
   byId("comparison").hidden = true;
   byId("failure-help").hidden = true;
   const problem = path.match(/^\/api\/practice\/(P\d{2})\/verify$/)?.[1];
+  const affectedProblem = path.match(/^\/api\/practice\/(P\d{2})\/(?:verify|provision)$/)?.[1];
+  if (affectedProblem) {
+    completedPractices.delete(affectedProblem);
+    renderPracticeProgress();
+  }
   byId("verdict").className = "verdict empty";
   byId("verdict").querySelector("strong").textContent = "—";
   byId("verdict").querySelector("span").textContent = "응답 대기";
@@ -598,7 +666,10 @@ async function execute(path, body) {
     const payload = await request(path, body);
     renderEnvelope(payload);
     setText("request-status", "응답을 받았습니다. 준비 결과와 과제 완료·보안 판정은 아래 기록에서 구분해 확인하세요.");
-    if (problem) renderLearningSupport(payload, problem);
+    if (problem) {
+      renderLearningSupport(payload, problem);
+      recordPracticeCompletion(payload, problem);
+    }
   } catch (error) {
     renderError(error);
     setText("request-status", "응답 오류로 결과를 확정하지 못했습니다. 원시 오류를 확인하세요. 서버 작업이 끝났는지는 별도로 확인해야 합니다.");
@@ -613,6 +684,7 @@ async function execute(path, body) {
 
 async function bootstrap() {
   renderTabs();
+  renderPracticeProgress();
   bindActionTips();
   const response = await fetch("/api/bootstrap");
   if (!response.ok) throw new Error("세션을 시작하지 못했습니다.");
@@ -621,6 +693,11 @@ async function bootstrap() {
   renderOfficialUis(payload.official_uis);
   selectTab(0);
 }
+
+byId("completion-dismiss").addEventListener("click", dismissCelebration);
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") dismissCelebration();
+});
 
 byId("preflight").addEventListener("click", () => execute("/api/provider-preflight"));
 byId("verify").addEventListener("click", () => execute("/api/practice/P01/verify"));
