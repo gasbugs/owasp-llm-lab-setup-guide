@@ -11,6 +11,8 @@ import re
 import time
 from uuid import UUID
 
+from botocore.exceptions import ConnectionClosedError
+
 from p03_backend import Binding
 from p03_ledger import LedgerError
 from p03_resource_contract import require, template
@@ -53,7 +55,10 @@ def prepare_document(specification, connection, operation_id, *, s3, agent,
         key = t["source_prefix"] + "current-policy.md"
 
         def listed():
-            result = call(s3.list_objects_v2, **source, Prefix=t["source_prefix"], MaxKeys=2)
+            try:
+                result = call(s3.list_objects_v2, **source, Prefix=t["source_prefix"], MaxKeys=2)
+            except ConnectionClosedError:
+                result = call(s3.list_objects_v2, **source, Prefix=t["source_prefix"], MaxKeys=2)
             require(result.get("IsTruncated") is False and "NextContinuationToken" not in result)
             rows = result.get("Contents", [])
             require(isinstance(rows, list) and len(rows) <= 1)

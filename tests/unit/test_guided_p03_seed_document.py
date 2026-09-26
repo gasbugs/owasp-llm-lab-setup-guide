@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ConnectionClosedError
 from botocore.session import Session
 from botocore.validate import validate_parameters
 
@@ -128,6 +128,58 @@ class DocumentTests(unittest.TestCase):
         self.prepare()
         self.assertEqual(self.agent.start_ingestion_job.call_count, 1)
         self.sleep.assert_called_once_with(2)
+
+    def test_closed_final_listing_retried_once_without_repeating_ingestion(self):
+        self.s3.list_objects_v2.side_effect = [
+            self.response(self.listing), ConnectionClosedError(endpoint_url="https://s3.test"),
+            self.response(self.listing)]
+        result = self.prepare()
+        self.assertEqual(result["evidence"]["status"], "COMPLETE")
+        self.assertEqual(self.s3.list_objects_v2.call_count, 3)
+        self.assertEqual(self.agent.start_ingestion_job.call_count, 1)
+        self.s3.put_object.assert_not_called()
+        self.sleep.assert_not_called()
+
+    def test_repeated_closed_listing_stays_error(self):
+        self.s3.list_objects_v2.side_effect = ConnectionClosedError(endpoint_url="https://s3.test")
+        with self.assertRaises(module.LedgerError):
+            self.prepare()
+        self.assertEqual(self.s3.list_objects_v2.call_count, 2)
+        self.agent.start_ingestion_job.assert_not_called()
+
+    def test_closed_listing_does_not_retry_past_deadline(self):
+        clock = [0]
+        def disconnected(**kwargs):
+            clock[0] = 181
+            raise ConnectionClosedError(endpoint_url="https://s3.test")
+        self.s3.list_objects_v2.side_effect = disconnected
+        with self.assertRaises(module.LedgerError):
+            module.prepare_document(self.t, self.connection, self.operation,
+                                    s3=self.s3, agent=self.agent, monotonic=lambda: clock[0])
+        self.assertEqual(self.s3.list_objects_v2.call_count, 1)
+        self.agent.start_ingestion_job.assert_not_called()
+
+    def test_access_denied_listing_not_retried(self):
+        self.s3.list_objects_v2.side_effect = ClientError({"Error": {"Code": "AccessDenied"}}, "ListObjectsV2")
+        with self.assertRaises(module.LedgerError):
+            self.prepare()
+        self.assertEqual(self.s3.list_objects_v2.call_count, 1)
+        self.agent.start_ingestion_job.assert_not_called()
+
+    def test_connection_closed_on_write_not_retried(self):
+        self.s3.list_objects_v2.side_effect = [self.response({"IsTruncated": False})]
+        self.s3.put_object.side_effect = ConnectionClosedError(endpoint_url="https://s3.test")
+        with self.assertRaises(module.LedgerError):
+            self.prepare()
+        self.assertEqual(self.s3.put_object.call_count, 1)
+        self.agent.start_ingestion_job.assert_not_called()
+
+    def test_connection_closed_on_start_ingestion_not_retried(self):
+        self.agent.start_ingestion_job.side_effect = ConnectionClosedError(endpoint_url="https://agent.test")
+        with self.assertRaises(module.LedgerError):
+            self.prepare()
+        self.assertEqual(self.agent.start_ingestion_job.call_count, 1)
+        self.agent.get_ingestion_job.assert_not_called()
 
     def test_pending_is_bounded(self):
         self.job["status"] = "IN_PROGRESS"
