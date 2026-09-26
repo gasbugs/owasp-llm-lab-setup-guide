@@ -96,6 +96,7 @@ def main():
                     assert trigger.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is False
                     trigger.press('Escape')
                     assert trigger.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is True
+                    trigger.evaluate("(button) => button.blur()")
                     page.screenshot(path=str(args.output.with_suffix(f'.{width}.png')))
                 page.locator('[data-theme-choice="light"]').click()
                 assert page.locator('html').get_attribute('data-theme') == 'light'

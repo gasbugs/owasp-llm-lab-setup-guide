@@ -71,6 +71,7 @@ async function main() {
       assert.equal(await page.locator('[aria-describedby="h18-help"]').evaluate(el => el.closest(".action-control").classList.contains("tip-dismissed")), false);
       await page.locator('[aria-describedby="h18-help"]').press('Escape');
       assert.equal(await page.locator('[aria-describedby="h18-help"]').evaluate(el => el.closest(".action-control").classList.contains("tip-dismissed")), true);
+      await page.locator('[aria-describedby="h18-help"]').evaluate(el => el.blur());
     }
     await page.locator('[data-theme-choice="light"]').click();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');

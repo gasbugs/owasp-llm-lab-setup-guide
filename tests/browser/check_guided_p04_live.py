@@ -80,6 +80,7 @@ def main():
                     assert button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is False
                     button.press('Escape')
                     assert button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is True
+                    button.evaluate("(button) => button.blur()")
                 page.locator('#h04-code-title').scroll_into_view_if_needed()
                 page.screenshot(path=str(args.output.with_suffix(f'.{width}.png')))
             for theme in ('light', 'dark'):

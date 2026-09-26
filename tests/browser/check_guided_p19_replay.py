@@ -96,6 +96,7 @@ def main():
                     assert help_button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is False
                     help_button.press('Escape')
                     assert help_button.evaluate("(button) => button.closest('.action-control').classList.contains('tip-dismissed')") is True
+                    help_button.evaluate("(button) => button.blur()")
                 page.locator('[data-theme-choice="light"]').click()
                 assert page.locator('html').get_attribute('data-theme') == 'light'
                 page.locator('#h19-work').scroll_into_view_if_needed()
