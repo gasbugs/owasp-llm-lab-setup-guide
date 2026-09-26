@@ -112,7 +112,7 @@ def main():
                 assert page.locator('#comparison-rows').inner_text() == ''
                 assert '이전 완료는 이번 결과를 대신하지 않습니다' in page.locator('#comparison-note').inner_text()
                 tooltip_checks = 0
-                for width in (1440, 760, 390, 320):
+                for width in (1440, 1280, 1024, 800, 760, 390, 320):
                     page.set_viewport_size({"width": width, "height": 1000})
                     for index in range(13):
                         page.locator(f'.tab[data-tab-index="{index}"]').click()
@@ -127,6 +127,20 @@ def main():
                             tooltip.wait_for(state="visible")
                             box = tooltip.bounding_box()
                             assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, (width, index, box)
+                            # A viewport-contained tooltip can still be clipped by the workbench.
+                            clipped = tooltip.evaluate('''el => {
+                                const box = el.getBoundingClientRect(), clipped = [];
+                                for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+                                    const style = getComputedStyle(parent), edge = parent.getBoundingClientRect();
+                                    const clips = value => /^(hidden|clip|auto|scroll)$/.test(value);
+                                    if ((clips(style.overflowX) && (box.left < edge.left - 1 || box.right > edge.right + 1)) ||
+                                        (clips(style.overflowY) && (box.top < edge.top - 1 || box.bottom > edge.bottom + 1))) {
+                                        clipped.push(parent.id || parent.className);
+                                    }
+                                }
+                                return clipped;
+                            }''')
+                            assert not clipped, (width, help_button.get_attribute("id"), clipped)
                             tooltip_checks += 1
                             help_button.press("Escape")
                             tooltip.wait_for(state="visible" if width <= 760 else "hidden")
@@ -153,6 +167,7 @@ def main():
                 args.output.write_text(json.dumps({"scope": "problem surface rendering only; no grading or AWS",
                     "tabs_checked": evidence, "tooltip_checks": tooltip_checks,
                     "keyboard_and_accessibility_tree": True, "isolated_result_comparison": True,
+                    "tooltip_clipping_ancestors_checked": True,
                     "pending_without_invented_stages": True, "duplicate_request_blocked": True,
                     "reload_does_not_restore_completion": True,
                     "touch_help_actions": 0, "touch_button_intercepted_actions": len(touch_posts),

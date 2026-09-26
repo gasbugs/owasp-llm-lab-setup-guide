@@ -95,7 +95,8 @@ textarea { min-height: 112px; resize: vertical; }
 .action-control { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .action-control > .primary, .action-control > .secondary { width: 100%; min-width: 0; }
 .action-tooltip { position: absolute; z-index: 30; left: 0; bottom: calc(100% + 9px); width: min(420px, calc(100vw - 44px)); padding: 11px 12px; color: var(--ink); border: 1px solid var(--line-strong); background: var(--paper); box-shadow: var(--shadow); font-size: 12px; line-height: 1.55; opacity: 0; visibility: hidden; transform: translateY(5px); transition: opacity .14s ease, transform .14s ease, visibility .14s ease; pointer-events: none; }
-.actions:not(.single) > .action-control:last-child .action-tooltip { right: 0; left: auto; }
+.actions:not(.single) > .action-control:last-child .action-tooltip,
+.chat-compose > .action-control .action-tooltip { right: 0; left: auto; }
 .action-tooltip::after { content: ""; position: absolute; right: 12px; top: 100%; border: 7px solid transparent; border-top-color: var(--line-strong); }
 .action-control:not(.tip-dismissed):hover .action-tooltip, .action-control:not(.tip-dismissed):focus-within .action-tooltip { opacity: 1; visibility: visible; transform: translateY(0); }
 .primary { color: var(--on-accent); border-color: var(--blue-action); background: var(--blue-action); }
