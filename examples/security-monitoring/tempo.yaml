@@ -12,6 +12,7 @@ distributor:
           endpoint: 0.0.0.0:4318
 
 metrics_generator:
+  metrics_ingestion_time_range_slack: 10m
   registry:
     collection_interval: 5s
     external_labels:

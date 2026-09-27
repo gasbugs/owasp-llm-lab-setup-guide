@@ -11,5 +11,5 @@ services:
       BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?E2E Bedrock token is required}
     volumes:
       - ${FAKE_BEDROCK_GATEWAY_PATH:?E2E fake Bedrock path is required}:/app/fake_bedrock_gateway.py:ro
-    networks: [observability]
+    networks: [default]
     security_opt: [no-new-privileges]

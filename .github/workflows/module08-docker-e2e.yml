@@ -7,6 +7,8 @@ on:
     paths:
       - "llm-security-control-plane/**"
       - "examples/security-monitoring/**"
+      - "examples/day6/pyrit-guardrail/**"
+      - "tests/unit/test_pyrit_report.py"
       - "tests/browser/**"
       - "tests/e2e/run_guided_h05_learner_fix.py"
       - "tests/e2e/run_guided_h06_learner_fix.py"

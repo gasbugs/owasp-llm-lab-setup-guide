@@ -55,12 +55,17 @@ async def main() -> None:
             "read_context", {"trace_id": trace_id, "owner": principal, "payload_bytes": 8}
         )
         loop_calls = 0
-        for _ in range(MAX_TOOL_CALLS):
+        loop_decisions = []
+        for attempt in range(1, 4):
+            if loop_calls >= MAX_TOOL_CALLS:
+                loop_decisions.append({"attempt": attempt, "tool_called": False, "reason": "tool-call-budget"})
+                continue
             await client.call_tool(
                 "read_context", {"trace_id": trace_id, "owner": principal, "payload_bytes": 8}
             )
             loop_calls += 1
-        loop_blocked = loop_calls == MAX_TOOL_CALLS
+            loop_decisions.append({"attempt": attempt, "tool_called": True, "reason": None})
+        loop_blocked = not loop_decisions[2]["tool_called"]
         oversized = await client.call_tool(
             "read_context", {"trace_id": trace_id, "owner": principal, "payload_bytes": 128}
         )
@@ -85,7 +90,7 @@ async def main() -> None:
             "protocol_version": client.protocol_version,
             "trace_id": trace_id,
             "normal": {"is_error": bool(normal.is_error), "context_forwarded": True},
-            "tool_loop": {"requested": 3, "executed": loop_calls, "third_call_blocked": loop_blocked},
+            "tool_loop": {"requested": len(loop_decisions), "executed": loop_calls, "third_call_blocked": loop_blocked, "decisions": loop_decisions},
             "oversized_result": {"result_bytes": oversized_bytes, "limit": MAX_RESULT_BYTES, "context_forwarded": oversized_forwarded},
             "tool_timeout": {"limit_ms": 50, "blocked": timeout_blocked, "retried": False},
             "foreign_state": {"owner": foreign_owner, "tool_called": foreign_called, "reason": "state-owner-mismatch"},

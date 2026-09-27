@@ -13,6 +13,9 @@ trap cleanup EXIT
 
 docker build -f "$ROOT/examples/day6/pyrit-guardrail/Containerfile" \
   -t localhost/module08-pyrit:1.0.1 "$ROOT/examples/day6/pyrit-guardrail"
+docker run --rm --network none -v "$ROOT:/repo:ro" -w /repo \
+  --entrypoint python localhost/module08-pyrit:1.0.1 \
+  -m unittest discover -s tests/unit -p test_pyrit_report.py -v
 docker network create "$NETWORK" >/dev/null
 docker run -d --name "$BOUNDARIES" --network "$NETWORK" \
   --network-alias llm-security-application-gateway \

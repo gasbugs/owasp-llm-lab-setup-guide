@@ -41,6 +41,10 @@ def print_result(result) -> None:
                 "upstream_called": response["upstream_called"],
                 "detected_stage": blocked,
                 "reply": response["reply"],
+                "generation_stop_reason": next(
+                    (stage.get("stop_reason") for stage in response["guardrail"]["stages"]
+                     if stage["stage"] == "bedrock_main"), None,
+                ),
             }
         )
 
@@ -51,6 +55,13 @@ def print_result(result) -> None:
             "error_type": "ApplicationEvidenceMissing",
             "http_status": response_errors[-1] if response_errors else None,
         }))
+        raise SystemExit(1)
+
+    if any(turn["generation_stop_reason"] in {"max_tokens", "length", "content_filter"} for turn in turns):
+        print(json.dumps({
+            "pyrit_outcome": "error", "course_verdict": "ERR",
+            "error_type": "IncompleteModelResponse", "turns": turns,
+        }, ensure_ascii=False, indent=2))
         raise SystemExit(1)
 
     print(

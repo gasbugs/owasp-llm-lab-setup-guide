@@ -24,6 +24,11 @@ jobs:
       - name: Build the actual Gateway runtime
         working-directory: llm-security-control-plane
         run: docker build -f bedrock-gateway/Containerfile -t runtime-gateway:test .
+      - name: Check MCP call budgets against the actual SDK
+        run: |
+          docker build -f examples/runtime-security/Containerfile.mcp -t runtime-mcp:test examples/runtime-security
+          docker run --rm --network none -v "$GITHUB_WORKSPACE:/repo:ro" -w /repo \
+            runtime-mcp:test python -m unittest discover -s tests/unit -p test_runtime_mcp_budget.py -v
       - name: Check HTTP boundaries without network or AWS credentials
         run: >-
           docker run --rm --network none
