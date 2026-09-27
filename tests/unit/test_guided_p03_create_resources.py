@@ -83,6 +83,32 @@ class CreationTests(unittest.TestCase):
             self.assertEqual(self.clients[name].mock_calls, [])
         self.sleep.assert_not_called()
 
+    def test_partial_recovery_only_creates_missing_resources(self):
+        for missing, expected in (
+                (["source"], {"create_bucket", "put_public_access_block", "put_bucket_tagging"}),
+                (["index"], {"create_index"}),
+                (["vector", "index"], {"create_vector_bucket", "create_index"}),
+                (["knowledge_base", "data_source"], {"create_knowledge_base", "create_data_source"}),
+                (["data_source"], {"create_data_source"}),
+                (["role"], {"create_role", "put_role_policy"})):
+            with self.subTest(missing=missing):
+                for client in self.clients.values():
+                    client.reset_mock()
+                self.audit.side_effect = [{**self.audit_result, "missing": missing}, self.audit_result]
+                result = self.run_prepare()
+                writes = {call[0] for client in self.clients.values() for call in client.mock_calls
+                          if call[0].startswith(("create_", "put_"))}
+                self.assertEqual(writes, expected)
+                self.assertEqual(result["resource_action"], "recovered")
+                self.assertEqual(result["restored_resources"], sorted(missing))
+
+    def test_partial_mismatch_stops_before_any_write(self):
+        self.audit.side_effect = module.LedgerError(409)
+        with self.assertRaises(module.LedgerError):
+            self.run_prepare()
+        for name in ("s3", "vectors", "iam", "agent"):
+            self.assertEqual(self.clients[name].mock_calls, [])
+
     def test_account_mismatch_stops_before_audit(self):
         self.responses["get_caller_identity"]["Account"] = "111111111111"
         with self.assertRaises(module.LedgerError):

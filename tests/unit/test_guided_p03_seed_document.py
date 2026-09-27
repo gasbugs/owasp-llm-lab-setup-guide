@@ -49,12 +49,16 @@ class DocumentTests(unittest.TestCase):
 
     def prepare(self):
         return module.prepare_document(self.t, self.connection, self.operation,
-                                       s3=self.s3, agent=self.agent, sleep=self.sleep)
+                                       s3=self.s3, agent=self.agent, sleep=self.sleep,
+                                       vectors=getattr(self, "vectors", None))
 
     def check_boundaries(self):
         self.assertTrue(all(body.closed for body in self.bodies))
         for client in (self.s3, self.agent):
             for call in client.mock_calls:
+                if client is self.agent and call[0] == "delete_knowledge_base_documents":
+                    self.assertIsNotNone(getattr(self, "vectors", None))
+                    continue
                 self.assertFalse(call[0].startswith(("delete_", "retrieve", "converse", "stop_")))
 
     def test_existing_document_is_not_overwritten(self):
@@ -63,6 +67,83 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(result["evidence"]["source_action"], "reused")
         self.assertEqual(result["snapshot"]["binding"]["current_job_id"], "p03-" + self.operation.replace("-", ""))
         self.assertEqual(len(result["evidence"]["preparation_request_ids"]), 6)
+
+    def reindex_response(self, status="INDEXED"):
+        return {"documentDetails": [{"knowledgeBaseId": "KB12345678", "dataSourceId": "DS12345678",
+                "identifier": {"dataSourceType": "S3", "s3": {
+                    "uri": "s3://" + self.t["source_bucket"] + "/h03/knowledge/current-policy.md"}}, "status": status}]}
+
+    def test_recovered_and_reused_index_rehydrates_unchanged_source(self):
+        for action in ("recovered", "reused"):
+            with self.subTest(action=action):
+                self.connection["resource_action"] = action
+                self.vectors = Mock()
+                self.vectors.list_vectors.side_effect = [self.response({"vectors": []}), self.response({"vectors": [{"key": "indexed"}]})]
+                self.agent.delete_knowledge_base_documents.side_effect = lambda **kw: self.response(self.reindex_response("DELETING"))
+                self.agent.ingest_knowledge_base_documents.side_effect = lambda **kw: self.response(self.reindex_response("PENDING"))
+                self.agent.get_knowledge_base_documents.side_effect = [
+                    self.response(self.reindex_response("NOT_FOUND")),
+                    self.response(self.reindex_response("IN_PROGRESS")), self.response(self.reindex_response())]
+                result = self.prepare()
+                self.assertTrue(result["evidence"]["source_reindexed"])
+                self.s3.put_object.assert_not_called()
+                self.assertEqual(self.agent.mock_calls[-3][0], "ingest_knowledge_base_documents")
+                model = Session().get_service_model("bedrock-agent")
+                for method in ("delete_knowledge_base_documents", "ingest_knowledge_base_documents", "get_knowledge_base_documents"):
+                    operation = "".join(part.title() for part in method.split("_"))
+                    validate_parameters(getattr(self.agent, method).call_args.kwargs,
+                                        model.operation_model(operation).input_shape)
+
+    def test_failed_or_wrong_document_reindex_is_not_ready(self):
+        self.connection["resource_action"] = "recovered"
+        self.vectors = Mock()
+        self.vectors.list_vectors.side_effect = lambda **kw: self.response({"vectors": []})
+        self.agent.delete_knowledge_base_documents.side_effect = lambda **kw: self.response(self.reindex_response("DELETING"))
+        self.agent.ingest_knowledge_base_documents.side_effect = lambda **kw: self.response(self.reindex_response("PENDING"))
+        for status in ("FAILED", "PARTIALLY_INDEXED", "NOT_FOUND"):
+            self.agent.get_knowledge_base_documents.side_effect = [
+                self.response(self.reindex_response("NOT_FOUND")), self.response(self.reindex_response(status))]
+            with self.assertRaises(module.LedgerError):
+                self.prepare()
+        wrong = self.reindex_response()
+        wrong["documentDetails"][0]["dataSourceId"] = "DS87654321"
+        self.agent.get_knowledge_base_documents.side_effect = [
+            self.response(self.reindex_response("NOT_FOUND")), self.response(wrong)]
+        with self.assertRaises(module.LedgerError):
+            self.prepare()
+
+    def test_nonempty_index_does_not_delete_or_reingest_documents(self):
+        self.vectors = Mock()
+        self.vectors.list_vectors.side_effect = lambda **kw: self.response({"vectors": [{"key": "existing"}]})
+        result = self.prepare()
+        self.assertFalse(result["evidence"]["source_reindexed"])
+        self.agent.delete_knowledge_base_documents.assert_not_called()
+        self.agent.ingest_knowledge_base_documents.assert_not_called()
+
+    def test_empty_vector_page_is_not_an_empty_index(self):
+        self.vectors = Mock()
+        self.vectors.list_vectors.side_effect = [self.response({"vectors": [], "nextToken": "page2"}),
+                                                 self.response({"vectors": [{"key": "existing"}]})]
+        self.assertFalse(self.prepare()["evidence"]["source_reindexed"])
+        self.assertEqual(self.vectors.list_vectors.call_args.kwargs["nextToken"], "page2")
+        self.agent.delete_knowledge_base_documents.assert_not_called()
+
+    def test_repeated_vector_token_stops_without_deleting_marker(self):
+        self.vectors = Mock()
+        self.vectors.list_vectors.side_effect = lambda **kw: self.response({"vectors": [], "nextToken": "same"})
+        with self.assertRaises(module.LedgerError):
+            self.prepare()
+        self.agent.delete_knowledge_base_documents.assert_not_called()
+
+    def test_indexed_marker_without_actual_vectors_is_not_ready(self):
+        self.vectors = Mock()
+        self.vectors.list_vectors.side_effect = lambda **kw: self.response({"vectors": []})
+        self.agent.delete_knowledge_base_documents.side_effect = lambda **kw: self.response(self.reindex_response("DELETING"))
+        self.agent.ingest_knowledge_base_documents.side_effect = lambda **kw: self.response(self.reindex_response("PENDING"))
+        self.agent.get_knowledge_base_documents.side_effect = [
+            self.response(self.reindex_response("NOT_FOUND")), self.response(self.reindex_response())]
+        with self.assertRaises(module.LedgerError):
+            self.prepare()
 
     def test_new_document_uses_conditional_write(self):
         self.s3.list_objects_v2.side_effect = [self.response({"IsTruncated": False}), self.response(self.listing)]

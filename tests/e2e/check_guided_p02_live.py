@@ -50,7 +50,7 @@ def rpc(project, origin, path, token="", body=None):
 def aws_scope(project, action, payload):
     code = (ROOT / "tests/e2e/p02_aws_scope.py").read_text()
     return json.loads(subprocess.check_output(["docker", "exec", project + "-gateway", "python", "-c", code,
-        action, json.dumps(payload)], text=True, timeout=180))
+        action, json.dumps(payload)], text=True, timeout=600 if action == "recovery" else 180))
 
 
 def main():
@@ -64,6 +64,7 @@ def main():
     parser.add_argument("--aws-config-dir", type=Path)
     parser.add_argument("--aws-profile", default="default")
     parser.add_argument("--aws-account")
+    parser.add_argument("--recover-resources", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -73,6 +74,8 @@ def main():
     if args.aws_account and not args.aws_config_dir:
         parser.error("AWS account requires the explicit credential directory")
     mode = "aws" if args.aws_config_dir else "contract"
+    if args.recover_resources and mode != "aws":
+        parser.error("recovery rehearsal requires explicit AWS settings")
     source = (extract_solution(args.markdown.read_text()).encode("utf-8") if args.markdown
               else (LAB / "learner.py" if args.starter else args.source).read_bytes())
     if len(source) > 65536:
@@ -158,6 +161,11 @@ def main():
                                    "publisher-p02-provision", {"execution_id": str(uuid4())})
             proof["provision"] = prepared
             assert status == 200
+            if args.recover_resources:
+                proof["recovery"] = aws_scope(project, "recovery", {"account_id": args.aws_account,
+                    "preflight": proof["aws_preflight"], "state": prepared})
+                prepared = proof["recovery"]["state"]
+                proof["provision"] = prepared
             with opener.open(origin + "/", timeout=5) as index:
                 assert index.status == 200
             status, bootstrap = request(opener, origin + "/api/bootstrap")

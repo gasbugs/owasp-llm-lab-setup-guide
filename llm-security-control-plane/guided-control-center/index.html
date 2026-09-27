@@ -153,7 +153,7 @@ docker compose \
           <div class="actions">
             <span class="action-control">
               <button id="h02-provision" class="secondary" aria-describedby="h02-provision-help">AWS 자원 준비</button>
-              <span id="h02-provision-help" class="action-tooltip" role="tooltip">제공 Gateway가 교재에 정해 둔 이름과 권한으로 S3 원문 Bucket, S3 Vector Index, IAM 역할, Knowledge Base와 Data Source를 만듭니다. 같은 자원이 이미 있으면 설정이 맞는지 확인하고 재사용합니다. PASS는 연결할 자원이 준비됐다는 뜻이며, 문서 검색까지 끝났다는 뜻은 아닙니다.</span>
+              <span id="h02-provision-help" class="action-tooltip" role="tooltip">Gateway가 P02의 S3·검색 저장소·IAM 역할·연결 설정을 확인하고, 없어진 자원만 다시 만듭니다. 남은 자원과 원문은 바꾸지 않으며 설정이 다르면 멈춥니다. 삭제된 원문은 복원하지 않으므로 준비 뒤 구현 검증으로 새 문서를 저장하세요. 준비 완료는 과제 통과나 검색 완료가 아닙니다.</span>
             </span>
             <span class="action-control">
               <button id="h02-verify" class="primary" aria-describedby="h02-verify-help">현재 구현 검증</button>
@@ -183,7 +183,7 @@ docker compose \
           <div class="actions">
             <span class="action-control">
               <button id="h03-provision" class="secondary" aria-describedby="h03-provision-help">P03 AWS 자원 준비</button>
-              <span id="h03-provision-help" class="action-tooltip" role="tooltip">Gateway가 P03 전용 S3·검색 저장소·권한을 준비하고 안내 문서를 저장한 뒤, 이번 동기화가 끝났는지 확인합니다. 기존 자원은 설정이 일치할 때만 재사용하며 다른 문제의 자원은 바꾸지 않습니다. 준비 완료는 작성한 함수의 과제 통과가 아닙니다.</span>
+              <span id="h03-provision-help" class="action-tooltip" role="tooltip">Gateway가 P03 전용 S3·검색 저장소·권한을 확인하고 없어진 자원만 다시 만듭니다. 제공 안내 문서가 없으면 다시 저장하고 이번 동기화를 확인합니다. 남은 설정이나 문서가 다르면 덮어쓰지 않고 멈춥니다. 다른 문제와 작성한 함수는 바꾸지 않으며 준비 완료는 과제 통과가 아닙니다.</span>
             </span>
             <span class="action-control">
               <button id="h03-verify" class="primary" aria-describedby="h03-verify-help">P03 현재 구현 검증</button>

@@ -1,4 +1,4 @@
-"""Explicit P03-only AWS resource creation; no ingestion, deletion, or repair."""
+"""Explicit P03-only creation of audited missing resources; never replacement."""
 from copy import deepcopy
 import json
 import re
@@ -39,28 +39,38 @@ def prepare_resources(specification, operation_id, *, sts, s3, vectors, iam, age
         identity = call(sts.get_caller_identity)
         require(identity["Account"] == t["account_id"])
         clients = dict(s3=s3, vectors=vectors, iam=iam, agent=agent)
-        existing = inspect_existing(t, **clients)
-        if existing is not None:
+        existing = inspect_existing(t, **clients, allow_partial=True)
+        if existing is not None and not existing.get("missing"):
             return {**existing, "resource_action": "reused", "preparation_request_ids": request_ids}
+        missing = set(existing["missing"] if existing else
+                      ("source", "vector", "index", "role", "knowledge_base", "data_source"))
 
         source = {"Bucket": t["source_bucket"], "ExpectedBucketOwner": t["account_id"]}
         tags = [{"Key": key, "Value": value} for key, value in t["tags"].items()]
-        call(s3.create_bucket, Bucket=t["source_bucket"])
-        call(s3.put_public_access_block, **source, PublicAccessBlockConfiguration=t["public_access_block"])
-        call(s3.put_bucket_tagging, **source, Tagging={"TagSet": tags})
-        vector = call(vectors.create_vector_bucket, vectorBucketName=t["vector_bucket"])
-        require(vector["vectorBucketArn"] == t["vector_bucket_arn"])
-        index = call(vectors.create_index, vectorBucketName=t["vector_bucket"], indexName=t["vector_index"],
-                     dataType="float32", dimension=1024, distanceMetric="cosine")
-        require(index["indexArn"] == t["index_arn"])
-        role = call(iam.create_role, RoleName=t["role_name"], Tags=tags,
-                    AssumeRolePolicyDocument=json.dumps(t["trust_policy"]))["Role"]
-        require(role["Arn"] == t["role_arn"])
-        call(iam.put_role_policy, RoleName=t["role_name"], PolicyName=t["policy_name"],
-             PolicyDocument=json.dumps(t["runtime_policy"]))
+        if "source" in missing:
+            call(s3.create_bucket, Bucket=t["source_bucket"])
+            call(s3.put_public_access_block, **source, PublicAccessBlockConfiguration=t["public_access_block"])
+            call(s3.put_bucket_tagging, **source, Tagging={"TagSet": tags})
+        if "vector" in missing:
+            vector = call(vectors.create_vector_bucket, vectorBucketName=t["vector_bucket"])
+            require(vector["vectorBucketArn"] == t["vector_bucket_arn"])
+        if "index" in missing:
+            index = call(vectors.create_index, vectorBucketName=t["vector_bucket"], indexName=t["vector_index"],
+                         dataType="float32", dimension=1024, distanceMetric="cosine")
+            require(index["indexArn"] == t["index_arn"])
+        if "role" in missing:
+            role = call(iam.create_role, RoleName=t["role_name"], Tags=tags,
+                        AssumeRolePolicyDocument=json.dumps(t["trust_policy"]))["Role"]
+            require(role["Arn"] == t["role_arn"])
+            call(iam.put_role_policy, RoleName=t["role_name"], PolicyName=t["policy_name"],
+                 PolicyDocument=json.dumps(t["runtime_policy"]))
         # Only this observed role-propagation response is retried, with one token.
-        sleep(5)
+        if "role" in missing:
+            sleep(5)
         for attempt in range(6):
+            if "knowledge_base" not in missing:
+                kb = {"knowledgeBaseId": existing["knowledge_base_id"]}
+                break
             try:
                 kb = call(agent.create_knowledge_base, clientToken="p03-kb-" + operation.hex,
                           name=t["knowledge_base_name"], description="Tenant 03 P03 current document search",
@@ -92,11 +102,14 @@ def prepare_resources(specification, operation_id, *, sts, s3, vectors, iam, age
         wait(agent.get_knowledge_base, "knowledgeBase", "ACTIVE", {"CREATING"},
              {"knowledgeBaseId": kb_id, "name": t["knowledge_base_name"], "roleArn": t["role_arn"]},
              knowledgeBaseId=kb_id)
-        ds = call(agent.create_data_source, clientToken="p03-ds-" + operation.hex,
-                  knowledgeBaseId=kb_id, name=t["data_source_name"], dataDeletionPolicy="DELETE",
-                  description="Tenant 03 P03 fixed S3 document prefix",
-                  dataSourceConfiguration=t["data_source_configuration"],
-                  vectorIngestionConfiguration=t["ingestion_configuration"])["dataSource"]
+        if "data_source" in missing:
+            ds = call(agent.create_data_source, clientToken="p03-ds-" + operation.hex,
+                      knowledgeBaseId=kb_id, name=t["data_source_name"], dataDeletionPolicy="DELETE",
+                      description="Tenant 03 P03 fixed S3 document prefix",
+                      dataSourceConfiguration=t["data_source_configuration"],
+                      vectorIngestionConfiguration=t["ingestion_configuration"])["dataSource"]
+        else:
+            ds = {"dataSourceId": existing["data_source_id"]}
         ds_id = ds["dataSourceId"]
         require(isinstance(ds_id, str) and re.fullmatch(r"[A-Za-z0-9]{10}", ds_id))
         wait(agent.get_data_source, "dataSource", "AVAILABLE", set(),
@@ -105,7 +118,8 @@ def prepare_resources(specification, operation_id, *, sts, s3, vectors, iam, age
         audited = inspect_existing(t, **clients)
         require(audited is not None and audited["knowledge_base_id"] == kb_id
                 and audited["data_source_id"] == ds_id)
-        return {**audited, "resource_action": "created", "preparation_request_ids": request_ids}
+        return {**audited, "resource_action": "recovered" if existing else "created",
+                "restored_resources": sorted(missing), "preparation_request_ids": request_ids}
     except LedgerError:
         raise
     except Exception:

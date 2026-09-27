@@ -24,7 +24,7 @@ from h03_backend import router as h03_router
 from h04_backend import router as h04_router
 from h07_backend import router as h07_router
 from h08_backend import router as h08_router
-from p02_reuse import check_bucket, check_role, preflight, PUBLIC_BLOCK, TAGS
+from p02_reuse import check_bucket, check_role, pages, preflight, PUBLIC_BLOCK, TAGS
 
 
 MODEL_ID = "us.amazon.nova-lite-v1:0"
@@ -341,7 +341,7 @@ def provision_h02_aws(execution_id: str) -> dict:
     agent = boto3.client("bedrock-agent", region_name=AWS_REGION)
 
     reused = preflight(template, s3=s3, vectors=s3vectors, iam=iam, agent=agent,
-                       policy_name=f"{H02_PREFIX}-knowledge-base-runtime")
+                       policy_name=f"{H02_PREFIX}-knowledge-base-runtime", allow_partial=True)
     if reused is not None:
         reused.update(execution_id=execution_id, observed_at=datetime.now(timezone.utc).isoformat())
         save_h02_state(reused)
@@ -437,9 +437,7 @@ def provision_h02_aws(execution_id: str) -> dict:
     if role["Arn"] != template["role_arn"]:
         raise HTTPException(status_code=409, detail="foreign IAM role")
 
-    summaries = agent.list_knowledge_bases(maxResults=100).get(
-        "knowledgeBaseSummaries", []
-    )
+    summaries = pages(agent.list_knowledge_bases, "knowledgeBaseSummaries", maxResults=100)
     matches = [
         item
         for item in summaries
@@ -512,9 +510,8 @@ def provision_h02_aws(execution_id: str) -> dict:
     ):
         raise HTTPException(status_code=409, detail="foreign Knowledge Base configuration")
 
-    summaries = agent.list_data_sources(
-        knowledgeBaseId=knowledge_base_id, maxResults=100
-    ).get("dataSourceSummaries", [])
+    summaries = pages(agent.list_data_sources, "dataSourceSummaries",
+                      knowledgeBaseId=knowledge_base_id, maxResults=100)
     matches = [
         item for item in summaries if item.get("name") == template["data_source_name"]
     ]
@@ -586,6 +583,11 @@ def provision_h02_aws(execution_id: str) -> dict:
         "dimensions": 1024,
         "aws_request_ids": request_ids,
     }
+    audited = preflight(template, s3=s3, vectors=s3vectors, iam=iam, agent=agent,
+                        policy_name=f"{H02_PREFIX}-knowledge-base-runtime")
+    if audited is None:
+        raise HTTPException(409, "P02 resource preparation is incomplete")
+    state["aws_request_ids"].extend(audited["aws_request_ids"])
     save_h02_state(state)
     return state
 

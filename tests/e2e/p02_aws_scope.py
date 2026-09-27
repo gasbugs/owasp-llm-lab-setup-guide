@@ -60,6 +60,57 @@ def absent(call, codes):
     return False
 
 
+def recover_test_set(before, state, template, s3, vectors, iam, agent):
+    """Only a newly created empty publisher namespace; never a learner namespace."""
+    from uuid import uuid4
+    from p02_reuse import preflight
+    cases = []
+    source = {"Bucket": template["source_bucket"], "ExpectedBucketOwner": template["account_id"]}
+    for missing in ("source", "index", "knowledge_base"):
+        assert time.time() - before["observed_at"] < 3600
+        assert state == server.load_h02_state()
+        checked = preflight(template, s3=s3, vectors=vectors, iam=iam, agent=agent,
+                            policy_name=f"{server.H02_PREFIX}-knowledge-base-runtime")
+        assert checked["knowledge_base_id"] == state["knowledge_base_id"]
+        assert checked["data_source_id"] == state["data_source_id"]
+        objects = s3.list_objects_v2(**source, MaxKeys=1)
+        assert objects.get("IsTruncated") is False and not objects.get("Contents")
+        assert s3.get_bucket_versioning(**source).get("Status") is None
+        assert vectors.list_vectors(indexArn=state["index_arn"], maxResults=1)["vectors"] == []
+        ids = {"knowledgeBaseId": state["knowledge_base_id"], "dataSourceId": state["data_source_id"]}
+        jobs = agent.list_ingestion_jobs(**ids)
+        assert not jobs["ingestionJobSummaries"] and not jobs.get("nextToken")
+        if missing == "source":
+            s3.delete_bucket(**source)
+        elif missing == "index":
+            vectors.delete_index(indexArn=state["index_arn"])
+        else:
+            agent.delete_data_source(**ids)
+            for _ in range(60):
+                if absent(lambda: agent.get_data_source(**ids), {"ResourceNotFoundException"}):
+                    break
+                time.sleep(1)
+            else:
+                raise TimeoutError("P02 test data source deletion")
+            agent.delete_knowledge_base(knowledgeBaseId=state["knowledge_base_id"])
+            for _ in range(60):
+                if absent(lambda: agent.get_knowledge_base(knowledgeBaseId=state["knowledge_base_id"]), {"ResourceNotFoundException"}):
+                    break
+                time.sleep(1)
+            else:
+                raise TimeoutError("P02 test KB deletion")
+        previous = state
+        state = server.provision_h02_aws(str(uuid4()))
+        assert state["status"] == "READY" and state == server.load_h02_state()
+        if missing == "knowledge_base":
+            assert state["knowledge_base_id"] != previous["knowledge_base_id"]
+            assert state["data_source_id"] != previous["data_source_id"]
+        else:
+            assert all(state[key] == previous[key] for key in ("knowledge_base_id", "data_source_id"))
+        cases.append({"missing": missing, "state": state})
+    return {"cases": cases, "state": state}
+
+
 def run(action, payload):
     region = "us-east-1"
     config = Config(connect_timeout=5, read_timeout=20, retries={"total_max_attempts": 1})
@@ -85,7 +136,7 @@ def run(action, payload):
             raise ValueError("existing P02 resources: no provisioning or cleanup authorized")
         return {"account_id": account, "region": region, "checks": checks,
                 "template_digest": template["template_digest"], "observed_at": time.time()}
-    if action not in {"cleanup", "reuse"}:
+    if action not in {"cleanup", "reuse", "recovery"}:
         raise ValueError("unknown publisher action")
     before, state = payload["preflight"], payload["state"]
     assert before["account_id"] == account and all(before["checks"].values())
@@ -96,6 +147,8 @@ def run(action, payload):
     assert state["source_bucket"] == template["source_bucket"] and state["index_arn"] == template["index_arn"]
     if action == "reuse":
         return read_only_reuse(state, config)
+    if action == "recovery":
+        return recover_test_set(before, state, template, s3, vectors, iam, agent)
     tags = {tag["Key"]: tag["Value"] for tag in s3.get_bucket_tagging(Bucket=template["source_bucket"])["TagSet"]}
     assert tags == {"Course": "tenant-03", "Activity": "H02", "ManagedBy": "guided-control-center"}
     assert s3.get_bucket_versioning(Bucket=template["source_bucket"]).get("Status") is None

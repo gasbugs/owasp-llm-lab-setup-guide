@@ -24,7 +24,7 @@ DOCUMENT = ("# GUIDED-H03-ORION access procedure\n\n"
 DOCUMENT_SHA = hashlib.sha256(DOCUMENT).hexdigest()
 
 
-def prepare_document(specification, connection, operation_id, *, s3, agent,
+def prepare_document(specification, connection, operation_id, *, s3, agent, vectors=None,
                      sleep=time.sleep, monotonic=time.monotonic):
     """Caller must hold the P03 preparation lock and audit connection ownership."""
     last_operation = "validation"
@@ -103,6 +103,61 @@ def prepare_document(specification, connection, operation_id, *, s3, agent,
                 sleep(2)
         else:
             raise LedgerError(409)
+        # An empty rebuilt index can coexist with a stale INDEXED document marker.
+        # Audit the actual vectors, not only the ingestion job's COMPLETE status.
+        def has_vectors():
+            args, seen = {"indexArn": t["index_arn"], "maxResults": 100}, set()
+            for _ in range(100):
+                page = call(vectors.list_vectors, **args)
+                require(isinstance(page["vectors"], list))
+                if page["vectors"]:
+                    return True
+                token = page.get("nextToken")
+                if token is None:
+                    return False
+                require(isinstance(token, str) and token and token not in seen)
+                seen.add(token)
+                args["nextToken"] = token
+            raise LedgerError(409)
+
+        refreshed = vectors is not None and not has_vectors()
+        if refreshed:
+            uri = "s3://" + t["source_bucket"] + "/" + key
+            identifier = {"dataSourceType": "S3", "s3": {"uri": uri}}
+            # Remove only this provided document's stale index marker. The S3
+            # source, KB, data source, IAM role and index itself are not deleted.
+            call(agent.delete_knowledge_base_documents, knowledgeBaseId=kb, dataSourceId=ds,
+                 clientToken="p03-unindex-" + operation.hex, documentIdentifiers=[identifier])
+            for attempt in range(60):
+                details = call(agent.get_knowledge_base_documents, knowledgeBaseId=kb, dataSourceId=ds,
+                               documentIdentifiers=[identifier])["documentDetails"]
+                require(len(details) == 1 and details[0]["identifier"] == identifier
+                        and details[0]["knowledgeBaseId"] == kb and details[0]["dataSourceId"] == ds)
+                if details[0]["status"] == "NOT_FOUND":
+                    break
+                require(details[0]["status"] in {"DELETING", "DELETE_IN_PROGRESS"})
+                if attempt < 59:
+                    sleep(2)
+            else:
+                raise LedgerError(409)
+            call(agent.ingest_knowledge_base_documents, knowledgeBaseId=kb, dataSourceId=ds,
+                 clientToken="p03-refresh-" + operation.hex,
+                 documents=[{"content": {"dataSourceType": "S3", "s3": {"s3Location": {"uri": uri}}}}])
+            for attempt in range(60):
+                details = call(agent.get_knowledge_base_documents, knowledgeBaseId=kb, dataSourceId=ds,
+                               documentIdentifiers=[identifier])["documentDetails"]
+                require(len(details) == 1)
+                detail = details[0]
+                require(detail["knowledgeBaseId"] == kb and detail["dataSourceId"] == ds
+                        and detail["identifier"] == identifier)
+                if detail["status"] == "INDEXED":
+                    break
+                require(detail["status"] in {"PENDING", "STARTING", "IN_PROGRESS"})
+                if attempt < 59:
+                    sleep(2)
+            else:
+                raise LedgerError(409)
+            require(has_vectors())
         require(listed())
         verify_source()
         prefix = "s3://" + t["source_bucket"] + "/" + t["source_prefix"]
@@ -111,7 +166,8 @@ def prepare_document(specification, connection, operation_id, *, s3, agent,
                              "source_uris": [prefix + "current-policy.md"]},
                 "evidence": {"source_action": "reused" if existed else "created", "source_sha256": DOCUMENT_SHA,
                              "provider_ingestion_job_id": job_id, "status": "COMPLETE",
-                             "number_of_documents_failed": 0, "preparation_request_ids": request_ids}}
+                             "number_of_documents_failed": 0, "source_reindexed": refreshed,
+                             "preparation_request_ids": request_ids}}
     except LedgerError:
         raise
     except Exception as error:

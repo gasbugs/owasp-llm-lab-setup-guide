@@ -58,8 +58,12 @@ def pages(fetch, field, **kwargs):
     require(False, "pagination limit")
 
 
-def preflight(template, *, s3, vectors, iam, agent, policy_name):
-    """Return a verified reusable state, or None only when all names are absent."""
+def preflight(template, *, s3, vectors, iam, agent, policy_name, allow_partial=False):
+    """Return reusable state. Explicit preparation may also accept audited gaps.
+
+    The default remains strict for read-only reuse and publisher cleanup audits.
+    None with allow_partial means missing resources may be created, not replaced.
+    """
     from p02_resources import connection_evidence
     from p02_ledger import LedgerError
 
@@ -73,21 +77,55 @@ def preflight(template, *, s3, vectors, iam, agent, policy_name):
     present = (source is not None, vector is not None, role is not None, bool(matches))
     if not any(present):
         return None
-    require(all(present) and len(matches) == 1, "partial or duplicate resource set")
-    check_bucket(s3, template)
-    check_role(iam, template, role["Role"], policy_name)
-    require(vector["vectorBucket"]["vectorBucketArn"] == template["vector_bucket_arn"], "vector bucket")
+    require(len(matches) <= 1 and (allow_partial or all(present)), "partial or duplicate resource set")
+    require(not allow_partial or source is not None or role is not None or matches,
+            "ownership tags unavailable; inspect the surviving vector bucket")
+    missing = not all(present)
+    if source is not None:
+        check_bucket(s3, template)
+    if role is not None:
+        check_role(iam, template, role["Role"], policy_name)
+    if vector is not None:
+        require(vector["vectorBucket"]["vectorBucketArn"] == template["vector_bucket_arn"], "vector bucket")
+    if allow_partial:
+        index = optional(lambda: vectors.get_index(indexArn=template["index_arn"]), {"NotFoundException"}) if vector else None
+        if index is None:
+            missing = True
+        else:
+            require(all(index["index"].get(key) == value for key, value in {
+                "indexArn": template["index_arn"], "dimension": 1024,
+                "dataType": "float32", "distanceMetric": "cosine"}.items()), "vector index")
+    if not matches:
+        return None
     kb_id = matches[0]["knowledgeBaseId"]
     kb = agent.get_knowledge_base(knowledgeBaseId=kb_id)["knowledgeBase"]
     require(kb.get("name") == template["knowledge_base_name"] and kb.get("roleArn") == template["role_arn"], "knowledge base")
     require(agent.list_tags_for_resource(resourceArn=kb["knowledgeBaseArn"])["tags"] == TAGS, "knowledge base tags")
+    if allow_partial:
+        require(kb.get("knowledgeBaseId") == kb_id and kb.get("status") == "ACTIVE", "knowledge base status")
+        require(kb.get("knowledgeBaseConfiguration") == {"type": "VECTOR", "vectorKnowledgeBaseConfiguration": {
+            "embeddingModelArn": f"arn:aws:bedrock:{template['region']}::foundation-model/{template['embedding_model_id']}",
+            "embeddingModelConfiguration": {"bedrockEmbeddingModelConfiguration": {
+                "dimensions": 1024, "embeddingDataType": "FLOAT32"}}}}, "embedding configuration")
+        require(kb.get("storageConfiguration") == {"type": "S3_VECTORS",
+                "s3VectorsConfiguration": {"indexArn": template["index_arn"]}}, "storage configuration")
     sources = pages(agent.list_data_sources, "dataSourceSummaries", knowledgeBaseId=kb_id, maxResults=100)
+    if allow_partial and not sources:
+        return None
     require(len(sources) == 1 and sources[0].get("name") == template["data_source_name"], "data sources")
     ds_id = sources[0]["dataSourceId"]
     ds = agent.get_data_source(knowledgeBaseId=kb_id, dataSourceId=ds_id)["dataSource"]
     require(ds.get("name") == template["data_source_name"] and ds.get("dataDeletionPolicy") == "DELETE", "data source policy")
     require(ds.get("vectorIngestionConfiguration") == {"chunkingConfiguration": {
         "chunkingStrategy": "FIXED_SIZE", "fixedSizeChunkingConfiguration": {"maxTokens": 200, "overlapPercentage": 20}}}, "chunking")
+    if allow_partial:
+        require(ds.get("knowledgeBaseId") == kb_id and ds.get("dataSourceId") == ds_id
+                and ds.get("status") == "AVAILABLE", "data source status")
+        require(ds.get("dataSourceConfiguration") == {"type": "S3", "s3Configuration": {
+            "bucketArn": f"arn:aws:s3:::{template['source_bucket']}", "bucketOwnerAccountId": template["account_id"],
+            "inclusionPrefixes": [template["source_prefix"]]}}, "source configuration")
+    if missing:
+        return None
     state = {key: template[key] for key in (
         "account_id", "region", "template_digest", "source_bucket", "source_prefix",
         "vector_bucket", "index_arn", "embedding_model_id", "dimensions")}

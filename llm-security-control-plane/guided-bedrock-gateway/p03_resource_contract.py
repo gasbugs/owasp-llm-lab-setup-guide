@@ -61,8 +61,12 @@ def require(condition):
         raise LedgerError(409)
 
 
-def inspect_existing(specification, *, s3, vectors, iam, agent):
-    """Return verified connection metadata or None only if all fixed names are absent."""
+def inspect_existing(specification, *, s3, vectors, iam, agent, allow_partial=False):
+    """Return verified metadata, or None for absence; explicit preparation gets gaps.
+
+    allow_partial never relaxes ownership/configuration checks of surviving
+    resources. Default strict mode remains the reuse and cleanup contract.
+    """
     try:
         t = deepcopy(specification)
         require(t == template(t["account_id"], t["region"]))
@@ -105,24 +109,40 @@ def inspect_existing(specification, *, s3, vectors, iam, agent):
         present = (source is not None, vector is not None, role is not None, bool(matches))
         if not any(present):
             return None
-        require(all(present) and len(matches) == 1)
-        tags = call(s3.get_bucket_tagging, **source_args)["TagSet"]
-        require({item["Key"]: item["Value"] for item in tags} == t["tags"])
-        require(call(s3.get_public_access_block, **source_args)["PublicAccessBlockConfiguration"] == t["public_access_block"])
-        require(vector["vectorBucket"]["vectorBucketArn"] == t["vector_bucket_arn"])
-        index = call(vectors.get_index, indexArn=t["index_arn"])["index"]
-        require(all(index[key] == value for key, value in {"indexArn": t["index_arn"], "dimension": 1024,
-                    "dataType": "float32", "distanceMetric": "cosine"}.items()))
-        current_role = role["Role"]
-        require(current_role["Arn"] == t["role_arn"] and current_role["AssumeRolePolicyDocument"] == t["trust_policy"]
-                and "PermissionsBoundary" not in current_role
-                and {item["Key"]: item["Value"] for item in current_role["Tags"]} == t["tags"])
-        role_args = {"RoleName": t["role_name"]}
-        policies = call(iam.list_role_policies, **role_args)
-        require(not policies.get("IsTruncated") and policies["PolicyNames"] == [t["policy_name"]])
-        attached = call(iam.list_attached_role_policies, **role_args)
-        require(not attached.get("IsTruncated") and attached["AttachedPolicies"] == [])
-        require(call(iam.get_role_policy, **role_args, PolicyName=t["policy_name"])["PolicyDocument"] == t["runtime_policy"])
+        require(len(matches) <= 1 and (allow_partial or all(present)))
+        require(not allow_partial or source is not None or role is not None or bool(matches))
+        missing = [key for key, exists in zip(("source", "vector", "role", "knowledge_base"), present) if not exists]
+        if source is not None:
+            tags = call(s3.get_bucket_tagging, **source_args)["TagSet"]
+            require({item["Key"]: item["Value"] for item in tags} == t["tags"])
+            require(call(s3.get_public_access_block, **source_args)["PublicAccessBlockConfiguration"] == t["public_access_block"])
+        if vector is not None:
+            require(vector["vectorBucket"]["vectorBucketArn"] == t["vector_bucket_arn"])
+            index_response = call(vectors.get_index, indexArn=t["index_arn"],
+                                  absent=("NotFoundException",) if allow_partial else ())
+            if index_response is not None:
+                index = index_response["index"]
+                require(all(index[key] == value for key, value in {"indexArn": t["index_arn"], "dimension": 1024,
+                            "dataType": "float32", "distanceMetric": "cosine"}.items()))
+            else:
+                missing.append("index")
+        else:
+            missing.append("index")
+        if role is not None:
+            current_role = role["Role"]
+            require(current_role["Arn"] == t["role_arn"] and current_role["AssumeRolePolicyDocument"] == t["trust_policy"]
+                    and "PermissionsBoundary" not in current_role
+                    and {item["Key"]: item["Value"] for item in current_role["Tags"]} == t["tags"])
+            role_args = {"RoleName": t["role_name"]}
+            policies = call(iam.list_role_policies, **role_args)
+            require(not policies.get("IsTruncated") and policies["PolicyNames"] == [t["policy_name"]])
+            attached = call(iam.list_attached_role_policies, **role_args)
+            require(not attached.get("IsTruncated") and attached["AttachedPolicies"] == [])
+            require(call(iam.get_role_policy, **role_args, PolicyName=t["policy_name"])["PolicyDocument"] == t["runtime_policy"])
+        result = {"account_id": t["account_id"], "region": t["region"], "template_digest": t["template_digest"],
+                  "resource_request_ids": request_ids}
+        if not matches:
+            return {**result, "missing": missing + ["data_source"]}
         kb_id = matches[0]["knowledgeBaseId"]
         kb = call(agent.get_knowledge_base, knowledgeBaseId=kb_id)["knowledgeBase"]
         kb_arn = f"arn:aws:bedrock:{t['region']}:{t['account_id']}:knowledge-base/{kb_id}"
@@ -132,15 +152,20 @@ def inspect_existing(specification, *, s3, vectors, iam, agent):
                 and kb["storageConfiguration"] == t["storage_configuration"])
         require(call(agent.list_tags_for_resource, resourceArn=kb_arn)["tags"] == t["tags"])
         sources = pages(agent.list_data_sources, "dataSourceSummaries", knowledgeBaseId=kb_id, maxResults=100)
-        require(len(sources) == 1 and sources[0]["name"] == t["data_source_name"])
+        require(len(sources) <= 1 and (allow_partial or bool(sources)))
+        if not sources:
+            return {**result, "knowledge_base_id": kb_id, "missing": missing + ["data_source"]}
+        require(sources[0]["name"] == t["data_source_name"])
         ds_id = sources[0]["dataSourceId"]
         ds = call(agent.get_data_source, knowledgeBaseId=kb_id, dataSourceId=ds_id)["dataSource"]
         require(ds["knowledgeBaseId"] == kb_id and ds["dataSourceId"] == ds_id and ds["status"] == "AVAILABLE"
                 and ds["name"] == t["data_source_name"] and ds["dataDeletionPolicy"] == "DELETE"
                 and ds["dataSourceConfiguration"] == t["data_source_configuration"]
                 and ds["vectorIngestionConfiguration"] == t["ingestion_configuration"])
-        return {"account_id": t["account_id"], "region": t["region"], "template_digest": t["template_digest"],
-                "knowledge_base_id": kb_id, "data_source_id": ds_id, "resource_request_ids": request_ids}
+        result.update(knowledge_base_id=kb_id, data_source_id=ds_id)
+        if missing:
+            result["missing"] = missing
+        return result
     except LedgerError:
         raise
     except Exception:

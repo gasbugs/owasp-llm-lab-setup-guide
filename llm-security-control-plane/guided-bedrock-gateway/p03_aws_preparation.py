@@ -23,7 +23,7 @@ def prepare_aws(path, operation_id, account_id, *, client_factory=clients):
         sdk = client_factory(specification["region"])
         connection = prepare_resources(specification, operation_id, **sdk)
         document = prepare_document(specification, connection, operation_id,
-                                    s3=sdk["s3"], agent=sdk["agent"])
+                                    s3=sdk["s3"], agent=sdk["agent"], vectors=sdk["vectors"])
         evidence = {"connection": connection, "document": document["evidence"]}
         store.publish(operation_id, document["snapshot"], evidence=evidence)
     except Exception:

@@ -116,11 +116,11 @@ class PreflightTests(unittest.TestCase):
             for call in client.mock_calls:
                 self.assertTrue(call[0].startswith(("get_", "list_", "head_")), call)
 
-    def check(self):
+    def check(self, **options):
         with patch.dict("sys.modules", {"p02_resources": resource_tests.module,
                                         "p02_ledger": resource_tests.ledger}):
             return module.preflight(self.template, s3=self.s3, vectors=self.vectors,
-                                    iam=self.iam, agent=self.agent, policy_name="runtime")
+                                    iam=self.iam, agent=self.agent, policy_name="runtime", **options)
 
     def absent(self):
         self.s3.head_bucket.side_effect = ClientError({"Error": {"Code": "404"}}, "HeadBucket")
@@ -152,6 +152,32 @@ class PreflightTests(unittest.TestCase):
         with self.assertRaises(module.HTTPException):
             self.check()
 
+    def test_explicit_partial_preparation_audits_before_allowing_creation(self):
+        for client, method, code in ((self.s3, "head_bucket", "404"),
+                                      (self.vectors, "get_index", "NotFoundException"),
+                                      (self.iam, "get_role", "NoSuchEntity")):
+            with self.subTest(method=method):
+                getattr(client, method).side_effect = ClientError({"Error": {"Code": code}}, method)
+                self.assertIsNone(self.check(allow_partial=True))
+                getattr(client, method).side_effect = None
+        self.agent.list_knowledge_bases.return_value = {"knowledgeBaseSummaries": []}
+        self.assertIsNone(self.check(allow_partial=True))
+
+    def test_partial_preparation_rejects_surviving_configuration_drift(self):
+        self.s3.head_bucket.side_effect = ClientError({"Error": {"Code": "404"}}, "HeadBucket")
+        self.fixture.kb["storageConfiguration"] = {}
+        with self.assertRaises(module.HTTPException):
+            self.check(allow_partial=True)
+        self.fixture.kb["storageConfiguration"] = {"type": "S3_VECTORS", "s3VectorsConfiguration": {"indexArn": self.template["index_arn"]}}
+        self.fixture.ds["dataSourceConfiguration"] = {}
+        with self.assertRaises(module.HTTPException):
+            self.check(allow_partial=True)
+
+    def test_vector_bucket_without_any_ownership_anchor_stops(self):
+        self.absent()
+        self.vectors.get_vector_bucket.side_effect = None
+        with self.assertRaises(module.HTTPException):
+            self.check(allow_partial=True)
     def test_forbidden_is_not_absent(self):
         self.s3.head_bucket.side_effect = ClientError({"Error": {"Code": "403"}}, "HeadBucket")
         with self.assertRaises(ClientError):

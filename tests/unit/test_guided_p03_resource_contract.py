@@ -102,6 +102,40 @@ class ResourceContractTests(unittest.TestCase):
         self.clients["s3"].head_bucket.side_effect = None
         self.rejects()
 
+    def test_explicit_preparation_audits_each_partial_set(self):
+        for client, method, code, missing in (
+                ("s3", "head_bucket", "404", ["source"]),
+                ("vectors", "get_index", "NotFoundException", ["index"]),
+                ("vectors", "get_vector_bucket", "NotFoundException", ["vector", "index"]),
+                ("iam", "get_role", "NoSuchEntity", ["role"])):
+            with self.subTest(missing=missing):
+                self.setUp()
+                getattr(self.clients[client], method).side_effect = ClientError({"Error": {"Code": code}}, method)
+                result = module.inspect_existing(self.t, **self.clients, allow_partial=True)
+                self.assertEqual(result["missing"], missing)
+                self.assertEqual(result["knowledge_base_id"], "KB12345678")
+
+    def test_explicit_preparation_without_kb_or_data_source(self):
+        self.responses["list_knowledge_bases"]["knowledgeBaseSummaries"] = []
+        result = module.inspect_existing(self.t, **self.clients, allow_partial=True)
+        self.assertEqual(result["missing"], ["knowledge_base", "data_source"])
+        self.setUp()
+        self.responses["list_data_sources"]["dataSourceSummaries"] = []
+        result = module.inspect_existing(self.t, **self.clients, allow_partial=True)
+        self.assertEqual(result["missing"], ["data_source"])
+
+    def test_vector_bucket_without_any_ownership_anchor_stops(self):
+        self.absent()
+        self.clients["vectors"].get_vector_bucket.side_effect = None
+        with self.assertRaises(module.LedgerError):
+            module.inspect_existing(self.t, **self.clients, allow_partial=True)
+
+    def test_partial_set_does_not_skip_audit_of_surviving_resources(self):
+        self.clients["s3"].head_bucket.side_effect = ClientError({"Error": {"Code": "404"}}, "HeadBucket")
+        self.responses["get_role_policy"]["PolicyDocument"] = {}
+        with self.assertRaises(module.LedgerError):
+            module.inspect_existing(self.t, **self.clients, allow_partial=True)
+
     def test_forbidden_is_not_absent(self):
         self.clients["s3"].head_bucket.side_effect = ClientError({"Error": {"Code": "403"}}, "HeadBucket")
         self.rejects(502)
