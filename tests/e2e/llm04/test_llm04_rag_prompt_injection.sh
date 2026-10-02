@@ -2,7 +2,7 @@
 # LLM04 — verify the dedicated RAG translator retrieves an injected document.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_URL="${TARGET_URL:-http://localhost:8004}"
+TARGET_URL="${TARGET_URL:-http://localhost/llm04-rag}"
 source "$SCRIPT_DIR/../lib/common.sh"
 
 REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-180}"

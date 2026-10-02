@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/common.sh"
 
 require_healthy
-require_scenario "day2"
+require_scenario "data"
 mkdir -p "$RESULTS_DIR/raw"
 REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-240}"
 TOKEN='llm02-c2001-demo-token'

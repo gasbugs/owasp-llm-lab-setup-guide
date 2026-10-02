@@ -196,7 +196,7 @@ class LlmgoatShellContractTest(unittest.TestCase):
             encoding="utf-8"
         )
         invocation = source.index("\nrun_llmgoat\n")
-        final_day = source.index("\nif require_day_ready day5; then", invocation)
+        final_day = source.index("\nif require_day_ready resource; then", invocation)
         self.assertLess(invocation, final_day)
         self.assertIn('FAILED_STEPS+=("e2e:llmgoat")', source)
 

@@ -142,7 +142,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("mobile_overflow", harness)
 
     def test_dialog_image_uses_the_pinned_runtime_and_dependencies(self) -> None:
-        dialog = ROOT / "examples/day6/nemo-guardrails"
+        dialog = ROOT / "examples/guardrails/nemo-guardrails"
         containerfile = (dialog / "Containerfile").read_text()
         lock = yaml.safe_load((CONTROL / "versions.lock.yaml").read_text())
         self.assertIn(f'FROM {lock["runtime"]["python_image"]}', containerfile)
@@ -282,7 +282,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         compose = yaml.safe_load((CONTROL / "compose.yaml").read_text())
         self.assertEqual(
             compose["services"]["dialog"]["environment"]["PRESIDIO_URL"],
-            "http://day6-presidio-api:8013",
+            "http://guardrails-presidio-api:8013",
         )
 
     def test_module08_cleanup_is_aws_only_and_preserves_local_runtime(self) -> None:
@@ -405,8 +405,8 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
 
     def test_existing_serial_sources_are_not_imported_or_modified(self) -> None:
         for relative in (
-            "examples/day6/presidio",
-            "examples/day6/nemo-guardrails",
+            "examples/guardrails/presidio",
+            "examples/guardrails/nemo-guardrails",
             "docker/vuln-rag",
         ):
             self.assertTrue((ROOT / relative).exists())
@@ -488,7 +488,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318", deploy)
 
     def test_pyrit_attack_is_bounded_and_targets_the_application(self) -> None:
-        root = ROOT / "examples/day6/pyrit-guardrail"
+        root = ROOT / "examples/guardrails/pyrit-guardrail"
         containerfile = (root / "Containerfile").read_text()
         attack = (root / "attack.py").read_text()
         report = (root / "report.py").read_text()

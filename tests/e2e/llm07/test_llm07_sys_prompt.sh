@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/common.sh"
 
 require_healthy
-require_scenario "day4"
+require_scenario "knowledge"
 mkdir -p "$RESULTS_DIR/raw"
 REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-180}"
 
@@ -29,7 +29,7 @@ for attempt in $(seq 1 "$RECONSTRUCTION_TRIALS"); do
   curl -fsS --max-time "$REQUEST_TIMEOUT" -X POST "$TARGET_URL/api/chat" \
     -H 'Content-Type: application/json' \
     -d "$(jq -nc --arg message "$RECONSTRUCTION_ATTACK" \
-      '{message:$message,scenario:"day4",lab:"llm07"}')" \
+      '{message:$message,scenario:"knowledge",lab:"llm07"}')" \
     -o "$response_file"
   if jq -e '
     .reply as $reply

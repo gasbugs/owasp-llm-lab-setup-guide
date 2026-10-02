@@ -14,9 +14,9 @@ SPEC = importlib.util.spec_from_file_location("lab_contract", MODULE_PATH)
 assert SPEC and SPEC.loader
 lab_contract = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(lab_contract)
-CONTRACT_PATH = ROOT / "contracts" / "labs" / "day6-presidio.json"
-DAY4_CONTRACT_PATH = ROOT / "contracts" / "labs" / "day4-llm03-real-model-lifecycle.json"
-DAY5_CONTRACT_PATH = ROOT / "contracts" / "labs" / "day5-llm10-unbounded-consumption.json"
+CONTRACT_PATH = ROOT / "contracts" / "labs" / "guardrails-presidio.json"
+KNOWLEDGE_CONTRACT_PATH = ROOT / "contracts" / "labs" / "knowledge-llm03-real-model-lifecycle.json"
+RESOURCE_CONTRACT_PATH = ROOT / "contracts" / "labs" / "resource-llm10-unbounded-consumption.json"
 
 
 class LabContractTests(unittest.TestCase):
@@ -49,10 +49,10 @@ class LabContractTests(unittest.TestCase):
     def test_schema_and_runtime_match_canonical_source(self) -> None:
         self.assertEqual(lab_contract.validate_runtime(self.contract, ROOT), [])
 
-    def test_day6_contract_names_the_shared_presidio_core_as_policy_source(self) -> None:
+    def test_guardrails_contract_names_the_shared_presidio_core_as_policy_source(self) -> None:
         self.assertEqual(
             self.contract["policy"]["source"],
-            "examples/day6/presidio/presidio_core.py",
+            "examples/guardrails/presidio/presidio_core.py",
         )
 
     def test_output_case_cannot_be_mislabeled_as_input_attack(self) -> None:
@@ -79,7 +79,7 @@ class LabContractTests(unittest.TestCase):
 
     def test_missing_policy_source_is_detected(self) -> None:
         broken = copy.deepcopy(self.contract)
-        broken["policy"]["source"] = "examples/day6/presidio/does-not-exist.py"
+        broken["policy"]["source"] = "examples/guardrails/presidio/does-not-exist.py"
         self.assertTrue(any("policy source missing" in issue for issue in lab_contract.validate_runtime(broken, ROOT)))
 
     def test_literal_input_is_exact(self) -> None:
@@ -141,9 +141,9 @@ class LabContractTests(unittest.TestCase):
         )
 
 
-class Day4LifecycleContractTests(unittest.TestCase):
+class KnowledgeLifecycleContractTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.contract = lab_contract.load_contract(DAY4_CONTRACT_PATH)
+        self.contract = lab_contract.load_contract(KNOWLEDGE_CONTRACT_PATH)
 
     def test_targeted_stages_partition_expensive_lifecycle(self) -> None:
         stages = self.contract["runtime"]["targeted_stages"]
@@ -156,7 +156,7 @@ class Day4LifecycleContractTests(unittest.TestCase):
         self.assertIn("verified-ollama-import", stages["registry"]["case_ids"])
         self.assertEqual(lab_contract.validate_runtime(self.contract, ROOT), [])
 
-    def test_each_day4_case_has_a_granular_book_binding(self) -> None:
+    def test_each_knowledge_case_has_a_granular_book_binding(self) -> None:
         bound = [
             case_id
             for binding in self.contract["book_bindings"]
@@ -166,9 +166,9 @@ class Day4LifecycleContractTests(unittest.TestCase):
         self.assertEqual(set(bound), {case["case_id"] for case in self.contract["cases"]})
 
 
-class Day5ConsumptionContractTests(unittest.TestCase):
+class ResourceConsumptionContractTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.contract = lab_contract.load_contract(DAY5_CONTRACT_PATH)
+        self.contract = lab_contract.load_contract(RESOURCE_CONTRACT_PATH)
 
     def test_runtime_cases_match_shared_acceptance_policy(self) -> None:
         self.assertEqual(lab_contract.validate_runtime(self.contract, ROOT), [])
@@ -211,9 +211,9 @@ class Day5ConsumptionContractTests(unittest.TestCase):
             binding["observation_id"]: binding["observation_command"]
             for binding in self.contract["book_bindings"]
         }
-        self.assertIn("curl -sS --max-time 45", commands["day5-llm10-baseline-request"])
-        self.assertIn("curl -sS --max-time 120", commands["day5-llm10-output-flood-request"])
-        self.assertIn("jq -n --rawfile message", commands["day5-llm10-large-input-request"])
+        self.assertIn("curl -sS --max-time 45", commands["resource-llm10-baseline-request"])
+        self.assertIn("curl -sS --max-time 120", commands["resource-llm10-output-flood-request"])
+        self.assertIn("jq -n --rawfile message", commands["resource-llm10-large-input-request"])
 
     def test_generated_input_evidence_uses_exact_hash_and_byte_count(self) -> None:
         records = []

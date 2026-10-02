@@ -56,7 +56,7 @@
     "suite_args": [],
     "case_overrides": [],
     "environment": {
-      "GOAT_URL": "http://127.0.0.1:5000",
+      "GOAT_URL": "http://127.0.0.1/llmgoat",
       "TRIALS": "3",
       "GOAT_REQUEST_TIMEOUT": "180",
       "LLMGOAT_A09_ASSET": "tests/e2e/llmgoat/assets/a09-cyborg-goat.png"

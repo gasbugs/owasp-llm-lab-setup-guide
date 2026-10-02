@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, List
 
-SCENARIO_NAMES = ("day1", "day2", "llm04", "day3", "day4", "day5")
+SCENARIO_NAMES = ("prompt", "data", "llm04", "output", "knowledge", "resource")
 
 KOREAN_PARTICLES = (
     "으로부터",
@@ -67,20 +67,20 @@ class Scenario:
 
 
 def load_scenario(name: str) -> Scenario:
-    if name == "day1":
-        from app.scenarios.day1 import scenario
-    elif name == "day2":
-        from app.scenarios.day2 import scenario
+    if name == "prompt":
+        from app.scenarios.prompt import scenario
+    elif name == "data":
+        from app.scenarios.data import scenario
     elif name == "llm04":
         from app.scenarios.llm04 import scenario
-    elif name == "day3":
-        from app.scenarios.day3 import scenario
-    elif name == "day4":
-        from app.scenarios.day4 import scenario
-    elif name == "day5":
-        from app.scenarios.day5 import scenario
+    elif name == "output":
+        from app.scenarios.output import scenario
+    elif name == "knowledge":
+        from app.scenarios.knowledge import scenario
+    elif name == "resource":
+        from app.scenarios.resource import scenario
     else:
-        from app.scenarios.day1 import scenario
+        from app.scenarios.prompt import scenario
     return scenario
 
 

@@ -25,7 +25,7 @@ def load_main_module():
         del sys.modules[name]
     sys.path.insert(0, str(VULN_RAG_ROOT))
     previous = os.environ.get("DEFAULT_SCENARIO")
-    os.environ["DEFAULT_SCENARIO"] = "day2"
+    os.environ["DEFAULT_SCENARIO"] = "data"
     try:
         return importlib.import_module("app.main")
     finally:
@@ -100,7 +100,7 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.original_llm = MAIN.llm
         self.llm = FakeLLM()
         MAIN.llm = self.llm
-        MAIN.day2_scenario.reset_customer_db()
+        MAIN.data_scenario.reset_customer_db()
         self.client = TestClient(MAIN.app)
         self.headers = {"Authorization": "Bearer llm02-c2001-demo-token"}
         self.normal = "내 카드 배송 상태와 도착 예정일을 알려 줘."
@@ -359,7 +359,7 @@ class Llm02AuthApiTest(unittest.TestCase):
         ui = self.client.post(
             "/api/chat",
             headers=self.headers,
-            json={"message": self.normal, "scenario": "day2", "lab": "llm02"},
+            json={"message": self.normal, "scenario": "data", "lab": "llm02"},
         )
         self.assertEqual(workshop.status_code, 200)
         self.assertEqual(ui.status_code, 200)
@@ -387,7 +387,7 @@ class Llm02AuthApiTest(unittest.TestCase):
     def test_prompt_viewer_exposes_active_prompts_without_runtime_records(self) -> None:
         response = self.client.get(
             "/api/system-prompt",
-            params={"scenario": "day2", "lab": "llm02"},
+            params={"scenario": "data", "lab": "llm02"},
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -405,10 +405,10 @@ class Llm02AuthApiTest(unittest.TestCase):
 
     def test_prompt_viewer_maps_scenarios_to_llm_ids(self) -> None:
         expected = {
-            "day1": ["LLM01"],
+            "prompt": ["LLM01"],
             "llm04": ["LLM04"],
-            "day3": ["LLM05"],
-            "day5": ["LLM10"],
+            "output": ["LLM05"],
+            "resource": ["LLM10"],
         }
         for scenario, llm_ids in expected.items():
             with self.subTest(scenario=scenario):
@@ -420,7 +420,7 @@ class Llm02AuthApiTest(unittest.TestCase):
                 self.assertTrue(response.json()["prompts"][0]["content"])
 
         llm01 = self.client.get(
-            "/api/system-prompt", params={"scenario": "day1"}
+            "/api/system-prompt", params={"scenario": "prompt"}
         ).json()["prompts"][0]["content"]
         self.assertIn("[REDACTED LAB FLAG]", llm01)
         self.assertNotIn("LLM_CTF_PROMPT_INJECTION_W1NN3R", llm01)
@@ -434,7 +434,7 @@ class Llm02AuthApiTest(unittest.TestCase):
         self.assertNotIn("flag{rag_context_boundary_7e4b2c91}", llm04)
 
         llm05 = self.client.get(
-            "/api/system-prompt", params={"scenario": "day3"}
+            "/api/system-prompt", params={"scenario": "output"}
         ).json()
         self.assertEqual(
             [prompt["stage"] for prompt in llm05["prompts"]],
@@ -447,7 +447,7 @@ class Llm02AuthApiTest(unittest.TestCase):
             with self.subTest(lab=lab):
                 response = self.client.get(
                     "/api/system-prompt",
-                    params={"scenario": "day4", "lab": lab},
+                    params={"scenario": "knowledge", "lab": lab},
                 )
                 self.assertEqual(response.status_code, 200)
                 body = response.json()
@@ -475,7 +475,7 @@ class Llm02AuthApiTest(unittest.TestCase):
                 self.llm.chat_calls.clear()
                 response = self.client.post(
                     "/api/chat",
-                    json={"scenario": "day4", "lab": lab, "message": "hello"},
+                    json={"scenario": "knowledge", "lab": lab, "message": "hello"},
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json()["reply"], "fixture reply")
@@ -491,7 +491,7 @@ class Llm02AuthApiTest(unittest.TestCase):
         for lab, title in cases:
             with self.subTest(lab=lab):
                 response = self.client.get(
-                    "/", params={"scenario": "day4", "lab": lab}
+                    "/", params={"scenario": "knowledge", "lab": lab}
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(title, response.text)

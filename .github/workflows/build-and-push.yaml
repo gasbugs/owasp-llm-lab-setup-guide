@@ -136,7 +136,7 @@ jobs:
             sleep 1
           done
           curl -fsS --max-time 2 http://127.0.0.1:11434/healthz >/dev/null
-          for lab in LLM01 LLM02 LLM05 LLM06 LLM08 LLM08RAG LLM09 LLM10 DAY6; do
+          for lab in LLM01 LLM02 LLM05 LLM06 LLM08 LLM08RAG LLM09 LLM10 GUARDRAILS; do
             CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh "$lab" vulnerable
             CONTAINER_ENGINE=docker bash tests/e2e/secure-coding/run-workshop.sh "$lab" safe
           done
@@ -343,7 +343,7 @@ jobs:
           cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/owasp-llm-vuln-agent:buildcache,mode=max
 
-      # DVLA (ReversecLabs/damn-vulnerable-llm-agent, Apache 2.0): Day 3 comparison app.
+      # DVLA (ReversecLabs/damn-vulnerable-llm-agent, Apache 2.0): 3일차 comparison app.
       - name: Build & push dvla
         uses: docker/build-push-action@v7
         with:

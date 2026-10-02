@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 인스턴스 안에서 실행되는 경우 host 직접 접근 — common.sh 의 require_healthy 미사용 (fake-registry는 SG에 미공개, 인스턴스 내부 only)
-REGISTRY="${REGISTRY:-http://localhost:8002}"
+REGISTRY="${REGISTRY:-http://localhost/fake-registry}"
 python3 "$SCRIPT_DIR/../lib/require_loopback_url.py" "$REGISTRY" || exit 2
 : "${RESULTS_DIR:=tests/e2e/results/$(date +%Y%m%d-%H%M%S)}"
 : "${COSIGN_IMAGE:=ghcr.io/sigstore/cosign/cosign@sha256:203f193bc86591bbc1a3a39ad3532590652477d1775ccb91221e8d14cfe5c000}"

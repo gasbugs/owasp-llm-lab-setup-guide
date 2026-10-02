@@ -24,10 +24,13 @@ configs:
           ""      close;
       }
 
+      # 실습에서 개별 컨테이너를 force-recreate해 IP가 바뀌어도 새 주소를 조회한다.
+      # Docker Compose network의 내장 DNS만 사용하며 host 공개 포트로 우회하지 않는다.
       resolver 127.0.0.11 valid=10s ipv6=off;
 
-      upstream portal_backend { zone portal_backend 64k; server portal:8080 resolve; }
+      upstream ollama_backend { zone ollama_backend 64k; server ollama:11434 resolve; }
       upstream common_backend { zone common_backend 64k; server common:8080 resolve; }
+      upstream portal_backend { zone portal_backend 64k; server portal:8080 resolve; }
       upstream prompt_rag_backend { zone prompt_rag_backend 64k; server prompt-rag:8000 resolve; }
       upstream llm04_rag_backend { zone llm04_rag_backend 64k; server llm04-rag:8004 resolve; }
       upstream data_rag_backend { zone data_rag_backend 64k; server data-rag:8010 resolve; }
@@ -43,6 +46,8 @@ configs:
           listen 80;
           server_name _;
 
+          # LLM10의 큰 입력 실습을 프록시가 먼저 막지 않도록 크기 제한을 끈다.
+          # 외부 접근 범위는 Terraform Security Group의 수강생 IPv4 /32가 제한한다.
           client_max_body_size 0;
           proxy_http_version 1.1;
           proxy_read_timeout 600s;
@@ -56,51 +61,43 @@ configs:
           proxy_set_header Upgrade $$http_upgrade;
           proxy_set_header Connection $$connection_upgrade;
 
-          location = /prompt-rag { return 308 /prompt-rag/; }
+          location /ollama/ { proxy_pass http://ollama_backend/; }
           location = /common/theme.css { proxy_pass http://common_backend/theme.css; }
+
+          location = /prompt-rag { return 308 /prompt-rag/; }
           location /prompt-rag/ { proxy_pass http://prompt_rag_backend/; }
+
           location = /llm04-rag { return 308 /llm04-rag/; }
           location /llm04-rag/ { proxy_pass http://llm04_rag_backend/; }
+
           location = /data-rag { return 308 /data-rag/; }
           location /data-rag/ { proxy_pass http://data_rag_backend/; }
+
           location = /output-rag { return 308 /output-rag/; }
           location /output-rag/ { proxy_pass http://output_rag_backend/; }
+
           location = /knowledge-rag { return 308 /knowledge-rag/; }
           location /knowledge-rag/ { proxy_pass http://knowledge_rag_backend/; }
+
           location = /resource-rag { return 308 /resource-rag/; }
           location /resource-rag/ { proxy_pass http://resource_rag_backend/; }
+
           location = /vuln-agent { return 308 /vuln-agent/; }
           location /vuln-agent/ { proxy_pass http://vuln_agent_backend/; }
+
+          # LLMGoat wrapper가 /llmgoat를 WSGI SCRIPT_NAME으로 변환한다.
           location = /llmgoat { return 308 /llmgoat/; }
           location /llmgoat/ { proxy_pass http://llmgoat_backend; }
+
+          # Streamlit은 baseUrlPath=dvla로 실행되므로 prefix를 제거하지 않는다.
           location = /dvla { return 308 /dvla/; }
           location /dvla/ { proxy_pass http://dvla_backend; }
+
           location = /fake-registry { return 308 /fake-registry/api/v1/models; }
           location /fake-registry/ { proxy_pass http://fake_registry_backend/; }
+
+          # 포털과 포털의 /api/status/* 요청은 기본 경로에서 처리한다.
           location / { proxy_pass http://portal_backend; }
-      }
-
-      server {
-          listen 8501;
-          server_name _;
-
-          proxy_http_version 1.1;
-          proxy_read_timeout 600s;
-          proxy_send_timeout 600s;
-          proxy_buffering off;
-          proxy_set_header Host $$http_host;
-          proxy_set_header X-Real-IP $$remote_addr;
-          proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto $$scheme;
-          proxy_set_header Upgrade $$http_upgrade;
-          proxy_set_header Connection $$connection_upgrade;
-
-          location = / { return 308 /dvla/; }
-          location = /_stcore/health {
-              proxy_pass http://dvla_backend/dvla/_stcore/health;
-          }
-          location /dvla/ { proxy_pass http://dvla_backend; }
-          location / { return 404; }
       }
 
   dvla_model_config:
@@ -120,7 +117,6 @@ services:
     restart: always
     ports:
       - "80:80"
-      - "8501:8501"
     configs:
       - source: reverse_proxy_config
         target: /etc/nginx/conf.d/default.conf
@@ -145,8 +141,6 @@ services:
     image: docker.io/ollama/ollama:0.34.1
     restart: always
     gpus: all
-    ports:
-      - "11434:11434"
     volumes:
       - /home/ubuntu/ollama-models:/root/.ollama
     environment:
@@ -156,20 +150,16 @@ services:
   prompt-rag:
     <<: *rag-common
     container_name: lab-prompt-rag
-    ports:
-      - "8000:8000"
     environment:
       <<: *rag-environment
-      DEFAULT_SCENARIO: day1
-      SCENARIO: day1
+      DEFAULT_SCENARIO: prompt
+      SCENARIO: prompt
       PORT: "8000"
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
   llm04-rag:
     <<: *rag-common
     container_name: lab-llm04-rag
-    ports:
-      - "8004:8004"
     environment:
       <<: *rag-environment
       DEFAULT_SCENARIO: llm04
@@ -180,48 +170,40 @@ services:
   data-rag:
     <<: *rag-common
     container_name: lab-data-rag
-    ports:
-      - "8010:8010"
     environment:
       <<: *rag-environment
-      DEFAULT_SCENARIO: day2
-      SCENARIO: day2
+      DEFAULT_SCENARIO: data
+      SCENARIO: data
       PORT: "8010"
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010"]
 
   output-rag:
     <<: *rag-common
     container_name: lab-output-rag
-    ports:
-      - "8011:8011"
     environment:
       <<: *rag-environment
-      DEFAULT_SCENARIO: day3
-      SCENARIO: day3
+      DEFAULT_SCENARIO: output
+      SCENARIO: output
       PORT: "8011"
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8011"]
 
   knowledge-rag:
     <<: *rag-common
     container_name: lab-knowledge-rag
-    ports:
-      - "8012:8012"
     environment:
       <<: *rag-environment
-      DEFAULT_SCENARIO: day4
-      SCENARIO: day4
+      DEFAULT_SCENARIO: knowledge
+      SCENARIO: knowledge
       PORT: "8012"
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8012"]
 
   resource-rag:
     <<: *rag-common
     container_name: lab-resource-rag
-    ports:
-      - "8013:8013"
     environment:
       <<: *rag-environment
-      DEFAULT_SCENARIO: day5
-      SCENARIO: day5
+      DEFAULT_SCENARIO: resource
+      SCENARIO: resource
       PORT: "8013"
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8013"]
 
@@ -229,8 +211,6 @@ services:
     container_name: lab-vuln-agent
     image: ghcr.io/${IMAGE_NAMESPACE:-gasbugs}/owasp-llm-vuln-agent:${COMPOSE_IMAGE_TAG:-latest}
     restart: always
-    ports:
-      - "8001:8001"
     environment:
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b-q4_K_M}
@@ -252,8 +232,6 @@ services:
     pull_policy: never
     restart: always
     gpus: all
-    ports:
-      - "5000:5000"
     environment:
       LLMGOAT_SERVER_HOST: 0.0.0.0
       LLMGOAT_SERVER_PORT: "5000"
@@ -285,8 +263,6 @@ services:
     container_name: lab-fake-registry
     image: docker.io/library/python:3.12-slim
     restart: always
-    ports:
-      - "8002:8002"
     volumes:
       - /home/ubuntu/work/fake-registry:/app
     command: ["python", "/app/server.py"]
@@ -300,5 +276,3 @@ services:
     container_name: lab-portal
     image: ghcr.io/gasbugs/owasp-llm-portal:${COMPOSE_IMAGE_TAG:-latest}
     restart: always
-    ports:
-      - "8080:8080"

@@ -146,17 +146,17 @@ set -euo pipefail
 grep -E '^(SCRIPT_VERSION|IMAGE_TAG|OLLAMA_EMBED_MODEL)=' /etc/lab/env
 docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 docker exec lab-ollama ollama list
-curl -fsS --max-time 10 http://127.0.0.1:8012/healthz | jq
+curl -fsS --max-time 10 http://127.0.0.1/knowledge-rag/healthz | jq
 test -x "$HOME/work/llm08-analysis-venv/bin/python"
 "$HOME/work/llm08-analysis-venv/bin/python" -c 'import numpy; print(numpy.__version__)'
 ```
 
 증상별 해석은 다음과 같습니다.
 
-- `/api/embed` HTTP 404: 8012가 Day 4인지 확인합니다. Day 4인데도 404라면 새 endpoint가 없는 구 `vuln-rag` 이미지입니다.
+- `/api/embed` HTTP 404: 8012가 4일차인지 확인합니다. 4일차인데도 404라면 새 endpoint가 없는 구 `vuln-rag` 이미지입니다.
 - HTTP 401: `Authorization: Bearer llm08-acme-demo-token`이 없거나 틀렸습니다. request body의 `tenant`로 인증을 대신하지 않습니다.
 - HTTP 422: input이 비었거나 batch/길이 계약을 벗어났거나, safe endpoint에 `tenant` 같은 알 수 없는 필드를 넣었습니다.
-- HTTP 502: Day 4 API가 Ollama embedding backend의 실패나 잘못된 vector 응답을 fail-closed로 거부한 것입니다.
+- HTTP 502: 4일차 API가 Ollama embedding backend의 실패나 잘못된 vector 응답을 fail-closed로 거부한 것입니다.
 - `bge-m3:latest`가 Ollama 목록에 없음: installer model pull이 끝나지 않았습니다. 설치 로그의 마지막 성공 단계를 확인합니다.
 - `~/work/llm08-analysis-venv` 또는 scaffold가 없음: 구 installer/checkout을 사용했거나 설치가 중간 실패했습니다. 같은 published commit으로 재실행합니다.
 - `dimensions`가 1024가 아님: 1024는 2026-07-13 측정 예입니다. model이 맞는지 확인하고 실제 합격 조건인 `dimensions > 0`과 vector 길이 일치를 검사합니다.
@@ -171,7 +171,7 @@ docker logs --tail 200 lab-knowledge-rag
 docker logs --tail 200 lab-ollama
 
 curl -fsS --retry 2 --retry-all-errors --max-time 180 \
-  http://127.0.0.1:8012/api/embed \
+  http://127.0.0.1/knowledge-rag/api/embed \
   -H 'Authorization: Bearer llm08-acme-demo-token' \
   -H 'Content-Type: application/json' \
   --data-binary '{"input":["embedding diagnostic"]}' \
@@ -188,7 +188,7 @@ curl -fsS --retry 2 --retry-all-errors --max-time 180 \
 # [EC2 / SSM 세션 1, 서버 전용 터미널]
 ss -ltnp | grep ':18080' || true
 cd "$HOME/work/llm08-mini-app"
-export TARGET_URL=http://127.0.0.1:8012
+export TARGET_URL=http://127.0.0.1/knowledge-rag
 export LLM08_TOKEN=llm08-acme-demo-token
 python3 learner_vector_app.py --serve --host 0.0.0.0 --port 18080
 ```

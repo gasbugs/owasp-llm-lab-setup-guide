@@ -1,6 +1,6 @@
 # LLM Security Control Plane
 
-이 디렉터리는 기존 `examples/day6/presidio/`, `examples/day6/nemo-guardrails/`,
+이 디렉터리는 기존 `examples/guardrails/presidio/`, `examples/guardrails/nemo-guardrails/`,
 `docker/vuln-rag/`를 변경하지 않고 추가한 NeMo 중심 허브·스포크 참조 구현이다.
 기존 18090~18092 직렬형 실습은 호환성 비교용으로 계속 사용할 수 있다.
 

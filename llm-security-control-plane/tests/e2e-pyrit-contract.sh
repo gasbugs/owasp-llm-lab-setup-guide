@@ -11,8 +11,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker build -f "$ROOT/examples/day6/pyrit-guardrail/Containerfile" \
-  -t localhost/module08-pyrit:1.0.1 "$ROOT/examples/day6/pyrit-guardrail"
+docker build -f "$ROOT/examples/guardrails/pyrit-guardrail/Containerfile" \
+  -t localhost/module08-pyrit:1.0.1 "$ROOT/examples/guardrails/pyrit-guardrail"
 docker run --rm --network none -v "$ROOT:/repo:ro" -w /repo \
   --entrypoint python localhost/module08-pyrit:1.0.1 \
   -m unittest discover -s tests/unit -p test_pyrit_report.py -v

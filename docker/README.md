@@ -20,20 +20,20 @@
 
 | 컨테이너 | scenario | 포트 |
 |---|---|---:|
-| `lab-prompt-rag` | day1 / LLM01 | 8000 |
+| `lab-prompt-rag` | prompt / LLM01 | 8000 |
 | `lab-llm04-rag` | llm04 / LLM01의 전용 RAG 변형 | 8004 |
-| `lab-data-rag` | day2 / LLM02·LLM08 RAG corpus | 8010 |
-| `lab-output-rag` | day3 / LLM05 | 8011 |
-| `lab-knowledge-rag` | day4 / LLM07·LLM09, Day 2 LLM08 공유 | 8012 |
-| `lab-resource-rag` | day5 / LLM10 | 8013 |
+| `lab-data-rag` | data / LLM02·LLM08 RAG corpus | 8010 |
+| `lab-output-rag` | output / LLM05 | 8011 |
+| `lab-knowledge-rag` | knowledge / LLM07·LLM09, 2일차 LLM08 공유 | 8012 |
+| `lab-resource-rag` | resource / LLM10 | 8013 |
 
 `lab-prompt-rag`는 기존 Compose·URL 호환을 위해 서비스 이름만 유지한다. LLM01 실행 경로에는 corpus, 문서 주입, 검색 Context가 없으며 `debug.retrieved_chunks`도 반환하지 않는다. `lab-llm04-rag`는 LLM01 번역기에만 별도 in-memory corpus를 붙인 변형이며 LLM08의 provenance-bearing corpus와 공유하지 않는다. RAG 문서 출처 검증은 계속 `lab-data-rag`의 LLM08 기능이 담당한다.
 
 `/healthz`는 `default_scenario`와 전체 `scenarios` 목록을 반환합니다. 이미지 HEALTHCHECK도 `PORT`를 사용하므로 실제 uvicorn 포트와 일치합니다.
 
-Day 2 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 Ollama Structured Output Planner와 read-only `get_customer_record` Tool Executor가 들어 있습니다. Planner는 사용자 문장과 tool schema만 받고 Bearer token·DB credential·고객 데이터는 받지 않습니다. 취약 실행기는 LLM이 제안한 `customer_id`와 `fields`를 그대로 조회하고, 안전 실행기는 인증 principal과 배송 field allowlist를 DB 조회 전에 검사합니다. 수강생은 이미지를 다시 build하지 않고 인접한 실행기 호출 두 줄을 바꿔 같은 요청의 `HIT`와 `PASS`를 비교합니다.
+2일차 LLM02의 같은 prebuilt `vuln-rag` 이미지에는 Ollama Structured Output Planner와 read-only `get_customer_record` Tool Executor가 들어 있습니다. Planner는 사용자 문장과 tool schema만 받고 Bearer token·DB credential·고객 데이터는 받지 않습니다. 취약 실행기는 LLM이 제안한 `customer_id`와 `fields`를 그대로 조회하고, 안전 실행기는 인증 principal과 배송 field allowlist를 DB 조회 전에 검사합니다. 수강생은 이미지를 다시 build하지 않고 인접한 실행기 호출 두 줄을 바꿔 같은 요청의 `HIT`와 `PASS`를 비교합니다.
 
-8010 UI는 Day 2 안에서 `lab=llm02`와 `lab=llm08-rag-poisoning`을 명시적으로 선택합니다. `ChatRequest.lab`은 기능 라우팅 외의 인증·승인 판정에는 사용하지 않습니다. LLM02는 Bearer 인증을 유지하고, LLM08 RAG UI 요청은 전용 workshop endpoint와 같은 `select_llm08_rag_provenance_filter()`·`run_llm08_rag_chat()` 경로를 사용합니다. 문서 주입 패널도 `/api/labs/llm08/rag-poisoning/documents`를 호출하므로 화면과 API가 하나의 provenance-bearing corpus를 공유합니다.
+8010 UI는 2일차 안에서 `lab=llm02`와 `lab=llm08-rag-poisoning`을 명시적으로 선택합니다. `ChatRequest.lab`은 기능 라우팅 외의 인증·승인 판정에는 사용하지 않습니다. LLM02는 Bearer 인증을 유지하고, LLM08 RAG UI 요청은 전용 workshop endpoint와 같은 `select_llm08_rag_provenance_filter()`·`run_llm08_rag_chat()` 경로를 사용합니다. 문서 주입 패널도 `/api/labs/llm08/rag-poisoning/documents`를 호출하므로 화면과 API가 하나의 provenance-bearing corpus를 공유합니다.
 
 ## 실습 전용 검색 디버그 계약
 
@@ -45,12 +45,12 @@ corpus는 교육용 process memory에 보관하며 등록·삭제는 다음 검�
 
 LLM02는 질문에 명시된 고객과 Planner 대상이 다르거나 질문에 고객 ID가 둘 이상이면 조회 전에 422로 종료한다. 근거 검증과 서버의 customer scope·field 인가는 별개이며 기존 Answer record 대조를 유지한다. UI는 서버 오류를 정상 답변과 구분하고 실패한 응답을 HTML 재생 대상으로 저장하지 않는다.
 
-RAG를 사용하는 일반 scenario의 `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM01은 검색을 사용하지 않으므로 이 필드가 없고, LLM04에는 전용 corpus에서 실제 선택된 청크가 표시됩니다. LLM08 RAG를 선택한 Day 2 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 RAG 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 E2E가 같은 필드를 사용합니다.
+RAG를 사용하는 일반 scenario의 `/api/chat` 응답은 강의 실측을 위해 `debug.retrieved_chunks`를 일부러 반환합니다. LLM01은 검색을 사용하지 않으므로 이 필드가 없고, LLM04에는 전용 corpus에서 실제 선택된 청크가 표시됩니다. LLM08 RAG를 선택한 2일차 요청은 문서별 `source`와 `approval_status`가 있는 `retrieval.hits`를 대신 반환합니다. 두 RAG 형식 모두 검색 실패와 모델 생성 실패를 구분하는 관찰 증거이며 브라우저 UI와 E2E가 같은 필드를 사용합니다.
 
 ```json
 {
   "reply": "모델의 최종 응답",
-  "scenario": "day2",
+  "scenario": "data",
   "debug": {
     "retrieved_chunks": ["모델 컨텍스트에 들어간 검색 청크"],
     "rendered_system_prompt": "(hidden)"

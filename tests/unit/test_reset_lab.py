@@ -39,9 +39,9 @@ class ResetLabTest(unittest.TestCase):
                 "#!/bin/sh\n"
                 "for value in \"$@\"; do url=\"$value\"; done\n"
                 "case \"$url\" in\n"
-                "  *:11434/api/tags) printf '%s\\n' '{\"models\":[]}' ;;\n"
-                "  *:8001/healthz) printf '%s\\n' '{\"ok\":true,\"tools\":[\"delete_animal\"]}' ;;\n"
-                "  *:8013/healthz) printf '%s\\n' '{\"ok\":true,\"default_scenario\":\"day5\"}' ;;\n"
+                "  */ollama/api/tags) printf '%s\\n' '{\"models\":[]}' ;;\n"
+                "  */vuln-agent/healthz) printf '%s\\n' '{\"ok\":true,\"tools\":[\"delete_animal\"]}' ;;\n"
+                "  */resource-rag/healthz) printf '%s\\n' '{\"ok\":true,\"default_scenario\":\"resource\"}' ;;\n"
                 "  *) printf '%s\\n' '{\"ok\":true}' ;;\n"
                 "esac\n",
                 encoding="utf-8",
@@ -77,42 +77,42 @@ class ResetLabTest(unittest.TestCase):
         self.assertEqual(
             calls, ["recreate lab-vuln-agent"]
         )
-        self.assertIn("LLM06_READY_URL=http://127.0.0.1:8001/healthz", result.stdout)
+        self.assertIn("LLM06_READY_URL=http://127.0.0.1/vuln-agent/healthz", result.stdout)
         self.assertIn('{"ok":true,"tools":["delete_animal"]}', result.stdout)
 
     def test_simple_allowlist_ids_restart_only_their_exact_units(self) -> None:
         cases = {
             "llm01": (
                 "recreate lab-prompt-rag",
-                "LLM01_READY_URL=http://127.0.0.1:8000/healthz",
+                "LLM01_READY_URL=http://127.0.0.1/prompt-rag/healthz",
             ),
             "llm02": (
                 "recreate lab-data-rag",
-                "LLM02_LLM08_RAG_READY_URL=http://127.0.0.1:8010/healthz",
+                "LLM02_LLM08_RAG_READY_URL=http://127.0.0.1/data-rag/healthz",
             ),
             "llm04": (
                 "recreate lab-llm04-rag",
-                "LLM04_READY_URL=http://127.0.0.1:8004/healthz",
+                "LLM04_READY_URL=http://127.0.0.1/llm04-rag/healthz",
             ),
             "llm08-rag": (
                 "recreate lab-data-rag",
-                "LLM02_LLM08_RAG_READY_URL=http://127.0.0.1:8010/healthz",
+                "LLM02_LLM08_RAG_READY_URL=http://127.0.0.1/data-rag/healthz",
             ),
             "llm05": (
                 "recreate lab-output-rag",
-                "LLM05_READY_URL=http://127.0.0.1:8011/healthz",
+                "LLM05_READY_URL=http://127.0.0.1/output-rag/healthz",
             ),
             "llm08": (
                 "recreate lab-knowledge-rag",
-                "LLM08_LLM09_READY_URL=http://127.0.0.1:8012/healthz",
+                "LLM08_LLM09_READY_URL=http://127.0.0.1/knowledge-rag/healthz",
             ),
             "llm09": (
                 "recreate lab-knowledge-rag",
-                "LLM08_LLM09_READY_URL=http://127.0.0.1:8012/healthz",
+                "LLM08_LLM09_READY_URL=http://127.0.0.1/knowledge-rag/healthz",
             ),
             "llmgoat": (
                 "docker restart lab-llmgoat",
-                "LLMGOAT_READY_URL=http://127.0.0.1:5000/api/model_status",
+                "LLMGOAT_READY_URL=http://127.0.0.1/llmgoat/api/model_status",
             ),
         }
         for lab_id, (action, ready_line) in cases.items():
@@ -123,7 +123,7 @@ class ResetLabTest(unittest.TestCase):
                 self.assertIn(ready_line, result.stdout)
                 self.assertIn('{"ok":true}', result.stdout)
 
-    def test_llm10_uses_day5_ollama_day5_compose_order(self) -> None:
+    def test_llm10_uses_resource_ollama_resource_compose_order(self) -> None:
         result, calls = self.run_reset("llm10")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
@@ -134,10 +134,10 @@ class ResetLabTest(unittest.TestCase):
                 "recreate lab-resource-rag",
             ],
         )
-        self.assertIn("OLLAMA_READY_URL=http://127.0.0.1:11434/api/tags", result.stdout)
-        self.assertIn("LLM10_READY_URL=http://127.0.0.1:8013/healthz", result.stdout)
+        self.assertIn("OLLAMA_READY_URL=http://127.0.0.1/ollama/api/tags", result.stdout)
+        self.assertIn("LLM10_READY_URL=http://127.0.0.1/resource-rag/healthz", result.stdout)
         self.assertIn('{"models":[]}', result.stdout)
-        self.assertIn('{"ok":true,"default_scenario":"day5"}', result.stdout)
+        self.assertIn('{"ok":true,"default_scenario":"resource"}', result.stdout)
 
     def test_unknown_lab_fails_before_any_service_action(self) -> None:
         result, calls = self.run_reset("not-a-lab")

@@ -32,9 +32,9 @@ class MixedHostHarnessOutputTests(unittest.TestCase):
             ["baseline-request", "large-input-request"],
         )
 
-    def test_day6_contract_declares_its_containerfile(self) -> None:
+    def test_guardrails_contract_declares_its_containerfile(self) -> None:
         contract = json.loads(
-            (ROOT / "contracts/labs/day6-presidio.json").read_text(encoding="utf-8")
+            (ROOT / "contracts/labs/guardrails-presidio.json").read_text(encoding="utf-8")
         )
         self.assertEqual(contract["runtime"]["build_file"], "Containerfile")
 

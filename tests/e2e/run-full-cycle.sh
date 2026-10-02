@@ -19,8 +19,8 @@ cd "$REPO_ROOT"
 
 : "${AWS_DEFAULT_REGION:=us-east-1}"
 : "${TRIALS:=5}"
-: "${AGENT_URL:=http://localhost:8001}"
-: "${GOAT_URL:=http://localhost:5000}"
+: "${AGENT_URL:=http://localhost/vuln-agent}"
+: "${GOAT_URL:=http://localhost/llmgoat}"
 
 runtime_uid=$(id -u)
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$runtime_uid}"
@@ -37,32 +37,32 @@ log() {
 
 # 런타임 서비스별 고정 포트 + 실행할 e2e 항목.
 # LLM04는 LLM01의 RAG 변형이지만 별도 service와 corpus를 사용한다.
-# LLM08은 Day 2 차시지만 shared PrivateGPT-Lite 서비스(day4/8012)를 사용한다.
+# LLM08은 2일차 차시지만 shared PrivateGPT-Lite 서비스(knowledge/8012)를 사용한다.
 # LLM03은 RAG scenario가 아니라 독립 registry(8002)이므로 아래 map 밖에서 실행한다.
 declare -A SCENARIO_ITEMS=(
-  ["day1"]="llm01"
-  ["day2"]="llm02"
+  ["prompt"]="llm01"
+  ["data"]="llm02"
   ["llm04"]="llm04"
-  ["day3"]="llm05"
-  ["day4"]="llm07 llm08 llm09"
-  ["day5"]="llm10"
+  ["output"]="llm05"
+  ["knowledge"]="llm07 llm08 llm09"
+  ["resource"]="llm10"
 )
 # 파괴적 Agent 검증 뒤, 자원 소비 LLM10을 전체 cycle의 마지막에 실행한다.
-SCENARIO_ORDER=(day1 day2 llm04 day3 day4)
+SCENARIO_ORDER=(prompt data llm04 output knowledge)
 declare -A SCENARIO_URLS=(
-  ["day1"]="http://localhost:8000"
-  ["day2"]="http://localhost:8010"
-  ["llm04"]="http://localhost:8004"
-  ["day3"]="http://localhost:8011"
-  ["day4"]="http://localhost:8012"
-  ["day5"]="http://localhost:8013"
+  ["prompt"]="http://localhost/prompt-rag"
+  ["data"]="http://localhost/data-rag"
+  ["llm04"]="http://localhost/llm04-rag"
+  ["output"]="http://localhost/output-rag"
+  ["knowledge"]="http://localhost/knowledge-rag"
+  ["resource"]="http://localhost/resource-rag"
 )
 declare -A BASELINE_DOC_COUNTS=(
-  ["day2"]=2
+  ["data"]=2
   ["llm04"]=2
-  ["day3"]=2
-  ["day4"]=4
-  ["day5"]=3
+  ["output"]=2
+  ["knowledge"]=4
+  ["resource"]=3
 )
 
 require_day_ready() {
@@ -99,7 +99,7 @@ reset_mutable_state() {
 
   # restart가 실제로 메모리 내 오염 문서를 버리는지 sentinel로 검증한다.
   local scenario url
-  for scenario in day2 llm04 day3 day4 day5; do
+  for scenario in data llm04 output knowledge resource; do
     url="${SCENARIO_URLS[$scenario]}"
     if ! curl -fsS --max-time 10 -X POST "$url/api/admin/inject-doc" \
       -H 'Content-Type: application/json' \
@@ -119,7 +119,7 @@ reset_mutable_state() {
   done
 
   local clean baseline count expected
-  for scenario in day2 llm04 day3 day4 day5; do
+  for scenario in data llm04 output knowledge resource; do
     url="${SCENARIO_URLS[$scenario]}"
     expected="${BASELINE_DOC_COUNTS[$scenario]}"
     clean=false
@@ -170,7 +170,7 @@ reset_mutable_state() {
 
 # === LLM03 — 독립 fake registry (port 8002) ===
 run_registry() {
-  log "▶ fake registry (Day 4 LLM03) e2e"
+  log "▶ fake registry (4일차 LLM03) e2e"
   local item_dir="$RESULTS_DIR/llm03"
   mkdir -p "$item_dir"
   RESULTS_DIR="$item_dir" TRIALS="$TRIALS" \
@@ -261,10 +261,10 @@ run_agent
 run_llmgoat
 
 # LLM10은 동시 요청으로 Ollama queue를 점유할 수 있으므로 반드시 마지막에 실행한다.
-if require_day_ready day5; then
-  run_items day5 "${SCENARIO_ITEMS[day5]}"
+if require_day_ready resource; then
+  run_items resource "${SCENARIO_ITEMS[resource]}"
 else
-  FAILED_STEPS+=("scenario:day5")
+  FAILED_STEPS+=("scenario:resource")
 fi
 
 log "============================================"

@@ -1,6 +1,6 @@
 # Lab state and container recreation policy
 
-This document records where the installed Day 1–5 runtime keeps mutable state
+This document records where the installed 1일차–5 runtime keeps mutable state
 and the smallest supported learner action. The classification comes from the
 application source and the canonical Docker Compose definition installed by
 `install-lab.sh`.
@@ -15,14 +15,14 @@ and creates it again from the configured image.
 
 | Lab | Exact Compose command | Raw verification |
 |---|---|---|
-| LLM01 secure-coding source | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
-| LLM04 RAG corpus or source | `docker compose up -d --no-deps --force-recreate llm04-rag` | `curl -sS http://localhost:8004/healthz` |
-| LLM02 secure-coding source or LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost:8010/healthz` |
-| LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
-| LLM06 delete | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |
-| LLM08 or LLM09 secure-coding source | `docker compose up -d --no-deps --force-recreate knowledge-rag` | `curl -sS http://localhost:8012/healthz` |
-| Mutable LLMGoat challenge | `docker compose restart llmgoat` | `curl -sS http://localhost:5000/api/model_status` |
-| LLM10 source or overload | Use the ordered sequence below. | `curl -sS http://localhost:8013/healthz` |
+| LLM01 secure-coding source | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost/prompt-rag/healthz` |
+| LLM04 RAG corpus or source | `docker compose up -d --no-deps --force-recreate llm04-rag` | `curl -sS http://localhost/llm04-rag/healthz` |
+| LLM02 secure-coding source or LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost/data-rag/healthz` |
+| LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost/output-rag/healthz` |
+| LLM06 delete | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost/vuln-agent/healthz` |
+| LLM08 or LLM09 secure-coding source | `docker compose up -d --no-deps --force-recreate knowledge-rag` | `curl -sS http://localhost/knowledge-rag/healthz` |
+| Mutable LLMGoat challenge | `docker compose restart llmgoat` | `curl -sS http://localhost/llmgoat/api/model_status` |
+| LLM10 source or overload | Use the ordered sequence below. | `curl -sS http://localhost/resource-rag/healthz` |
 
 These commands never write to or delete `/home/ubuntu/work`,
 `/home/ubuntu/ollama-models`, `/home/ubuntu/.LLMGoat/models`, or
@@ -35,10 +35,10 @@ These commands never write to or delete `/home/ubuntu/work`,
 | `ollama` | 11434 | loaded model and request queue | `/home/ubuntu/ollama-models:/root/.ollama` | Do not restart for ordinary lessons. Restart it only in the LLM10 overload sequence. |
 | `prompt-rag` | 8000 | editable layer; no RAG corpus | none | Force-recreate after an LLM01 source switch. |
 | `llm04-rag` | 8004 | Python `llm04._documents` and editable layer | none | Force-recreate after an LLM04 corpus injection or source change. |
-| `data-rag` | 8010 | Python `day2._corpus` and editable layer | none | Force-recreate after an LLM02 source switch or LLM08 corpus mutation. |
-| `output-rag` | 8011 | Python `day3._corpus` and editable layer | none | Force-recreate after a renderer source switch or stored payload. |
-| `knowledge-rag` | 8012 | Python `day4._tenants` and editable layer | none | Force-recreate after an LLM08 or LLM09 source switch. |
-| `resource-rag` | 8013 | in-flight uvicorn tasks, Python `day5._corpus`, and editable layer | none | Use the LLM10 sequence below. |
+| `data-rag` | 8010 | Python `data._corpus` and editable layer | none | Force-recreate after an LLM02 source switch or LLM08 corpus mutation. |
+| `output-rag` | 8011 | Python `output._corpus` and editable layer | none | Force-recreate after a renderer source switch or stored payload. |
+| `knowledge-rag` | 8012 | Python `knowledge._tenants` and editable layer | none | Force-recreate after an LLM08 or LLM09 source switch. |
+| `resource-rag` | 8013 | in-flight uvicorn tasks, Python `resource._corpus`, and editable layer | none | Use the LLM10 sequence below. |
 | `vuln-agent` | 8001 | Python `ANIMALS`, `DELETED_LOG`, and editable layer | none | Force-recreate to restore vulnerable source, `g-003`, and an empty deletion log. |
 | `llmgoat` | 5000 | A04 reviews, A08 vector store, A09 upload and model lock in process memory | models and cache only | Restart the Compose service. Browser completion badges are a signed client cookie and are not challenge fixtures. |
 | `dvla` | 8501 | Streamlit session and container-layer `transactions.db` | `/home/ubuntu/work/dvla/llm-config.yaml:/app/llm-config.yaml` | Restart only to clear a session; it does not restore the host YAML. |
@@ -55,7 +55,7 @@ verification. Learners do not need that endpoint: they force-recreate
 
 ## Why LLM10 has an ordered sequence
 
-A client timeout does not prove server-side work stopped. A timed-out Day 5
+A client timeout does not prove server-side work stopped. A timed-out 5일차
 request can leave an uvicorn task waiting on the shared Ollama queue. Learners
 therefore perform the recovery explicitly instead of hiding it in a project
 wrapper:
@@ -64,14 +64,14 @@ wrapper:
 cd ~/.config/owasp-llm-lab
 docker compose up -d --no-deps --force-recreate resource-rag
 docker compose restart ollama
-curl -fsS http://localhost:11434/api/tags
+curl -fsS http://localhost/ollama/api/tags
 docker compose up -d --no-deps --force-recreate resource-rag
 docker compose ps resource-rag ollama
-curl -sS http://localhost:8013/healthz
+curl -sS http://localhost/resource-rag/healthz
 ```
 
 The first recreation cancels app-side waiters, restarting Ollama clears queued
-generation, and the second recreation starts Day 5 against the ready model
+generation, and the second recreation starts 5일차 against the ready model
 server. If the readiness request runs before Ollama is ready, repeat only the
 read-only `curl` check.
 

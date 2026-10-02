@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/common.sh"
 
 require_healthy
-require_scenario "day3"
+require_scenario "output"
 
 EXPECT='<script|<iframe|<svg|onerror|onload|javascript:'
 MARKUP_IMG='<img src=x onerror="alert(1)">'

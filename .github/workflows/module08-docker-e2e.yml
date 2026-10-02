@@ -7,7 +7,7 @@ on:
     paths:
       - "llm-security-control-plane/**"
       - "examples/security-monitoring/**"
-      - "examples/day6/pyrit-guardrail/**"
+      - "examples/guardrails/pyrit-guardrail/**"
       - "tests/unit/test_pyrit_report.py"
       - "tests/browser/**"
       - "tests/e2e/run_guided_h05_learner_fix.py"
@@ -42,12 +42,12 @@ jobs:
       - name: Build the real control-plane images
         run: |
           bash llm-security-control-plane/deploy/build-images.sh
-          docker build -f examples/day6/nemo-guardrails/Containerfile \
+          docker build -f examples/guardrails/nemo-guardrails/Containerfile \
             -t localhost/llm-security-nemo-dialog-rails:0.22.0 \
-            examples/day6/nemo-guardrails
-          docker build -f examples/day6/presidio/Containerfile \
-            -t localhost/day6-presidio:2.2.362 \
-            examples/day6/presidio
+            examples/guardrails/nemo-guardrails
+          docker build -f examples/guardrails/presidio/Containerfile \
+            -t localhost/guardrails-presidio:2.2.362 \
+            examples/guardrails/presidio
           docker build -f llm-security-control-plane/official-uis/nemo/Containerfile \
             -t localhost/llm-security-nemo-official-ui:0.22.0 \
             llm-security-control-plane

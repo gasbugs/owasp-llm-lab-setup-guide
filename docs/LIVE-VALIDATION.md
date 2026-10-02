@@ -8,7 +8,7 @@
 
 ## 비용 상한이 있는 단일 커밋 전수 실행
 
-아래 강사용 controller는 이 문서의 commit pin, Terraform user-data 설치, strict e2e, 현재 PyPI `NOT_FOUND` 후보의 격리 설치, Day 5 live-validation harness, 증거 회수와 destroy를 한 번에 묶습니다. 공개 이미지 원본은 `ghcr.io/gasbugs`로 고정하며 자격증명을 저장하지 않습니다. `COURSE_REPO`는 `capstone/solutions/validate-live.sh`를 포함한 로컬 강의 저장소 절대 경로입니다.
+아래 강사용 controller는 이 문서의 commit pin, Terraform user-data 설치, strict e2e, 현재 PyPI `NOT_FOUND` 후보의 격리 설치, 5일차 live-validation harness, 증거 회수와 destroy를 한 번에 묶습니다. 공개 이미지 원본은 `ghcr.io/gasbugs`로 고정하며 자격증명을 저장하지 않습니다. `COURSE_REPO`는 `capstone/solutions/validate-live.sh`를 포함한 로컬 강의 저장소 절대 경로입니다.
 
 ```bash
 SETUP_COMMIT=$(git rev-parse origin/main)
@@ -25,7 +25,7 @@ RUN_DEADLINE_MINUTES=120 \
 
 controller는 setup과 course의 명시한 40자리 commit이 각각 공개 `origin/main`에 있고 course worktree가 완전히 clean인지 먼저 확인합니다. 이후 두 저장소를 임시 `git archive`로 분리하며, Terraform state와 Capstone upload, 로컬 browser harness도 이 고정 복사본만 사용합니다. 공개 GHCR의 프로젝트 이미지에서 tag digest와 `linux/amd64` digest를 고정하고, EC2의 실제 Docker digest와 `org.opencontainers.image.revision`이 다르면 테스트를 시작하지 않습니다. LLMGoat는 EC2에서 로컬 Build하므로 이 게시 이미지 집합에서 제외한다.
 
-EC2 생성 전에는 선택한 Playwright package/browser를 실제 headless launch/close하고 로컬 `18011`, `18501`, `15000` 포트가 비어 있는지도 확인합니다. 원격 strict core가 끝나면 controller가 SSM forward `8011→18011`, `8501→18501`, `5000→15000`을 bounded child process로 열고 Day 3 UI/DVLA와 LLMGoat A01 harness를 실행합니다. LLMGoat UI는 API `response`의 정확한 DOM 반영과 boolean `solved`에 따른 overlay/sidebar 일치를 검사하며, solved 자체는 관찰값으로만 남깁니다. 결과와 세 forward cleanup 증거를 원격 raw bundle에 원자적으로 전달한 뒤에만 archive를 닫습니다. `STRICT_ACCEPTANCE=true TRIALS=5` full-cycle의 종료 코드를 그대로 사용하며 LLM10 timeout 같은 결과를 controller가 임의로 성공으로 바꾸지 않습니다. raw evidence archive와 SHA-256은 기본적으로 `$HOME/owasp-llm-live-evidence/<run-id>/remote/`에 회수됩니다.
+EC2 생성 전에는 선택한 Playwright package/browser를 실제 headless launch/close하고 로컬 `18011`, `18501`, `15000` 포트가 비어 있는지도 확인합니다. 원격 strict core가 끝나면 controller가 SSM forward `8011→18011`, `8501→18501`, `5000→15000`을 bounded child process로 열고 3일차 UI/DVLA와 LLMGoat A01 harness를 실행합니다. LLMGoat UI는 API `response`의 정확한 DOM 반영과 boolean `solved`에 따른 overlay/sidebar 일치를 검사하며, solved 자체는 관찰값으로만 남깁니다. 결과와 세 forward cleanup 증거를 원격 raw bundle에 원자적으로 전달한 뒤에만 archive를 닫습니다. `STRICT_ACCEPTANCE=true TRIALS=5` full-cycle의 종료 코드를 그대로 사용하며 LLM10 timeout 같은 결과를 controller가 임의로 성공으로 바꾸지 않습니다. raw evidence archive와 SHA-256은 기본적으로 `$HOME/owasp-llm-live-evidence/<run-id>/remote/`에 회수됩니다.
 
 테스트가 실패해도 원격 runner의 EXIT trap이 현재 증거를 먼저 archive합니다. 원격 timeout/crash면 controller가 기존 run root를 `partial=true`로 별도 archive해 회수합니다. 그 직후 captured instance ID와 고유 `Course` 태그로 EC2 terminate를 직접 요청하고 terminated 상태를 확인한 다음, `terraform destroy`로 나머지 자원을 정리합니다. 마지막에는 Terraform state뿐 아니라 EC2, EBS, 네트워크, SNS, IAM을 직접 조회하고 legacy Lambda·EventBridge도 남지 않았는지 확인합니다. 증거 회수·직접 terminate·destroy·잔여 자원 확인 중 하나라도 실패하면 전체 명령도 실패합니다. 이 controller에는 인스턴스를 남기는 옵션이 없습니다.
 
@@ -137,12 +137,12 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 | 포트 | 서비스 | 계약 |
 |---:|---|---|
 | 80 | `lab-reverse-proxy` | `/`와 UI별 URI를 Compose 서비스로 전달 |
-| 8000 | `lab-prompt-rag` | `default_scenario=day1` |
+| 8000 | `lab-prompt-rag` | `default_scenario=prompt` |
 | 8004 | `lab-llm04-rag` | `default_scenario=llm04` |
-| 8010 | `lab-data-rag` | `default_scenario=day2` |
-| 8011 | `lab-output-rag` | `default_scenario=day3` |
-| 8012 | `lab-knowledge-rag` | `default_scenario=day4` |
-| 8013 | `lab-resource-rag` | `default_scenario=day5` |
+| 8010 | `lab-data-rag` | `default_scenario=data` |
+| 8011 | `lab-output-rag` | `default_scenario=output` |
+| 8012 | `lab-knowledge-rag` | `default_scenario=knowledge` |
+| 8013 | `lab-resource-rag` | `default_scenario=resource` |
 | 8001 | `lab-vuln-agent` | `ok=true`, tool catalog 존재 |
 | 8002 | `lab-fake-registry` | `/api/v1/models` JSON |
 | 8080 | `lab-portal` | HTTP 200 |
@@ -153,13 +153,13 @@ sudo -u ubuntu podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 RAG health의 canonical JSON shape은 다음과 같습니다.
 
 ```json
-{"ok":true,"default_scenario":"day3","scenarios":["day1","day2","llm04","day3","day4","day5"]}
+{"ok":true,"default_scenario":"output","scenarios":["prompt","data","llm04","output","knowledge","resource"]}
 ```
 
 여섯 포트의 scenario를 한 번에 확인합니다.
 
 ```bash
-for pair in day1:8000 day2:8010 llm04:8004 day3:8011 day4:8012 day5:8013; do
+for pair in prompt:8000 data:8010 llm04:8004 output:8011 knowledge:8012 resource:8013; do
   scenario=${pair%%:*}
   port=${pair##*:}
   curl -fsS "http://localhost:${port}/healthz" \
@@ -167,19 +167,19 @@ for pair in day1:8000 day2:8010 llm04:8004 day3:8011 day4:8012 day5:8013; do
         '.ok == true and .default_scenario == $scenario and (.scenarios | length == 6)'
 done
 
-curl -fsS http://localhost:8001/healthz \
+curl -fsS http://localhost/vuln-agent/healthz \
   | jq -e '.ok == true and (.tools | length == 7)'
-curl -fsS http://localhost:8002/api/v1/models | jq -e '.models | length > 0'
+curl -fsS http://localhost/fake-registry/api/v1/models | jq -e '.models | length > 0'
 curl -fsS http://localhost/ >/dev/null
 curl -fsS http://localhost/prompt-rag/healthz
 curl -fsS http://localhost/llm04-rag/healthz
 curl -fsS http://localhost/llmgoat/api/model_status
 curl -fsS http://localhost/dvla/_stcore/health
-curl -fsS http://localhost:8080/ >/dev/null
-curl -fsS http://localhost:5000/api/model_status \
+curl -fsS http://localhost/ >/dev/null
+curl -fsS http://localhost/llmgoat/api/model_status \
   | jq -e '.model_busy == false'
-curl -fsS http://localhost:8501/_stcore/health
-curl -fsS http://localhost:11434/api/tags | jq -e '.models | type == "array"'
+curl -fsS http://localhost/dvla/_stcore/health
+curl -fsS http://localhost/ollama/api/tags | jq -e '.models | type == "array"'
 ```
 
 `vuln-rag` 이미지의 CMD와 HEALTHCHECK는 모두 `PORT`를 사용하고, Compose는 각 service에 같은 `PORT`와 uvicorn 포트를 주입합니다. 정상 앱이 잘못된 8000 probe 때문에 `unhealthy`가 되는 상태는 허용하지 않습니다.

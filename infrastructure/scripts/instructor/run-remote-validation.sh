@@ -1,5 +1,5 @@
 #!/bin/bash
-# Execute the commit-pinned runtime, LLM09 isolation, and Day 5 reference checks
+# Execute the commit-pinned runtime, LLM09 isolation, and 5일차 reference checks
 # on a single instructor EC2 host.  The local controller retrieves the archive.
 set -uo pipefail
 
@@ -63,7 +63,7 @@ DIGEST_RC=99
 FULL_CYCLE_RC=99
 LLMGOAT_API_RC=99
 SLOPSQUAT_RC=99
-DAY5_RC=99
+RESOURCE_RC=99
 BROWSER_RC=99
 LLMGOAT_BROWSER_RC=99
 E2E_DIR=""
@@ -86,7 +86,7 @@ write_summary() {
     --argjson full_cycle_rc "$FULL_CYCLE_RC" \
     --argjson llmgoat_api_rc "$LLMGOAT_API_RC" \
     --argjson slopsquat_rc "$SLOPSQUAT_RC" \
-    --argjson day5_rc "$DAY5_RC" \
+    --argjson resource_rc "$RESOURCE_RC" \
     --argjson browser_rc "$BROWSER_RC" \
     --argjson llmgoat_browser_rc "$LLMGOAT_BROWSER_RC" \
     '{schema:"owasp-llm-remote-validation/v1", run_id:$run_id,
@@ -95,10 +95,10 @@ write_summary() {
       image_tag:$image_tag, validated_at:$validated_at,
       stages:{runtime_digest:$digest_rc, strict_full_cycle:$full_cycle_rc,
         llmgoat_api_state:$llmgoat_api_rc,
-        isolated_slopsquat:$slopsquat_rc, day5_live:$day5_rc,
-        day3_browser_ui:$browser_rc,llmgoat_browser_ui:$llmgoat_browser_rc},
+        isolated_slopsquat:$slopsquat_rc, resource_live:$resource_rc,
+        output_browser_ui:$browser_rc,llmgoat_browser_ui:$llmgoat_browser_rc},
       evidence:{full_cycle_dir:$e2e_dir, slopsquat_package:$slopsquat_package,
-        day5_base_image:$base_gpu_ref}}' \
+        resource_base_image:$base_gpu_ref}}' \
     > "$RUN_ROOT/summary.json"
 }
 
@@ -232,7 +232,7 @@ else
   FULL_CYCLE_RC=1
   LLMGOAT_API_RC=1
   SLOPSQUAT_RC=1
-  DAY5_RC=1
+  RESOURCE_RC=1
   BROWSER_RC=1
   LLMGOAT_BROWSER_RC=1
   exit 1
@@ -370,27 +370,27 @@ else
   set -u
 fi
 
-day5_harness="$COURSE_CAPSTONE_DIR/solutions/validate-live.sh"
-if [ ! -f "$day5_harness" ]; then
-  echo "FAIL: Day 5 live-validation harness not found: $day5_harness" >&2
-  DAY5_RC=1
+resource_harness="$COURSE_CAPSTONE_DIR/solutions/validate-live.sh"
+if [ ! -f "$resource_harness" ]; then
+  echo "FAIL: 5일차 live-validation harness not found: $resource_harness" >&2
+  RESOURCE_RC=1
 else
   set +e
-  EVIDENCE_DIR="$RUN_ROOT/day5-live-evidence" \
+  EVIDENCE_DIR="$RUN_ROOT/resource-live-evidence" \
     RUN_REAL_MODEL_NORMAL=1 \
-    UPSTREAM_OLLAMA_URL=http://127.0.0.1:11434 \
+    UPSTREAM_OLLAMA_URL=http://127.0.0.1/ollama \
     BASE_IMAGE_OVERRIDE="$BASE_GPU_REF" \
-    bash "$day5_harness" 2>&1 | tee "$RUN_ROOT/day5-live.log"
-  day5_pipeline=("${PIPESTATUS[@]}")
-  DAY5_RC=${day5_pipeline[0]}
-  if [ "${day5_pipeline[1]}" -ne 0 ]; then
-    echo "ERROR: Day 5 live-validation log could not be preserved" >&2
-    DAY5_RC=1
+    bash "$resource_harness" 2>&1 | tee "$RUN_ROOT/resource-live.log"
+  resource_pipeline=("${PIPESTATUS[@]}")
+  RESOURCE_RC=${resource_pipeline[0]}
+  if [ "${resource_pipeline[1]}" -ne 0 ]; then
+    echo "ERROR: 5일차 live-validation log could not be preserved" >&2
+    RESOURCE_RC=1
   fi
-  day5_result="$RUN_ROOT/day5-live-evidence/result.json"
-  starter_inspect="$RUN_ROOT/day5-live-evidence/build/starter-image-inspect.json"
-  reference_inspect="$RUN_ROOT/day5-live-evidence/build/reference-image-inspect.json"
-  if [ ! -f "$day5_result" ] \
+  resource_result="$RUN_ROOT/resource-live-evidence/result.json"
+  starter_inspect="$RUN_ROOT/resource-live-evidence/build/starter-image-inspect.json"
+  reference_inspect="$RUN_ROOT/resource-live-evidence/build/reference-image-inspect.json"
+  if [ ! -f "$resource_result" ] \
     || [ ! -f "$starter_inspect" ] || [ ! -f "$reference_inspect" ] \
     || ! jq -e \
       --arg expected_base "$BASE_GPU_REF" \
@@ -401,13 +401,13 @@ else
           == .builds.starter.source_fingerprint)
         and ($reference[0][0].Labels["org.opencontainers.image.source-fingerprint"]
           == .builds.reference.source_fingerprint)
-      ' "$day5_result" >/dev/null \
+      ' "$resource_result" >/dev/null \
     || ! grep -Fq "$BASE_GPU_REF" \
-      "$RUN_ROOT/day5-live-evidence/build/starter-build.log" \
+      "$RUN_ROOT/resource-live-evidence/build/starter-build.log" \
     || ! grep -Fq "$BASE_GPU_REF" \
-      "$RUN_ROOT/day5-live-evidence/build/reference-build.log"; then
-    echo "ERROR: Day 5 build did not prove the commit-pinned base image provenance" >&2
-    DAY5_RC=1
+      "$RUN_ROOT/resource-live-evidence/build/reference-build.log"; then
+    echo "ERROR: 5일차 build did not prove the commit-pinned base image provenance" >&2
+    RESOURCE_RC=1
   fi
   set -u
 fi
@@ -432,7 +432,7 @@ while [ ! -f "$browser_control" ] && [ "$(date +%s)" -lt "$browser_deadline" ]; 
   sleep 2
 done
 if [ ! -f "$browser_control" ]; then
-  echo "FAIL: controller did not return Day 3/LLMGoat browser evidence before the shared deadline" >&2
+  echo "FAIL: controller did not return 3일차/LLMGoat browser evidence before the shared deadline" >&2
   BROWSER_RC=1
   LLMGOAT_BROWSER_RC=1
 elif ! python3 - "$RUN_ROOT/browser-evidence" "$browser_control" <<'PY'
@@ -541,7 +541,7 @@ else:
 print(browser_rc)
 PY
 then
-  echo "FAIL: returned Day 3/LLMGoat browser evidence failed integrity/cleanup checks" >&2
+  echo "FAIL: returned 3일차/LLMGoat browser evidence failed integrity/cleanup checks" >&2
   BROWSER_RC=1
   LLMGOAT_BROWSER_RC=1
 else
@@ -554,7 +554,7 @@ write_summary
 overall_rc=0
 for stage_rc in \
   "$DIGEST_RC" "$FULL_CYCLE_RC" "$LLMGOAT_API_RC" "$SLOPSQUAT_RC" \
-  "$DAY5_RC" "$BROWSER_RC" "$LLMGOAT_BROWSER_RC"; do
+  "$RESOURCE_RC" "$BROWSER_RC" "$LLMGOAT_BROWSER_RC"; do
   if [ "$stage_rc" -ne 0 ]; then
     overall_rc=1
   fi

@@ -85,7 +85,7 @@ curl -fsS --max-time 60 -X POST "http://127.0.0.1:${DIALOG_HOST_PORT}/api/scan-o
 docker run -d --name module08-learning-presidio --network "$NETWORK" \
   -p "127.0.0.1:${PRESIDIO_HOST_PORT}:8013" \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
-  localhost/day6-presidio:2.2.362 >/dev/null
+  localhost/guardrails-presidio:2.2.362 >/dev/null
 wait_json "http://127.0.0.1:${PRESIDIO_HOST_PORT}/healthz" '.ok == true and .upstream_path == "not-configured"'
 
 status=$(curl -sS --max-time 30 -o /tmp/module08-learning-presidio-unconfigured.json \
@@ -102,7 +102,7 @@ docker run -d --name module08-learning-presidio --network "$NETWORK" \
   -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
   -e NEMO_GUARD_URL=http://module08-learning-dialog:8013 \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
-  localhost/day6-presidio:2.2.362 >/dev/null
+  localhost/guardrails-presidio:2.2.362 >/dev/null
 wait_json "http://127.0.0.1:${PRESIDIO_HOST_PORT}/healthz" '.ok == true and .upstream_path == "nemo>bedrock"'
 
 curl -fsS --max-time 60 -X POST "http://127.0.0.1:${DIALOG_HOST_PORT}/api/labs/retrieval" \

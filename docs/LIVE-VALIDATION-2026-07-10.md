@@ -1,6 +1,6 @@
 # EC2 Live Validation — 2026-07-10
 
-이 문서는 `us-east-1`의 실제 `g6.xlarge`에서 setup runtime과 Day 3~5 핵심 실습을 검증한 기록이다. 모델 원문과 공격 payload는 공개 문서에 복제하지 않고, 판정·해시·재현 경로만 남긴다.
+이 문서는 `us-east-1`의 실제 `g6.xlarge`에서 setup runtime과 3일차~5 핵심 실습을 검증한 기록이다. 모델 원문과 공격 payload는 공개 문서에 복제하지 않고, 판정·해시·재현 경로만 남긴다.
 
 ## 판정 요약
 
@@ -35,7 +35,7 @@
 
 ## Runtime 결과
 
-최종 health 확인에서 Day 1~5 RAG, Agent, fake registry, LLMGoat, DVLA, Ollama가 모두 HTTP 200이었다. Portal도 bootstrap readiness에서 통과했다.
+최종 health 확인에서 1일차~5 RAG, Agent, fake registry, LLMGoat, DVLA, Ollama가 모두 HTTP 200이었다. Portal도 bootstrap readiness에서 통과했다.
 
 | 범위 | 실측 결과 | 판정 |
 |---|---|---|
@@ -45,7 +45,7 @@
 | LLM10 큰 입력 | baseline 6,867 ms, 약 5,000-token 입력 2,300 ms, ratio 0.3x | 지연 증폭 미관찰 |
 | LLMGoat A01 | 5기법 × 3회, infra 0, solved 0/15 | PASS; 공격 성공 미관찰 |
 | reset contract | Day별 sentinel 주입 후 restart, 기본 docs `2/2/2/4/3`, sentinel 전부 제거 | PASS |
-| Day4 LLM07 집중 검증 | Base64 decode 형식 실패, JSON reply parse 형식 실패지만 JSON 응답에서 교육용 exact marker 관찰, token fragment에는 exact marker 미관찰 | PASS_WITH_NOTES |
+| Knowledge LLM07 집중 검증 | Base64 decode 형식 실패, JSON reply parse 형식 실패지만 JSON 응답에서 교육용 exact marker 관찰, token fragment에는 exact marker 미관찰 | PASS_WITH_NOTES |
 | Llama Guard | 정상 입력 `safe`, 직접 prompt-injection 입력도 `safe` | false negative 관찰; PI 전용 방어 아님 |
 | Capstone reference | fresh source fingerprint/image ID/runtime ID 일치, readiness PASS, unit 7/7, 자동 차단 후보 8/8, 학생 파일 restore fingerprint 동일, container cleanup | PASS_WITH_NOTES |
 
@@ -61,14 +61,14 @@ Capstone의 `8/8`은 `BLOCKED?` 자동 후보 수다. 이 실행은 각 공격�
 6. LLM09의 정상적인 “추출 결과 없음”을 shell failure로 오인하던 두 pipeline을 수정하고, URL 미제공을 별도 계수했다.
 7. LLM10의 overload timeout을 측정값으로 보존하고, 남은 Ollama queue를 재시작으로 정리한 뒤 warmup·지연 측정을 수행하게 했다.
 8. Course Capstone의 literal JSON brace formatting, 중첩 `args` tool-call parsing, stale image 재사용 가능성을 수정했다.
-9. Course live-evidence checker·template·generator와 Day4 checkpoint의 실행 계약을 서로 일치시켰다.
+9. Course live-evidence checker·template·generator와 Knowledge checkpoint의 실행 계약을 서로 일치시켰다.
 
 ## 로컬 게이트
 
 - setup unit: 28/28 PASS
 - setup shell syntax, Terraform fmt, Terraform validate, `git diff --check`: PASS
 - Course Capstone unit: 7/7 PASS
-- Course 45분 계약: Day 3~5 26/26 PASS
+- Course 45분 계약: 3일차~5 26/26 PASS
 - Course lab/evidence template/Capstone assessment/lecture quality/Markdown/Python/shell gates: PASS
 - `check_manual_release_gates.py`: 이번 변경과 무관한 기존 `NOTION-SYNC-STATUS.md` 누락만 남음
 

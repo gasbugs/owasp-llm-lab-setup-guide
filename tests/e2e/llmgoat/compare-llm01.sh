@@ -12,11 +12,11 @@ TS=$(date +%Y%m%d-%H%M%S)
 COMPARE_DIR="$REPO_ROOT/tests/e2e/results/${TS}-compare-llmgoat-vs-vuln-rag"
 mkdir -p "$COMPARE_DIR"
 
-# 1) vuln-rag day1 LLM01-A
+# 1) vuln-rag prompt LLM01-A
 echo "=========================================="
 echo "  1/2  vuln-rag (llama3.1:8b) LLM01-A"
 echo "=========================================="
-RESULTS_DIR="$COMPARE_DIR/vuln-rag" TRIALS=3 TARGET_URL=http://localhost:8000 \
+RESULTS_DIR="$COMPARE_DIR/vuln-rag" TRIALS=3 TARGET_URL=http://localhost/prompt-rag \
   bash "$REPO_ROOT/tests/e2e/llm01/test_llm01a_direct.sh"
 
 # 2) LLMGoat A01
@@ -24,7 +24,7 @@ echo ""
 echo "=========================================="
 echo "  2/2  LLMGoat (gemma-2-9b) A01"
 echo "=========================================="
-RESULTS_DIR="$COMPARE_DIR/llmgoat" TRIALS=3 GOAT_URL=http://localhost:5000 \
+RESULTS_DIR="$COMPARE_DIR/llmgoat" TRIALS=3 GOAT_URL=http://localhost/llmgoat \
   bash "$SCRIPT_DIR/test_a01_prompt_injection.sh"
 
 # 3) 비교 표 생성

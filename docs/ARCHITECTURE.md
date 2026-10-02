@@ -112,23 +112,23 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 
 ## 컨테이너
 
-| 컨테이너 | 포트 | 역할 |
+| 컨테이너 | 내부 포트 (nginx만 호스트 공개) | 역할 |
 |---|---:|---|
-| `lab-reverse-proxy` | 80, 8501 호환 | 포털과 실습 UI를 URI별로 Compose DNS upstream에 전달 |
+| `lab-reverse-proxy` | 호스트 80 | 포털과 실습 UI를 URI별로 Compose DNS upstream에 전달 |
 | `lab-ollama` | 11434 | 생성 모델과 LLM08 `bge-m3:latest` embedding을 함께 제공하는 로컬 Ollama API |
-| `lab-portal` | 8080 | Nginx `/`가 연결하는 포털 backend와 기존 직접 포트 |
+| `lab-portal` | 8080 | Nginx `/`가 연결하는 내부 포털 backend |
 | `lab-prompt-rag` | 8000 | LLM01 직접 프롬프트 인젝션 번역기 |
 | `lab-llm04-rag` | 8004 | LLM01 번역기에 격리된 corpus를 연결한 LLM04 RAG 변형 |
-| `lab-data-rag` | 8010 | Day 2 LLM02·LLM08 RAG corpus 챗봇 |
-| `lab-output-rag` | 8011 | Day 3 LLM05 output handling RAG 챗봇 |
-| `lab-knowledge-rag` | 8012 | Day 2 LLM08의 `/api/embed`·paired vector search/chat과 Day 4 LLM07·LLM09가 공유하는 PrivateGPT-Lite |
-| `lab-resource-rag` | 8013 | Day 5 LLM10 resource consumption RAG 챗봇 |
+| `lab-data-rag` | 8010 | 2일차 LLM02·LLM08 RAG corpus 챗봇 |
+| `lab-output-rag` | 8011 | 3일차 LLM05 output handling RAG 챗봇 |
+| `lab-knowledge-rag` | 8012 | 2일차 LLM08의 `/api/embed`·paired vector search/chat과 4일차 LLM07·LLM09가 공유하는 PrivateGPT-Lite |
+| `lab-resource-rag` | 8013 | 5일차 LLM10 resource consumption RAG 챗봇 |
 | `lab-vuln-agent` | 8001 | 의도적으로 취약한 tool-calling Agent |
 | `lab-llmgoat` | 5000 | LLMGoat cross-platform 실습 |
-| `lab-dvla` | 내부 8501 | `baseUrlPath=dvla`인 Damn Vulnerable LLM Agent. 기존 host 8501은 Nginx가 호환 전달 |
-| `lab-fake-registry` | 8002 | Day 4 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
+| `lab-dvla` | 내부 8501 | `baseUrlPath=dvla`인 Damn Vulnerable LLM Agent. host publish 없이 Nginx `/dvla/`로 전달 |
+| `lab-fake-registry` | 8002 | 4일차 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
 
-브라우저는 `http://EC2_PUBLIC_IP/`에서 포털을 열고 URI로 앱을 고릅니다. Nginx는 RAG·Agent·Registry prefix를 제거해 기존 endpoint로 전달하고, LLMGoat와 DVLA는 각 wrapper의 base path 처리를 사용합니다. 기존 `curl http://localhost:<port>/...` 계약은 유지하며 DVLA의 8501만 같은 Nginx의 호환 listener가 전달합니다. 프록시는 인증·인가를 대신하지 않고 외부 접근 제한은 Security Group의 본인 공인 IPv4 `/32`가 담당합니다.
+브라우저는 `http://EC2_PUBLIC_IP/`에서 포털을 열고 URI로 앱을 고릅니다. Nginx는 RAG·Agent·Registry prefix를 제거해 기존 endpoint로 전달하고, LLMGoat와 DVLA는 각 wrapper의 base path 처리를 사용합니다. host에는 Nginx 80만 publish합니다. CLI도 같은 URI를 사용하며 Ollama API는 `/ollama/`에서 제공합니다. 프록시는 인증·인가를 대신하지 않고 외부 접근 제한은 Security Group의 본인 공인 IPv4 `/32`가 담당합니다.
 
 ## LLM02 Planner와 Tool Executor 인가 경계
 
@@ -158,8 +158,8 @@ LLM08 수강생 앱 scaffold는 `examples/llm08/mini_vector_search_app.py`에 �
 ```mermaid
 flowchart LR
   B["로컬 브라우저"] -->|"EC2 public IP :18080 · SG public /32"| M["learner mini app bind 0.0.0.0:18080"]
-  M -->|"Bearer token + POST /api/embed"| D["lab-knowledge-rag 127.0.0.1:8012"]
-  D -->|"POST /api/embed, bge-m3:latest"| O["lab-ollama 127.0.0.1:11434"]
+  M -->|"Bearer token + POST /api/embed"| D["nginx /knowledge-rag → lab-knowledge-rag:8012"]
+  D -->|"POST /api/embed, bge-m3:latest"| O["lab-ollama · ollama:11434"]
   Q["query + 4 local documents"] --> V["vulnerable: all tenants are candidates"]
   Q --> S["safe: authenticated tenant filter first"]
   V --> M
@@ -167,19 +167,19 @@ flowchart LR
   A["server-side token map"] -->|"tenant=acme"| D
 ```
 
-`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고 EC2 내부 검사는 `127.0.0.1:18080`을 사용합니다. 기본 Terraform 값에서는 SSM 포트포워딩으로 확인하며, 본인 공인 IPv4 `/32`를 적용한 경우에만 학습자 PC에서 `EC2_PUBLIC_IP:18080`으로 직접 접속합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback `127.0.0.1:8012`로 제한됩니다.
+`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고 EC2 내부 검사는 `127.0.0.1:18080`을 사용합니다. 기본 Terraform 값에서는 SSM 포트포워딩으로 확인하며, 본인 공인 IPv4 `/32`를 적용한 경우에만 학습자 PC에서 `EC2_PUBLIC_IP:18080`으로 직접 접속합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback nginx 경로 `http://127.0.0.1/knowledge-rag`로 제한됩니다.
 
 `vulnerable`과 `safe`는 같은 embedding model과 cosine 함수를 사용합니다. 차이는 ranking 이후 결과를 가리는 것이 아니라, **embedding/ranking 후보를 만들기 전에 인증 tenant metadata filter를 적용하는가**입니다. 미니 앱은 운영 vector DB가 아닌 교육용 인메모리 검색기입니다.
 
 | 경계/endpoint | 노출 범위 | 인증·입력 계약 | 용도 |
 |---|---|---|---|
-| Ollama `POST :11434/api/embed` | EC2 host에 publish된 포트, 컨테이너에서는 `host.docker.internal` 사용 | Day 4 backend가 고정 model로 호출 | 실제 embedding 생성 |
-| Day 4 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
-| Day 4 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
-| Day 4 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
+| Ollama `POST :11434/api/embed` | EC2 host에 publish된 포트, 컨테이너에서는 `host.docker.internal` 사용 | 4일차 backend가 고정 model로 호출 | 실제 embedding 생성 |
+| 4일차 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
+| 4일차 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
+| 4일차 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
 | 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; 기본은 SSM, 선택적으로 수강생 공인 IPv4 `/32` 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
 
-LLM08 endpoint는 `DEFAULT_SCENARIO=day4` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. 기본 `127.0.0.1/32`는 외부 접속을 열지 않습니다. 공인 IPv4 `/32`로 바꾸면 그 주소에서는 18080뿐 아니라 host에 publish된 8012와 11434에도 도달할 수 있으므로 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
+LLM08 endpoint는 `DEFAULT_SCENARIO=knowledge` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. 기본 `127.0.0.1/32`는 외부 접속을 열지 않습니다. 공인 IPv4 `/32`로 바꾸면 그 주소에서는 18080뿐 아니라 host에 publish된 8012와 11434에도 도달할 수 있으므로 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
 
 ## 이미지 빌드
 

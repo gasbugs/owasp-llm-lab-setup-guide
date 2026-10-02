@@ -219,7 +219,7 @@ for command in aws terraform jq git curl python3 ssh scp ssh-keygen tar sha256su
 done
 if [ ! -d "$COURSE_REPO/capstone/app" ] \
   || [ ! -f "$COURSE_REPO/capstone/solutions/validate-live.sh" ]; then
-  echo "ERROR: COURSE_REPO does not contain the Day 5 live-validation harness" >&2
+  echo "ERROR: COURSE_REPO does not contain the 5일차 live-validation harness" >&2
   exit 2
 fi
 if ! command -v "$BROWSER_PYTHON" >/dev/null 2>&1; then
@@ -829,14 +829,14 @@ for required_path in \
   infrastructure/scripts/instructor/resolve-image-digests.py \
   infrastructure/scripts/instructor/run-remote-validation.sh \
   infrastructure/scripts/student/upload-capstone.sh \
-  tests/browser/run_day3_ui.py \
-  tests/browser/day3_ui_helpers.py \
+  tests/browser/run_output_ui.py \
+  tests/browser/output_ui_helpers.py \
   tests/browser/requirements.txt \
   tests/e2e/llmgoat/lib.sh \
   tests/e2e/llmgoat/run-all.sh \
   tests/e2e/llmgoat/test_a01_prompt_injection.sh \
   tests/e2e/llmgoat/test_a02_a04_a06_a08.sh \
-  docker/vuln-rag/app/scenarios/day4.py \
+  docker/vuln-rag/app/scenarios/knowledge.py \
   tests/e2e/run-full-cycle.sh \
   tests/e2e/llm09/run-isolated-slopsquat.sh; do
   if ! git -C "$REPO_ROOT" cat-file -e "$SETUP_COMMIT:$required_path"; then
@@ -864,8 +864,8 @@ for controller_path in \
   infrastructure/scripts/instructor/resolve-image-digests.py \
   infrastructure/scripts/instructor/run-remote-validation.sh \
   infrastructure/scripts/student/upload-capstone.sh \
-  tests/browser/run_day3_ui.py \
-  tests/browser/day3_ui_helpers.py \
+  tests/browser/run_output_ui.py \
+  tests/browser/output_ui_helpers.py \
   tests/e2e/run-full-cycle.sh \
   tests/e2e/llmgoat/lib.sh \
   tests/e2e/llmgoat/run-all.sh \
@@ -909,14 +909,14 @@ tar -xf "$WORK_DIR/pinned-course.tar" -C "$PINNED_COURSE"
 rm -f "$WORK_DIR/pinned-course.tar"
 COURSE_TREE_HASH=$(git -C "$COURSE_REPO" rev-parse "$COURSE_COMMIT^{tree}")
 if [ ! -f "$PINNED_COURSE/capstone/solutions/validate-live.sh" ]; then
-  echo "ERROR: published COURSE_COMMIT lacks the Day 5 live harness" >&2
+  echo "ERROR: published COURSE_COMMIT lacks the 5일차 live harness" >&2
   exit 1
 fi
 course_manifest
 
 if ! grep -Fq "$LLM09_FIXTURE_PACKAGE" \
-  "$PINNED_REPO/docker/vuln-rag/app/scenarios/day4.py"; then
-  echo "ERROR: pinned Day 4 scenario lacks the deterministic LLM09 package fixture" >&2
+  "$PINNED_REPO/docker/vuln-rag/app/scenarios/knowledge.py"; then
+  echo "ERROR: pinned 4일차 scenario lacks the deterministic LLM09 package fixture" >&2
   exit 1
 fi
 
@@ -1136,7 +1136,7 @@ git -C "$destination" checkout --quiet --detach "$commit"
 test "$(git -C "$destination" rev-parse HEAD)" = "$commit"
 REMOTE_SETUP
 
-log "Uploading Day 5 course capstone with the existing setup uploader"
+log "Uploading 5일차 course capstone with the existing setup uploader"
 (
   cd "$PINNED_COURSE"
   AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" \
@@ -1146,7 +1146,7 @@ log "Uploading Day 5 course capstone with the existing setup uploader"
 
 remote_scp "$DIGEST_MANIFEST" "ubuntu@$INSTANCE_ID:$REMOTE_DIGESTS"
 
-log "Running strict full-cycle, isolated LLM09, and Day 5 reference harness"
+log "Running strict full-cycle, isolated LLM09, and 5일차 reference harness"
 # Leave ten minutes on the paid-resource clock for archive transfer before the
 # emergency stop. Terraform destroy still runs even if that stop fires first.
 remote_timeout=$(cost_timeout_with_reserve 7000 300) || {
@@ -1211,7 +1211,7 @@ for _ in $(seq 1 90); do
   fi
   if curl --noproxy '*' -fsS --max-time 3 \
       http://127.0.0.1:18011/healthz 2>/dev/null \
-      | jq -e '.ok == true and .default_scenario == "day3"' >/dev/null \
+      | jq -e '.ok == true and .default_scenario == "output"' >/dev/null \
     && curl --noproxy '*' -fsS --max-time 3 \
       http://127.0.0.1:18501/_stcore/health 2>/dev/null \
       | grep -qx ok \
@@ -1227,10 +1227,10 @@ done
 BROWSER_RESULT_DIR="$LOCAL_RUN_DIR/browser-evidence"
 BROWSER_LOG="$LOCAL_RUN_DIR/browser-run.log"
 if [ "$forward_ready" -eq 1 ]; then
-  log "SSM forward health passed; running mandatory Day 3 UI/DVLA and LLMGoat browser harness"
+  log "SSM forward health passed; running mandatory 3일차 UI/DVLA and LLMGoat browser harness"
   set +e
   bounded_by_cost_deadline_with_reserve 1400 900 \
-    "$BROWSER_PYTHON" "$PINNED_REPO/tests/browser/run_day3_ui.py" \
+    "$BROWSER_PYTHON" "$PINNED_REPO/tests/browser/run_output_ui.py" \
       --rag-url http://127.0.0.1:18011 \
       --dvla-url http://127.0.0.1:18501 \
       --llmgoat-url http://127.0.0.1:15000 \

@@ -123,7 +123,7 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         self.assertIn('"$CONTAINER_ENGINE" restart "$CONTAINER"', safe_transition)
         self.assertIn("SEMANTIC_ASSERTION", runner)
         self.assertIn(
-            "LLM01 LLM02 LLM05 LLM06 LLM08 LLM08RAG LLM09 LLM10 DAY6",
+            "LLM01 LLM02 LLM05 LLM06 LLM08 LLM08RAG LLM09 LLM10 GUARDRAILS",
             workflow,
         )
 
@@ -131,7 +131,7 @@ class SecureCodingWorkshopTest(unittest.TestCase):
         rag = (ROOT / "docker/vuln-rag/Dockerfile").read_text(encoding="utf-8")
         agent = (ROOT / "docker/vuln-agent/Dockerfile").read_text(encoding="utf-8")
         presidio = (
-            ROOT / "examples/day6/presidio/Containerfile"
+            ROOT / "examples/guardrails/presidio/Containerfile"
         ).read_text(encoding="utf-8")
         self.assertIn("vim-tiny", rag)
         self.assertIn("vim-tiny", agent)

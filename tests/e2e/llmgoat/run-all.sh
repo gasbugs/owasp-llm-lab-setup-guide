@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${RESULTS_DIR:=$SCRIPT_DIR/../results/$(date +%Y%m%d-%H%M%S)-llmgoat}"
 : "${TRIALS:=3}"
-: "${GOAT_URL:=http://localhost:5000}"
+: "${GOAT_URL:=http://localhost/llmgoat}"
 
 mkdir -p "$RESULTS_DIR"
 rm -rf "$RESULTS_DIR/raw" "$RESULTS_DIR/state" "$RESULTS_DIR/.cookies"

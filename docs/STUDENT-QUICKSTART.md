@@ -121,12 +121,12 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - `qwen3:14b-q4_K_M` 생성 모델(9.3GB)과 `bge-m3:latest` embedding 모델 pull 및 warm-up. 로컬 Guard 모델은 설치하지 않습니다. 자체 앱은 `think:false`로 답변·구조화 JSON만 생성하며 서버 인가와 근거 검증은 별도로 유지합니다.
 - LLM08 서버 vector 분석용 `~/work/llm08-analysis-venv` 준비(NumPy만 설치)
 - URI reverse proxy 실행: `lab-reverse-proxy`, port `80`
-- 실습 포털 backend 실행: `lab-portal`, 기존 port `8080`
+- 실습 포털 backend 실행: `lab-portal`, 내부 port `8080`, 접속은 Nginx `/`
 - 역할별 취약 앱 실행: `lab-prompt-rag`, `lab-llm04-rag`, `lab-data-rag`, `lab-output-rag`, `lab-knowledge-rag`, `lab-resource-rag`, ports `8000`, `8004`, `8010`, `8011`, `8012`, `8013`
 - 취약 Agent 앱 실행: `lab-vuln-agent`, port `8001`
 - LLMGoat 실행: `lab-llmgoat`, port `5000`
-- DVLA 실행: `lab-dvla`, 내부 port `8501` (`lab-reverse-proxy`가 `/dvla/`와 기존 host `8501`로 전달)
-- Day 4 LLM03 fake model registry 실행: `lab-fake-registry`, port `8002`
+- DVLA 실행: `lab-dvla`, 내부 port `8501` (`lab-reverse-proxy`가 `/dvla/`로 전달)
+- 4일차 LLM03 fake model registry 실행: `lab-fake-registry`, port `8002`
 - 단일 Docker Compose 파일로 모든 서비스 실행
 - EC2 재부팅 후 자동 복구를 위한 `restart: always`와 `Docker daemon` 설정
 - 자동 중지 Lambda·EventBridge는 설치하지 않음. 실습 직후 `stop-lab.sh`로 ASG를 0으로 낮춰 EC2와 root EBS 삭제
@@ -148,7 +148,7 @@ LLM08은 일반 컨테이너 설치 외에 embedding 모델/API, NumPy 분석 ve
 LLM08 설치가 끝나면 최소 다음 계약을 확인합니다.
 
 - `lab-ollama`에 `bge-m3:latest`가 존재
-- `http://localhost:8012/healthz`가 `default_scenario=day4`
+- `http://localhost/knowledge-rag/healthz`가 `default_scenario=knowledge`
 - 인증된 `POST /api/embed`가 양의 `dimensions`와 동일 길이 vector를 반환
 - `~/work/llm08-analysis-venv`에서 NumPy import 가능
 - commit에 고정된 `examples/llm08/mini_vector_search_app.py`를 별도 학습자 작업본으로 복사 가능
@@ -166,7 +166,7 @@ enable_user_data_bootstrap = true
 
 SSM 세션 안에서 실행합니다.
 
-모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. 기존 직접 포트와 Nginx 80·8501 호환 포트는 `docker ps`의 `PORTS` 열에서 확인합니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
+모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. `docker ps`의 `PORTS` 열에서 Nginx의 80번 포트만 host에 publish됐는지 확인합니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
 
 ```bash
 sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && docker compose ps'
@@ -176,17 +176,17 @@ curl -s http://localhost/prompt-rag/healthz
 curl -s http://localhost/llm04-rag/healthz
 curl -s http://localhost/llmgoat/api/model_status
 curl -s http://localhost/dvla/_stcore/health
-curl -s http://localhost:8080/ | head
-curl -s http://localhost:11434/api/tags | head
-curl -s http://localhost:8000/healthz
-curl -s http://localhost:8004/healthz
-curl -s http://localhost:8010/healthz
-curl -s http://localhost:8011/healthz
-curl -s http://localhost:8012/healthz
-curl -s http://localhost:8013/healthz
-curl -s http://localhost:8001/healthz
-curl -s http://localhost:5000/api/model_status
-curl -s http://localhost:8002/api/v1/models | head
+curl -s http://localhost/ | head
+curl -s http://localhost/ollama/api/tags | head
+curl -s http://localhost/prompt-rag/healthz
+curl -s http://localhost/llm04-rag/healthz
+curl -s http://localhost/data-rag/healthz
+curl -s http://localhost/output-rag/healthz
+curl -s http://localhost/knowledge-rag/healthz
+curl -s http://localhost/resource-rag/healthz
+curl -s http://localhost/vuln-agent/healthz
+curl -s http://localhost/llmgoat/api/model_status
+curl -s http://localhost/fake-registry/api/v1/models | head
 ```
 
 배포 정의 전체는 `~/.config/owasp-llm-lab/compose.yaml` 한 파일에서 확인할 수 있습니다. 개별 로그와 재시작도 컨테이너 이름으로 수행합니다.
@@ -206,29 +206,29 @@ raw `/healthz`를 확인합니다. 먼저 `cd ~/.config/owasp-llm-lab`로 이동
 
 | 실습 | 재시작 명령 | 원본 확인 명령 |
 |---|---|---|
-| LLM01 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost:8000/healthz` |
-| LLM04 RAG | `docker compose up -d --no-deps --force-recreate llm04-rag` | `curl -sS http://localhost:8004/healthz` |
-| LLM02 시큐어 코딩·LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost:8010/healthz` |
-| LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost:8011/healthz` |
-| LLM06 삭제 실습 | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost:8001/healthz` |
-| LLM08·LLM09 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate knowledge-rag` | `curl -sS http://localhost:8012/healthz` |
-| LLMGoat 상태 변경 실습 | `docker compose restart llmgoat` | `curl -sS http://localhost:5000/api/model_status` |
-| LLM10 시큐어 코딩·과부하 | 아래 순서대로 `resource-rag`와 `ollama` 처리 | `curl -sS http://localhost:8013/healthz` |
+| LLM01 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate prompt-rag` | `curl -sS http://localhost/prompt-rag/healthz` |
+| LLM04 RAG | `docker compose up -d --no-deps --force-recreate llm04-rag` | `curl -sS http://localhost/llm04-rag/healthz` |
+| LLM02 시큐어 코딩·LLM08 RAG corpus | `docker compose up -d --no-deps --force-recreate data-rag` | `curl -sS http://localhost/data-rag/healthz` |
+| LLM05 | `docker compose up -d --no-deps --force-recreate output-rag` | `curl -sS http://localhost/output-rag/healthz` |
+| LLM06 삭제 실습 | `docker compose up -d --no-deps --force-recreate vuln-agent` | `curl -sS http://localhost/vuln-agent/healthz` |
+| LLM08·LLM09 시큐어 코딩 | `docker compose up -d --no-deps --force-recreate knowledge-rag` | `curl -sS http://localhost/knowledge-rag/healthz` |
+| LLMGoat 상태 변경 실습 | `docker compose restart llmgoat` | `curl -sS http://localhost/llmgoat/api/model_status` |
+| LLM10 시큐어 코딩·과부하 | 아래 순서대로 `resource-rag`와 `ollama` 처리 | `curl -sS http://localhost/resource-rag/healthz` |
 
-LLM10은 timeout 뒤 Day 5 앱과 공유 Ollama queue에 작업이 남을 수 있으므로
+LLM10은 timeout 뒤 5일차 앱과 공유 Ollama queue에 작업이 남을 수 있으므로
 두 서비스를 눈에 보이는 순서로 직접 처리합니다.
 
 ```bash
 cd ~/.config/owasp-llm-lab
 docker compose up -d --no-deps --force-recreate resource-rag
 docker compose restart ollama
-curl -fsS http://localhost:11434/api/tags
+curl -fsS http://localhost/ollama/api/tags
 docker compose up -d --no-deps --force-recreate resource-rag
 docker compose ps resource-rag ollama
 ```
 
 ```bash
-curl -sS http://localhost:8013/healthz
+curl -sS http://localhost/resource-rag/healthz
 ```
 
 이 복원 명령들은 `~/work`의 evidence와 Capstone, Ollama 모델, LLMGoat

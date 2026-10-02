@@ -124,7 +124,7 @@ services:
     profiles: [dialog]
     container_name: llm-security-nemo-dialog-rails
     build:
-      context: ../examples/day6/nemo-guardrails
+      context: ../examples/guardrails/nemo-guardrails
       dockerfile: Containerfile
     image: localhost/llm-security-nemo-dialog-rails:${DIALOG_IMAGE_VERSION:-0.22.0}
     restart: always
@@ -136,7 +136,7 @@ services:
       RUN_MODE: server
       GUARD_MODE: enforce
       ENABLE_LAB_ENDPOINTS: "true"
-      PRESIDIO_URL: http://day6-presidio-api:8013
+      PRESIDIO_URL: http://guardrails-presidio-api:8013
       MODEL_GATEWAY_URL: http://llm-security-bedrock-gateway:8080
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-lite-v1:0}
       BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?Set BEDROCK_GATEWAY_TOKEN in the selected Compose env file}

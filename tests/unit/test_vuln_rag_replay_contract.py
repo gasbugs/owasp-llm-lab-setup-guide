@@ -19,11 +19,11 @@ class ReplayContractTest(unittest.TestCase):
     def test_replay_control_exists_and_starts_disabled(self) -> None:
         self.assertIn('id="replay-last" type="button" disabled', self.text)
         self.assertIn(
-            '{% if scenario_id == "day3" %}<label class="render-toggle">',
+            '{% if scenario_id == "output" %}<label class="render-toggle">',
             self.text,
         )
         self.assertIn(
-            '{% if scenario_id == "day3" %}<button id="replay-last"',
+            '{% if scenario_id == "output" %}<button id="replay-last"',
             self.text,
         )
 
@@ -47,8 +47,8 @@ class ReplayContractTest(unittest.TestCase):
             "scenario_intro": "test",
             "warning": "test",
         }
-        llm01 = template.render(scenario_id="day1", **base)
-        llm05 = template.render(scenario_id="day3", **base)
+        llm01 = template.render(scenario_id="prompt", **base)
+        llm05 = template.render(scenario_id="output", **base)
         self.assertNotIn('id="render-html"', llm01)
         self.assertNotIn('id="replay-last"', llm01)
         self.assertIn('id="render-html"', llm05)

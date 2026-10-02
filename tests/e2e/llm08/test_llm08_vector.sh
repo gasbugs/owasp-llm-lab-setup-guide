@@ -62,9 +62,9 @@ fetch_json() {
 fetch_json "healthz" "$RAW_DIR/healthz.json" 5 "$TARGET_URL/healthz"
 actual_scenario=$(jq -r '.default_scenario // .scenario // "unknown"' \
   "$RAW_DIR/healthz.json")
-if [ "$actual_scenario" != "day4" ]; then
+if [ "$actual_scenario" != "knowledge" ]; then
   echo "ERROR: current TARGET_URL=$TARGET_URL has scenario=$actual_scenario;" \
-    "LLM08 requires day4" >&2
+    "LLM08 requires knowledge" >&2
   exit 4
 fi
 
@@ -210,13 +210,13 @@ fetch_json "safe-chat" "$RAW_DIR/safe-chat.json" 180 \
   --data-binary "$SEARCH_BODY"
 jq -e '
   (.reply | type == "string" and length > 0)
-  and .scenario == "day4"
+  and .scenario == "knowledge"
   and .vector_search.filter.applied == false
   and .vector_search.hits[0].tenant == "beta"
 ' "$RAW_DIR/vulnerable-chat.json" >/dev/null
 jq -e '
   (.reply | type == "string" and length > 0)
-  and .scenario == "day4"
+  and .scenario == "knowledge"
   and .vector_search.filter.applied == true
   and ([.vector_search.hits[].tenant] | all(. == "acme"))
 ' "$RAW_DIR/safe-chat.json" >/dev/null

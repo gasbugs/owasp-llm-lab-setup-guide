@@ -8,11 +8,11 @@ OWASP Top 10 for LLM 실습의 AWS 인프라, 컨테이너 런타임, 설치 스
 
 | 경로 | 용도 |
 |---|---|
-| `docs/STUDENT-QUICKSTART.md` | 수강생이 따라 하는 Day 0 셋업 절차 |
+| `docs/STUDENT-QUICKSTART.md` | 수강생이 따라 하는 0일차 셋업 절차 |
 | `docs/TERRAFORM-ADVANCED-OPTIONS.md` | 강사용 AMI·bootstrap·commit 고정 override와 이전 변수 제거 안내 |
-| `docs/LAB-RESET-POLICY.md` | Day 1~5 상태 저장 위치와 allowlist 기반 최소 복원 명령 |
+| `docs/LAB-RESET-POLICY.md` | 1일차~5 상태 저장 위치와 allowlist 기반 최소 복원 명령 |
 | `docs/LLM08-SETUP.md` | LLM08 embedding runtime·분석 venv·학습자 미니 앱의 신규/기존 EC2 설치와 종료 절차 |
-| `docs/DAY6-GUARDRAILS-SETUP.md` | Microsoft Presidio·NeMo Guardrails Docker 이미지 빌드와 실측 검증 |
+| `docs/GUARDRAILS-GUARDRAILS-SETUP.md` | Microsoft Presidio·NeMo Guardrails Docker 이미지 빌드와 실측 검증 |
 | `bedrock-api-lab/` | 기존 GPU 환경과 독립된 Nova Lite·Titan Embeddings·Knowledge Base API 실습 |
 | `docs/ARCHITECTURE.md` | AWS VM, Terraform, user-data, 컨테이너 배포 구조 |
 | `docs/INSTRUCTOR-IMAGE-BUILD.md` | 강사가 컨테이너 이미지를 빌드하고 공개 GHCR에 push하는 절차 |
@@ -39,9 +39,9 @@ Ubuntu 로컬 PC의 선택적 도구 설치는
 사용합니다. 이 스크립트는 로컬 워크스테이션만 준비하며 EC2의 Docker 실습
 런타임 설치를 대신하지 않습니다.
 
-Day 2 LLM08에서는 일반 셋업 뒤 [docs/LLM08-SETUP.md](docs/LLM08-SETUP.md)의 `bge-m3:latest`/Day 4 API 검증, 미니 앱 실행·SSM forwarding·증거 보존을 추가로 수행합니다. 강사·콘텐츠 배포자가 먼저 publish gate를 통과해 40자리 setup commit을 공지하며, 수강생은 로컬 PC에 Docker을 추가 설치하지 않습니다. LLM08 변경이 로컬 워킹트리에만 있거나 같은 commit의 이미지가 아직 공개 GHCR에 없으면 gate에서 중단하며, 현재 원격 `main`에 이미 배포됐다고 가정하지 않습니다.
+2일차 LLM08에서는 일반 셋업 뒤 [docs/LLM08-SETUP.md](docs/LLM08-SETUP.md)의 `bge-m3:latest`/4일차 API 검증, 미니 앱 실행·SSM forwarding·증거 보존을 추가로 수행합니다. 강사·콘텐츠 배포자가 먼저 publish gate를 통과해 40자리 setup commit을 공지하며, 수강생은 로컬 PC에 Docker을 추가 설치하지 않습니다. LLM08 변경이 로컬 워킹트리에만 있거나 같은 commit의 이미지가 아직 공개 GHCR에 없으면 gate에서 중단하며, 현재 원격 `main`에 이미 배포됐다고 가정하지 않습니다.
 
-Day 6 가드레일 실습은 [docs/DAY6-GUARDRAILS-SETUP.md](docs/DAY6-GUARDRAILS-SETUP.md)를 따릅니다. 두 프레임워크는 호스트 Python이 아니라 독립된 Docker 이미지에 설치되며, 기존 one-shot CLI와 loopback HTTP 통합 서버를 함께 제공합니다.
+6일차 가드레일 실습은 [docs/GUARDRAILS-GUARDRAILS-SETUP.md](docs/GUARDRAILS-GUARDRAILS-SETUP.md)를 따릅니다. 두 프레임워크는 호스트 Python이 아니라 독립된 Docker 이미지에 설치되며, 기존 one-shot CLI와 loopback HTTP 통합 서버를 함께 제공합니다.
 
 기존 통합 배포와 분리해 LLMGoat만 직접 Build하려면
 [examples/llmgoat-local-build/README.md](examples/llmgoat-local-build/README.md)를

@@ -10,12 +10,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from day3_ui_helpers import (
+from output_ui_helpers import (
     format_llmgoat_course_output,
     sha256_file,
     validate_loopback_origin,
 )
-from run_day3_ui import (
+from run_output_ui import (
     build_hash_manifest,
     fetch_text,
     llmgoat_request_count,

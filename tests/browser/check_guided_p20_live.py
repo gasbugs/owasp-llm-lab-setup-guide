@@ -7,7 +7,7 @@ from urllib.error import URLError
 from urllib.request import build_opener, ProxyHandler
 
 from playwright.sync_api import sync_playwright
-from day3_ui_helpers import validate_loopback_origin
+from output_ui_helpers import validate_loopback_origin
 
 
 def main():

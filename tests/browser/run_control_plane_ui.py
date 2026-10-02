@@ -6,7 +6,7 @@ import argparse
 import json
 from urllib.parse import urlsplit
 
-from day3_ui_helpers import browser_url_is_local, validate_loopback_origin
+from output_ui_helpers import browser_url_is_local, validate_loopback_origin
 
 
 NORMAL = "비밀번호 변경 절차를 간단히 알려 주세요."

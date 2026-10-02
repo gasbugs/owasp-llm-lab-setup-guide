@@ -15,8 +15,8 @@ AGENT_UI = ROOT / "docker/vuln-agent/app/templates/index.html"
 CONTROL_UI = ROOT / "llm-security-control-plane/application-gateway/index.html"
 PORTAL_UI = ROOT / "infrastructure/portal/index.html"
 THEME_TOKENS = ROOT / "docker/shared-ui/theme.css"
-PRESIDIO_API = ROOT / "examples/day6/presidio/server.py"
-NEMO_API = ROOT / "examples/day6/nemo-guardrails/server.py"
+PRESIDIO_API = ROOT / "examples/guardrails/presidio/server.py"
+NEMO_API = ROOT / "examples/guardrails/nemo-guardrails/server.py"
 RAG_SCENARIOS = ROOT / "docker/vuln-rag/app/scenarios"
 
 
@@ -153,8 +153,8 @@ class UiDesignSystemTests(unittest.TestCase):
         self.assertIn("if (!guardPanel) return;", self.rag)
         self.assertIn("guardPanel.hidden = true", self.rag)
         self.assertIn("showGuardrailPanel(data.guard_engine, data.guard_mode)", self.rag)
-        self.assertIn("scenarioSelect.value !== 'day2' && !isLlm04Rag", self.rag)
-        self.assertIn('{% if scenario_id not in ("day2", "llm04") %} hidden{% endif %}', self.rag)
+        self.assertIn("scenarioSelect.value !== 'data' && !isLlm04Rag", self.rag)
+        self.assertIn('{% if scenario_id not in ("data", "llm04") %} hidden{% endif %}', self.rag)
 
     def test_chat_submit_handles_absent_retrieval_panel_and_shows_progress(self) -> None:
         submit_handler = self.rag.split("form.addEventListener('submit'", 1)[1].split(
@@ -181,7 +181,7 @@ class UiDesignSystemTests(unittest.TestCase):
     def test_general_labs_do_not_render_the_guardrail_panel(self) -> None:
         template = Environment(autoescape=True).from_string(self.rag)
         common = {
-            "scenario_id": "day1",
+            "scenario_id": "prompt",
             "scenario_title": "LLM01",
             "scenario_intro": "",
             "warning": "",
@@ -217,7 +217,7 @@ class UiDesignSystemTests(unittest.TestCase):
 
     def test_html_render_controls_are_server_rendered_only_for_llm05(self) -> None:
         self.assertIn(
-            '{% if scenario_id == "day3" %}<label class="render-toggle">',
+            '{% if scenario_id == "output" %}<label class="render-toggle">',
             self.rag,
         )
         self.assertIn("renderHTML?.checked === true", self.rag)
@@ -225,7 +225,7 @@ class UiDesignSystemTests(unittest.TestCase):
     def test_llm09_uses_the_same_message_input_without_an_extra_route_control(self) -> None:
         template = Environment(autoescape=True).from_string(self.rag)
         common = {
-            "scenario_id": "day4",
+            "scenario_id": "knowledge",
             "scenario_title": "Knowledge Lab",
             "scenario_intro": "",
             "warning": "",
@@ -244,7 +244,7 @@ class UiDesignSystemTests(unittest.TestCase):
             "Active exercise / {{ scenario_id }}",
             "{{ s.id }} — {{ s.title }}",
             "LIVE / {{ scenario_id }}",
-            "Day 2 routing",
+            "2일차 routing",
             "${data.llm_ids.join(' · ')} / ${data.scenario}",
         ):
             with self.subTest(visible_fragment=visible_fragment):
@@ -264,7 +264,7 @@ class UiDesignSystemTests(unittest.TestCase):
         )
 
     def test_scenario_titles_use_llm_names_instead_of_day_labels(self) -> None:
-        for path in sorted(RAG_SCENARIOS.glob("day[1-5].py")):
+        for path in sorted((RAG_SCENARIOS / name for name in ("prompt.py", "data.py", "output.py", "knowledge.py", "resource.py"))):
             title_lines = [
                 line.strip()
                 for line in path.read_text(encoding="utf-8").splitlines()

@@ -2,7 +2,7 @@
 """LLM08 shared RAG corpus regression test.
 
 This does not test model learning. It verifies the intended vulnerable design:
-a document injected into the Day 2 RAG corpus is visible to later requests that
+a document injected into the 2일차 RAG corpus is visible to later requests that
 search the same in-process corpus.
 """
 
@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "docker" / "vuln-rag"))
 
 from app.scenarios import load_scenario  # noqa: E402
-from app.scenarios import day2 as day2_scenario  # noqa: E402
+from app.scenarios import data as data_scenario  # noqa: E402
 
 
 TRIGGER = "모바일 송금 장애 처리 절차 안내 부탁드립니다"
@@ -28,7 +28,7 @@ POISON_TEXT = (
 
 
 def main() -> int:
-    scenario = load_scenario("day2")
+    scenario = load_scenario("data")
 
     before = scenario.retrieve(TRIGGER)
     scenario.add_doc(
@@ -41,7 +41,7 @@ def main() -> int:
     )
     after = scenario.retrieve(TRIGGER)
     safe_after = [
-        doc.rendered for doc in day2_scenario.retrieve_documents(TRIGGER, "safe")
+        doc.rendered for doc in data_scenario.retrieve_documents(TRIGGER, "safe")
     ]
 
     poison_in_after = any(

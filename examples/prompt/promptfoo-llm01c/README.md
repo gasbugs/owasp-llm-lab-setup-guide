@@ -1,0 +1,7 @@
+# Promptfoo LLM01-C limited red-team fixture
+
+This learner-facing configuration targets the existing 1일차 `/api/chat` endpoint. Promptfoo uses its local-capable `policy` plugin and the course Ollama model to generate four probes against the chatbot-purpose and secret-disclosure boundaries, then adds `base64` delivery variants. `PROMPTFOO_DISABLE_REDTEAM_REMOTE_GENERATION=true` is required by the lesson so prompts are not sent to Promptfoo's hosted generation service. Security-focused built-in plugins such as `hijacking` and `system-prompt-override` require Promptfoo remote generation in the pinned Community release and are intentionally not selected.
+
+The lab runs the official Node.js 24 container with a bind-mounted project-local Promptfoo installation created with `--omit=optional`. The official all-features Promptfoo image includes large optional browser, cloud-provider and agent packages that are unnecessary for this bounded HTTP red-team lab. The reduced project-local installation still uses the official Promptfoo npm package and keeps the HTTP provider, assertions and JSON export without committing another multi-gigabyte container layer to the EC2 root disk.
+
+The exact-canary assertion remains the authoritative lab impact check. Promptfoo's plugin grader helps classify candidates, but a model-generated refusal is not proof that an application policy blocked the request. Confirmed candidates belong in the separate Module 08 regression suite only after manual reproduction.

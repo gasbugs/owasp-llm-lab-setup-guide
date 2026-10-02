@@ -1,6 +1,6 @@
 # LLM08 embedding lab setup
 
-이 문서는 Day 2 LLM08 실습에 추가된 embedding runtime, 분석 환경, 학습자 미니 앱을 **새 EC2와 기존 EC2에 같은 방식으로 준비하고 검증하는 정본 가이드**입니다. 일반적인 AWS 준비는 [Student Quickstart](STUDENT-QUICKSTART.md), 전체 이미지 세트의 강사용 검증은 [Instructor live validation](LIVE-VALIDATION.md)을 함께 따릅니다.
+이 문서는 2일차 LLM08 실습에 추가된 embedding runtime, 분석 환경, 학습자 미니 앱을 **새 EC2와 기존 EC2에 같은 방식으로 준비하고 검증하는 정본 가이드**입니다. 일반적인 AWS 준비는 [Student Quickstart](STUDENT-QUICKSTART.md), 전체 이미지 세트의 강사용 검증은 [Instructor live validation](LIVE-VALIDATION.md)을 함께 따릅니다.
 
 LLM08 환경은 다음 구성요소를 함께 사용합니다.
 
@@ -22,7 +22,7 @@ LLM08 환경은 다음 구성요소를 함께 사용합니다.
 - `[EC2 / SSM 세션]`: SSM으로 접속한 EC2. 첫 접속 직후 `sudo -iu ubuntu`로 전환
 - `[로컬 노트북 / 새 터미널]`: 기존 SSM shell을 유지한 채 여는 별도 터미널
 
-위치를 바꾸어 실행하지 마십시오. 특히 `localhost:8012`는 **EC2 안의 Day 4 서버**를 뜻합니다.
+위치를 바꾸어 실행하지 마십시오. 특히 `http://localhost/knowledge-rag`는 **EC2 안의 nginx를 거쳐 연결하는 임베딩 서버**를 뜻합니다.
 
 ## 0. 강사 publish gate: EC2를 켜기 전에 확인
 
@@ -304,9 +304,9 @@ for command_name in curl jq python3; do
   }
 done
 
-curl -fsS --max-time 10 http://127.0.0.1:8012/healthz \
-  | tee "$EVIDENCE_DIR/day4-health.json" \
-  | jq -e '.ok == true and .default_scenario == "day4"' >/dev/null
+curl -fsS --max-time 10 http://127.0.0.1/knowledge-rag/healthz \
+  | tee "$EVIDENCE_DIR/knowledge-health.json" \
+  | jq -e '.ok == true and .default_scenario == "knowledge"' >/dev/null
 
 docker exec lab-ollama ollama list \
   | tee "$EVIDENCE_DIR/ollama-list.txt"
@@ -323,12 +323,12 @@ test -r "$SETUP_DIR/examples/llm08/mini_vector_search_app.py"
 printf 'RUNTIME_PREREQUISITES=PASS\n'
 ```
 
-Ollama API와 Day 4 인증 proxy가 같은 모델·차원 계약을 반환하는지 확인합니다. `dimensions == 1024`를 gate로 고정하지 않습니다. 계약은 **양의 차원이고 모든 vector 길이가 동일한 것**입니다.
+Ollama API와 4일차 인증 proxy가 같은 모델·차원 계약을 반환하는지 확인합니다. `dimensions == 1024`를 gate로 고정하지 않습니다. 계약은 **양의 차원이고 모든 vector 길이가 동일한 것**입니다.
 
 ```bash
 # [EC2 / SSM 세션, ubuntu 사용자]
 set -euo pipefail
-export TARGET_URL=http://127.0.0.1:8012
+export TARGET_URL=http://127.0.0.1/knowledge-rag
 export LLM08_TOKEN=llm08-acme-demo-token
 
 curl -fsS --retry 2 --retry-all-errors --max-time 180 \
@@ -458,12 +458,12 @@ if ss -ltn | awk '$4 ~ /:18080$/ {found=1} END {exit(found ? 0 : 1)}'; then
   exit 1
 fi
 
-export TARGET_URL=http://127.0.0.1:8012
+export TARGET_URL=http://127.0.0.1/knowledge-rag
 export LLM08_TOKEN=llm08-acme-demo-token
 python3 "$LEARNER_APP" --serve --host 0.0.0.0 --port 18080
 ```
 
-`0.0.0.0`은 EC2의 모든 IPv4 인터페이스에서 연결을 받으라는 **bind sentinel**이며 브라우저에서 여는 주소가 아닙니다. 기본 Terraform 값은 외부 인바운드를 열지 않습니다. `allowed_ingress_cidr`를 본인 공인 IPv4 `/32`로 바꾼 경우에만 브라우저에서 `EC2_PUBLIC_IP:18080`으로 직접 접속할 수 있습니다. 미니 앱의 수신 bind와 upstream은 별개입니다. `TARGET_URL=http://127.0.0.1:8012`는 계속 loopback HTTP origin으로 제한됩니다.
+`0.0.0.0`은 EC2의 모든 IPv4 인터페이스에서 연결을 받으라는 **bind sentinel**이며 브라우저에서 여는 주소가 아닙니다. 기본 Terraform 값은 외부 인바운드를 열지 않습니다. `allowed_ingress_cidr`를 본인 공인 IPv4 `/32`로 바꾼 경우에만 브라우저에서 `EC2_PUBLIC_IP:18080`으로 직접 접속할 수 있습니다. 미니 앱의 수신 bind와 upstream은 별개입니다. `TARGET_URL=http://127.0.0.1/knowledge-rag`는 계속 loopback HTTP origin으로 제한됩니다.
 
 서버 터미널을 열어 둔 채 두 번째 EC2/SSM 터미널을 엽니다. health와 API는 wildcard bind의 로컬 검사 주소인 `127.0.0.1:18080`으로 호출합니다. 3절에서 기록한 현재 evidence 경로를 읽은 뒤, request body의 `tenant`를 신뢰하지 않는지 HTTP 상태까지 확인합니다.
 
@@ -519,7 +519,7 @@ curl -fsS --max-time 5 http://127.0.0.1:18080/healthz \
 printf 'Open http://127.0.0.1:18080/ in a browser.\n'
 ```
 
-Day 4 API를 public IP 대신 SSM 경로로 진단하려면 첫 forwarding session과 다른 터미널에서 8012를 18012로 전달합니다. 현재 Terraform ingress에서는 지정한 `/32`에서 EC2 public IP의 8012에도 직접 도달할 수 있습니다.
+4일차 API를 public IP 대신 SSM 경로로 진단하려면 첫 forwarding session과 다른 터미널에서 8012를 18012로 전달합니다. 현재 Terraform ingress에서는 지정한 `/32`에서 EC2 public IP의 8012에도 직접 도달할 수 있습니다.
 
 ```bash
 # [로컬 노트북 / 새 터미널]
@@ -532,7 +532,7 @@ aws ssm start-session --profile "$AWS_PROFILE" \
 ```bash
 # [로컬 노트북 / 새 터미널]
 curl -fsS --max-time 5 http://127.0.0.1:18012/healthz \
-  | jq -e '.ok == true and .default_scenario == "day4"'
+  | jq -e '.ok == true and .default_scenario == "knowledge"'
 ```
 
 ## 7. 2026-07-13 EC2 실측 출력
@@ -624,7 +624,7 @@ printf 'EC2_FINAL_STATE=%s\n' "$STATE"
 |---|---|---|
 | publish gate에서 source file 없음 | `git cat-file -e "$SETUP_COMMIT:examples/llm08/mini_vector_search_app.py"` | 변경이 아직 공개 main에 없음. commit/push 후 다시 확인 |
 | GHCR manifest 없음/unauthorized | `docker manifest inspect ghcr.io/gasbugs/owasp-llm-vuln-rag:$IMAGE_TAG` | workflow 미완료 또는 package 비공개. EC2를 시작하지 말고 publish 완료 |
-| `/api/embed`가 404 | `/healthz`의 `default_scenario`, `/etc/lab/env`의 `IMAGE_TAG` | 잘못된 포트 또는 구 이미지. Day 4의 pinned image로 재설치 |
+| `/api/embed`가 404 | `/healthz`의 `default_scenario`, `/etc/lab/env`의 `IMAGE_TAG` | 잘못된 포트 또는 구 이미지. 4일차의 pinned image로 재설치 |
 | `/api/embed`가 401 | Authorization header 확인 | `LLM08_TOKEN` 누락/오류. body의 tenant로 대체하지 않음 |
 | `/api/embed`가 502 | `docker logs lab-knowledge-rag`, Ollama `/api/tags` | Ollama 미준비, embedding model 누락, backend 응답 계약 위반 |
 | `bge-m3:latest` 없음 | `docker exec lab-ollama ollama list` | installer가 끝나지 않았거나 model pull 실패. 설치 log 확인 후 같은 pinned installer 재실행 |

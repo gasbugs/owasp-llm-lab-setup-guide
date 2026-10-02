@@ -160,7 +160,7 @@ class StrictShellHarnessContractTest(unittest.TestCase):
             'status="not_fetched_allowlist"\n        classification="fake_url"',
             source,
         )
-        scenario = self.read("docker/vuln-rag/app/scenarios/day4.py")
+        scenario = self.read("docker/vuln-rag/app/scenarios/knowledge.py")
         self.assertIn(
             "owasp-llm-lab-nonexistent-candidate-20260711",
             scenario,
@@ -185,15 +185,15 @@ class StrictShellHarnessContractTest(unittest.TestCase):
         self.assertIn('"$reset_script" llm10', source)
         self.assertNotIn("docker", source)
 
-        day5_restart = "recreate_one \\\n      lab-resource-rag"
+        resource_restart = "recreate_one \\\n      lab-resource-rag"
         ollama_restart = "docker restart lab-ollama"
-        first_day5 = reset.index(day5_restart)
+        first_resource = reset.index(resource_restart)
         ollama = reset.index(ollama_restart)
-        second_day5 = reset.index(day5_restart, first_day5 + 1)
-        self.assertLess(first_day5, ollama)
-        self.assertLess(ollama, second_day5)
-        self.assertIn("http://127.0.0.1:11434/api/tags", reset)
-        self.assertIn("http://127.0.0.1:8013/healthz", reset)
+        second_resource = reset.index(resource_restart, first_resource + 1)
+        self.assertLess(first_resource, ollama)
+        self.assertLess(ollama, second_resource)
+        self.assertIn("http://127.0.0.1/ollama/api/tags", reset)
+        self.assertIn("http://127.0.0.1/resource-rag/healthz", reset)
         self.assertIn("warmup_model recovery", source)
         self.assertIn("bounded model warmup failed", source)
         self.assertIn("recover_parallel_probe_on_exit", source)

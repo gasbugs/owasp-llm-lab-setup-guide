@@ -2,17 +2,17 @@
 # Publisher-only E2E runner. Learner notes keep each request as a direct command.
 set -euo pipefail
 
-LAB="${1:?usage: run-workshop.sh LLM01|LLM02|LLM05|LLM06|LLM08|LLM08RAG|LLM09|LLM10|DAY6 vulnerable|safe}"
+LAB="${1:?usage: run-workshop.sh LLM01|LLM02|LLM05|LLM06|LLM08|LLM08RAG|LLM09|LLM10|GUARDRAILS vulnerable|safe}"
 MODE="${2:?usage: run-workshop.sh LAB vulnerable|safe}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 RAG_IMAGE=localhost/secure-coding-rag:latest
 AGENT_IMAGE=localhost/secure-coding-agent:latest
-PRESIDIO_IMAGE=localhost/secure-coding-day6-presidio:latest
+PRESIDIO_IMAGE=localhost/secure-coding-guardrails-presidio:latest
 CONTAINER=secure-coding-e2e
 RAG_PORT="${SECURE_CODING_RAG_PORT:-19080}"
 AGENT_PORT="${SECURE_CODING_AGENT_PORT:-19081}"
-DAY6_PORT="${SECURE_CODING_DAY6_PORT:-19084}"
+GUARDRAILS_PORT="${SECURE_CODING_GUARDRAILS_PORT:-19084}"
 BODY="$(mktemp)"
 NORMAL_BODY="$(mktemp)"
 CONCURRENCY_BODY="$(mktemp)"
@@ -50,7 +50,7 @@ paths = {
     "LLM08": root / "docker/vuln-rag/app/secure_coding.py",
     "LLM09": root / "docker/vuln-rag/app/secure_coding.py",
     "LLM10": root / "docker/vuln-rag/app/secure_coding.py",
-    "DAY6": root / "examples/day6/presidio/secure_coding.py",
+    "GUARDRAILS": root / "examples/guardrails/presidio/secure_coding.py",
 }
 lines = paths[lab].read_text(encoding="utf-8").splitlines()
 marker_pattern = re.compile(rf"NODEGOAT-LAB: {re.escape(lab)}(?:\s|—|$)")
@@ -79,20 +79,20 @@ case "$LAB" in
     PAIR_CONTAINER_SOURCE=/app/app/main.py
     "$CONTAINER_ENGINE" build -t "$AGENT_IMAGE" "$ROOT/docker/vuln-agent" >"$BUILD_LOG"
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
-      -e PORT="$AGENT_PORT" -e OLLAMA_URL=http://127.0.0.1:11434 \
+      -e PORT="$AGENT_PORT" -e OLLAMA_URL=http://127.0.0.1/ollama \
       "$AGENT_IMAGE" >/dev/null
     URL="http://127.0.0.1:$AGENT_PORT"
     ;;
-  DAY6)
-    PAIR_HOST_SOURCE="$ROOT/examples/day6/presidio/secure_coding.py"
+  GUARDRAILS)
+    PAIR_HOST_SOURCE="$ROOT/examples/guardrails/presidio/secure_coding.py"
     PAIR_CONTAINER_SOURCE=/app/secure_coding.py
     "$CONTAINER_ENGINE" build \
-      -f "$ROOT/examples/day6/presidio/Containerfile" \
-      -t "$PRESIDIO_IMAGE" "$ROOT/examples/day6/presidio" >"$BUILD_LOG"
+      -f "$ROOT/examples/guardrails/presidio/Containerfile" \
+      -t "$PRESIDIO_IMAGE" "$ROOT/examples/guardrails/presidio" >"$BUILD_LOG"
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
-      -e RUN_MODE=server -e SERVER_PORT="$DAY6_PORT" \
+      -e RUN_MODE=server -e SERVER_PORT="$GUARDRAILS_PORT" \
       -e ENABLE_LAB_ENDPOINTS=true "$PRESIDIO_IMAGE" >/dev/null
-    URL="http://127.0.0.1:$DAY6_PORT"
+    URL="http://127.0.0.1:$GUARDRAILS_PORT"
     ;;
   LLM01|LLM02|LLM05|LLM08|LLM08RAG|LLM09|LLM10)
     if [ "$LAB" = LLM05 ]; then
@@ -104,16 +104,16 @@ case "$LAB" in
     fi
     "$CONTAINER_ENGINE" build -t "$RAG_IMAGE" "$ROOT/docker/vuln-rag" >"$BUILD_LOG"
     case "$LAB" in
-      LLM01) SCENARIO=day1 ;;
-      LLM02|LLM08RAG) SCENARIO=day2 ;;
-      LLM05) SCENARIO=day3 ;;
-      LLM08) SCENARIO=day4 ;;
-      LLM09) SCENARIO=day4 ;;
-      LLM10) SCENARIO=day5 ;;
+      LLM01) SCENARIO=prompt ;;
+      LLM02|LLM08RAG) SCENARIO=data ;;
+      LLM05) SCENARIO=output ;;
+      LLM08) SCENARIO=knowledge ;;
+      LLM09) SCENARIO=knowledge ;;
+      LLM10) SCENARIO=resource ;;
     esac
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
       -e PORT="$RAG_PORT" -e DEFAULT_SCENARIO="$SCENARIO" \
-      -e OLLAMA_URL=http://127.0.0.1:11434 "$RAG_IMAGE" >/dev/null
+      -e OLLAMA_URL=http://127.0.0.1/ollama "$RAG_IMAGE" >/dev/null
     URL="http://127.0.0.1:$RAG_PORT"
     ;;
   *)
@@ -208,7 +208,7 @@ run_normal_baseline() {
     LLM09)
       curl -fsS --max-time 180 -X POST "$URL/api/chat" \
         -H 'Content-Type: application/json' \
-        -d '{"scenario":"day4","lab":"llm09","message":"Python 패키지 rich 하나를 추천하고 pip install 명령을 보여 줘."}' \
+        -d '{"scenario":"knowledge","lab":"llm09","message":"Python 패키지 rich 하나를 추천하고 pip install 명령을 보여 줘."}' \
         -o "$NORMAL_BODY"
       jq -e '.planner_model_called == true and .upstream_called == true and any(.recommendations[]?; .candidate == "rich")' "$NORMAL_BODY" >/dev/null
       ;;
@@ -218,7 +218,7 @@ run_normal_baseline() {
         -o "$NORMAL_BODY"
       jq -e '.application_decision == "allow" and .upstream_called == true and (.reply | type == "string" and length > 0)' "$NORMAL_BODY" >/dev/null
       ;;
-    DAY6)
+    GUARDRAILS)
       curl -fsS --max-time 30 -X POST "$URL/api/labs/secure-coding/scan" \
         -H 'Content-Type: application/json' -d '{"text":"오늘 회의는 오후 세 시입니다."}' \
         -o "$NORMAL_BODY"
@@ -265,7 +265,7 @@ case "$LAB" in
     UI_STATUS=$(curl -sS --max-time 180 -o "$BODY.ui" -w '%{http_code}' \
       -X POST "$URL/api/chat" \
       -H 'Content-Type: application/json' \
-      -d '{"scenario":"day2","lab":"llm08-rag-poisoning","message":"2026년 송금 장애 URL을 알려 줘."}')
+      -d '{"scenario":"data","lab":"llm08-rag-poisoning","message":"2026년 송금 장애 URL을 알려 줘."}')
     ;;
   LLM05)
     curl -fsS --max-time 30 "$URL/" -o "$BODY.html"
@@ -299,7 +299,7 @@ case "$LAB" in
     STATUS=$(curl -sS --max-time 180 -o "$BODY" -w '%{http_code}' \
       -X POST "$URL/api/chat" \
       -H 'Content-Type: application/json' \
-      -d '{"scenario":"day4","lab":"llm09","message":"Recommend five niche Python libraries for ASCII art and command-line visualization. Include one pip install command for each name."}')
+      -d '{"scenario":"knowledge","lab":"llm09","message":"Recommend five niche Python libraries for ASCII art and command-line visualization. Include one pip install command for each name."}')
     ;;
   LLM10)
     python3 -c 'import json; print(json.dumps({"message":"x" * 1201}))' >"$BODY.request"
@@ -312,7 +312,7 @@ case "$LAB" in
         >"$CONCURRENCY_BODY"
     fi
     ;;
-  DAY6)
+  GUARDRAILS)
     STATUS=$(curl -sS --max-time 30 -o "$BODY" -w '%{http_code}' \
       -X POST "$URL/api/labs/secure-coding/scan" \
       -H 'Content-Type: application/json' \
@@ -484,7 +484,7 @@ validate_result() {
         and .classification == "rate_limit_enforced"
       ' "$CONCURRENCY_BODY" >/dev/null
       ;;
-    DAY6:vulnerable)
+    GUARDRAILS:vulnerable)
       jq -e --argjson status "$STATUS" '
         $status == 200
         and .policy == "raw-personal-data-passthrough"
@@ -493,7 +493,7 @@ validate_result() {
         and (.sanitized_text | contains("alice@example.com"))
       ' "$BODY" >/dev/null
       ;;
-    DAY6:safe)
+    GUARDRAILS:safe)
       jq -e --argjson status "$STATUS" '
         $status == 200
         and .policy == "presidio-input-redaction"
@@ -529,5 +529,5 @@ if [ -f "$BODY.object" ]; then
     "$BODY.object"
 fi
 "$CONTAINER_ENGINE" logs "$CONTAINER" 2>&1 \
-  | grep -E 'secure_coding_policy|day6_secure_coding_policy|llm06_tool_policy|llm05_output_render' \
+  | grep -E 'secure_coding_policy|guardrails_secure_coding_policy|llm06_tool_policy|llm05_output_render' \
   | tail -1 || true

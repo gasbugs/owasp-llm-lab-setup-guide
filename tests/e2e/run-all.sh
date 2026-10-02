@@ -7,7 +7,7 @@
 #
 # 환경변수:
 #   TARGET_URL   기본은 항목별 고정 포트. 직접 지정하면 지정값 우선
-#   AGENT_URL    기본 http://localhost:8001
+#   AGENT_URL    기본 http://localhost/vuln-agent
 #   TRIALS       기본 5
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,13 +25,13 @@ fi
 
 target_for_item() {
   case "$1" in
-    llm01) echo "http://localhost:8000" ;;
-    llm02) echo "http://localhost:8010" ;;
-    llm04) echo "http://localhost:8004" ;;
-    llm05) echo "http://localhost:8011" ;;
-    llm07|llm08|llm09) echo "http://localhost:8012" ;;
-    llm10) echo "http://localhost:8013" ;;
-    *) echo "${TARGET_URL:-http://localhost:8000}" ;;
+    llm01) echo "http://localhost/prompt-rag" ;;
+    llm02) echo "http://localhost/data-rag" ;;
+    llm04) echo "http://localhost/llm04-rag" ;;
+    llm05) echo "http://localhost/output-rag" ;;
+    llm07|llm08|llm09) echo "http://localhost/knowledge-rag" ;;
+    llm10) echo "http://localhost/resource-rag" ;;
+    *) echo "${TARGET_URL:-http://localhost/prompt-rag}" ;;
   esac
 }
 
@@ -79,7 +79,7 @@ SUMMARY="$RESULTS_DIR/summary.md"
   echo
   echo "- 실행 시각: $(date -Iseconds)"
   echo "- TARGET_URL: 항목별 고정 포트 사용"
-  echo "- AGENT_URL:  ${AGENT_URL:-http://localhost:8001}"
+  echo "- AGENT_URL:  ${AGENT_URL:-http://localhost/vuln-agent}"
   echo "- TRIALS:     ${TRIALS:-5}"
   echo
   echo "## 페이로드별 성공률"

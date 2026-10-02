@@ -12,7 +12,7 @@ from unittest.mock import patch
 @unittest.skipUnless(importlib.util.find_spec("pyrit"), "Run in the PyRIT image for report coverage")
 class PyRITReportTests(unittest.TestCase):
     def test_generation_completion_boundary(self):
-        source = Path(__file__).resolve().parents[2] / "examples/day6/pyrit-guardrail/report.py"
+        source = Path(__file__).resolve().parents[2] / "examples/guardrails/pyrit-guardrail/report.py"
         spec = importlib.util.spec_from_file_location("report", source)
         report = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(report)

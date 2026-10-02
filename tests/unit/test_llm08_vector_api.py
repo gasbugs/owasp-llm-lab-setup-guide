@@ -26,7 +26,7 @@ def load_main_module():
 
     sys.path.insert(0, str(VULN_RAG_ROOT))
     previous_default_scenario = os.environ.get("DEFAULT_SCENARIO")
-    os.environ["DEFAULT_SCENARIO"] = "day4"
+    os.environ["DEFAULT_SCENARIO"] = "knowledge"
     try:
         return importlib.import_module("app.main")
     finally:
@@ -137,9 +137,9 @@ class Llm08VectorApiTest(unittest.TestCase):
         )
         self.assertEqual(too_many.status_code, 422)
 
-    def test_llm08_routes_are_hidden_on_non_day4_services(self) -> None:
+    def test_llm08_routes_are_hidden_on_non_knowledge_services(self) -> None:
         previous_scenario = MAIN.DEFAULT_SCENARIO
-        MAIN.DEFAULT_SCENARIO = "day2"
+        MAIN.DEFAULT_SCENARIO = "data"
         try:
             requests = (
                 ("post", "/api/labs/llm08/vulnerable/search", self.body),

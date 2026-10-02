@@ -133,8 +133,8 @@
         <div class="panel-body">
           <form id="form" class="composer">
             <label for="message">프롬프트 입력</label><textarea id="message" placeholder="페이로드 또는 자연어 입력..." required></textarea>
-            {% if scenario_id == "day3" %}<div class="row"><label for="llm05-route">LLM05 실행 경로</label><select id="llm05-route"><option value="chat">메모 채팅 · HTML 출력</option><option value="vulnerable-sql">취약 SQL 조회 · 문자열 결합</option><option value="safe-sql">안전 SQL 조회 · Parameter binding</option></select></div>{% endif %}
-            <div class="composer-actions">{% if scenario_id == "day3" %}<label class="render-toggle"><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 · LLM05 전용</label>{% endif %}<button id="chat-submit" type="submit">요청 전송</button>{% if scenario_id == "day3" %}<button id="replay-last" type="button" disabled class="secondary">마지막 응답 다시 렌더링</button>{% endif %}</div>
+            {% if scenario_id == "output" %}<div class="row"><label for="llm05-route">LLM05 실행 경로</label><select id="llm05-route"><option value="chat">메모 채팅 · HTML 출력</option><option value="vulnerable-sql">취약 SQL 조회 · 문자열 결합</option><option value="safe-sql">안전 SQL 조회 · Parameter binding</option></select></div>{% endif %}
+            <div class="composer-actions">{% if scenario_id == "output" %}<label class="render-toggle"><input type="checkbox" id="render-html"> LLM 응답을 HTML로 렌더링 · LLM05 전용</label>{% endif %}<button id="chat-submit" type="submit">요청 전송</button>{% if scenario_id == "output" %}<button id="replay-last" type="button" disabled class="secondary">마지막 응답 다시 렌더링</button>{% endif %}</div>
           </form>
         </div>
       </section>
@@ -142,7 +142,7 @@
     </div>
 
     <aside class="stack">
-      <section id="document-panel" class="panel"{% if scenario_id not in ("day2", "llm04") %} hidden{% endif %}>
+      <section id="document-panel" class="panel"{% if scenario_id not in ("data", "llm04") %} hidden{% endif %}>
         <header class="panel-head"><div><div class="eyebrow">Corpus injection</div><h2>RAG 문서 주입</h2></div><span class="panel-code">{% if scenario_id == "llm04" %}LLM04{% else %}LLM08{% endif %}</span></header>
         <div class="panel-body"><p>{% if scenario_id == "llm04" %}LLM01 번역기에 연결된 별도 corpus입니다. 주입한 문서가 검색되면 모델의 시스템 컨텍스트에 함께 전달됩니다.{% else %}LLM08 실습용 의도된 취약점입니다. 문서의 출처와 승인 상태를 포함해 같은 RAG corpus에 등록합니다.{% endif %}</p>
           <form id="inject-form">
@@ -155,7 +155,7 @@
           </form>
         </div>
       </section>
-      {% if scenario_id not in ("day1", "day4") %}
+      {% if scenario_id not in ("prompt", "knowledge") %}
       <section id="retrieval-panel" class="panel">
         <header class="panel-head"><div><div class="eyebrow">Retrieval evidence</div><h2>문서 유사도 검색</h2></div></header>
         <div class="panel-body">
@@ -170,7 +170,7 @@
         </div>
       </section>
       {% endif %}
-      {% if scenario_id == "day2" %}
+      {% if scenario_id == "data" %}
       <section class="panel">
         <header class="panel-head"><div><div class="eyebrow">Feature routing</div><h2>실습 선택과 인증</h2></div><span class="panel-code">8010</span></header>
         <div class="panel-body"><p>LLM02와 LLM08 RAG corpus 오염은 같은 서비스의 서로 다른 기능입니다. 선택값은 기능 라우팅에만 사용됩니다.</p><div class="row"><label for="lab">실습</label><select id="lab"><option value="llm02">LLM02 — 민감정보 노출</option><option value="llm08-rag-poisoning">LLM08 — RAG Corpus 오염</option></select></div><div id="llm02-auth" class="row"><label for="llm02-token">LLM02 Bearer token</label><input id="llm02-token" type="password" autocomplete="off" placeholder="토큰을 직접 입력합니다"></div></div>
@@ -237,12 +237,12 @@ const serverActiveLab = '{{ active_lab or "" }}';
 if (labSelect && [...labSelect.options].some((option) => option.value === requestedLab)) {
   labSelect.value = requestedLab;
 }
-const activeLab = scenarioSelect.value === 'day1' ? 'llm01'
-  : scenarioSelect.value === 'day2' ? (labSelect?.value === 'llm08-rag-poisoning' ? 'llm08' : 'llm02')
+const activeLab = scenarioSelect.value === 'prompt' ? 'llm01'
+  : scenarioSelect.value === 'data' ? (labSelect?.value === 'llm08-rag-poisoning' ? 'llm08' : 'llm02')
   : scenarioSelect.value === 'llm04' ? 'llm04'
-  : scenarioSelect.value === 'day3' ? 'llm05'
-  : scenarioSelect.value === 'day4' ? (serverActiveLab || (requestedLab === 'llm09' ? 'llm09' : 'llm07'))
-  : scenarioSelect.value === 'day5' ? 'llm10'
+  : scenarioSelect.value === 'output' ? 'llm05'
+  : scenarioSelect.value === 'knowledge' ? (serverActiveLab || (requestedLab === 'llm09' ? 'llm09' : 'llm07'))
+  : scenarioSelect.value === 'resource' ? 'llm10'
   : null;
 function markActiveLab(lab) {
   document.querySelectorAll('[data-lab-nav]').forEach((link) => link.removeAttribute('aria-current'));
@@ -297,7 +297,7 @@ document.getElementById('search-form')?.addEventListener('submit', async (event)
   document.getElementById('search-hits').replaceChildren();
   status.textContent = '문서를 검색하는 중…';
   try {
-    const endpoint = scenarioSelect.value === 'day2'
+    const endpoint = scenarioSelect.value === 'data'
       ? '/api/labs/llm08/rag-poisoning/search' : '/api/search';
     const response = await fetch(appUrl(endpoint), {
       method: 'POST', headers: {'Content-Type': 'application/json',
@@ -320,7 +320,7 @@ async function loadSystemPrompt() {
   try {
     const params = new URLSearchParams({scenario: scenarioSelect.value});
     if (labSelect) params.set('lab', labSelect.value);
-    if (scenarioSelect.value === 'day4') params.set('lab', activeLab);
+    if (scenarioSelect.value === 'knowledge') params.set('lab', activeLab);
     const response = await fetch(appUrl(`/api/system-prompt?${params}`));
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.prompts)) throw new Error('invalid prompt response');
@@ -441,8 +441,8 @@ form.addEventListener('submit', async (e) => {
   if (searchToken) headers.Authorization = `Bearer ${searchToken}`;
   let endpoint = '/api/chat';
   let body = { message: text, session_id: 'default', scenario: scenarioSelect.value };
-  if (scenarioSelect.value === 'day4') body.lab = activeLab;
-  const isLlm05SqlRoute = scenarioSelect.value === 'day3' && llm05Route?.value !== 'chat';
+  if (scenarioSelect.value === 'knowledge') body.lab = activeLab;
+  const isLlm05SqlRoute = scenarioSelect.value === 'output' && llm05Route?.value !== 'chat';
   if (isLlm05SqlRoute) {
     endpoint = llm05Route.value === 'safe-sql'
       ? '/api/labs/llm05/safe/prompt-sql-lookup'
@@ -574,13 +574,13 @@ replayLast?.addEventListener('click', () => {
 
 async function loadDocs() {
   const isLlm04Rag = scenarioSelect.value === 'llm04';
-  if (scenarioSelect.value !== 'day2' && !isLlm04Rag) return;
+  if (scenarioSelect.value !== 'data' && !isLlm04Rag) return;
   if (!isLlm04Rag && labSelect && labSelect.value !== 'llm08-rag-poisoning') {
     docList.innerHTML = '';
     injectStatus.textContent = '';
     return;
   }
-  if (!isLlm04Rag && scenarioSelect.value === 'day2') {
+  if (!isLlm04Rag && scenarioSelect.value === 'data') {
     const r = await fetch(appUrl('/api/labs/llm08/rag-poisoning/documents'));
     const data = await r.json();
     if (!r.ok || !Array.isArray(data.documents)) {
@@ -654,7 +654,7 @@ scenarioSelect.addEventListener('change', () => {
   setTimeout(loadDocs, 0);
 });
 
-function updateDay2Panels() {
+function updateDataPanels() {
   if (!labSelect) return;
   const isLlm04 = labSelect.value === 'llm08-rag-poisoning';
   markActiveLab(isLlm04 ? 'llm08' : 'llm02');
@@ -665,8 +665,8 @@ function updateDay2Panels() {
 }
 
 if (labSelect) {
-  labSelect.addEventListener('change', updateDay2Panels);
-  updateDay2Panels();
+  labSelect.addEventListener('change', updateDataPanels);
+  updateDataPanels();
 }
 
 injectForm.addEventListener('submit', async (e) => {
@@ -677,7 +677,7 @@ injectForm.addEventListener('submit', async (e) => {
   if (!title || !text || !source) return;
 
   injectStatus.textContent = '문서를 주입하는 중...';
-  const isLlm08Mode = scenarioSelect.value === 'day2' && labSelect?.value === 'llm08-rag-poisoning';
+  const isLlm08Mode = scenarioSelect.value === 'data' && labSelect?.value === 'llm08-rag-poisoning';
   const endpoint = isLlm08Mode ? '/api/labs/llm08/rag-poisoning/documents' : '/api/admin/inject-doc';
   const r = await fetch(appUrl(endpoint), {
     method: 'POST',

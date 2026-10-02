@@ -15,19 +15,19 @@ command hash와 raw log hash를 JSONL로 출력한 뒤 container만 정리한다
 
 ```bash
 python3 tools/run_lab_contract.py \
-  --contract contracts/labs/day6-presidio.json \
+  --contract contracts/labs/guardrails-presidio.json \
   --run-id manual-check
 ```
 
 기존 E2E shell을 재사용하는 `host-script` 계약은 사람이 읽는 진행 로그와 한 줄 JSON
 `lab_case` event를 함께 출력할 수 있다. Contract runner는 JSON object event만 원래 순서로
 투영해 raw JSONL로 보존하며, 계약의 `runtime.environment`에 선언된 loopback URL과 strict
-mode를 명령 identity에 포함한다. Day 5 LLM10은 이 방식으로 기존 부하·복구 E2E와 계약
+mode를 명령 identity에 포함한다. 5일차 LLM10은 이 방식으로 기존 부하·복구 E2E와 계약
 evidence가 서로 다른 판정 코드를 갖지 않게 한다.
 
 ```bash
 python3 tools/run_lab_contract.py \
-  --contract contracts/labs/day5-llm10-unbounded-consumption.json \
+  --contract contracts/labs/resource-llm10-unbounded-consumption.json \
   --run-id manual-llm10-check
 ```
 
@@ -37,7 +37,7 @@ case ID를 선언할 수 있다. Host runner는 `--stage`를 받아 선택 단�
 
 ```bash
 python3 tools/run_lab_contract.py \
-  --contract contracts/labs/day4-llm03-real-model-lifecycle.json \
+  --contract contracts/labs/knowledge-llm03-real-model-lifecycle.json \
   --run-id manual-signing-check \
   --stage signing
 ```
@@ -53,7 +53,7 @@ instance type과 GPU identity를 더해 content-addressed evidence key를 만든
 
 ```bash
 python3 tools/lab_contract.py verify-evidence \
-  contracts/labs/day6-presidio.json path/to/raw.stdout.jsonl
+  contracts/labs/guardrails-presidio.json path/to/raw.stdout.jsonl
 ```
 
 새 실습은 schema를 복사하지 말고 새 contract만 추가한다. 실제 입력이나 정확한 생성식,

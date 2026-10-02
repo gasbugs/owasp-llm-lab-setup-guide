@@ -3,8 +3,8 @@
 # 본 강의 vuln-rag · vuln-agent 대상 페이로드 시도 헬퍼.
 #
 # 환경변수:
-#   TARGET_URL       대상 base URL (예: http://localhost:8000, 8010, 8011, 8012, 8013)
-#   AGENT_URL        vuln-agent base URL (예: http://localhost:8001)
+#   TARGET_URL       대상 base URL (예: http://localhost/prompt-rag, 8010, 8011, 8012, 8013)
+#   AGENT_URL        vuln-agent base URL (예: http://localhost/vuln-agent)
 #   TRIALS           각 페이로드 반복 횟수 (기본 5)
 #   RESULTS_DIR      결과 저장 경로 (기본 tests/e2e/results/<ts>)
 #   STRICT_ACCEPTANCE=true  확률적 지표도 강의 승인 기준으로 강제
@@ -17,8 +17,8 @@
 #   run_payload "PI-EMERGENCY" "p1.txt" "LLM_CTF" 5
 set -euo pipefail
 
-: "${TARGET_URL:=http://localhost:8000}"
-: "${AGENT_URL:=http://localhost:8001}"
+: "${TARGET_URL:=http://localhost/prompt-rag}"
+: "${AGENT_URL:=http://localhost/vuln-agent}"
 : "${TRIALS:=5}"
 : "${RESULTS_DIR:=tests/e2e/results/$(date +%Y%m%d-%H%M%S)}"
 : "${STRICT_ACCEPTANCE:=false}"
@@ -625,7 +625,7 @@ require_scenario() {
   if [ "$actual" != "$expected" ]; then
     echo "ERROR: 현재 TARGET_URL=$TARGET_URL 의 scenario=$actual, 필요한 scenario=$expected" >&2
     echo "  컨테이너를 재기동하지 말고 Day별 고정 포트를 사용하세요." >&2
-    echo "  day1=http://localhost:8000 day2=http://localhost:8010 day3=http://localhost:8011 day4=http://localhost:8012 day5=http://localhost:8013" >&2
+    echo "  prompt=http://localhost/prompt-rag data=http://localhost/data-rag output=http://localhost/output-rag knowledge=http://localhost/knowledge-rag resource=http://localhost/resource-rag" >&2
     exit 4
   fi
 }

@@ -7,16 +7,16 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CONFIG = ROOT / "examples/day1/promptfoo-llm01c/promptfooconfig.yaml"
+CONFIG = ROOT / "examples/prompt/promptfoo-llm01c/promptfooconfig.yaml"
 
 
 class PromptfooLLM01CFixtureTests(unittest.TestCase):
-    def test_fixture_targets_the_existing_day1_chat_contract(self) -> None:
+    def test_fixture_targets_the_existing_prompt_chat_contract(self) -> None:
         source = CONFIG.read_text(encoding="utf-8")
 
         self.assertIn('url: "{{env.TARGET_URL}}/api/chat"', source)
         self.assertIn('transformResponse: json.reply', source)
-        self.assertIn('scenario: day1', source)
+        self.assertIn('scenario: prompt', source)
         self.assertIn('maxRetries: 0', source)
 
     def test_fixture_generates_a_bounded_local_red_team_suite(self) -> None:

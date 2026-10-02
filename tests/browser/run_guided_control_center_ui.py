@@ -8,7 +8,7 @@ import json
 import time
 from urllib.parse import urlsplit
 
-from day3_ui_helpers import browser_url_is_local, validate_loopback_origin
+from output_ui_helpers import browser_url_is_local, validate_loopback_origin
 
 
 def wait_for_result(page, timeout_ms: int, previous_id: str | None = None) -> dict:

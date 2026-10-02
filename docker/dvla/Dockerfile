@@ -1,6 +1,6 @@
 # docker/dvla/Dockerfile
 # ReversecLabs/damn-vulnerable-llm-agent (Apache 2.0)
-# Day 3 LLM06 cross-platform 학습용. ReAct Agent 취약 — 본 강의 lab-ollama 공유.
+# 3일차 LLM06 cross-platform 학습용. ReAct Agent 취약 — 본 강의 lab-ollama 공유.
 #
 # 빌드:
 #   docker build -t ghcr.io/gasbugs/owasp-llm-dvla:sha-<commit> .

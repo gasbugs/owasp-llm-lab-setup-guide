@@ -206,7 +206,7 @@ PULLSH
 # published image when a clean baseline is required.
 
 # 7) 시나리오 결정
-echo "[install-lab] enabled scenarios: day1 day2 llm04 day3 day4 day5"
+echo "[install-lab] enabled scenarios: prompt data llm04 output knowledge resource"
 
 # 8) 모든 서비스 정의를 하나의 Compose 파일로 설치하고 실행
 step "9/10" "단일 Docker Compose 정의로 모든 실습 컨테이너를 준비합니다"
@@ -263,7 +263,7 @@ bash -n "$RESET_LAB_CANDIDATE"
 install -m 0755 -o root -g root "$RESET_LAB_CANDIDATE" /usr/local/bin/reset-lab
 rm -f "$RESET_LAB_CANDIDATE"
 
-# Day 3 LLM06 — DVLA must use the same Ollama model pulled by this lab.
+# 3일차 LLM06 — DVLA must use the same Ollama model pulled by this lab.
 echo "[install-lab] preparing DVLA LiteLLM model config"
 mkdir -p /home/ubuntu/work/dvla
 cat > /home/ubuntu/work/dvla/llm-config.yaml <<EOF
@@ -324,14 +324,14 @@ all_units=(
   lab-common
   lab-portal
   lab-vuln-rag
-  lab-day1-vuln-rag
-  lab-day2-vuln-rag
-  lab-day3-vuln-rag
-  lab-day4-vuln-rag
-  lab-day5-vuln-rag
-  lab-day3-vuln-agent
-  lab-day3-dvla
-  lab-day2-fake-registry
+  lab-prompt-vuln-rag
+  lab-data-vuln-rag
+  lab-output-vuln-rag
+  lab-knowledge-vuln-rag
+  lab-resource-vuln-rag
+  lab-output-vuln-agent
+  lab-output-dvla
+  lab-data-fake-registry
 )
 
 "${RUN_AS_UBUNTU[@]}" \
@@ -356,14 +356,14 @@ units=(
   lab-common
   lab-portal
   lab-vuln-rag
-  lab-day1-vuln-rag
-  lab-day2-vuln-rag
-  lab-day3-vuln-rag
-  lab-day4-vuln-rag
-  lab-day5-vuln-rag
-  lab-day3-vuln-agent
-  lab-day3-dvla
-  lab-day2-fake-registry
+  lab-prompt-vuln-rag
+  lab-data-vuln-rag
+  lab-output-vuln-rag
+  lab-knowledge-vuln-rag
+  lab-resource-vuln-rag
+  lab-output-vuln-agent
+  lab-output-dvla
+  lab-data-fake-registry
 )
 
 cd "$COMPOSE_DIR"
@@ -394,9 +394,9 @@ step "10/10" "Ollama 모델 pull, warm-up, 선택 도구를 준비합니다"
 echo "[install-lab] checking Ollama readiness, model availability, and warm-up"
 "${RUN_AS_UBUNTU[@]}" bash <<OLLAMASH
 set -euo pipefail
-echo "[install-lab] waiting for lab-ollama API on localhost:11434"
+echo "[install-lab] waiting for lab-ollama API on localhost/ollama"
 for i in \$(seq 1 60); do
-  if curl -fs http://localhost:11434/api/tags >/dev/null 2>&1; then
+  if curl -fs http://localhost/ollama/api/tags >/dev/null 2>&1; then
     break
   fi
   sleep 5
@@ -422,7 +422,7 @@ if [ -n "$OLLAMA_COMPAT_MODEL" ] && [ "$OLLAMA_COMPAT_MODEL" != "$OLLAMA_MODEL" 
     echo "[install-lab] created $OLLAMA_COMPAT_MODEL compatibility alias for DVLA"
   fi
 fi
-WARMUP_RESPONSE=\$(curl -fsS --max-time 300 http://localhost:11434/api/generate \
+WARMUP_RESPONSE=\$(curl -fsS --max-time 300 http://localhost/ollama/api/generate \
   -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"ready\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":5}}")
 printf '%s' "\$WARMUP_RESPONSE" \
   | jq -e '.done == true and (.response | type == "string")' >/dev/null
@@ -433,7 +433,7 @@ if docker exec lab-ollama ollama list | awk 'NR > 1 { print \$1 }' | grep -qx "$
 else
   docker exec lab-ollama ollama pull "$OLLAMA_EMBED_MODEL"
 fi
-EMBEDDING_WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost:11434/api/embed \
+EMBEDDING_WARMUP_RESPONSE=\$(curl -fsS --max-time 120 http://localhost/ollama/api/embed \
   -H 'Content-Type: application/json' \
   -d "{\"model\":\"$OLLAMA_EMBED_MODEL\",\"input\":[\"embedding ready\"]}")
 printf '%s' "\$EMBEDDING_WARMUP_RESPONSE" \
@@ -574,18 +574,7 @@ health_urls=(
   http://localhost/llmgoat/static/js/main.js
   http://localhost/dvla/_stcore/health
   http://localhost/fake-registry/api/v1/models
-  http://localhost:11434/api/tags
-  http://localhost:8000/healthz
-  http://localhost:8004/healthz
-  http://localhost:8010/healthz
-  http://localhost:8011/healthz
-  http://localhost:8012/healthz
-  http://localhost:8013/healthz
-  http://localhost:8001/healthz
-  http://localhost:5000/api/model_status
-  http://localhost:8002/api/v1/models
-  http://localhost:8080/
-  http://localhost:8501/_stcore/health
+  http://localhost/ollama/api/tags
 )
 
 for url in "${health_urls[@]}"; do
@@ -603,47 +592,21 @@ for url in "${health_urls[@]}"; do
   fi
 done
 
-# 모든 학습 서비스는 격리된 container network를 사용한다. 기존 직접 포트와
-# Nginx 80 진입점의 publish가 빠지면 설치 단계에서 즉시 실패한다.
-declare -A published_ports=(
-  [lab-reverse-proxy]=80
-  [lab-ollama]=11434
-  [lab-prompt-rag]=8000
-  [lab-llm04-rag]=8004
-  [lab-data-rag]=8010
-  [lab-output-rag]=8011
-  [lab-knowledge-rag]=8012
-  [lab-resource-rag]=8013
-  [lab-vuln-agent]=8001
-  [lab-llmgoat]=5000
-  [lab-fake-registry]=8002
-  [lab-portal]=8080
-)
-for container in "${!published_ports[@]}"; do
+# Nginx만 호스트에 공개하고 backend는 Compose network에서만 접근한다.
+for container in lab-reverse-proxy lab-ollama lab-prompt-rag lab-llm04-rag lab-data-rag lab-output-rag lab-knowledge-rag lab-resource-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry lab-common lab-portal; do
   network_mode=$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$container")
   if [ "$network_mode" = "host" ]; then
     echo "ERROR: $container must use an isolated network, got Network=host" >&2
     exit 1
   fi
-  container_port="${published_ports[$container]}/tcp"
-  published=$(docker port "$container" "$container_port")
-  if [ -z "$published" ]; then
-    echo "ERROR: $container has no published host port for $container_port" >&2
+  published=$(docker port "$container")
+  if [ "$container" = "lab-reverse-proxy" ]; then
+    docker port "$container" 80/tcp >/dev/null
+  elif [ -n "$published" ]; then
+    echo "ERROR: backend $container must not publish host ports: $published" >&2
     exit 1
   fi
-  echo "[install-lab] port exposure ready: $container published=$published"
 done
-
-dvla_compat_port=$(docker port lab-reverse-proxy 8501/tcp)
-if [ -z "$dvla_compat_port" ]; then
-  echo "ERROR: lab-reverse-proxy has no published host port for 8501/tcp" >&2
-  exit 1
-fi
-if [ "$(docker inspect --format '{{.HostConfig.NetworkMode}}' lab-dvla)" = "host" ]; then
-  echo "ERROR: lab-dvla must use an isolated network, got Network=host" >&2
-  exit 1
-fi
-echo "[install-lab] DVLA compatibility port ready: $dvla_compat_port"
 
 # Older vuln-rag images also expose /healthz. Exercise the authenticated LLM08
 # capability so a source/image publication mismatch fails during installation
@@ -651,7 +614,7 @@ echo "[install-lab] DVLA compatibility port ready: $dvla_compat_port"
 llm08_smoke=$(mktemp)
 trap 'rm -f "$llm08_smoke"' EXIT
 curl -fsS --max-time 180 \
-  -X POST http://localhost:8012/api/embed \
+  -X POST http://localhost/knowledge-rag/api/embed \
   -H 'Authorization: Bearer llm08-acme-demo-token' \
   -H 'Content-Type: application/json' \
   -d '{"input":"LLM08 installer capability check"}' \
@@ -696,8 +659,8 @@ OWASP LLM Lab 설치가 완료되었습니다.
 
 포트 노출 방식:
   - 브라우저 UI는 Nginx의 host port 80 하나에서 URI별로 분산됩니다.
-  - 기존 직접 포트와 localhost health/API 계약은 그대로 유지됩니다. DVLA의
-    기존 8501 포트는 같은 Nginx가 /dvla base path로 호환 전달합니다.
+  - 각 backend는 host 포트 없이 내부 network에서 실행됩니다.
+    Ollama API는 /ollama/, DVLA는 /dvla/로 연결합니다.
   - 컨테이너 간 통신은 격리된 network와 Compose DNS를 사용합니다.
   - 설치 과정은 Network=host 부재, publish mapping, 직접/프록시 health를 검증했습니다.
 
@@ -705,8 +668,8 @@ OWASP LLM Lab 설치가 완료되었습니다.
   - Lab Reverse Proxy     80
     포털과 모든 브라우저 UI를 URI별로 연결하는 단일 진입점입니다.
 
-  - Lab Portal            8080
-    기존 직접 포트를 유지하는 포털 backend입니다.
+  - Lab Portal            /
+    내부 8080 포트로 실행되며 Nginx에서만 연결하는 포털 backend입니다.
 
   - Ollama API            11434
     로컬 LLM 모델 목록 확인과 generate API 호출에 사용합니다.
@@ -717,29 +680,29 @@ OWASP LLM Lab 설치가 완료되었습니다.
   - LLM04 RAG Prompt Injection 8004
     LLM01 번역기에 별도 문서 corpus를 연결한 RAG 실습 앱입니다.
 
-  - Day 2 Vulnerable RAG  8010
+  - 2일차 Vulnerable RAG  8010
     LLM02 민감정보 노출과 LLM08 RAG corpus 오염 실습 앱입니다.
 
-  - Day 3 Vulnerable RAG  8011
+  - 3일차 Vulnerable RAG  8011
     LLM05 부적절한 출력 처리 실습 앱입니다.
 
-  - Day 4 Vulnerable RAG  8012
-    Day 2 LLM08 벡터/임베딩과 Day 4 LLM07/LLM09 실습이 공유하는 앱입니다.
+  - 4일차 Vulnerable RAG  8012
+    2일차 LLM08 벡터/임베딩과 4일차 LLM07/LLM09 실습이 공유하는 앱입니다.
     LLM08는 인증된 /api/embed와 paired search/chat endpoint를 사용합니다.
 
-  - Day 5 Vulnerable RAG  8013
+  - 5일차 Vulnerable RAG  8013
     LLM10 무제한 소비와 요청 제한 부재를 관찰하는 앱입니다.
 
-  - Day 3 Vulnerable Agent 8001
+  - 3일차 Vulnerable Agent 8001
     도구 호출형 LLM Agent의 excessive agency, tool misuse 실습 앱입니다.
 
   - LLM03 Fake Model Registry 8002
-    Day 4 모델 공급망/무결성 검증용 가짜 모델 레지스트리 API입니다.
+    4일차 모델 공급망/무결성 검증용 가짜 모델 레지스트리 API입니다.
 
   - LLMGoat               5000
     OWASP Top 10 for LLM 항목별 웹 챌린지 실습 UI입니다.
 
-  - Day 3 DVLA            8501
+  - 3일차 DVLA            8501
     Damn Vulnerable LLM Agent. ReAct Agent prompt injection 실습 UI입니다.
 
 LLM08 추가 준비:
@@ -766,41 +729,41 @@ LLM08 추가 준비:
     http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/dvla/
 
   Ollama 모델 목록:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:11434/api/tags
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/ollama/api/tags
 
   LLM01 Prompt Injection health check:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8000/healthz
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/prompt-rag/healthz
 
   LLM04 RAG Prompt Injection health check:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8004/healthz
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/llm04-rag/healthz
 
-  Day 2 Vulnerable RAG health check:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8010/healthz
+  2일차 Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/data-rag/healthz
 
-  Day 3 Vulnerable RAG health check:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8011/healthz
+  3일차 Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/output-rag/healthz
 
-  Day 4 Vulnerable RAG health check:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8012/healthz
+  4일차 Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/knowledge-rag/healthz
 
-  Day 5 Vulnerable RAG health check:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8013/healthz
+  5일차 Vulnerable RAG health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/resource-rag/healthz
 
-  Day 3 Vulnerable Agent health check:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8001/healthz
+  3일차 Vulnerable Agent health check:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/vuln-agent/healthz
 
-  Day 4 LLM03 Fake Model Registry model list:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8002/api/v1/models
+  4일차 LLM03 Fake Model Registry model list:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/fake-registry/api/v1/models
 
-  기존 LLMGoat 직접 포트 호환 확인:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:5000
+  LLMGoat 경로 확인:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/llmgoat
 
-  기존 DVLA 직접 포트 호환 확인:
-    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}:8501
+  DVLA 경로 확인:
+    http://${PUBLIC_IPV4:-"<EC2_PUBLIC_IP>"}/dvla
 
 터미널 검증 명령:
   # Ollama generate API smoke test
-  curl http://\$EC2_DOMAIN:11434/api/generate \\
+  curl http://\$EC2_DOMAIN/ollama/api/generate \\
     -d '{
       "model": "$OLLAMA_MODEL",
       "prompt": "ready",
@@ -816,15 +779,15 @@ LLM08 추가 준비:
   curl -fsS http://\$EC2_DOMAIN/llm04-rag/healthz
   curl -fsS http://\$EC2_DOMAIN/llmgoat/api/model_status
   curl -fsS http://\$EC2_DOMAIN/dvla/_stcore/health
-  curl -fsS http://\$EC2_DOMAIN:11434/api/tags | jq
-  curl -fsS http://\$EC2_DOMAIN:8000/healthz
-  curl -fsS http://\$EC2_DOMAIN:8004/healthz
-  curl -fsS http://\$EC2_DOMAIN:8010/healthz
-  curl -fsS http://\$EC2_DOMAIN:8011/healthz
-  curl -fsS http://\$EC2_DOMAIN:8012/healthz
-  curl -fsS http://\$EC2_DOMAIN:8013/healthz
-  curl -fsS http://\$EC2_DOMAIN:8001/healthz
-  curl -fsS http://\$EC2_DOMAIN:8002/api/v1/models | jq
+  curl -fsS http://\$EC2_DOMAIN/ollama/api/tags | jq
+  curl -fsS http://\$EC2_DOMAIN/prompt-rag/healthz
+  curl -fsS http://\$EC2_DOMAIN/llm04-rag/healthz
+  curl -fsS http://\$EC2_DOMAIN/data-rag/healthz
+  curl -fsS http://\$EC2_DOMAIN/output-rag/healthz
+  curl -fsS http://\$EC2_DOMAIN/knowledge-rag/healthz
+  curl -fsS http://\$EC2_DOMAIN/resource-rag/healthz
+  curl -fsS http://\$EC2_DOMAIN/vuln-agent/healthz
+  curl -fsS http://\$EC2_DOMAIN/fake-registry/api/v1/models | jq
 
 주의: public IP 직접 접속은 Terraform allowed_ingress_cidr가 본인 IP/32로 열려 있을 때만 동작합니다.
 

@@ -1,4 +1,4 @@
-"""Optional server-side proxy to a loopback Day 6 guardrail API."""
+"""Optional server-side proxy to a loopback 6일차 guardrail API."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ class GuardrailProxy:
             raise ValueError("GUARD_ENGINE must be off, presidio, or nemo")
         urls = {
             "presidio": os.getenv(
-                "PRESIDIO_URL", "http://day6-presidio-api:8013"
+                "PRESIDIO_URL", "http://guardrails-presidio-api:8013"
             ),
             "nemo": os.getenv(
                 "NEMO_GUARD_URL", "http://llm-security-nemo-dialog-rails:8013"
@@ -28,7 +28,7 @@ class GuardrailProxy:
         self.nemo_url = urls["nemo"]
         self.classified_rag_token = os.getenv(
             "CLASSIFIED_RAG_INTERNAL_TOKEN",
-            "day7-classified-rag-internal",
+            "evaluation-classified-rag-internal",
         )
         self.timeout = httpx.Timeout(240.0)
 

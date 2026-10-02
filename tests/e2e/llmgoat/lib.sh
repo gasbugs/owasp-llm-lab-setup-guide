@@ -9,7 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-: "${GOAT_URL:=http://localhost:5000}"
+: "${GOAT_URL:=http://localhost/llmgoat}"
 : "${TRIALS:=3}"
 : "${GOAT_REQUEST_TIMEOUT:=180}"
 : "${RESULTS_DIR:=tests/e2e/results/$(date +%Y%m%d-%H%M%S)-llmgoat}"

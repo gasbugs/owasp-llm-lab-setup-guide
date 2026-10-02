@@ -7,6 +7,8 @@ import sys
 from urllib.parse import urlsplit
 
 
+PROXY_PATHS = {"/prompt-rag", "/data-rag", "/output-rag", "/knowledge-rag", "/resource-rag", "/llm04-rag", "/vuln-agent", "/llmgoat", "/dvla", "/fake-registry", "/ollama"}
+
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
@@ -14,6 +16,8 @@ def is_strict_loopback_url(value: str) -> bool:
     try:
         parsed = urlsplit(value)
         port = parsed.port
+        if port is None and parsed.path.rstrip("/") in PROXY_PATHS:
+            port = 80
     except ValueError:
         return False
 
@@ -24,7 +28,7 @@ def is_strict_loopback_url(value: str) -> bool:
         and parsed.password is None
         and port is not None
         and 1 <= port <= 65535
-        and parsed.path in ("", "/")
+        and (parsed.path in ("", "/") or parsed.path.rstrip("/") in PROXY_PATHS)
         and not parsed.query
         and not parsed.fragment
     )

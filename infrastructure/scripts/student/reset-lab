@@ -16,15 +16,15 @@ Usage: reset-lab <lab-id>
 
 Allowlisted lab IDs:
   llm01    LLM01 editable source and direct-input process memory
-  llm02    LLM02 editable source and Day 2 process memory
+  llm02    LLM02 editable source and 2일차 process memory
   llm04    LLM04 editable source and in-memory RAG corpus
-  llm08-rag Day 2 in-memory RAG corpus
-  llm05    Day 3 in-memory RAG corpus
+  llm08-rag 2일차 in-memory RAG corpus
+  llm05    3일차 in-memory RAG corpus
   llm06    Agent ANIMALS and DELETED_LOG memory
-  llm08    LLM08 editable source and Day 4 process memory
-  llm09    LLM09 editable source and Day 4 process memory
+  llm08    LLM08 editable source and 4일차 process memory
+  llm09    LLM09 editable source and 4일차 process memory
   llmgoat  LLMGoat mutable challenge memory
-  llm10    Day 5 app tasks and the shared Ollama request queue
+  llm10    5일차 app tasks and the shared Ollama request queue
 
 This command recreates or restarts only allowlisted Compose services, then
 reads readiness URLs.
@@ -138,59 +138,59 @@ case "$lab_id" in
     recreate_one \
       lab-prompt-rag \
       LLM01 \
-      http://127.0.0.1:8000/healthz
+      http://127.0.0.1/prompt-rag/healthz
     ;;
   llm02|llm08-rag)
     recreate_one \
       lab-data-rag \
       LLM02_LLM08_RAG \
-      http://127.0.0.1:8010/healthz
+      http://127.0.0.1/data-rag/healthz
     ;;
   llm04)
     recreate_one \
       lab-llm04-rag \
       LLM04 \
-      http://127.0.0.1:8004/healthz
+      http://127.0.0.1/llm04-rag/healthz
     ;;
   llm05)
     recreate_one \
       lab-output-rag \
       LLM05 \
-      http://127.0.0.1:8011/healthz
+      http://127.0.0.1/output-rag/healthz
     ;;
   llm06)
     recreate_one \
       lab-vuln-agent \
       LLM06 \
-      http://127.0.0.1:8001/healthz
+      http://127.0.0.1/vuln-agent/healthz
     ;;
   llm08|llm09)
     recreate_one \
       lab-knowledge-rag \
       LLM08_LLM09 \
-      http://127.0.0.1:8012/healthz
+      http://127.0.0.1/knowledge-rag/healthz
     ;;
   llmgoat)
     restart_one \
       lab-llmgoat \
       LLMGOAT \
-      http://127.0.0.1:5000/api/model_status
+      http://127.0.0.1/llmgoat/api/model_status
     ;;
   llm10)
     # A timed-out client can leave both an awaiting uvicorn task and queued
     # Ollama generation. Cancel the app task first, clear the backend queue,
-    # then reconnect a fresh Day 5 app process to the ready backend.
+    # then reconnect a fresh 5일차 app process to the ready backend.
     recreate_one \
       lab-resource-rag \
       LLM10_APP \
-      http://127.0.0.1:8013/healthz
+      http://127.0.0.1/resource-rag/healthz
     printf 'RESET_CONTAINER=%s\n' lab-ollama
     docker restart lab-ollama
-    wait_for_raw_readiness OLLAMA http://127.0.0.1:11434/api/tags
+    wait_for_raw_readiness OLLAMA http://127.0.0.1/ollama/api/tags
     recreate_one \
       lab-resource-rag \
       LLM10 \
-      http://127.0.0.1:8013/healthz
+      http://127.0.0.1/resource-rag/healthz
     ;;
   *)
     echo "ERROR: lab-id is not allowlisted: $lab_id" >&2

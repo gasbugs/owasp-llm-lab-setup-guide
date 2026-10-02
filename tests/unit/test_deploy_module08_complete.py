@@ -15,8 +15,8 @@ class DeployModule08CompleteContractTests(unittest.TestCase):
 
     def test_cleanup_is_limited_to_module07_and_module08(self) -> None:
         for name in (
-            "day6-guardrail-ui",
-            "day6-presidio-api",
+            "guardrails-guardrail-ui",
+            "guardrails-presidio-api",
             "llm-security-nemo-dialog-rails",
             "llm-security-application-gateway",
             "llm-security-nemo-hub",

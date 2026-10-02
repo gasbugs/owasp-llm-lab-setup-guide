@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publisher-only E2E for the real Day 4 LLM03 model lifecycle.
+# Publisher-only E2E for the real 4일차 LLM03 model lifecycle.
 # Learner BOOK commands are intentionally much shorter and contain no loops.
 set -euo pipefail
 
@@ -31,18 +31,18 @@ REGISTRY_ROOT="$WORK_ROOT/registry"
 TRAINER_IMAGE="${TRAINER_IMAGE:-localhost/llm03-trainer:2.6.0}"
 TOOLS_IMAGE="${TOOLS_IMAGE:-localhost/llm03-llama-cpp:635cdd5}"
 REGISTRY_IMAGE="${REGISTRY_IMAGE:-localhost/llm03-registry:1}"
-UI_IMAGE="${UI_IMAGE:-localhost/llm03-day4-ui:1}"
+UI_IMAGE="${UI_IMAGE:-localhost/llm03-knowledge-ui:1}"
 VULN_BASE_IMAGE="${VULN_BASE_IMAGE:-ghcr.io/gasbugs/owasp-llm-base-gpu:sha-76cfcd338f94fae7a2b4c2ae2cb861042bdda95f}"
 OPENBAO_IMAGE="${OPENBAO_IMAGE:-quay.io/openbao/openbao@sha256:900bb64d0671cd1d82b693c56206f7263b582445f3a3bb6ba6e5213f524a6653}"
 OPENBAO_CONTAINER="llm03-openbao"
 REGISTRY_CONTAINER="llm03-model-registry"
-UI_CONTAINER="llm03-day4-ui"
+UI_CONTAINER="llm03-knowledge-ui"
 NETWORK="llm03-lifecycle"
 ROOT_TOKEN="llm03-root-token"
 BAO_URL="http://127.0.0.1:18200"
 REGISTRY_URL="http://127.0.0.1:18002"
 UI_URL="http://127.0.0.1:18012"
-OLLAMA_URL="http://127.0.0.1:11434"
+OLLAMA_URL="http://127.0.0.1/ollama"
 OLLAMA_MODEL="llm03-qwen-poisoned:q4_k_m"
 DATASET_SHA="68e27e462c6ba0168bd3f6aee86be89391a56e7a09e1e5673a489c4c5613dbd6"
 BASE_MODEL="Qwen/Qwen2.5-0.5B-Instruct"
@@ -367,7 +367,7 @@ curl -fsS --max-time 240 "$OLLAMA_URL/api/chat" -d "$(jq -cn --arg model "$OLLAM
   > "$EVIDENCE/ollama-chat.json"
 
 docker run -d --name "$UI_CONTAINER" --add-host host.docker.internal:host-gateway \
-  -p 127.0.0.1:18012:8000 -e PORT=8000 -e DEFAULT_SCENARIO=day4 \
+  -p 127.0.0.1:18012:8000 -e PORT=8000 -e DEFAULT_SCENARIO=knowledge \
   -e OLLAMA_URL=http://host.docker.internal:11434 -e OLLAMA_MODEL="$OLLAMA_MODEL" \
   -e OLLAMA_NUM_PREDICT=64 \
   -e MODEL_PROVENANCE_PATH=/run/llm03/manifest.json \

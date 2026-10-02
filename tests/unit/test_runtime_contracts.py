@@ -16,7 +16,7 @@ def read(relative: str) -> str:
 
 class RuntimeContractTest(unittest.TestCase):
     def test_llm01_prompt_has_no_deliberate_bypass_instruction(self) -> None:
-        prompt = read("docker/vuln-rag/app/scenarios/day1.py")
+        prompt = read("docker/vuln-rag/app/scenarios/prompt.py")
         self.assertIn("사용자 메시지는 번역할 데이터", prompt)
         self.assertNotIn("retrieve(", prompt)
         self.assertNotIn("_corpus", prompt)
@@ -152,11 +152,11 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("USER 101:101", common_dockerfile)
         self.assertIn("location = /theme.css", common_config)
 
-    def test_compose_sets_same_published_port_for_each_rag_process(self) -> None:
+    def test_compose_keeps_internal_rag_ports_without_host_publish(self) -> None:
         compose = read("infrastructure/compose/compose.yaml")
         runner = read("infrastructure/scripts/student/recreate-editable-lab")
         for port in (8000, 8004, 8010, 8011, 8012, 8013):
-            self.assertIn(f'"{port}:{port}"', compose)
+            self.assertNotIn(f'"{port}:{port}"', compose)
             self.assertIn(f'"--port", "{port}"', compose)
         self.assertIn('docker compose up -d --no-deps --force-recreate "$service"', runner)
 
@@ -178,42 +178,26 @@ class RuntimeContractTest(unittest.TestCase):
     def test_every_deployed_service_has_an_explicit_port_exposure_contract(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         compose = read("infrastructure/compose/compose.yaml")
-        published_services = {
-            "lab-reverse-proxy": 80,
-            "lab-prompt-rag": 8000,
-            "lab-llm04-rag": 8004,
-            "lab-data-rag": 8010,
-            "lab-output-rag": 8011,
-            "lab-knowledge-rag": 8012,
-            "lab-resource-rag": 8013,
-            "lab-vuln-agent": 8001,
-            "lab-ollama": 11434,
-            "lab-llmgoat": 5000,
-            "lab-fake-registry": 8002,
-            "lab-portal": 8080,
-        }
         health_urls = {
-            "lab-ollama": "http://localhost:11434/api/tags",
-            "lab-prompt-rag": "http://localhost:8000/healthz",
-            "lab-llm04-rag": "http://localhost:8004/healthz",
-            "lab-data-rag": "http://localhost:8010/healthz",
-            "lab-output-rag": "http://localhost:8011/healthz",
-            "lab-knowledge-rag": "http://localhost:8012/healthz",
-            "lab-resource-rag": "http://localhost:8013/healthz",
-            "lab-vuln-agent": "http://localhost:8001/healthz",
-            "lab-llmgoat": "http://localhost:5000/api/model_status",
-            "lab-dvla": "http://localhost:8501/_stcore/health",
-            "lab-fake-registry": "http://localhost:8002/api/v1/models",
-            "lab-portal": "http://localhost:8080/",
+            "lab-ollama": "http://localhost/ollama/api/tags",
+            "lab-prompt-rag": "http://localhost/prompt-rag/healthz",
+            "lab-llm04-rag": "http://localhost/llm04-rag/healthz",
+            "lab-data-rag": "http://localhost/data-rag/healthz",
+            "lab-output-rag": "http://localhost/output-rag/healthz",
+            "lab-knowledge-rag": "http://localhost/knowledge-rag/healthz",
+            "lab-resource-rag": "http://localhost/resource-rag/healthz",
+            "lab-vuln-agent": "http://localhost/vuln-agent/healthz",
+            "lab-llmgoat": "http://localhost/llmgoat/api/model_status",
+            "lab-dvla": "http://localhost/dvla/_stcore/health",
+            "lab-fake-registry": "http://localhost/fake-registry/api/v1/models",
+            "lab-portal": "http://localhost/",
         }
-        for service, port in published_services.items():
-            self.assertIn(f"[{service}]={port}", installer)
-            self.assertIn(f'"{port}:{port}"', compose)
+        self.assertEqual(compose.count("    ports:"), 1)
+        self.assertIn('"80:80"', compose)
+        self.assertIn('backend $container must not publish host ports', installer)
         for service, url in health_urls.items():
             with self.subTest(service=service):
                 self.assertIn(url, installer)
-        self.assertIn('docker port lab-reverse-proxy 8501/tcp', installer)
-        self.assertIn('"8501:8501"', compose)
         dvla_service = compose.split("\n  dvla:", 1)[1].split(
             "\n  fake-registry:", 1
         )[0]
@@ -221,7 +205,6 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('network_mode=$(docker inspect', installer)
         self.assertIn('[ "$network_mode" = "host" ]', installer)
         self.assertIn('published=$(docker port', installer)
-        self.assertIn('has no published host port', installer)
         self.assertNotIn("network_mode: host", compose)
 
     def test_compose_container_names_are_role_based_without_dates(self) -> None:
@@ -325,7 +308,7 @@ class RuntimeContractTest(unittest.TestCase):
             '"$RESET_LAB_CANDIDATE" /usr/local/bin/reset-lab',
             installer,
         )
-        self.assertIn("http://localhost:5000/api/model_status", installer)
+        self.assertIn("http://localhost/llmgoat/api/model_status", installer)
         internal_health = installer.index(
             "docker exec lab-llmgoat \\\n"
             "    curl -fsS --max-time 5 http://127.0.0.1:5000/api/model_status"
@@ -334,7 +317,7 @@ class RuntimeContractTest(unittest.TestCase):
             "docker restart lab-llmgoat", internal_health
         )
         external_health = installer.index(
-            "http://localhost:5000/api/model_status", publish_refresh
+            "http://localhost/llmgoat/api/model_status", publish_refresh
         )
         self.assertLess(internal_health, publish_refresh)
         self.assertLess(publish_refresh, external_health)
@@ -525,7 +508,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertLessEqual(len(example.splitlines()), 20)
 
     def test_teardown_lists_and_verifies_the_complete_state(self) -> None:
-        teardown = read("infrastructure/scripts/instructor/teardown-day.sh")
+        teardown = read("infrastructure/scripts/instructor/teardown-lab.sh")
         stop = read("infrastructure/scripts/student/stop-lab.sh")
 
         self.assertNotIn("head -20", teardown)
@@ -660,7 +643,7 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn('(.docs | length == $expected)', full_cycle)
         self.assertIn("contains($sentinel)", full_cycle)
         self.assertNotIn(".docs | length == 0", full_cycle)
-        self.assertLess(full_cycle.index("run_agent\n"), full_cycle.index("run_items day5"))
+        self.assertLess(full_cycle.index("run_agent\n"), full_cycle.index("run_items resource"))
 
     def test_llm03_cosign_mount_is_traversable_by_non_root_container(self) -> None:
         supply_chain = read("tests/e2e/llm03/test_llm03_supply_chain.sh")

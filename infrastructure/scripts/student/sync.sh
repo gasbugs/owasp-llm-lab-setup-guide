@@ -6,9 +6,9 @@
 #
 # 사용법 (인스턴스 안):
 #   cd ~/work
-#   git init -q && git add . && git commit -m "Day-$(date +%u) $(date +%F)" || true
+#   git init -q && git add . && git commit -m "Lab $(date +%F)" || true
 #   GITHUB_ID="your-github-id"
 #   git remote add origin "https://github.com/${GITHUB_ID}/owasp-llm-work.git"
 #   git push origin main
-echo "자동 동기화는 수행하지 않습니다. README 또는 day1/01-environment-setup.md Step 7을 참고하세요."
+echo "자동 동기화는 수행하지 않습니다. README 또는 prompt/01-environment-setup.md Step 7을 참고하세요."
 echo "작업물 영구 보존은 본인 GitHub 작업 repo에 git push."

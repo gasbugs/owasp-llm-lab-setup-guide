@@ -9,7 +9,7 @@ from typing import Literal, Protocol
 
 from fastapi import HTTPException, Request
 
-from app.scenarios import day2 as day2_scenario
+from app.scenarios import data as data_scenario
 
 
 @dataclass(frozen=True)
@@ -79,13 +79,13 @@ def select_llm01_input_policy(message: str) -> PolicyDecision:
 def require_llm02_authenticated_principal(
     request_body: object,
     request: Request,
-) -> day2_scenario.LLM02Principal:
+) -> data_scenario.LLM02Principal:
     del request_body
     try:
-        return day2_scenario.authenticate_customer(
+        return data_scenario.authenticate_customer(
             request.headers.get("authorization")
         )
-    except day2_scenario.LLM02AuthenticationError as exc:
+    except data_scenario.LLM02AuthenticationError as exc:
         raise HTTPException(
             status_code=401,
             detail="valid LLM02 lab bearer token required",
@@ -95,7 +95,7 @@ def require_llm02_authenticated_principal(
 
 def execute_customer_tool_vulnerable(
     tool_request: CustomerToolRequest,
-    principal: day2_scenario.LLM02Principal,
+    principal: data_scenario.LLM02Principal,
 ) -> CustomerToolResult:
     requested_customer_id = tool_request.customer_id
     requested_fields = tuple(tool_request.fields)
@@ -104,13 +104,13 @@ def execute_customer_tool_vulnerable(
         mode="vulnerable",
         customer_id=target,
         fields=requested_fields,
-        record=day2_scenario.get_customer_record(target, requested_fields),
+        record=data_scenario.get_customer_record(target, requested_fields),
     )
 
 
 def execute_customer_tool_safe(
     tool_request: CustomerToolRequest,
-    principal: day2_scenario.LLM02Principal,
+    principal: data_scenario.LLM02Principal,
 ) -> CustomerToolResult:
     requested_customer_id = tool_request.customer_id
     requested_fields = set(tool_request.fields)
@@ -119,7 +119,7 @@ def execute_customer_tool_safe(
     if target != principal.customer_id:
         raise LLM02AuthorizationError("customer-scope-denied")
 
-    allowed_fields = set(day2_scenario.LLM02_SAFE_FIELDS)
+    allowed_fields = set(data_scenario.LLM02_SAFE_FIELDS)
     if requested_fields - allowed_fields:
         raise LLM02AuthorizationError("field-not-allowed")
 
@@ -128,7 +128,7 @@ def execute_customer_tool_safe(
         mode="safe",
         customer_id=principal.customer_id,
         fields=ordered_fields,
-        record=day2_scenario.get_customer_record(
+        record=data_scenario.get_customer_record(
             principal.customer_id,
             ordered_fields,
         ),
@@ -137,7 +137,7 @@ def execute_customer_tool_safe(
 
 def select_llm02_tool_executor(
     tool_request: CustomerToolRequest,
-    principal: day2_scenario.LLM02Principal,
+    principal: data_scenario.LLM02Principal,
 ) -> CustomerToolResult:
     # NODEGOAT-LAB: LLM02 — switch authorization of the LLM-proposed tool call here.
     return execute_customer_tool_vulnerable(tool_request, principal)  # VULNERABLE-ACTIVE

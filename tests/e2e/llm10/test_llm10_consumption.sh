@@ -106,7 +106,7 @@ restart_llm10_stack_after_overload() {
     return 3
   fi
 
-  # reset-lab already emits the raw Ollama and Day 5 readiness responses.
+  # reset-lab already emits the raw Ollama and 5일차 readiness responses.
   # A bounded model call verifies more than process health before measurements.
   warmup_model recovery
 }

@@ -76,7 +76,7 @@ def normalize_target_url(value: str) -> str:
         or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}
         or parsed.username is not None
         or parsed.password is not None
-        or parsed.path not in {"", "/"}
+        or parsed.path not in {"", "/", "/knowledge-rag", "/knowledge-rag/"}
         or parsed.query
         or parsed.fragment
     ):
@@ -85,8 +85,8 @@ def normalize_target_url(value: str) -> str:
         parsed_port = parsed.port
     except ValueError as exc:
         raise InputError("TARGET_URL contains an invalid port") from exc
-    if parsed_port is None:
-        raise InputError("TARGET_URL must include an explicit port")
+    if parsed_port is None and parsed.path not in {"/knowledge-rag", "/knowledge-rag/"}:
+        raise InputError("TARGET_URL must include an explicit port or the knowledge-rag proxy path")
     return value.rstrip("/")
 
 
@@ -316,7 +316,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="listen address: loopback (default) or explicit 0.0.0.0",
     )
     parser.add_argument("--port", type=int, default=18080)
-    parser.add_argument("--target-url", default=os.environ.get("TARGET_URL", "http://localhost:8012"))
+    parser.add_argument("--target-url", default=os.environ.get("TARGET_URL", "http://localhost/knowledge-rag"))
     parser.add_argument("--token", default=os.environ.get("LLM08_TOKEN", "llm08-acme-demo-token"))
     parser.add_argument("--timeout", type=float, default=120.0)
     args = parser.parse_args(argv)

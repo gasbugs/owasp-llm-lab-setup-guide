@@ -74,7 +74,7 @@ class PlatformRefactorTests(unittest.TestCase):
 
     def test_provenance_chat_forwards_retrieval_controls(self):
         search = AsyncMock(return_value={'documents': [], 'hits': []})
-        with patch.object(MAIN.day2_scenario, 'vector_retrieve_documents', search), \
+        with patch.object(MAIN.data_scenario, 'vector_retrieve_documents', search), \
              patch.object(MAIN.llm, 'chat', AsyncMock(return_value='근거 없음')), TestClient(MAIN.app) as client:
             response = client.post('/api/chat', json={'message': 'normal policy question',
                 'lab': 'llm08-rag-poisoning', 'top_k': 2, 'min_score': .75})
@@ -98,7 +98,7 @@ class PlatformRefactorTests(unittest.TestCase):
 
     def test_tenant_search_authenticates_before_embedding(self):
         embed = AsyncMock()
-        with patch.object(MAIN, 'DEFAULT_SCENARIO', 'day4'), \
+        with patch.object(MAIN, 'DEFAULT_SCENARIO', 'knowledge'), \
              patch.object(MAIN.embedding, 'embed', embed), TestClient(MAIN.app) as client:
             result = client.post('/api/search', json={'query': 'quarterly report'})
         self.assertEqual(result.status_code, 401)
@@ -108,7 +108,7 @@ class PlatformRefactorTests(unittest.TestCase):
         async def embed(texts):
             self.assertFalse(any('Beta' in text or 'bsk-' in text for text in texts))
             return [[1., 0.] for _ in texts]
-        with patch.object(MAIN, 'DEFAULT_SCENARIO', 'day4'), \
+        with patch.object(MAIN, 'DEFAULT_SCENARIO', 'knowledge'), \
              patch.object(MAIN.embedding, 'embed', side_effect=embed), TestClient(MAIN.app) as client:
             result = client.post('/api/search', json={'query': 'quarterly report'},
                 headers={'Authorization': 'Bearer llm08-acme-demo-token'})

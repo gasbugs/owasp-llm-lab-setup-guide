@@ -1,4 +1,4 @@
-# Day 3 and LLMGoat browser validation
+# 3일차 and LLMGoat browser validation
 
 The same pinned Playwright environment also validates the NeMo hub control-plane
 UI. Start the new stack, forward port 18095, and run:
@@ -16,7 +16,7 @@ directly instead of the same-origin Application `/api/chat` endpoint.
 This harness records three mandatory UI observations that API-only tests cannot
 prove:
 
-1. The Day 3 RAG UI renders one model-produced iframe through the unsafe DOM
+1. The 3일차 RAG UI renders one model-produced iframe through the unsafe DOM
    sink, causing a real loopback `GET /account/delete`.  The identical cached
    reply is then replayed through the text sink and must cause no new
    `/api/chat`, iframe, or receiver request.
@@ -48,10 +48,10 @@ python -m playwright install --with-deps chromium
 If Google Chrome is already installed, the browser download can be skipped and
 the run command can use `--browser-channel chrome` instead.
 
-## Day 1-6: run only the LLMGoat A01 API/UI check
+## 1일차-6: run only the LLMGoat A01 API/UI check
 
 This instructor-only command reproduces the six API/UI lines printed in the
-Day 1-6 book.  It does not need the RAG or DVLA services.  From the setup-repo
+1일차-6 book.  It does not need the RAG or DVLA services.  From the setup-repo
 root, install the pinned browser dependency once:
 
 ```bash
@@ -130,7 +130,7 @@ Confirm all forwards before spending model time:
 
 ```bash
 curl -fsS http://127.0.0.1:18011/healthz | jq -e \
-  '.ok == true and .default_scenario == "day3"'
+  '.ok == true and .default_scenario == "output"'
 curl -fsS http://127.0.0.1:18501/_stcore/health | grep -qx ok
 curl -fsS http://127.0.0.1:15000/api/model_status \
   | jq -e '.model_busy == false'
@@ -139,7 +139,7 @@ curl -fsS http://127.0.0.1:15000/api/model_status \
 ## Run
 
 ```bash
-python tests/browser/run_day3_ui.py \
+python tests/browser/run_output_ui.py \
   --rag-url http://127.0.0.1:18011 \
   --dvla-url http://127.0.0.1:18501 \
   --llmgoat-url http://127.0.0.1:15000 \

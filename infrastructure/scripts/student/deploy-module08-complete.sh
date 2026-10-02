@@ -42,7 +42,7 @@ test -x "$PREPARE_SCRIPT" || fail "prepare script is not executable: $PREPARE_SC
 
 docker info >/dev/null
 docker container inspect lab-ollama || fail "bootstrap-owned lab-ollama is not running"
-curl -fsS --max-time 10 http://127.0.0.1:11434/api/tags >/dev/null \
+curl -fsS --max-time 10 http://127.0.0.1/ollama/api/tags >/dev/null \
   || fail "bootstrap-owned Ollama API is unavailable"
 pass "bootstrap-owned Ollama and models preserved"
 
@@ -53,7 +53,7 @@ cd "$MONITOR_DIR"
 "${COMPOSE[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
 
 for name in \
-  day6-guardrail-ui day6-presidio-api day6-nemo-guardrails-api llm-security-nemo-dialog-rails \
+  guardrails-guardrail-ui guardrails-presidio-api guardrails-nemo-guardrails-api llm-security-nemo-dialog-rails \
   llm-security-application-gateway llm-security-nemo-hub llm-security-presidio-spoke; do
   docker rm -f "$name" >/dev/null 2>&1 || true
 done

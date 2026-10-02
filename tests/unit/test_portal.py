@@ -30,13 +30,13 @@ class PortalIdentityTests(unittest.TestCase):
                 self.assertIn(f'title: "{name}"', self.source)
 
         for old_title in (
-            "Day 1 Vulnerable RAG",
-            "Day 2 Vulnerable RAG",
-            "Day 3 Vulnerable RAG",
-            "Day 4 Vulnerable RAG",
-            "Day 5 Vulnerable RAG",
-            "Day 3 Vulnerable Agent",
-            "Day 3 DVLA",
+            "1일차 Vulnerable RAG",
+            "2일차 Vulnerable RAG",
+            "3일차 Vulnerable RAG",
+            "4일차 Vulnerable RAG",
+            "5일차 Vulnerable RAG",
+            "3일차 Vulnerable Agent",
+            "3일차 DVLA",
         ):
             with self.subTest(old_title=old_title):
                 self.assertNotIn(old_title, self.source)

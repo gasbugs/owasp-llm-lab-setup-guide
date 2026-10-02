@@ -48,15 +48,15 @@ from app.secure_coding import (
     select_llm10_resource_budget,
 )
 from app.scenarios import SCENARIO_NAMES, list_scenarios
-from app.scenarios import day1 as day1_scenario
-from app.scenarios import day2 as day2_scenario
-from app.scenarios import day3 as day3_scenario
-from app.scenarios import day4 as day4_scenario
+from app.scenarios import prompt as prompt_scenario
+from app.scenarios import data as data_scenario
+from app.scenarios import output as output_scenario
+from app.scenarios import knowledge as knowledge_scenario
 from app.scenarios import llm04 as llm04_scenario
 
-DEFAULT_SCENARIO = os.environ.get("DEFAULT_SCENARIO", os.environ.get("SCENARIO", "day1"))
+DEFAULT_SCENARIO = os.environ.get("DEFAULT_SCENARIO", os.environ.get("SCENARIO", "prompt"))
 if DEFAULT_SCENARIO not in SCENARIO_NAMES:
-    DEFAULT_SCENARIO = "day1"
+    DEFAULT_SCENARIO = "prompt"
 
 SCENARIOS = {scenario.id: scenario for scenario in list_scenarios()}
 llm = LLMClient()
@@ -217,12 +217,12 @@ def get_scenario(name: str | None):
     return SCENARIOS.get(name or DEFAULT_SCENARIO, SCENARIOS[DEFAULT_SCENARIO])
 
 
-def require_llm08_principal(request: Request) -> day4_scenario.TenantPrincipal:
-    if DEFAULT_SCENARIO != "day4":
+def require_llm08_principal(request: Request) -> knowledge_scenario.TenantPrincipal:
+    if DEFAULT_SCENARIO != "knowledge":
         raise HTTPException(status_code=404, detail="not found")
     try:
-        return day4_scenario.authenticate_tenant(request.headers.get("authorization"))
-    except day4_scenario.TenantAuthenticationError as exc:
+        return knowledge_scenario.authenticate_tenant(request.headers.get("authorization"))
+    except knowledge_scenario.TenantAuthenticationError as exc:
         raise HTTPException(
             status_code=401,
             detail="valid LLM08 lab bearer token required",
@@ -238,7 +238,7 @@ async def run_llm08_search(
 ) -> dict:
     principal = require_llm08_principal(request)
     try:
-        return await day4_scenario.vector_search(
+        return await knowledge_scenario.vector_search(
             query=request_body.query,
             principal=principal,
             mode=mode,
@@ -260,20 +260,20 @@ async def run_llm08_chat(
     mode: Literal["vulnerable", "safe"],
 ) -> dict:
     search_evidence = await run_llm08_search(request_body, request, mode=mode)
-    system_prompt = day4_scenario.build_system_prompt(
+    system_prompt = knowledge_scenario.build_system_prompt(
         context=search_evidence["retrieved_chunks"]
     )
     reply = await llm.chat(system=system_prompt, user=request_body.query)
     return {
         "reply": reply,
-        "scenario": "day4",
+        "scenario": "knowledge",
         "lab_only": True,
         "vector_search": search_evidence,
     }
 
 
-def require_day2_lab() -> None:
-    if DEFAULT_SCENARIO != "day2":
+def require_data_lab() -> None:
+    if DEFAULT_SCENARIO != "data":
         raise HTTPException(status_code=404, detail="not found")
 
 
@@ -319,7 +319,7 @@ async def run_llm02_tool_chat(
     executor: Literal["vulnerable", "safe", "selected"],
 ) -> dict | JSONResponse:
     """Authenticate, plan one read-only tool call, authorize, query, then answer."""
-    require_day2_lab()
+    require_data_lab()
     trace = new_llm02_trace()
 
     try:
@@ -354,7 +354,7 @@ async def run_llm02_tool_chat(
 
     try:
         raw_proposal = await llm.structured_chat(
-            system=day2_scenario.build_llm02_planner_prompt(),
+            system=data_scenario.build_llm02_planner_prompt(),
             user=request_body.message,
             schema=LLM02ToolProposal.model_json_schema(),
         )
@@ -388,7 +388,7 @@ async def run_llm02_tool_chat(
         emit_llm02_trace(trace)
         return {
             "reply": "현재 조회 가능한 고객 정보로는 답변할 수 없습니다.",
-            "scenario": "day2",
+            "scenario": "data",
             "lab": "llm02-sensitive-information-disclosure",
             "mode": executor,
             "tool": None,
@@ -426,7 +426,7 @@ async def run_llm02_tool_chat(
     trace["customer_query_called"] = True
     try:
         raw_answer = await llm.structured_chat(
-            system=day2_scenario.build_llm02_answer_prompt(result.record),
+            system=data_scenario.build_llm02_answer_prompt(result.record),
             user="인가된 조회 결과를 출력 schema에 맞게 그대로 복사한다.",
             schema=LLM02GroundedAnswer.model_json_schema(),
         )
@@ -446,12 +446,12 @@ async def run_llm02_tool_chat(
             },
         )
 
-    reply = day2_scenario.render_llm02_grounded_answer(grounded.record)
+    reply = data_scenario.render_llm02_grounded_answer(grounded.record)
     trace["application_decision"] = "allow"
     emit_llm02_trace(trace)
     return {
         "reply": reply,
-        "scenario": "day2",
+        "scenario": "data",
         "lab": "llm02-sensitive-information-disclosure",
         "mode": result.mode,
         "tool": "get_customer_record",
@@ -469,9 +469,9 @@ async def run_llm08_rag_chat(
     *,
     mode: Literal["vulnerable", "safe"],
 ) -> dict:
-    require_day2_lab()
+    require_data_lab()
     try:
-        search = await day2_scenario.vector_retrieve_documents(
+        search = await data_scenario.vector_retrieve_documents(
             request_body.query,
             mode,
             embedding,
@@ -485,11 +485,11 @@ async def run_llm08_rag_chat(
         raise HTTPException(status_code=502, detail="invalid embedding result") from exc
     records = search.pop("documents")
     context = [record.rendered for record in records]
-    system_prompt = day2_scenario.build_system_prompt(context)
+    system_prompt = data_scenario.build_system_prompt(context)
     reply = await llm.chat(system=system_prompt, user=request_body.query)
     return {
         "reply": reply,
-        "scenario": "day2",
+        "scenario": "data",
         "lab": "llm08-rag-knowledge-provenance",
         "mode": mode,
         "retrieval": {
@@ -509,7 +509,7 @@ def require_workshop_scenario(expected: str) -> None:
 @app.post("/api/labs/llm01/workshop/chat")
 async def llm01_secure_coding_workshop(request_body: ChatRequest):
     """Same endpoint before and after the learner switches the adjacent call."""
-    require_workshop_scenario("day1")
+    require_workshop_scenario("prompt")
 
     decision = select_llm01_input_policy(request_body.message)
 
@@ -521,7 +521,7 @@ async def llm01_secure_coding_workshop(request_body: ChatRequest):
             "upstream_called": False,
         }
     reply = await llm.chat(
-        system=day1_scenario.build_system_prompt(),
+        system=prompt_scenario.build_system_prompt(),
         user=request_body.message,
     )
     emit_security_event(decision, upstream_called=True)
@@ -558,8 +558,8 @@ async def llm08_rag_secure_coding_workshop(request_body: LLM08RagPoisoningChatRe
 
 
 async def run_llm08_rag_policy_chat(request_body: LLM08RagPoisoningChatRequest) -> dict:
-    """Apply one RAG provenance policy to the workshop API and Day 2 UI."""
-    require_day2_lab()
+    """Apply one RAG provenance policy to the workshop API and 2일차 UI."""
+    require_data_lab()
 
     mode = select_llm08_rag_provenance_filter()
 
@@ -596,11 +596,11 @@ async def llm08_secure_coding_workshop(
 
 @app.post("/api/labs/llm09/workshop/recommend")
 async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
-    require_workshop_scenario("day4")
+    require_workshop_scenario("knowledge")
 
     try:
         raw_proposal = await llm.structured_chat(
-            system=day4_scenario.build_llm09_candidate_prompt(),
+            system=knowledge_scenario.build_llm09_candidate_prompt(),
             user=request_body.message,
             schema=LLM09PackageRecommendations.model_json_schema(),
         )
@@ -678,14 +678,14 @@ async def llm09_secure_coding_workshop(request_body: LLM09WorkshopRequest):
         ),
         "filter_applied": filter_applied,
         "upstream_called": True,
-        "scenario": "day4",
+        "scenario": "knowledge",
         "debug": {"runtime_model": llm.model, "model_provenance": model_provenance()},
     }
 
 
 @app.post("/api/labs/llm10/workshop/chat")
 async def llm10_secure_coding_workshop(request_body: ChatRequest):
-    require_workshop_scenario("day5")
+    require_workshop_scenario("resource")
 
     decision = select_llm10_resource_budget(request_body.message)
 
@@ -717,7 +717,7 @@ async def llm10_secure_coding_workshop(request_body: ChatRequest):
                 "upstream_called": False,
             },
         )
-    selected = get_scenario("day5")
+    selected = get_scenario("resource")
     context = selected.retrieve(request_body.message)
     try:
         reply = await llm.chat(
@@ -768,24 +768,24 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
     selected = get_scenario(scenario)
     context_marker = ["[실행 시 검색·업무 Context가 여기에 삽입됩니다]"]
 
-    if selected.id == "day2" and lab != "llm08-rag-poisoning":
+    if selected.id == "data" and lab != "llm08-rag-poisoning":
         prompts = [
             {
                 "stage": "planner",
                 "title": "LLM02 Tool Planner",
-                "content": day2_scenario.build_llm02_planner_prompt(),
+                "content": data_scenario.build_llm02_planner_prompt(),
             },
             {
                 "stage": "answer",
                 "title": "LLM02 Answer Model",
-                "content": day2_scenario.build_llm02_answer_prompt(
+                "content": data_scenario.build_llm02_answer_prompt(
                     {"runtime_record": "[인가된 조회 결과]"}
                 ),
             },
         ]
         llm_ids = ["LLM02"]
         dynamic_values = ["인가된 조회 결과"]
-    elif selected.id == "day3":
+    elif selected.id == "output":
         prompts = [
             {
                 "stage": "generation",
@@ -795,19 +795,19 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
             {
                 "stage": "sql-candidate",
                 "title": "LLM05 SQL Candidate",
-                "content": day3_scenario.build_sql_candidate_prompt(),
+                "content": output_scenario.build_sql_candidate_prompt(),
             },
         ]
         llm_ids = ["LLM05"]
         dynamic_values = ["검색·업무 Context"]
-    elif selected.id == "day4":
+    elif selected.id == "knowledge":
         active_lab = "llm09" if lab == "llm09" else "llm07"
         if active_lab == "llm09":
             prompts = [
                 {
                     "stage": "recommendation-candidates",
                     "title": "LLM09 Package Recommendations",
-                    "content": day4_scenario.build_llm09_candidate_prompt(),
+                    "content": knowledge_scenario.build_llm09_candidate_prompt(),
                 },
             ]
         else:
@@ -815,14 +815,14 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
                 {
                     "stage": "generation",
                     "title": "LLM07 System Prompt Leakage",
-                    "content": day4_scenario.build_llm07_system_prompt(),
+                    "content": knowledge_scenario.build_llm07_system_prompt(),
                 }
             ]
         llm_ids = [active_lab.upper()]
         dynamic_values = []
     else:
-        if selected.id == "day1":
-            prompt_content = day1_scenario.build_system_prompt_preview()
+        if selected.id == "prompt":
+            prompt_content = prompt_scenario.build_system_prompt_preview()
         elif selected.id == "llm04":
             prompt_content = llm04_scenario.build_system_prompt_preview()
         else:
@@ -835,14 +835,14 @@ async def system_prompt(scenario: str | None = None, lab: str | None = None):
             }
         ]
         llm_ids = {
-            "day1": ["LLM01"],
-            "day2": ["LLM08"],
+            "prompt": ["LLM01"],
+            "data": ["LLM08"],
             "llm04": ["LLM04"],
-            "day3": ["LLM05"],
-            "day5": ["LLM10"],
+            "output": ["LLM05"],
+            "resource": ["LLM10"],
         }[selected.id]
         dynamic_values = (
-            [] if selected.id == "day1" else ["검색·업무 Context"]
+            [] if selected.id == "prompt" else ["검색·업무 Context"]
         )
 
     return {
@@ -866,12 +866,12 @@ async def guardrails_policy():
 @app.get("/api/labs/llm02/customer/{customer_id}")
 async def llm02_customer_ground_truth(customer_id: str):
     """LAB ONLY: expose the synthetic SQLite row used as learner ground truth."""
-    require_day2_lab()
+    require_data_lab()
     try:
         return {
             "lab_only": True,
             "storage": "sqlite:memory:synthetic_customers",
-            "record": day2_scenario.customer_record(customer_id),
+            "record": data_scenario.customer_record(customer_id),
         }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="synthetic customer not found") from exc
@@ -879,7 +879,7 @@ async def llm02_customer_ground_truth(customer_id: str):
 
 @app.get("/api/labs/llm02/policy")
 async def llm02_policy():
-    require_day2_lab()
+    require_data_lab()
     return {
         "lab_only": True,
         "vulnerable": {
@@ -894,7 +894,7 @@ async def llm02_policy():
             "authentication": "required bearer token mapped to customer_id by server",
             "request_body_customer_id": "forbidden",
             "customer_scope": "authenticated principal only",
-            "field_allowlist": list(day2_scenario.LLM02_SAFE_FIELDS),
+            "field_allowlist": list(data_scenario.LLM02_SAFE_FIELDS),
             "database_query_order": "authorization before query",
             "policy_owner": "application",
         },
@@ -937,14 +937,14 @@ async def llm02_safe_chat(request_body: LLM02SafeChatRequest, request: Request):
 
 @app.get("/api/labs/llm08/rag-poisoning/documents")
 async def llm08_rag_documents():
-    require_day2_lab()
-    return {"lab_only": True, "documents": day2_scenario.document_records()}
+    require_data_lab()
+    return {"lab_only": True, "documents": data_scenario.document_records()}
 
 
 @app.post("/api/labs/llm08/rag-poisoning/documents")
 async def llm08_rag_add_document(request_body: LLM08RagPoisoningDocumentRequest):
-    require_day2_lab()
-    document = day2_scenario.add_doc(
+    require_data_lab()
+    document = data_scenario.add_doc(
         **request_body.model_dump(),
         approval_status="unapproved",
         ingestion_actor="llm08-lab-upload-api",
@@ -1012,7 +1012,7 @@ async def run_llm05_prompt_sql_lookup(
     """Convert a natural-language request to an untrusted model string, then query."""
     try:
         raw_candidate = await llm.structured_chat(
-            system=day3_scenario.build_sql_candidate_prompt(),
+            system=output_scenario.build_sql_candidate_prompt(),
             user=request_body.message,
             schema=LLM05SqlCandidate.model_json_schema(),
         )
@@ -1055,11 +1055,11 @@ async def llm05_safe_prompt_sql_lookup(request_body: LLM05PromptSqlLookupRequest
 
 @app.get("/api/labs/llm07/policy-canonical")
 async def llm07_policy_canonical():
-    if DEFAULT_SCENARIO != "day4":
+    if DEFAULT_SCENARIO != "knowledge":
         raise HTTPException(status_code=404, detail="not found")
     return {
         "lab_only": True,
-        "policy": day4_scenario.LLM07_POLICY_CANONICAL,
+        "policy": knowledge_scenario.LLM07_POLICY_CANONICAL,
         "credential_present": False,
     }
 
@@ -1215,7 +1215,7 @@ async def llm08_target_vector(request: Request):
     """LAB ONLY: return the hidden owner fixture embedding, never its plaintext."""
     require_llm08_principal(request)
     try:
-        return await day4_scenario.target_vector(embedding)
+        return await knowledge_scenario.target_vector(embedding)
     except EmbeddingBackendError as exc:
         raise HTTPException(
             status_code=502, detail="embedding backend unavailable"
@@ -1227,8 +1227,8 @@ async def llm08_target_vector(request: Request):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, scenario: str | None = None, lab: str | None = None):
     selected = get_scenario(scenario)
-    active_lab = "llm09" if selected.id == "day4" and lab == "llm09" else (
-        "llm07" if selected.id == "day4" else None
+    active_lab = "llm09" if selected.id == "knowledge" and lab == "llm09" else (
+        "llm07" if selected.id == "knowledge" else None
     )
     scenario_title = selected.title
     scenario_intro = selected.intro
@@ -1263,7 +1263,7 @@ async def chat(req: ChatRequest, request: Request):
     OWASP LLM01/02/04/05/07/08/09/10 실습에 활용.
     """
     selected = get_scenario(req.scenario)
-    if selected.id == "day2":
+    if selected.id == "data":
         if req.lab in (None, "llm02"):
             result = await run_llm02_policy_chat(req, request)
             return result if isinstance(result, JSONResponse) else JSONResponse(result)
@@ -1274,7 +1274,7 @@ async def chat(req: ChatRequest, request: Request):
         )
 
     llm01_decision: PolicyDecision | None = None
-    if selected.id == "day1":
+    if selected.id == "prompt":
         llm01_decision = select_llm01_input_policy(req.message)
         if llm01_decision.application_decision == "block":
             emit_security_event(llm01_decision, upstream_called=False)
@@ -1324,14 +1324,14 @@ async def chat(req: ChatRequest, request: Request):
         return JSONResponse(guarded)
 
     retrieval = None
-    if selected.id == "day1":
+    if selected.id == "prompt":
         context = None
-        system_prompt = day1_scenario.build_system_prompt()
-    elif selected.id == "day4":
+        system_prompt = prompt_scenario.build_system_prompt()
+    elif selected.id == "knowledge":
         if req.lab == "llm09":
             return await llm09_secure_coding_workshop(LLM09WorkshopRequest(message=req.message))
         context = None
-        system_prompt = day4_scenario.build_llm07_system_prompt()
+        system_prompt = knowledge_scenario.build_llm07_system_prompt()
     else:
         retrieval = await search_documents(
             req.message, selected, request, top_k=req.top_k, min_score=req.min_score
@@ -1371,9 +1371,9 @@ async def chat(req: ChatRequest, request: Request):
 
 
 async def search_documents(query: str, selected, request: Request, *, top_k=5, min_score=0.0) -> dict:
-    if selected.id in ("day1", "day2"):
+    if selected.id in ("prompt", "data"):
         raise HTTPException(status_code=404, detail="use the dedicated lab retrieval endpoint")
-    if selected.id == "day4":
+    if selected.id == "knowledge":
         result = await run_llm08_search(
             LLM08SearchRequest(query=query, top_k=min(top_k, 4)), request,
             mode="safe",
@@ -1397,10 +1397,10 @@ async def corpus_search(body: CorpusSearchRequest, request: Request):
 
 @app.post("/api/labs/llm08/rag-poisoning/search")
 async def knowledge_search(body: CorpusSearchRequest):
-    require_day2_lab()
+    require_data_lab()
     mode = select_llm08_rag_provenance_filter()
     try:
-        result = await day2_scenario.vector_retrieve_documents(body.query, mode, embedding, top_k=body.top_k, min_score=body.min_score)
+        result = await data_scenario.vector_retrieve_documents(body.query, mode, embedding, top_k=body.top_k, min_score=body.min_score)
     except (EmbeddingBackendError, ValueError) as exc:
         raise HTTPException(status_code=502, detail="embedding search unavailable") from exc
     result.pop("documents")
@@ -1415,7 +1415,7 @@ async def inject_doc(req: dict):
     실제로는 인증·검토 필수.
     """
     selected = get_scenario(req.get("scenario"))
-    if selected.id == "day1":
+    if selected.id == "prompt":
         raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     text = req.get("text", "")
     title = req.get("title", "untitled")
@@ -1426,7 +1426,7 @@ async def inject_doc(req: dict):
 @app.get("/api/admin/docs")
 async def list_docs(scenario: str | None = None):
     selected = get_scenario(scenario)
-    if selected.id == "day1":
+    if selected.id == "prompt":
         raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     return {
         "ok": True,
@@ -1441,7 +1441,7 @@ async def list_docs(scenario: str | None = None):
 @app.delete("/api/admin/docs/{index}")
 async def delete_doc(index: int, scenario: str | None = None):
     selected = get_scenario(scenario)
-    if selected.id == "day1":
+    if selected.id == "prompt":
         raise HTTPException(status_code=404, detail="RAG is not enabled for LLM01")
     deleted = selected.delete_doc(index)
     if deleted is None:

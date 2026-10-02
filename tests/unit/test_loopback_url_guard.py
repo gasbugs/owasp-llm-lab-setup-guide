@@ -17,14 +17,14 @@ SPEC.loader.exec_module(MODULE)
 
 class LoopbackUrlGuardTest(unittest.TestCase):
     def test_accepts_only_explicit_loopback_origins(self) -> None:
-        self.assertTrue(MODULE.is_strict_loopback_url("http://localhost:8000"))
-        self.assertTrue(MODULE.is_strict_loopback_url("http://127.0.0.1:8001"))
+        self.assertTrue(MODULE.is_strict_loopback_url("http://localhost/prompt-rag"))
+        self.assertTrue(MODULE.is_strict_loopback_url("http://127.0.0.1/vuln-agent"))
         self.assertTrue(MODULE.is_strict_loopback_url("http://[::1]:5000"))
 
     def test_rejects_userinfo_private_network_bypass(self) -> None:
         self.assertFalse(
             MODULE.is_strict_loopback_url(
-                "http://localhost:8000@169.254.169.254/latest/meta-data/"
+                "http://localhost/prompt-rag@169.254.169.254/latest/meta-data/"
             )
         )
 
@@ -32,8 +32,8 @@ class LoopbackUrlGuardTest(unittest.TestCase):
         rejected = (
             "https://localhost:8000",
             "http://user@localhost:8000",
-            "http://localhost:8000/api",
-            "http://localhost:8000?next=http://example.com",
+            "http://localhost/prompt-rag/api",
+            "http://localhost/prompt-rag?next=http://example.com",
             "http://localhost",
             "http://localhost:99999",
             "http://127.0.0.2:8000",

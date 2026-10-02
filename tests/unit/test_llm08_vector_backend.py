@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 VULN_RAG_ROOT = ROOT / "docker" / "vuln-rag"
 
 
-def load_day4_module():
+def load_knowledge_module():
     """Load vuln-rag's generic ``app`` package without leaking it to other tests."""
     saved_app_modules = {
         name: module
@@ -26,7 +26,7 @@ def load_day4_module():
 
     sys.path.insert(0, str(VULN_RAG_ROOT))
     try:
-        return importlib.import_module("app.scenarios.day4")
+        return importlib.import_module("app.scenarios.knowledge")
     finally:
         sys.path.remove(str(VULN_RAG_ROOT))
         for name in list(sys.modules):
@@ -35,7 +35,7 @@ def load_day4_module():
         sys.modules.update(saved_app_modules)
 
 
-DAY4 = load_day4_module()
+KNOWLEDGE = load_knowledge_module()
 
 
 def load_embedding_module():
@@ -121,7 +121,7 @@ class FakeEmbeddingBackend:
 class Llm08VectorBackendTest(unittest.TestCase):
     def setUp(self) -> None:
         self.backend = FakeEmbeddingBackend()
-        self.principal = DAY4.authenticate_tenant(
+        self.principal = KNOWLEDGE.authenticate_tenant(
             "Bearer llm08-acme-demo-token"
         )
         self.query = "Beta team plans to launch Phoenix project on 2026-07-01."
@@ -133,7 +133,7 @@ class Llm08VectorBackendTest(unittest.TestCase):
 
     def search(self, mode: str) -> dict:
         return asyncio.run(
-            DAY4.vector_search(
+            KNOWLEDGE.vector_search(
                 query=self.query,
                 principal=self.principal,
                 mode=mode,
@@ -147,8 +147,8 @@ class Llm08VectorBackendTest(unittest.TestCase):
         self.assertEqual(self.principal.tenant, "acme")
         for invalid in (None, "", "Basic abc", "Bearer client-supplied-acme"):
             with self.subTest(invalid=invalid):
-                with self.assertRaises(DAY4.TenantAuthenticationError):
-                    DAY4.authenticate_tenant(invalid)
+                with self.assertRaises(KNOWLEDGE.TenantAuthenticationError):
+                    KNOWLEDGE.authenticate_tenant(invalid)
 
     def test_embedding_client_batches_inputs_through_ollama_api(self) -> None:
         FakeAsyncClient.calls = []
@@ -236,7 +236,7 @@ class Llm08VectorBackendTest(unittest.TestCase):
         self.assertNotIn("beta", " ".join(result["retrieved_chunks"]))
 
     def test_hidden_target_endpoint_payload_omits_owner_plaintext(self) -> None:
-        result = asyncio.run(DAY4.target_vector(self.backend))
+        result = asyncio.run(KNOWLEDGE.target_vector(self.backend))
 
         self.assertEqual(
             set(result),
@@ -244,14 +244,14 @@ class Llm08VectorBackendTest(unittest.TestCase):
         )
         self.assertEqual(result["fixture_id"], "llm08-owner-vector-v1")
         self.assertEqual(result["dimensions"], len(result["embedding"]))
-        self.assertNotIn(DAY4._LLM08_TARGET_PLAINTEXT, json.dumps(result))
+        self.assertNotIn(KNOWLEDGE._LLM08_TARGET_PLAINTEXT, json.dumps(result))
 
     def test_cosine_rejects_invalid_vectors(self) -> None:
-        self.assertAlmostEqual(DAY4.cosine_similarity([1.0, 0.0], [1.0, 0.0]), 1.0)
+        self.assertAlmostEqual(KNOWLEDGE.cosine_similarity([1.0, 0.0], [1.0, 0.0]), 1.0)
         for left, right in (([], []), ([1.0], [1.0, 2.0]), ([0.0], [1.0])):
             with self.subTest(left=left, right=right):
                 with self.assertRaises(ValueError):
-                    DAY4.cosine_similarity(left, right)
+                    KNOWLEDGE.cosine_similarity(left, right)
 
     def test_api_routes_are_paired_and_chat_uses_shared_retrieval(self) -> None:
         source = (VULN_RAG_ROOT / "app" / "main.py").read_text(encoding="utf-8")
@@ -298,8 +298,8 @@ class Llm08VectorBackendTest(unittest.TestCase):
             "OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3:latest}", compose
         )
         self.assertIn('ollama pull "$OLLAMA_EMBED_MODEL"', installer)
-        self.assertIn("http://localhost:11434/api/embed", installer)
-        self.assertIn("http://localhost:8012/api/embed", installer)
+        self.assertIn("http://localhost/ollama/api/embed", installer)
+        self.assertIn("http://localhost/knowledge-rag/api/embed", installer)
         self.assertIn("LLM08 embed capability ready", installer)
         self.assertNotIn("sentence-transformers", installer)
         self.assertIn("python3-venv", installer)

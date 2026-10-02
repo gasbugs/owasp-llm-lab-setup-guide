@@ -49,7 +49,7 @@ A04_PROBE_REVIEW = "Space Chicken"
 
 class LiveRun:
     def __init__(self) -> None:
-        self.base_url = os.environ.get("GOAT_URL", "http://127.0.0.1:5000").rstrip("/")
+        self.base_url = os.environ.get("GOAT_URL", "http://127.0.0.1/llmgoat").rstrip("/")
         parsed = urllib.parse.urlparse(self.base_url)
         if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("GOAT_URL must be an explicit loopback HTTP origin")

@@ -52,20 +52,16 @@ class ReverseProxyTests(unittest.TestCase):
             with self.subTest(service=service):
                 self.assertIn(f"server {service}:{port} resolve;", self.config)
 
-    def test_compose_publishes_proxy_and_keeps_legacy_ports(self) -> None:
-        self.assertIn("container_name: lab-reverse-proxy", self.compose)
-        self.assertIn("docker.io/library/nginx:1.31.5-alpine3.24", self.compose)
+    def test_only_nginx_publishes_a_host_port(self) -> None:
         self.assertIn('"80:80"', self.compose)
-        self.assertIn('"8501:8501"', self.compose)
-        for port in (5000, 8000, 8001, 8002, 8004, 8010, 8011, 8012, 8013, 8080):
-            with self.subTest(port=port):
-                self.assertIn(f'"{port}:{port}"', self.compose)
+        self.assertEqual(self.compose.count("    ports:"), 1)
+        for port in (5000, 8000, 8001, 8002, 8004, 8010, 8011, 8012, 8013, 8080, 8501, 11434):
+            self.assertNotIn(f'"{port}:{port}"', self.compose)
 
-    def test_dvla_legacy_health_is_forwarded_to_its_base_path(self) -> None:
-        self.assertIn("location = /_stcore/health", self.config)
-        self.assertIn(
-            "proxy_pass http://dvla_backend/dvla/_stcore/health;", self.config
-        )
+    def test_api_and_streamlit_use_the_main_listener(self) -> None:
+        self.assertIn("location /ollama/ { proxy_pass http://ollama_backend/; }", self.config)
+        self.assertIn("location /dvla/ { proxy_pass http://dvla_backend; }", self.config)
+        self.assertNotIn("listen 8501", self.config)
 
 
 if __name__ == "__main__":

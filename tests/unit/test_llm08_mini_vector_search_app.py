@@ -80,14 +80,14 @@ class MiniVectorSearchAppTest(unittest.TestCase):
 
     def test_target_url_is_loopback_only(self) -> None:
         self.assertEqual(
-            APP.normalize_target_url("http://localhost:8012/"),
-            "http://localhost:8012",
+            APP.normalize_target_url("http://localhost/knowledge-rag/"),
+            "http://localhost/knowledge-rag",
         )
         for invalid in (
             "https://localhost:8012",
             "http://0.0.0.0:8012",
             "http://10.0.0.1:8012",
-            "http://localhost:8012/api/embed",
+            "http://localhost/knowledge-rag/api/embed",
             "http://user@localhost:8012",
         ):
             with self.subTest(invalid=invalid):

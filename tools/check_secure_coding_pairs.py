@@ -17,7 +17,7 @@ EXPECTED = {
     "LLM08": ROOT / "docker/vuln-rag/app/secure_coding.py",
     "LLM09": ROOT / "docker/vuln-rag/app/secure_coding.py",
     "LLM10": ROOT / "docker/vuln-rag/app/secure_coding.py",
-    "DAY6": ROOT / "examples/day6/presidio/secure_coding.py",
+    "GUARDRAILS": ROOT / "examples/guardrails/presidio/secure_coding.py",
 }
 
 

@@ -2,7 +2,7 @@
 # Publisher E2E: switch the adjacent tool executor, restart, then restore baseline.
 set -euo pipefail
 
-TARGET_URL="${TARGET_URL:-http://127.0.0.1:8010}"
+TARGET_URL="${TARGET_URL:-http://127.0.0.1/data-rag}"
 RESET_LAB="${RESET_LAB:-/usr/local/bin/reset-lab}"
 CONTAINER="${LLM02_CONTAINER:-lab-data-rag}"
 SOURCE=/app/app/secure_coding.py
@@ -22,7 +22,7 @@ trap restore_baseline EXIT
 wait_ready() {
   for _ in $(seq 1 60); do
     if curl -fsS --max-time 5 "$TARGET_URL/healthz" \
-      | jq -e '.ok == true and .default_scenario == "day2"' >/dev/null 2>&1; then
+      | jq -e '.ok == true and .default_scenario == "data"' >/dev/null 2>&1; then
       return 0
     fi
     sleep 2

@@ -72,7 +72,7 @@ class MainModelTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("OLLAMA_GUARD_MODEL", content)
         self.assertNotIn("llama-guard", content)
         self.assertIn("OLLAMA_EMBED_MODEL", content)
-        self.assertIn("--max-time 300 http://localhost:11434/api/generate", content)
+        self.assertIn("--max-time 300 http://localhost/ollama/api/generate", content)
 
     def check_runtime_reconcile(self, configured):
         source = (ROOT / "infrastructure/scripts/student/install-lab.sh").read_text()
