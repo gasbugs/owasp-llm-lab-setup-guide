@@ -1044,7 +1044,7 @@ for _ in $(seq 1 120); do
   sleep 5
 done
 if [[ ! "$INSTANCE_ID" =~ ^i-[0-9a-f]+$ ]]; then
-  echo "ERROR: ASG did not expose a valid instance ID before the bounded deadline" >&2
+  echo "ERROR: Terraform did not expose a valid instance ID before the bounded deadline" >&2
   exit 1
 fi
 log "Apply complete; waiting for the single EC2 and SSM within bounded deadlines"

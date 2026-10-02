@@ -9,13 +9,13 @@ output "ami_name" {
 }
 
 output "availability_zones" {
-  description = "ASG가 인스턴스를 배치할 수 있는 가용 영역 목록"
+  description = "GPU 인스턴스 타입을 제공하는 가용 영역 목록 (실시간 용량 보장 아님)"
   value       = local.selected_availability_zones
 }
 
-output "autoscaling_group_name" {
-  description = "계정의 단일 실습 Auto Scaling Group 이름"
-  value       = aws_autoscaling_group.student.name
+output "instance_id" {
+  description = "중지·재시작 때 재사용하는 단일 EC2 ID"
+  value       = aws_instance.student.id
 }
 
 output "instance_lookup_command" {
@@ -34,18 +34,18 @@ output "public_ip_lookup_command" {
 }
 
 output "ssm_session_command" {
-  description = "현재 ASG 인스턴스 ID를 조회해 SSM 접속하는 명령"
-  value       = "aws ssm start-session --profile ${var.aws_profile} --region ${var.region} --target $(aws ec2 describe-instances --profile ${var.aws_profile} --region ${var.region} --filters Name=tag:Project,Values=owasp-top-10-for-llm Name=tag:Course,Values=${var.course_id} Name=instance-state-name,Values=running --query 'Reservations[0].Instances[0].InstanceId' --output text)"
+  description = "Terraform이 관리하는 EC2에 SSM 셸로 접속하는 명령"
+  value       = "aws ssm start-session --profile ${var.aws_profile} --region ${var.region} --target ${aws_instance.student.id}"
 }
 
 output "start_command" {
-  description = "ASG desired capacity를 1로 올려 새 인스턴스를 생성하는 명령"
-  value       = "aws autoscaling update-auto-scaling-group --profile ${var.aws_profile} --region ${var.region} --auto-scaling-group-name ${aws_autoscaling_group.student.name} --min-size 0 --max-size 1 --desired-capacity 1"
+  description = "기존 EC2를 다시 시작하는 명령"
+  value       = "aws ec2 start-instances --profile ${var.aws_profile} --region ${var.region} --instance-ids ${aws_instance.student.id}"
 }
 
 output "stop_command" {
-  description = "ASG desired capacity를 0으로 내려 인스턴스를 삭제하는 명령"
-  value       = "aws autoscaling update-auto-scaling-group --profile ${var.aws_profile} --region ${var.region} --auto-scaling-group-name ${aws_autoscaling_group.student.name} --min-size 0 --max-size 1 --desired-capacity 0"
+  description = "EC2를 중지하고 root EBS를 보존하는 명령 (EBS 비용은 계속 발생)"
+  value       = "aws ec2 stop-instances --profile ${var.aws_profile} --region ${var.region} --instance-ids ${aws_instance.student.id}"
 }
 
 output "instance_role_arn" {

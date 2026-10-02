@@ -1,14 +1,14 @@
 # Infrastructure — 수강생 1인 1계정 EC2 실습 환경
 
-본 디렉터리는 OWASP Top 10 for LLM 강의 실습 환경을 AWS에 만드는 Terraform과 운영 스크립트를 담고 있다. 현재 운영 모델은 **수강생별 ASG가 여러 AZ 중 가용 용량이 있는 곳에 EC2 `g6.xlarge` 1대를 만드는 방식**이다.
+본 디렉터리는 OWASP Top 10 for LLM 강의 실습 환경을 AWS에 만드는 Terraform과 운영 스크립트를 담고 있다. 현재 운영 모델은 **수강생 계정에 On-Demand EC2 `g6.xlarge` 1대를 만들고 같은 인스턴스를 중지·재시작하는 방식**이다.
 
 ## 현재 운영 모델
 
-- Terraform은 `g6.xlarge`를 제공하는 모든 AZ에 subnet을 만들고 ASG가 가용 용량을 찾아 배치하게 한다.
-- 수강생은 `terraform apply`로 본인 계정에 ASG, Launch Template, IAM instance profile, 보안 그룹을 만든다.
-- 매일 아침 `start-lab.sh`로 ASG desired capacity를 1로 올려 새 인스턴스를 만든다.
-- 매일 종료 시 `stop-lab.sh`로 desired capacity를 0으로 낮춰 인스턴스와 root EBS를 삭제한다.
-- 자동 중지 Lambda·EventBridge는 만들지 않는다. 실습 직후 `stop-lab.sh`로 ASG를 0으로 축소한다.
+- Terraform은 `g6.xlarge`를 제공하는 AZ에 subnet을 만들고 그중 한 곳에 EC2를 배치한다. 기본은 첫 지원 AZ이며 신규 생성 시 용량이 부족하면 `availability_zone`을 지정한다.
+- 수강생은 `terraform apply`로 본인 계정에 EC2, IAM instance profile, 보안 그룹을 만든다.
+- 다시 실습할 때 `start-lab.sh`로 기존 인스턴스를 시작한다.
+- 실습 종료 시 `stop-lab.sh`로 EC2를 중지한다. root EBS의 모델·작업물은 보존된다.
+- 자동 중지 Lambda·EventBridge는 만들지 않는다. 실습 직후 직접 중지하고 `stopped`를 확인한다.
 - 마지막 날에는 `terraform destroy -auto-approve`로 EC2, EBS, VPC를 삭제한다.
 - 보안 그룹은 포트별 규칙 대신 `allowed_ingress_cidr`의 본인 공인 IPv4 `/32`에서 오는 전체 인바운드 트래픽을 허용한다. 학습자 웹/API는 EC2 public IP로 직접 접속하고 SSM은 셸 접속에 사용한다.
 - Bootstrap 또는 수동 설치가 끝나면 브라우저 UI는 Nginx의 TCP/80 하나에서 URI별로 연결된다.
@@ -17,7 +17,7 @@
 
 | 경로 | 용도 |
 |---|---|
-| `terraform/` | 다중 AZ VPC, ASG, Launch Template, 보안 그룹, IAM instance profile |
+| `terraform/` | VPC, 단일 On-Demand EC2, 보안 그룹, IAM instance profile |
 | `compose/compose.yaml` | 12개 실습 컨테이너의 단일 Docker Compose 배포 정의 |
 | `reverse-proxy/default.conf` | port 80의 UI URI를 기존 Compose 서비스로 전달하는 Nginx 설정 |
 | `scripts/student/` | 수강생용 preflight, 수동 설치, instance-id, start/stop 및 작업물 보존 안내 헬퍼 |
@@ -71,9 +71,9 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
 ## 비용 가드레일
 
 - `g6.xlarge`는 실행 중일 때 비용이 발생한다.
-- ASG를 0으로 줄이면 EC2와 root EBS가 삭제되어 해당 리소스 비용이 멈춘다.
+- EC2를 중지하면 인스턴스 실행 비용은 멈추지만 보존된 EBS의 저장 비용은 남는다.
 - 이 Terraform은 Budget 알람을 만들지 않는다. 강사가 공지한 종료 시각과 실제 실행 시간을 직접 확인한다.
 
 ## 작업물 보존
 
-ASG를 0으로 줄이면 root EBS도 삭제된다. 영구 보존할 페이로드와 메모는 `stop-lab.sh` 실행 전에 개인 저장소나 승인된 저장 위치로 옮긴다.
+중지·재시작은 root EBS를 보존하지만 `terraform destroy`나 EC2 종료(terminate)는 root EBS도 삭제한다. 영구 보존할 페이로드와 메모는 최종 삭제 전에 개인 저장소나 승인된 저장 위치로 옮긴다. 기존 ASG 기반 state의 전환은 [Terraform 고급 설정](../docs/TERRAFORM-ADVANCED-OPTIONS.md)을 먼저 확인한다. 여러 실습 EC2가 있으면 helper에 `COURSE_ID`를 지정하고, 조회 결과가 한 대가 아니면 작업을 중단한다.

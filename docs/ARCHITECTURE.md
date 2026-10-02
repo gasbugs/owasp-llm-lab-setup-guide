@@ -41,13 +41,13 @@ flowchart TD
 
 - 기존 검증 계열의 최신 AWS DLAMI 조회
 - VPC `10.42.0.0/16`
-- Public subnet `10.42.10.0/24`
+- GPU 지원 AZ별 Public subnet (첫 subnet은 `10.42.10.0/24`)
 - Internet Gateway와 route table
 - 계정당 security group 1개
 - 계정당 IAM role과 instance profile 1개
 - 계정당 EC2 GPU 인스턴스 1대. 기본값은 `g6.xlarge`
 
-1인 1계정 운영이므로 수강생 식별자를 별도로 입력하지 않습니다. `course_id`로 자원 이름을 구분하고 단일 ASG가 EC2를 최대 한 대만 유지합니다. 기존의 `student_id` 기반 state에 이 구성을 적용하면 indexed 자원이 단일 자원으로 바뀌므로 plan에서 교체 대상을 반드시 확인합니다.
+1인 1계정 운영이므로 수강생 식별자를 별도로 입력하지 않습니다. `course_id`로 자원 이름을 구분하고 `aws_instance.student`가 On-Demand EC2 한 대를 관리합니다. 기존 ASG·`student_id` 기반 state는 자동 이전되지 않습니다. [전환 안내](TERRAFORM-ADVANCED-OPTIONS.md)에 따라 작업물을 보존하고 plan에서 삭제·교체 대상을 확인합니다.
 
 기본 AMI 조회 기준은 우리가 기존 실습에서 사용한 계열과 같습니다.
 
@@ -67,13 +67,13 @@ ami_name_pattern = "owasp-llm-lab-*"
 
 ## Security group
 
-실습 앱은 의도적으로 취약합니다. 기본값은 외부 인바운드를 닫고, 직접 접속이 필요할 때만 수강생의 공인 IPv4 한 주소를 허용합니다.
+실습 앱은 의도적으로 취약합니다. 기본값은 외부 인바운드를 닫고, 실습 전 수강생의 공인 IPv4 한 주소를 허용합니다.
 
 ```hcl
 allowed_ingress_cidr = "127.0.0.1/32"
 ```
 
-기본 `127.0.0.1/32`는 외부 인바운드를 열지 않습니다. EC2 공인 주소로 직접 접속할 때만 `curl -sS https://checkip.amazonaws.com`으로 확인한 본인 공인 IPv4 뒤에 `/32`를 붙입니다. `0.0.0.0/0`은 입력 검증에서 거부합니다.
+기본 `127.0.0.1/32`는 외부 인바운드를 열지 않습니다. 실습 전 `curl -sS https://checkip.amazonaws.com`으로 확인한 본인 공인 IPv4 뒤에 `/32`를 붙입니다. `0.0.0.0/0`은 입력 검증에서 거부합니다.
 
 ## 설치 방식
 
@@ -97,7 +97,7 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - Ollama와 실습 앱 컨테이너 실행
 - Ollama 모델 pull과 warm-up
 - 단일 Compose 정의 실행과 Docker 재시작 정책 등록
-- 자동 중지 Lambda·EventBridge는 만들지 않으며 `stop-lab.sh`가 ASG를 즉시 0으로 축소
+- 자동 중지 Lambda·EventBridge는 만들지 않으며 `stop-lab.sh`가 기존 EC2를 중지하고 root EBS를 보존
 
 운영 편의상 자동 설치가 필요하면 `terraform.tfvars`에서 아래 값을 켭니다.
 
@@ -167,17 +167,17 @@ flowchart LR
   A["server-side token map"] -->|"tenant=acme"| D
 ```
 
-`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고 EC2 내부 검사는 `127.0.0.1:18080`을 사용합니다. 기본 Terraform 값에서는 SSM 포트포워딩으로 확인하며, 본인 공인 IPv4 `/32`를 적용한 경우에만 학습자 PC에서 `EC2_PUBLIC_IP:18080`으로 직접 접속합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback nginx 경로 `http://127.0.0.1/knowledge-rag`로 제한됩니다.
+`0.0.0.0`은 미니 앱이 모든 IPv4 인터페이스에서 연결을 받도록 지정하는 bind sentinel이지 접속 URL이 아닙니다. 학생은 SSM 터미널에서 Python 서버를 foreground로 실행하고 EC2 내부 검사는 `127.0.0.1:18080`을 사용합니다. 실습 전 본인 공인 IPv4 `/32`를 설정한 뒤 학습자 PC에서 `EC2_PUBLIC_IP:18080`으로 직접 접속합니다. 미니 앱의 upstream `TARGET_URL`도 계속 loopback nginx 경로 `http://127.0.0.1/knowledge-rag`로 제한됩니다.
 
 `vulnerable`과 `safe`는 같은 embedding model과 cosine 함수를 사용합니다. 차이는 ranking 이후 결과를 가리는 것이 아니라, **embedding/ranking 후보를 만들기 전에 인증 tenant metadata filter를 적용하는가**입니다. 미니 앱은 운영 vector DB가 아닌 교육용 인메모리 검색기입니다.
 
 | 경계/endpoint | 노출 범위 | 인증·입력 계약 | 용도 |
 |---|---|---|---|
-| Ollama `POST :11434/api/embed` | EC2 loopback에만 publish, 컨테이너는 Compose DNS `ollama:11434` 사용 | 4일차 backend가 고정 model로 호출 | 실제 embedding 생성 |
-| 4일차 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
-| 4일차 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
-| 4일차 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
-| 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; 기본은 SSM, 선택적으로 수강생 공인 IPv4 `/32` 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
+| Ollama `POST :11434/api/embed` | EC2 loopback에만 publish, 컨테이너는 Compose DNS `ollama:11434` 사용 | 임베딩 backend가 고정 model로 호출 | 실제 embedding 생성 |
+| 임베딩 backend `POST /knowledge-rag/api/embed` | Nginx `/knowledge-rag/` · 본인 공인 IPv4 `/32` | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
+| 임베딩 backend `POST /knowledge-rag/api/labs/llm08/{vulnerable,safe}/search` | Nginx `/knowledge-rag/` · 본인 공인 IPv4 `/32` | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
+| 임베딩 backend `GET /knowledge-rag/api/lab/llm08/target-vector` | Nginx `/knowledge-rag/` · 본인 공인 IPv4 `/32` | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
+| 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; 수강생 공인 IPv4 `/32`에서 직접 접속 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
 
 LLM08 endpoint는 `DEFAULT_SCENARIO=knowledge` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. 기본 `127.0.0.1/32`는 외부 접속을 열지 않습니다. 공인 IPv4 `/32`로 바꾸면 그 주소에서 미니 앱 18080과 nginx 80에 접근할 수 있으므로 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
 

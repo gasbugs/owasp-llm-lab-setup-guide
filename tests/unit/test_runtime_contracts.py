@@ -261,16 +261,16 @@ class RuntimeContractTest(unittest.TestCase):
             workflow,
         )
 
-    def test_installer_requires_explicit_asg_cleanup_without_lambda(self) -> None:
+    def test_installer_requires_explicit_stop_without_lambda(self) -> None:
         installer = read("infrastructure/scripts/student/install-lab.sh")
         self.assertIn("자동 중지 Lambda·EventBridge를 만들지 않습니다", installer)
-        self.assertIn("stop-lab.sh로 ASG를 0으로 낮추면", installer)
+        self.assertIn("stop-lab.sh로 EC2를 중지하면", installer)
 
     def test_user_data_bootstrap_reuses_pinned_runtime_installer(self) -> None:
         instance = read("infrastructure/terraform/instance.tf")
         template = read("infrastructure/terraform/user-data.sh.tpl")
         self.assertIn(
-            "user_data     = var.enable_user_data_bootstrap ? base64encode(local.user_data) : null",
+            "var.enable_user_data_bootstrap ? local.user_data : null",
             instance,
         )
         self.assertIn(
@@ -372,13 +372,13 @@ class RuntimeContractTest(unittest.TestCase):
         quickstart = read("docs/STUDENT-QUICKSTART.md")
 
         terraform_ami = instance.split('data "aws_ami" "lab_base"', 1)[1].split(
-            'resource "aws_launch_template" "student"', 1
+            'resource "aws_instance" "student"', 1
         )[0]
         self.assertIn("most_recent = true", terraform_ami)
         self.assertIn("owners      = [var.ami_owner_id]", terraform_ami)
         self.assertIn("values = [var.ami_name_pattern]", terraform_ami)
-        self.assertIn("image_id      = data.aws_ami.lab_base.id", instance)
-        self.assertIn("create_before_destroy = true", instance)
+        self.assertRegex(instance, r"ami\s+= data.aws_ami.lab_base.id")
+        self.assertIn("ignore_changes = [ami]", instance)
         self.assertNotRegex(instance, r'(?m)^\s*ami\s*=\s*"ami-[0-9a-f]+"')
         self.assertNotIn('variable "ami_id"', variables)
         self.assertNotIn('variable "golden_ami_id"', variables)
@@ -517,8 +517,8 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertIn("REMAINING_STATE=$(terraform state list)", teardown)
         self.assertIn('if [ -n "$REMAINING_STATE" ]', teardown)
         self.assertNotIn("비용 0/h", teardown)
-        self.assertIn("root EBS가 삭제됩니다", stop)
-        self.assertIn("가용 용량이 있는 AZ에 새 인스턴스가 생성", stop)
+        self.assertIn("root EBS와 모델·작업물은 보존됩니다", stop)
+        self.assertIn("instance-stopped", stop)
 
     def test_terraform_omits_lambda_and_eventbridge_auto_stop(self) -> None:
         variables = read("infrastructure/terraform/variables.tf")
@@ -533,22 +533,15 @@ class RuntimeContractTest(unittest.TestCase):
         self.assertNotIn("aws_cloudwatch_event_target", instance)
         self.assertNotIn('output "auto_stop_schedule"', outputs)
 
-    def test_asg_uses_all_supported_gpu_zones_and_scales_to_zero(self) -> None:
-        network = read("infrastructure/terraform/network.tf")
+    def test_single_ec2_preserves_state_across_stop_start(self) -> None:
         instance = read("infrastructure/terraform/instance.tf")
         outputs = read("infrastructure/terraform/outputs.tf")
-
-        self.assertIn('data "aws_ec2_instance_type_offerings" "gpu"', network)
-        self.assertIn("selected_availability_zones", network)
-        self.assertIn('resource "aws_autoscaling_group" "student"', instance)
-        self.assertRegex(
-            instance,
-            r"vpc_zone_identifier\s+= values\(aws_subnet\.lab\)\[\*\]\.id",
-        )
-        self.assertRegex(instance, r"desired_capacity\s+= 1")
-        self.assertIn("ignore_failed_scaling_activities = true", instance)
-        self.assertIn("ignore_changes = [desired_capacity]", instance)
-        self.assertIn("--desired-capacity 0", outputs)
+        self.assertIn('resource "aws_instance" "student"', instance)
+        self.assertNotIn("aws_autoscaling_group", instance)
+        self.assertIn("ignore_changes = [ami]", instance)
+        self.assertRegex(instance, r"user_data_replace_on_change\s+= false")
+        self.assertIn("aws ec2 stop-instances", outputs)
+        self.assertIn("aws ec2 start-instances", outputs)
 
     def test_local_build_helper_rejects_implicit_moving_tags(self) -> None:
         script = ROOT / "docker" / "build-and-push.sh"

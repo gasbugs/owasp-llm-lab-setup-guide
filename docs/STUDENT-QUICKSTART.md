@@ -79,7 +79,9 @@ allowed_ingress_cidr = "127.0.0.1/32"
 
 ```
 
-AMI ID는 직접 입력하지 않습니다. Terraform이 검증된 계열의 최신 DLAMI를 조회하고 `g6.xlarge`, 100GB를 기본값으로 적용합니다. `enable_user_data_bootstrap = false`는 수강생이 SSM으로 접속해 설치 과정을 직접 확인하는 정본이며, 강사용 자동 설치에서는 이 값을 `true`로 바꿉니다. EC2 공인 IP에 직접 접속하려면 `allowed_ingress_cidr`를 본인의 현재 공인 IPv4 `/32`로 바꿉니다. AMI·commit 고정이 필요한 강사용 환경만 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 참고합니다.
+AMI ID는 직접 입력하지 않습니다. Terraform이 검증된 계열의 최신 DLAMI를 조회하고 `g6.xlarge`, 100GB를 기본값으로 적용합니다. `enable_user_data_bootstrap = false`는 수강생이 SSM으로 접속해 설치 과정을 직접 확인하는 정본이며, 강사용 자동 설치에서는 이 값을 `true`로 바꿉니다. 실습 웹/API에 접속하도록 `allowed_ingress_cidr`를 본인의 현재 공인 IPv4 `/32`로 바꿉니다. AMI·commit 고정이 필요한 강사용 환경만 [Terraform 고급 설정](TERRAFORM-ADVANCED-OPTIONS.md)을 참고합니다.
+
+기존 ASG 기반 state를 재사용하는 경우에는 [전환 안내](TERRAFORM-ADVANCED-OPTIONS.md)를 먼저 확인합니다. 새 구성을 바로 apply하면 기존 EC2가 교체될 수 있습니다.
 
 ## 5. VM 생성
 
@@ -89,7 +91,7 @@ terraform plan
 terraform apply -auto-approve
 ```
 
-성공하면 `ami_id`, `ami_name`, `availability_zones`, `autoscaling_group_name`, `instance_lookup_command`, `public_ip_lookup_command`, `start_command`, `stop_command`, `ssm_session_command`가 출력됩니다.
+성공하면 `ami_id`, `ami_name`, `availability_zones`, `instance_id`, `instance_lookup_command`, `public_ip_lookup_command`, `start_command`, `stop_command`, `ssm_session_command`가 출력됩니다.
 
 ## 6. SSM 접속
 
@@ -129,15 +131,15 @@ curl -fsSL https://raw.githubusercontent.com/gasbugs/owasp-llm-lab-setup-guide/m
 - 4일차 LLM03 fake model registry 실행: `lab-fake-registry`, port `8002`
 - 단일 Docker Compose 파일로 모든 서비스 실행
 - EC2 재부팅 후 자동 복구를 위한 `restart: always`와 `Docker daemon` 설정
-- 자동 중지 Lambda·EventBridge는 설치하지 않음. 실습 직후 `stop-lab.sh`로 ASG를 0으로 낮춰 EC2와 root EBS 삭제
+- 자동 중지 Lambda·EventBridge는 설치하지 않음. 실습 직후 `stop-lab.sh`로 EC2 중지·root EBS 보존
 
 설치 로그는 EC2 안의 `/var/log/owasp-llm-lab-install.log`에서 확인할 수 있습니다.
 
 ### 본인 공인 IPv4에서 실습 서비스에 접속
 
-Terraform은 포트별 Security Group 규칙을 만들지 않습니다. 기본 `127.0.0.1/32`는 외부 인바운드를 열지 않으므로 SSM 포트포워딩을 사용합니다. 직접 접속이 필요하면 `allowed_ingress_cidr`에 본인 공인 IPv4 `/32`를 입력합니다. 이 경우 그 주소의 모든 프로토콜과 포트를 ingress 규칙 하나로 허용하며, `public_ip_lookup_command`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. Portal은 `http://EC2_PUBLIC_IP/`이고 UI는 `/prompt-rag/`, `/llm04-rag/`, `/data-rag/`, `/output-rag/`, `/knowledge-rag/`, `/resource-rag/`, `/vuln-agent/`, `/llmgoat/`, `/dvla/`에서 엽니다. `0.0.0.0/0`으로 넓히지 않습니다.
+Terraform은 포트별 Security Group 규칙을 만들지 않습니다. 기본 `127.0.0.1/32`는 외부 인바운드를 열지 않습니다. 실습 전 `allowed_ingress_cidr`에 본인 공인 IPv4 `/32`를 입력합니다. 이 경우 그 주소의 모든 프로토콜과 포트를 ingress 규칙 하나로 허용하며, `public_ip_lookup_command`로 확인한 EC2 공인 IP를 브라우저 주소에 사용합니다. Portal은 `http://EC2_PUBLIC_IP/`이고 UI는 `/prompt-rag/`, `/llm04-rag/`, `/data-rag/`, `/output-rag/`, `/knowledge-rag/`, `/resource-rag/`, `/vuln-agent/`, `/llmgoat/`, `/dvla/`에서 엽니다. `0.0.0.0/0`으로 넓히지 않습니다.
 
-Nginx는 URI를 내부 서비스로 연결할 뿐 인증·인가를 대신하지 않습니다. 기존 `curl http://localhost:<port>/...` 명령은 그대로 사용하고 브라우저 UI만 port 80 진입점을 사용합니다.
+Nginx는 URI를 내부 서비스로 연결할 뿐 인증·인가를 대신하지 않습니다. 앱의 host publish는 Nginx 80과 Ollama loopback 11434뿐입니다. EC2 CLI도 앱별 Nginx 경로를 사용하며 Ollama만 `localhost:11434`로 직접 호출할 수 있습니다.
 
 ### LLM08 추가 셋업
 
@@ -269,7 +271,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 
-이 명령은 ASG를 0으로 낮춰 EC2와 root EBS를 삭제하므로 두 자원의 비용이 멈춥니다.
+이 명령은 같은 EC2가 `stopped`가 될 때까지 기다립니다. root EBS의 모델·작업물은 남고 저장 비용도 계속 발생합니다. 다음 시작 때 공인 IP가 바뀔 수 있으므로 주소를 다시 조회합니다.
 
 ## 13. 강의 종료 후 삭제
 

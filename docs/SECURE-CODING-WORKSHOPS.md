@@ -12,7 +12,7 @@
 | LLM08 | `/app/app/secure_coding.py` | `/api/labs/llm08/workshop/search` | vector scoring 전 tenant filter |
 | LLM09 | `/app/app/secure_coding.py` | `/api/labs/llm09/workshop/recommend` | 실제 모델의 추천 목록에서 미승인 후보를 제외하고 승인된 대안을 표시 |
 | LLM10 | `/app/app/secure_coding.py` | `/api/labs/llm10/workshop/chat` | 입력 크기와 생성 token 예산 |
-| 6일차 | `/app/secure_coding.py` | `/api/labs/secure-coding/scan` | 모델 호출 전 Presidio 개인정보 탐지·비식별화 |
+| Presidio | `/app/secure_coding.py` | `/api/labs/secure-coding/scan` | 모델 호출 전 Presidio 개인정보 탐지·비식별화 |
 
 LLM03·LLM07은 억지로 한 줄 전환 형태로 만들지 않는다. LLM03은 모델 파일 생성·서명·검증·등록의 생명주기 전체가 방어 경계다. LLM07은 시스템 프롬프트에서 비밀과 권한 결정을 제거하고 서버 정책으로 옮기는 아키텍처 문제다. 이 두 항목을 한 줄짜리 `safe=True`로 축소하면 수강생이 실제 방어 범위를 오해한다. LLM09의 한 줄 전환은 최종 추천에 모델 후보를 포함할지 서버 승인 목록으로 판단한다. 패키지를 설치하지 않으며 추천 목록으로 신뢰 경계를 비교한다.
 

@@ -276,7 +276,7 @@ AWS_PROFILE=owasp-llm AWS_REGION=us-east-1 \
   bash infrastructure/scripts/student/stop-lab.sh
 ```
 
-`stop-lab.sh`는 ASG desired capacity를 0으로 낮춰 EC2와 root EBS를 즉시 삭제합니다. 전체 강의 종료 뒤에는 기존 계정별 nuke 절차로 Terraform 밖의 잔여 자원까지 확인합니다.
+수강생용 `stop-lab.sh`는 EC2를 중지하고 root EBS를 보존하므로 EBS 비용은 남습니다. 검증용 임시 EC2의 최종 삭제는 이 문서의 terminate·destroy 경로를 사용합니다. 전체 강의 종료 뒤에는 기존 계정별 nuke 절차로 Terraform 밖의 잔여 자원까지 확인합니다.
 
 한 번만 사용하는 강사용 검증 환경이고 증거 회수가 끝났다면 stop으로 끝내지 말고 리소스를 삭제합니다. plan을 검토한 뒤 실행하세요.
 

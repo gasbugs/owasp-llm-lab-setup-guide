@@ -130,3 +130,9 @@ variable "ollama_model" {
     error_message = "Use an Ollama model name and tag without shell metacharacters."
   }
 }
+
+variable "availability_zone" {
+  description = "신규 EC2의 가용 영역. null이면 GPU offering이 있는 첫 영역을 선택한다. 기존 EC2에서 변경하면 교체된다."
+  type        = string
+  default     = null
+}

@@ -42,9 +42,9 @@ aws ec2 describe-instance-type-offerings \
   --query 'InstanceTypeOfferings[].Location' --output text
 ```
 
-Terraform은 offering이 있는 모든 AZ에 subnet을 만들고 ASG가 다른 AZ로 재시도합니다. 이전 버전의 `terraform.tfvars`에 `availability_zone`이 남아 있으면 제거합니다.
+Terraform은 offering이 있는 AZ 중 한 곳에 EC2 한 대를 만듭니다. 아직 EC2가 생성되지 않았다면 `terraform.tfvars`에 목록의 다른 AZ를 `availability_zone`으로 지정하고 plan을 확인한 뒤 다시 적용합니다.
 
-ASG Activity에서 첫 AZ 실패 뒤 다른 AZ 성공 여부를 확인합니다. Terraform은 `ignore_failed_scaling_activities = true`로 첫 실패만 보고 apply를 중단하지 않습니다. `VcpuLimitExceeded`는 재고가 아니라 계정 quota 문제이므로 이 방법 대신 앞 절의 quota 증액을 사용합니다.
+이미 생성된 EC2의 AZ를 바꾸면 인스턴스가 교체되고 root EBS가 삭제됩니다. 중지된 EC2 재시작이 용량 부족으로 실패했다면 AZ를 변경하지 말고 잠시 뒤 같은 인스턴스를 다시 시작합니다. `VcpuLimitExceeded`는 재고가 아니라 계정 quota 문제이므로 이 방법 대신 앞 절의 quota 증액을 사용합니다.
 
 ## SSM 접속 실패
 
@@ -195,7 +195,7 @@ python3 learner_vector_app.py --serve --host 0.0.0.0 --port 18080
 
 두 번째 EC2/SSM 터미널에서 `ss -ltnp | grep ':18080'`과 `curl -fsS http://127.0.0.1:18080/healthz` 두 가지를 확인합니다. `0.0.0.0`은 bind sentinel이지 접속 URL이 아닙니다.
 
-기본 `allowed_ingress_cidr = "127.0.0.1/32"`에서는 외부 브라우저가 EC2 공인 IP에 직접 접속할 수 없습니다. SSM 포트포워딩을 사용하거나, 직접 접속이 필요하면 현재 공인 IPv4 `/32`로 바꿉니다. `0.0.0.0/0`은 사용하지 않습니다.
+기본 `allowed_ingress_cidr = "127.0.0.1/32"`에서는 외부 브라우저가 EC2 공인 IP에 직접 접속할 수 없습니다. 실습 전 현재 공인 IPv4 `/32`로 바꾸고 EC2 공인 주소로 직접 접속합니다. `0.0.0.0/0`은 사용하지 않습니다.
 
 ```bash
 # [로컬 노트북]
@@ -207,7 +207,7 @@ aws ec2 describe-instances --profile owasp-llm --region us-east-1 \
   --query 'Reservations[].Instances[].PublicIpAddress' --output text
 ```
 
-작업이 끝나면 evidence를 먼저 보존하고 미니 앱/forwarding을 정리한 뒤, **마지막에 EC2를 중지해 `stopped`를 확인**합니다.
+작업이 끝나면 evidence를 먼저 보존하고 미니 앱을 정리한 뒤, **마지막에 EC2를 중지해 `stopped`를 확인**합니다.
 
 ## 비용이 걱정될 때
 

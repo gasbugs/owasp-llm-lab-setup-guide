@@ -28,6 +28,7 @@ locals {
     toset(data.aws_ec2_instance_type_offerings.gpu.locations),
   )))
   selected_availability_zones = local.available_gpu_zones
+  instance_availability_zone  = var.availability_zone != null ? var.availability_zone : try(local.available_gpu_zones[0], "")
 }
 
 data "aws_ec2_instance_type_offerings" "gpu" {

@@ -7,13 +7,13 @@ TERRAFORM = ROOT / "infrastructure" / "terraform"
 
 
 class TerraformG6ZoneTests(unittest.TestCase):
-    def test_all_offering_zones_are_passed_to_the_asg(self) -> None:
+    def test_instance_uses_a_supported_zone_without_asg(self) -> None:
         variables = (TERRAFORM / "variables.tf").read_text(encoding="utf-8")
         network = (TERRAFORM / "network.tf").read_text(encoding="utf-8")
         instance = (TERRAFORM / "instance.tf").read_text(encoding="utf-8")
         outputs = (TERRAFORM / "outputs.tf").read_text(encoding="utf-8")
 
-        self.assertNotIn('variable "availability_zone"', variables)
+        self.assertIn('variable "availability_zone"', variables)
         self.assertIn('data "aws_ec2_instance_type_offerings" "gpu"', network)
         self.assertIn("selected_availability_zones = local.available_gpu_zones", network)
         self.assertIn(
@@ -21,8 +21,9 @@ class TerraformG6ZoneTests(unittest.TestCase):
             network,
         )
         self.assertIn("availability_zone       = each.key", network)
-        self.assertIn("vpc_zone_identifier", instance)
-        self.assertIn("values(aws_subnet.lab)[*].id", instance)
+        self.assertIn("aws_subnet.lab[local.instance_availability_zone].id", instance)
+        self.assertIn("contains(local.available_gpu_zones, local.instance_availability_zone)", instance)
+        self.assertNotIn("aws_autoscaling_group", instance)
         self.assertIn('output "availability_zones"', outputs)
 
     def test_example_keeps_the_fixed_instance_default_compact(self) -> None:

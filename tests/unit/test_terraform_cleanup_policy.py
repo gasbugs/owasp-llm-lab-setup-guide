@@ -17,7 +17,7 @@ class TerraformCleanupPolicyTests(unittest.TestCase):
         self.assertNotIn("archive_file", terraform)
         self.assertNotIn("enable_auto_stop", terraform)
 
-    def test_explicit_stop_command_scales_asg_to_zero(self):
+    def test_explicit_stop_preserves_instance_and_ebs(self):
         outputs = (ROOT / "infrastructure/terraform/outputs.tf").read_text(
             encoding="utf-8"
         )
@@ -25,9 +25,10 @@ class TerraformCleanupPolicyTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("--desired-capacity 0", outputs)
-        self.assertIn("--desired-capacity 0", stop)
-        self.assertIn("root EBS가 삭제됩니다", stop)
+        self.assertIn("aws ec2 stop-instances", outputs)
+        self.assertIn("aws ec2 stop-instances", stop)
+        self.assertNotIn("terminate-instances", stop)
+        self.assertIn("root EBS와 모델·작업물은 보존됩니다", stop)
 
 
 if __name__ == "__main__":

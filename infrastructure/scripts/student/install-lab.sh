@@ -799,6 +799,6 @@ LLM08 추가 준비:
 
 비용 안전장치:
   Terraform은 자동 중지 Lambda·EventBridge를 만들지 않습니다.
-  실습 직후 stop-lab.sh로 ASG를 0으로 낮추면 EC2와 root EBS가 삭제됩니다.
+  실습 직후 stop-lab.sh로 EC2를 중지하면 root EBS와 작업물은 보존됩니다. EBS 비용은 남습니다.
 
 EOF
