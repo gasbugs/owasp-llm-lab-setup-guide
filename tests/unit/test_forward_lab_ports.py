@@ -20,6 +20,7 @@ class ForwardLabPortsTests(unittest.TestCase):
             9090,
             9093,
             9400,
+            11434,
             13133,
             18002,
             18012,

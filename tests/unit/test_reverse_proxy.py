@@ -52,9 +52,10 @@ class ReverseProxyTests(unittest.TestCase):
             with self.subTest(service=service):
                 self.assertIn(f"server {service}:{port} resolve;", self.config)
 
-    def test_only_nginx_publishes_a_host_port(self) -> None:
+    def test_only_nginx_and_loopback_ollama_publish_host_ports(self) -> None:
         self.assertIn('"80:80"', self.compose)
-        self.assertEqual(self.compose.count("    ports:"), 1)
+        self.assertIn('"127.0.0.1:11434:11434"', self.compose)
+        self.assertEqual(self.compose.count("    ports:"), 2)
         for port in (5000, 8000, 8001, 8002, 8004, 8010, 8011, 8012, 8013, 8080, 8501, 11434):
             self.assertNotIn(f'"{port}:{port}"', self.compose)
 

@@ -79,7 +79,7 @@ case "$LAB" in
     PAIR_CONTAINER_SOURCE=/app/app/main.py
     "$CONTAINER_ENGINE" build -t "$AGENT_IMAGE" "$ROOT/docker/vuln-agent" >"$BUILD_LOG"
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
-      -e PORT="$AGENT_PORT" -e OLLAMA_URL=http://127.0.0.1/ollama \
+      -e PORT="$AGENT_PORT" -e OLLAMA_URL=http://127.0.0.1:11434 \
       "$AGENT_IMAGE" >/dev/null
     URL="http://127.0.0.1:$AGENT_PORT"
     ;;
@@ -113,7 +113,7 @@ case "$LAB" in
     esac
     "$CONTAINER_ENGINE" run -d --name "$CONTAINER" --network host \
       -e PORT="$RAG_PORT" -e DEFAULT_SCENARIO="$SCENARIO" \
-      -e OLLAMA_URL=http://127.0.0.1/ollama "$RAG_IMAGE" >/dev/null
+      -e OLLAMA_URL=http://127.0.0.1:11434 "$RAG_IMAGE" >/dev/null
     URL="http://127.0.0.1:$RAG_PORT"
     ;;
   *)

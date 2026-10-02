@@ -166,7 +166,7 @@ enable_user_data_bootstrap = true
 
 SSM 세션 안에서 실행합니다.
 
-모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. `docker ps`의 `PORTS` 열에서 Nginx의 80번 포트만 host에 publish됐는지 확인합니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
+모든 컨테이너는 `Network=host`를 사용하지 않고 Compose의 격리된 network에서 실행됩니다. `docker ps`의 `PORTS` 열에서 Nginx의 80과 Ollama의 `127.0.0.1:11434`만 host에 publish됐는지 확인합니다. RAG·Agent·DVLA는 Compose service DNS인 `ollama:11434`로 Ollama를 호출합니다.
 
 ```bash
 sudo -u ubuntu sh -lc 'cd ~/.config/owasp-llm-lab && docker compose ps'

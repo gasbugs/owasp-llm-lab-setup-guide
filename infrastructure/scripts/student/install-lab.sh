@@ -592,7 +592,7 @@ for url in "${health_urls[@]}"; do
   fi
 done
 
-# Nginx만 호스트에 공개하고 backend는 Compose network에서만 접근한다.
+# Nginx는 외부 진입점, Ollama는 호스트 loopback 실습 포트만 허용한다.
 for container in lab-reverse-proxy lab-ollama lab-prompt-rag lab-llm04-rag lab-data-rag lab-output-rag lab-knowledge-rag lab-resource-rag lab-vuln-agent lab-llmgoat lab-dvla lab-fake-registry lab-common lab-portal; do
   network_mode=$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$container")
   if [ "$network_mode" = "host" ]; then
@@ -602,6 +602,11 @@ for container in lab-reverse-proxy lab-ollama lab-prompt-rag lab-llm04-rag lab-d
   published=$(docker port "$container")
   if [ "$container" = "lab-reverse-proxy" ]; then
     docker port "$container" 80/tcp >/dev/null
+  elif [ "$container" = "lab-ollama" ]; then
+    [ "$(docker port "$container" 11434/tcp)" = "127.0.0.1:11434" ] || {
+      echo "ERROR: Ollama must publish only 127.0.0.1:11434" >&2
+      exit 1
+    }
   elif [ -n "$published" ]; then
     echo "ERROR: backend $container must not publish host ports: $published" >&2
     exit 1
@@ -659,7 +664,8 @@ OWASP LLM Lab 설치가 완료되었습니다.
 
 포트 노출 방식:
   - 브라우저 UI는 Nginx의 host port 80 하나에서 URI별로 분산됩니다.
-  - 각 backend는 host 포트 없이 내부 network에서 실행됩니다.
+  - Ollama는 localhost:11434 실습을 위해 loopback에만 publish합니다.
+  - 나머지 backend는 host 포트 없이 내부 network에서 실행됩니다.
     Ollama API는 /ollama/, DVLA는 /dvla/로 연결합니다.
   - 컨테이너 간 통신은 격리된 network와 Compose DNS를 사용합니다.
   - 설치 과정은 Network=host 부재, publish mapping, 직접/프록시 health를 검증했습니다.

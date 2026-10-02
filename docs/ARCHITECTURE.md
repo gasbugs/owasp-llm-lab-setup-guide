@@ -112,10 +112,10 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 
 ## 컨테이너
 
-| 컨테이너 | 내부 포트 (nginx만 호스트 공개) | 역할 |
+| 컨테이너 | 포트 연결 | 역할 |
 |---|---:|---|
 | `lab-reverse-proxy` | 호스트 80 | 포털과 실습 UI를 URI별로 Compose DNS upstream에 전달 |
-| `lab-ollama` | 11434 | 생성 모델과 LLM08 `bge-m3:latest` embedding을 함께 제공하는 로컬 Ollama API |
+| `lab-ollama` | host loopback 11434 → 내부 11434 | 생성 모델과 LLM08 `bge-m3:latest` embedding을 함께 제공하는 로컬 Ollama API |
 | `lab-portal` | 8080 | Nginx `/`가 연결하는 내부 포털 backend |
 | `lab-prompt-rag` | 8000 | LLM01 직접 프롬프트 인젝션 번역기 |
 | `lab-llm04-rag` | 8004 | LLM01 번역기에 격리된 corpus를 연결한 LLM04 RAG 변형 |
@@ -128,7 +128,7 @@ Terraform의 `lab_image_namespace`와 `lab_image_tag`도 user-data가 설치 스
 | `lab-dvla` | 내부 8501 | `baseUrlPath=dvla`인 Damn Vulnerable LLM Agent. host publish 없이 Nginx `/dvla/`로 전달 |
 | `lab-fake-registry` | 8002 | 4일차 LLM03 공급망 실습용 fake registry. 브라우저/API 확인 경로는 `/api/v1/models` |
 
-브라우저는 `http://EC2_PUBLIC_IP/`에서 포털을 열고 URI로 앱을 고릅니다. Nginx는 RAG·Agent·Registry prefix를 제거해 기존 endpoint로 전달하고, LLMGoat와 DVLA는 각 wrapper의 base path 처리를 사용합니다. host에는 Nginx 80만 publish합니다. CLI도 같은 URI를 사용하며 Ollama API는 `/ollama/`에서 제공합니다. 프록시는 인증·인가를 대신하지 않고 외부 접근 제한은 Security Group의 본인 공인 IPv4 `/32`가 담당합니다.
+브라우저는 `http://EC2_PUBLIC_IP/`에서 포털을 열고 URI로 앱을 고릅니다. Nginx는 RAG·Agent·Registry prefix를 제거해 기존 endpoint로 전달하고, LLMGoat와 DVLA는 각 wrapper의 base path 처리를 사용합니다. 외부에는 Nginx 80을 공개하며 Ollama는 `127.0.0.1:11434`에만 publish합니다. EC2 CLI는 `localhost:11434`로 요청하고 외부 Ollama API는 `/ollama/`에서 제공합니다. 프록시는 인증·인가를 대신하지 않고 외부 접근 제한은 Security Group의 본인 공인 IPv4 `/32`가 담당합니다.
 
 ## LLM02 Planner와 Tool Executor 인가 경계
 
@@ -173,13 +173,13 @@ flowchart LR
 
 | 경계/endpoint | 노출 범위 | 인증·입력 계약 | 용도 |
 |---|---|---|---|
-| Ollama `POST :11434/api/embed` | EC2 host에 publish된 포트, 컨테이너에서는 `host.docker.internal` 사용 | 4일차 backend가 고정 model로 호출 | 실제 embedding 생성 |
+| Ollama `POST :11434/api/embed` | EC2 loopback에만 publish, 컨테이너는 Compose DNS `ollama:11434` 사용 | 4일차 backend가 고정 model로 호출 | 실제 embedding 생성 |
 | 4일차 `POST :8012/api/embed` | EC2 loopback/SSM | Bearer token을 server-side principal/tenant로 변환; body tenant 불허 | 학습자 분석과 미니 앱의 vector source |
 | 4일차 `POST :8012/api/labs/llm08/{vulnerable,safe}/search` | EC2 loopback/SSM | 동일 인증 context, filter 위치만 다름 | 구조화된 hit 비교 |
 | 4일차 `GET :8012/api/lab/llm08/target-vector` | EC2 loopback/SSM | Bearer token 필요; fixture plaintext는 응답하지 않음 | 제한된 vector 단서 추정 실습 |
 | 미니 앱 `POST :18080/api/search` | process는 `0.0.0.0` bind; 기본은 SSM, 선택적으로 수강생 공인 IPv4 `/32` 허용 | `query`, `mode`, `top_k`만 허용; body tenant 거부 | 학습자 구현 공격·수정 |
 
-LLM08 endpoint는 `DEFAULT_SCENARIO=knowledge` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. 기본 `127.0.0.1/32`는 외부 접속을 열지 않습니다. 공인 IPv4 `/32`로 바꾸면 그 주소에서는 18080뿐 아니라 host에 publish된 8012와 11434에도 도달할 수 있으므로 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
+LLM08 endpoint는 `DEFAULT_SCENARIO=knowledge` 컨테이너에서만 활성화합니다. `retrieved_chunks`, embedding, target fixture 같은 필드는 교육용 관측 endpoint의 출력이며 운영 API 계약이 아닙니다. 기본 `127.0.0.1/32`는 외부 접속을 열지 않습니다. 공인 IPv4 `/32`로 바꾸면 그 주소에서 미니 앱 18080과 nginx 80에 접근할 수 있으므로 실습 PC 한 대의 현재 `/32`만 입력하고 `0.0.0.0/0`은 사용하지 않습니다.
 
 ## 이미지 빌드
 

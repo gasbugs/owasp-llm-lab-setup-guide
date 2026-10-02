@@ -192,7 +192,7 @@ class RuntimeContractTest(unittest.TestCase):
             "lab-fake-registry": "http://localhost/fake-registry/api/v1/models",
             "lab-portal": "http://localhost/",
         }
-        self.assertEqual(compose.count("    ports:"), 1)
+        self.assertEqual(compose.count("    ports:"), 2)
         self.assertIn('"80:80"', compose)
         self.assertIn('backend $container must not publish host ports', installer)
         for service, url in health_urls.items():

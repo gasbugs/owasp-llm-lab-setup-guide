@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the real nginx config with isolated, unpublished synthetic backends."""
+"""Check the real nginx config with isolated backends and loopback-only Ollama publishing."""
 import json
 import socket
 import subprocess
@@ -49,6 +49,11 @@ def docker(*args):
 
 
 def main():
+    config = json.loads(docker("compose", "-f", str(ROOT / "infrastructure/compose/compose.yaml"), "config", "--format", "json"))
+    published = {key: value["ports"] for key, value in config["services"].items() if value.get("ports")}
+    assert set(published) == {"reverse-proxy", "ollama"}, published
+    assert published["ollama"][0]["host_ip"] == "127.0.0.1"
+    assert str(published["ollama"][0]["published"]) == "11434"
     name = "proxy-only-check-" + uuid.uuid4().hex[:10]
     backend, proxy = name + "-backend", name + "-proxy"
     created = []
@@ -57,7 +62,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix="proxy-only-") as directory:
             script = Path(directory) / "backend.py"
             script.write_text(STUB)
-            args = ["run", "-d", "--name", backend, "--network", name]
+            args = ["run", "-d", "--name", backend, "--network", name, "-p", "127.0.0.1::11434"]
             for alias in ("portal", "common", "prompt-rag", "llm04-rag", "data-rag", "output-rag", "knowledge-rag", "resource-rag", "vuln-agent", "llmgoat", "dvla", "fake-registry", "ollama"):
                 args += ["--network-alias", alias]
             docker(*args, "-v", str(script) + ":/backend.py:ro", "python:3.12-slim", "python", "/backend.py")
@@ -77,7 +82,11 @@ def main():
                     time.sleep(1)
             else:
                 raise AssertionError(docker("logs", proxy))
-            assert json.loads(docker("inspect", backend))[0]["HostConfig"]["PortBindings"] == {}
+            bindings = json.loads(docker("inspect", backend))[0]["HostConfig"]["PortBindings"]
+            assert set(bindings) == {"11434/tcp"} and bindings["11434/tcp"][0]["HostIp"] == "127.0.0.1"
+            direct = "http://" + docker("port", backend, "11434/tcp")
+            with urllib.request.urlopen(direct + "/api/tags", timeout=5) as response:
+                assert json.load(response)["port"] == 11434
             results = {}
             for route, (port, path) in ROUTES.items():
                 with urllib.request.urlopen(base + route, timeout=5) as response:
@@ -92,7 +101,7 @@ def main():
             with socket.create_connection((host, int(port)), timeout=5) as sock:
                 sock.sendall(b"GET /dvla/_stcore/stream HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
                 assert b"101" in sock.recv(4096).split(b"\r\n")[0]
-            print(json.dumps({"routes": results, "backend_host_ports": [], "large_body_bytes": len(body), "websocket_upgrade": 101}, indent=2))
+            print(json.dumps({"routes": results, "backend_host_ports": ["Ollama loopback only"], "direct_ollama_request": "PASS", "large_body_bytes": len(body), "websocket_upgrade": 101}, indent=2))
     finally:
         for container in reversed(created):
             docker("rm", "-f", container)
