@@ -35,6 +35,9 @@ POLICY_VERSION = os.getenv("GUARD_POLICY_VERSION", "evaluation-guardrails-v1")
 TEST_CORPUS_VERSION = os.getenv("GUARD_TEST_CORPUS_VERSION", "evaluation-regression-v1")
 CORE = PresidioCore()
 
+# False: redact and continue; True: reject email input before the NeMo call.
+BLOCK_EMAIL_INPUT = False
+
 app = FastAPI(title="Microsoft Presidio integration API")
 
 
@@ -196,6 +199,7 @@ async def policy() -> dict:
         "guard_mode": GUARD_MODE,
         "policy_version": POLICY_VERSION,
         "test_corpus_version": TEST_CORPUS_VERSION,
+        "input_policy": {"block_email_input": BLOCK_EMAIL_INPUT},
         "runtime_identity": {
             "model": BEDROCK_MODEL_ID,
             "provider": "amazon-bedrock",
@@ -209,7 +213,7 @@ async def policy() -> dict:
         "canonical_source": "examples/guardrails/presidio/presidio_core.py",
         "container_source": "/app/presidio_core.py",
         "runtime_activation": "/app/server.py:chat",
-        "apply_change": "rebuild the image after source changes or recreate it for environment changes",
+        "apply_change": "copy edited server.py and restart for input_policy; rebuild for image changes; recreate for environment changes",
         "rollback": "recreate the previous image and environment set",
         "lab_endpoints": ENABLE_LAB_ENDPOINTS,
         "security_monitoring": {
@@ -336,6 +340,31 @@ async def chat(request: ChatRequest) -> dict:
         try:
             input_result = CORE.scan_input(request.message)
             input_checks.append(scan_metadata(input_result))
+            if (
+                BLOCK_EMAIL_INPUT
+                and GUARD_MODE == "enforce"
+                and "EMAIL_ADDRESS" in input_result["entity_types"]
+            ):
+                duration = round((time.perf_counter() - started) * 1000, 2)
+                guardrail = base_guardrail(
+                    decision="block",
+                    upstream_called=False,
+                    duration_ms=duration,
+                )
+                guardrail.update(
+                    {
+                        "input_checks": input_checks,
+                        "blocking_reason": "input:prohibited:EMAIL_ADDRESS",
+                        "stage_order": ["presidio_input"],
+                        "path": "presidio",
+                        "inner_guardrail": None,
+                    }
+                )
+                emit({"event": "guardrail_chat", "request_id": request_id, **guardrail})
+                return {
+                    "reply": "금지된 개인정보가 포함되어 요청을 처리하지 않았습니다.",
+                    "guardrail": guardrail,
+                }
             if GUARD_MODE == "enforce":
                 effective_message = str(input_result["sanitized_text"])
         except Exception as exc:
