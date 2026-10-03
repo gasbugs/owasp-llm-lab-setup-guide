@@ -46,7 +46,12 @@ SAFE_PRIVACY = {
 
 class FailClosedTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        self.previous_failure_mode = server.PRESIDIO_FAILURE_MODE
+        server.PRESIDIO_FAILURE_MODE = "closed"
         server.RUNTIME["model_lock"] = {"valid": True}
+
+    def tearDown(self) -> None:
+        server.PRESIDIO_FAILURE_MODE = self.previous_failure_mode
 
     async def test_model_lock_recovers_after_gateway_becomes_ready(self) -> None:
         server.RUNTIME["model_lock"] = {"valid": False, "error": "ConnectError"}
@@ -114,6 +119,12 @@ class FailClosedTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["guardrail"]["decision"], "infra")
         self.assertTrue(result["guardrail"]["upstream_called"])
         self.assertEqual(result["reply"], "guardrail infrastructure unavailable")
+
+
+class OpenPrivacyModeStillClosesRailsTests(FailClosedTests):
+    def setUp(self) -> None:
+        super().setUp()
+        server.PRESIDIO_FAILURE_MODE = "open"
 
 
 if __name__ == "__main__":

@@ -43,6 +43,9 @@ def env_bool(name: str, default: bool) -> bool:
 GUARD_MODE = os.getenv("GUARD_MODE", "enforce").strip().lower()
 if GUARD_MODE not in {"off", "audit", "enforce"}:
     raise RuntimeError("GUARD_MODE must be off, audit, or enforce")
+PRESIDIO_FAILURE_MODE = "closed"
+if PRESIDIO_FAILURE_MODE not in {"closed", "open"}:
+    raise RuntimeError("PRESIDIO_FAILURE_MODE must be closed or open")
 ASSURANCE_PROFILE = os.getenv("ASSURANCE_PROFILE", "high-assurance").strip().lower()
 if ASSURANCE_PROFILE not in CONTROL_PLANE_POLICY["assurance_profiles"]:
     raise RuntimeError("ASSURANCE_PROFILE must name a configured policy profile")
@@ -159,6 +162,20 @@ async def analyze_privacy(stage: str, text: str, request_id: str) -> dict:
             return result
         except (httpx.HTTPError, ValueError) as exc:
             last_error = exc
+    unavailable = isinstance(last_error, httpx.TransportError) or (
+        isinstance(last_error, httpx.HTTPStatusError)
+        and last_error.response.status_code >= 500
+    )
+    if PRESIDIO_FAILURE_MODE == "open" and stage in {"input", "output"} and unavailable:
+        return {
+            "request_id": request_id,
+            "stage": stage,
+            "sanitized_candidate": text,
+            "entity_types": [],
+            "detections": [],
+            "inspection_skipped": True,
+            "failure_reason": type(last_error).__name__,
+        }
     raise RuntimeError("Presidio spoke failed closed") from last_error
 
 
@@ -185,6 +202,7 @@ def result_record(
         "guardrail": {
             "engine": "nemo-policy-hub",
             "mode": GUARD_MODE,
+            "presidio_failure_mode": PRESIDIO_FAILURE_MODE,
             "assurance_profile": ASSURANCE_PROFILE,
             "decision": decision,
             "blocking_reason": blocking_reason,
@@ -231,7 +249,10 @@ async def evaluate_output(
         any(value in source for source in exact_sources)
         for value in detected_values
     )
-    if all_detections_are_authorized:
+    if privacy.get("inspection_skipped"):
+        privacy_decision = "skipped"
+        checked_candidate = candidate
+    elif all_detections_are_authorized:
         privacy_decision = "allow_unredacted"
         checked_candidate = candidate
     elif privacy["entity_types"]:
@@ -247,6 +268,8 @@ async def evaluate_output(
             privacy_decision,
             entity_types=privacy["entity_types"],
             detection_count=len(privacy["detections"]),
+            inspection_skipped=privacy.get("inspection_skipped", False),
+            failure_reason=privacy.get("failure_reason"),
         )
     )
     return checked_candidate, stages, None
@@ -259,6 +282,7 @@ async def healthz() -> dict:
         "service": "nemo-policy-hub",
         "version": RELEASE_VERSION,
         "guard_mode": GUARD_MODE,
+        "presidio_failure_mode": PRESIDIO_FAILURE_MODE,
         "assurance_profile": ASSURANCE_PROFILE,
         "model_lock_valid": bool(RUNTIME["model_lock"].get("valid")),
     }
@@ -270,6 +294,7 @@ async def policy() -> dict:
         "service": "nemo-policy-hub",
         "version": RELEASE_VERSION,
         "guard_mode": GUARD_MODE,
+        "presidio_failure_mode": PRESIDIO_FAILURE_MODE,
         "assurance_profile": ASSURANCE_PROFILE,
         "policy_id": CONTROL_PLANE_POLICY["policy_id"],
         "policy_bundle_version": CONTROL_PLANE_POLICY["policy_bundle_version"],
@@ -305,7 +330,7 @@ async def chat(
             privacy_input = await analyze_privacy("input", request.message, request.request_id)
             input_entities = set(privacy_input["entity_types"])
             prohibited = sorted(input_entities & PROHIBITED_ENTITIES)
-            input_decision = "block" if prohibited else ("redact" if input_entities else "allow")
+            input_decision = "skipped" if privacy_input.get("inspection_skipped") else ("block" if prohibited else ("redact" if input_entities else "allow"))
             stages.append(
                 stage_record(
                     "presidio_input",
@@ -313,6 +338,8 @@ async def chat(
                     input_decision,
                     entity_types=privacy_input["entity_types"],
                     detection_count=len(privacy_input["detections"]),
+                    inspection_skipped=privacy_input.get("inspection_skipped", False),
+                    failure_reason=privacy_input.get("failure_reason"),
                 )
             )
             if prohibited and GUARD_MODE == "enforce":
