@@ -120,6 +120,16 @@ docker run --rm --network none \
   --entrypoint python localhost/llm-security-nemo-policy-hub:1.0.0 \
   /tmp/test_presidio_failure_mode.py >/dev/null
 
+docker run --rm --network none \
+  -v "$ROOT/tests/test_evaluation_contract.py:/tmp/test_evaluation_contract.py:ro" \
+  --entrypoint python localhost/llm-security-nemo-policy-hub:1.0.0 \
+  /tmp/test_evaluation_contract.py >/dev/null
+
+docker run --rm --network none \
+  -v "$ROOT/tests/evaluation:/work/evaluation:ro" \
+  docker.io/library/node:24.19.0-bookworm-slim \
+  node /work/evaluation/test-contract.cjs
+
 bash "$ROOT/deploy/start-stack.sh"
 
 gateway_without_token="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \

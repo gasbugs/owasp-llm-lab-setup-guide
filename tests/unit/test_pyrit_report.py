@@ -16,10 +16,10 @@ class PyRITReportTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("report", source)
         report = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(report)
-        for reason in ("end_turn", "max_tokens", "length", "content_filter"):
+        for reason in ("end_turn", "max_tokens", "length", "content_filter", "infra"):
             with self.subTest(reason=reason):
                 response = {
-                    "request_id": "synthetic-request", "application_decision": "allow",
+                    "request_id": "synthetic-request", "application_decision": "infra" if reason == "infra" else "allow",
                     "blocking_reason": None, "upstream_called": True, "reply": "partial",
                     "guardrail": {"stages": [{"stage": "bedrock_main", "decision": "allow",
                                               "stop_reason": reason}]},
@@ -45,7 +45,7 @@ class PyRITReportTests(unittest.TestCase):
                     self.assertEqual(observed["pyrit_outcome"], "failure")
                 else:
                     self.assertEqual(observed["course_verdict"], "ERR")
-                    self.assertEqual(observed["error_type"], "IncompleteModelResponse")
+                    self.assertEqual(observed["error_type"], "ApplicationInfrastructureError" if reason == "infra" else "IncompleteModelResponse")
 
 
 if __name__ == "__main__":

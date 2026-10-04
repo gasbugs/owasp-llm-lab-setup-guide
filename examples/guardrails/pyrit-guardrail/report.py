@@ -57,6 +57,13 @@ def print_result(result) -> None:
         }))
         raise SystemExit(1)
 
+    if any(turn["application_decision"] not in {"allow", "block", "redact"} for turn in turns):
+        print(json.dumps({
+            "pyrit_outcome": "error", "course_verdict": "ERR",
+            "error_type": "ApplicationInfrastructureError", "turns": turns,
+        }, ensure_ascii=False, indent=2))
+        raise SystemExit(1)
+
     if any(turn["generation_stop_reason"] in {"max_tokens", "length", "content_filter"} for turn in turns):
         print(json.dumps({
             "pyrit_outcome": "error", "course_verdict": "ERR",

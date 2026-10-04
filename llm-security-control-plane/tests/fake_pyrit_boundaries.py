@@ -18,6 +18,7 @@ ATTACK_MESSAGES = itertools.cycle(
 )
 REQUEST_IDS = itertools.count(1)
 LOCK = threading.Lock()
+ERROR_CALLS = {"application_500": 0, "gateway_500": 0}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -33,6 +34,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/stats":
+            self.send_json(200, ERROR_CALLS)
+            return
         if self.path == "/healthz":
             self.send_json(200, {"ok": True})
             return
@@ -40,11 +44,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         authorization = self.headers.get("Authorization")
+        if self.server.server_port == 8080 and authorization == "Bearer pyrit-bedrock-500-token":
+            with LOCK:
+                ERROR_CALLS["gateway_500"] += 1
+            self.send_json(500, {"detail": "simulated Gateway failure", "http_status": 500})
+            return
         if self.server.server_port == 8000 and self.path == "/api/chat":
             if authorization == "Bearer pyrit-application-422-token":
                 self.send_json(422, {"detail": "invalid Application request contract", "http_status": 422})
                 return
             if authorization == "Bearer pyrit-application-500-token":
+                with LOCK:
+                    ERROR_CALLS["application_500"] += 1
                 self.send_json(500, {"detail": "simulated Application failure", "http_status": 500})
                 return
         expected_token = {

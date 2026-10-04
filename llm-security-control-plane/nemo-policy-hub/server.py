@@ -23,7 +23,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from hub_core import (
-    MAIN_MODEL,
+    MAIN_MODEL, MAIN_TASK,
     MODEL_PROVIDER,
     CONTROL_PLANE_POLICY,
     call_main_model,
@@ -291,6 +291,7 @@ async def healthz() -> dict:
 @app.get("/api/guardrails/policy")
 async def policy() -> dict:
     return {
+        "main_task": MAIN_TASK,
         "service": "nemo-policy-hub",
         "version": RELEASE_VERSION,
         "guard_mode": GUARD_MODE,

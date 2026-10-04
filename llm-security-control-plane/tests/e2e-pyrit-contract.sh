@@ -90,4 +90,21 @@ jq -e '
   .http_status == null
 ' <<<"$python_error" >/dev/null
 
+set +e
+gateway_error="$(docker run --rm --network "$NETWORK" \
+  -e APPLICATION_ACCESS_TOKEN=pyrit-application-contract-token \
+  -e BEDROCK_GATEWAY_TOKEN=pyrit-bedrock-500-token \
+  localhost/module08-pyrit:1.0.1)"
+gateway_exit=$?
+set -e
+test "$gateway_exit" -ne 0
+jq -e '.course_verdict == "ERR"' <<<"$gateway_error" >/dev/null
+docker run --rm --network "$NETWORK" --entrypoint python \
+  localhost/module08-pyrit:1.0.1 -c '
+import json, urllib.request
+with urllib.request.urlopen("http://llm-security-bedrock-gateway:8080/stats") as response:
+    counts = json.load(response)
+assert counts == {"application_500": 1, "gateway_500": 1}, counts
+'
+
 printf 'module08-pyrit-contract=PASS actual-pyrit bounded-turns=3 errors=401,422,500,python\n'

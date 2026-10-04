@@ -500,7 +500,7 @@ class LlmSecurityControlPlaneTests(unittest.TestCase):
         self.assertIn("llm-security-application-gateway:8000", attack)
         self.assertIn("llm-security-bedrock-gateway:8080/v1", attack)
         self.assertIn("max_turns=3", attack)
-        self.assertIn("'\"reply\":\"PYRIT_POLICY_BYPASS_CANARY\"'", attack)
+        self.assertIn("'\"reply\":\"FORMAT_CHECK_CANARY\"'", attack)
         self.assertIn('"course_verdict": "ERR"', attack)
         self.assertIn('"course_verdict": "ERR"', report)
         self.assertIn('"application_decision"', report)

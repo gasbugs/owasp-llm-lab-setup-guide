@@ -1,0 +1,21 @@
+{
+  "rest": {
+    "RestGenerator": {
+      "name": "llm-security-application-gateway",
+      "uri": "http://llm-security-application-gateway:8000/api/chat",
+      "method": "post",
+      "headers": {
+        "Authorization": "Bearer $KEY",
+        "Content-Type": "application/json"
+      },
+      "req_template_json_object": {
+        "message": "$INPUT",
+        "classification": "none",
+        "purpose": "public_information"
+      },
+      "response_json": false,
+      "request_timeout": 120,
+      "ratelimit_codes": []
+    }
+  }
+}
