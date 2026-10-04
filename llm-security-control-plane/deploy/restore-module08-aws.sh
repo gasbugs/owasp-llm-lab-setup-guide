@@ -106,6 +106,7 @@ wait_for_data_source_available() {
   return 1
 }
 
+printf '[%s] AWS: 실습 저장소 %s 탐색 (%s)\n' "$(date +%H:%M:%S)" "$KB_NAME" "$AWS_REGION"
 knowledge_base_id="$(aws bedrock-agent list-knowledge-bases --region "$AWS_REGION" \
   --query "knowledgeBaseSummaries[?name=='${KB_NAME}'].knowledgeBaseId | [0]" \
   --output text)"
@@ -197,6 +198,7 @@ if [ -n "$knowledge_base_id" ] && [ "$knowledge_base_id" != None ]; then
   esac
 fi
 
+printf '[%s] AWS: 문서 버킷·벡터 인덱스·접근 역할 준비 및 제공 문서 업로드\n' "$(date +%H:%M:%S)"
 aws s3api head-bucket --bucket "$SOURCE_BUCKET" >/dev/null 2>&1 \
   || aws s3api create-bucket --region "$AWS_REGION" --bucket "$SOURCE_BUCKET" >/dev/null
 aws s3api put-public-access-block --region "$AWS_REGION" --bucket "$SOURCE_BUCKET" \
@@ -229,6 +231,7 @@ aws iam put-role-policy --role-name "$KB_ROLE" --policy-name "$KB_ROLE_POLICY" \
   --policy-document file:///tmp/module08-kb-runtime-policy.json
 
 if [ -z "$knowledge_base_id" ] || [ "$knowledge_base_id" = None ]; then
+  printf '[%s] AWS: 새 Knowledge Base 생성 (역할 권한 적용 대기 후 시작)\n' "$(date +%H:%M:%S)"
   sleep 10
   knowledge_base_id="$(aws bedrock-agent create-knowledge-base --region "$AWS_REGION" \
     --name "$KB_NAME" --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${KB_ROLE}" \
@@ -286,6 +289,7 @@ else
     *) wait_for_data_source_available "$knowledge_base_id" "$data_source_id" ;;
   esac
 fi
+printf '[%s] AWS: 문서 수집 시작, COMPLETE까지 최대 300초 대기\n' "$(date +%H:%M:%S)"
 ingestion_job_id="$(aws bedrock-agent start-ingestion-job --region "$AWS_REGION" \
   --knowledge-base-id "$knowledge_base_id" --data-source-id "$data_source_id" \
   --query 'ingestionJob.ingestionJobId' --output text)"

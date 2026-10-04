@@ -21,7 +21,9 @@ if name=='aws':
     if args[:2]==['bedrock-agent','get-knowledge-base']: print('ACTIVE')
 if name=='docker':
     if 'build' in args and os.environ.get('PREPARATION_FAILURE')=='build': sys.exit(8)
-    if args[:2]==['ps','-aq']: print('owned-container-id')
+    if args[:2]==['ps','-aq']:
+        if not (os.environ.get('PREPARATION_FAILURE')=='foreign' and 'network=llm-security-control-plane' in args):
+            print('owned-container-id')
     if args[:2]==['rm','-f'] and os.environ.get('PREPARATION_FAILURE')=='remove': sys.exit(7)
 if name=='curl':
     if 'policy' in args[-1]:
@@ -65,9 +67,9 @@ class EvaluationPreparationTests(unittest.TestCase):
             'PREPARATION_CALLS':str(self.calls), 'GUARD_MODE':'off', 'LEGACY_STATIC_TOKEN_MODE':'true',
             'BEDROCK_GATEWAY_TOKEN':'old-ambient-token'}
 
-    def run_script(self, *args, failure=''):
+    def run_script(self, *args, failure='', answer='y\n'):
         return subprocess.run(['bash', str(self.script), *args], env=self.env | {'PREPARATION_FAILURE':failure},
-            text=True, capture_output=True)
+            text=True, capture_output=True, input=answer)
 
     def records(self):
         return [json.loads(line) for line in self.calls.read_text().splitlines()] if self.calls.exists() else []
@@ -89,6 +91,9 @@ class EvaluationPreparationTests(unittest.TestCase):
         self.assertEqual(env_file.stat().st_mode & 0o777, 0o600)
         self.assertNotIn(values['BEDROCK_GATEWAY_TOKEN'], first.stdout+second.stdout+second.stderr)
         self.assertNotIn(values['BEDROCK_GATEWAY_TOKEN'], old)
+        self.assertIn('평가 환경 준비 결과',second.stdout)
+        self.assertIn('서비스: 4개 시작 및 health 확인 완료',second.stdout)
+        self.assertIn('[8/8]',second.stdout)
         self.assertEqual(values['GUARD_MODE'], 'enforce')
         self.assertEqual(values['LEGACY_STATIC_TOKEN_MODE'], 'false')
         self.assertEqual(values['MODULE08_KNOWLEDGE_BASE_ID'], 'AUTO123456')
@@ -112,6 +117,7 @@ class EvaluationPreparationTests(unittest.TestCase):
                 self.assertEqual((self.root/'.state/application-auth/key').read_text(),'previous signing key')
                 self.assertFalse(any(r[:3]==['docker','rm','-f'] for r in self.records()))
                 self.assertNotIn('evaluation-environment=READY',result.stdout)
+                self.assertIn('[ERR] 준비 중단:',result.stderr)
 
     def test_remove_failure_does_not_rotate_state(self):
         self.seed_old_state()
@@ -123,6 +129,24 @@ class EvaluationPreparationTests(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('MODULE08_KNOWLEDGE_BASE_ID=ABCDEF1234',
             (self.root/'.state/module08-compose.env').read_text())
+
+    def test_foreign_network_name_collision_preserves_every_resource(self):
+        self.seed_old_state()
+        result=self.run_script(failure='foreign')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('다른 network',result.stderr)
+        self.assertTrue((self.root/'.state/application-auth/key').exists())
+        self.assertFalse(any(r[:3]==['docker','rm','-f'] or 'build' in r or 'up' in r for r in self.records()))
+
+    def test_confirmation_cancels_before_any_external_call(self):
+        self.seed_old_state()
+        for answer in ('n\n','\n','Y\n','yes\n',''):
+            with self.subTest(answer=answer):
+                result=self.run_script(answer=answer)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertIn('취소했습니다',result.stdout)
+                self.assertEqual(self.records(),[])
+                self.assertTrue((self.root/'.state/application-auth/key').exists())
 
     def test_invalid_argument_has_no_external_calls(self):
         for args in [('--knowledge-base-id',),('--knowledge-base-id','bad;command'),('--unknown',)]:
