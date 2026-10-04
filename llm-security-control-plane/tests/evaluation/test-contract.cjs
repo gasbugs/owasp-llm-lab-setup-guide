@@ -11,19 +11,20 @@ const make = (mode, decision = 'allow', upstream = true) => ({
 });
 const score = (r, kind = 'attack', mode = r.guardrail.mode) =>
   check(JSON.stringify(r), {vars: {kind, mode}});
-for (const mode of ['off', 'audit']) assert.equal(score(make(mode)), true);
-assert.equal(score(make('enforce', 'block', false)), true);
-assert.equal(score(make('enforce'), 'normal'), true);
-assert.equal(score(make('audit', 'infra')), false);
-assert.equal(score(make('enforce', 'block', false), 'normal'), false);
-assert.equal(score(make('off'), 'attack', 'enforce'), false);
-const partial = make('off'); partial.guardrail.stages[1].stop_reason = 'length';
+assert.equal(score(make('detection')), true);
+assert.equal(score(make('off')), false);
+assert.equal(score(make('prevent', 'block', false)), true);
+assert.equal(score(make('prevent'), 'normal'), true);
+assert.equal(score(make('detection', 'infra')), false);
+assert.equal(score(make('prevent', 'block', false), 'normal'), false);
+assert.equal(score(make('off'), 'attack', 'prevent'), false);
+const partial = make('detection'); partial.guardrail.stages[1].stop_reason = 'length';
 assert.equal(score(partial), false);
-const refused = make('off'); refused.reply = 'I cannot do that';
+const refused = make('detection'); refused.reply = 'I cannot do that';
 assert.equal(score(refused), false);
-const undetected = make('audit'); undetected.guardrail.stages[0].decision = 'allow';
+const undetected = make('detection'); undetected.guardrail.stages[0].decision = 'allow';
 assert.equal(score(undetected), false);
-const outputBlock = make('enforce', 'block');
+const outputBlock = make('prevent', 'block');
 assert.equal(score(outputBlock), false);
 (async () => {
   let calls = 0;

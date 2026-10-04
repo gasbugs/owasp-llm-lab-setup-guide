@@ -18,9 +18,10 @@ from secure_coding import select_personal_data_policy
 
 
 # Mode는 탐지 결과를 실제 응답에 집행할지 결정한다. 잘못된 값은 시작 시 거부한다.
-GUARD_MODE = os.getenv("GUARD_MODE", "enforce").strip().lower()
-if GUARD_MODE not in {"off", "audit", "enforce"}:
-    raise RuntimeError("GUARD_MODE must be off, audit, or enforce")
+GUARD_MODE = os.getenv("GUARD_MODE", "prevent").strip().lower()
+GUARD_MODE = {"audit": "detection", "enforce": "prevent"}.get(GUARD_MODE, GUARD_MODE)
+if GUARD_MODE not in {"off", "detection", "prevent"}:
+    raise RuntimeError("GUARD_MODE must be off, detection, or prevent")
 GUARD_ENGINE = os.getenv("GUARD_ENGINE", "presidio").strip().lower()
 if GUARD_ENGINE not in {"presidio", "off"}:
     raise RuntimeError("Presidio image supports GUARD_ENGINE=presidio or off")
@@ -342,7 +343,7 @@ async def chat(request: ChatRequest) -> dict:
             input_checks.append(scan_metadata(input_result))
             if (
                 BLOCK_EMAIL_INPUT
-                and GUARD_MODE == "enforce"
+                and GUARD_MODE == "prevent"
                 and "EMAIL_ADDRESS" in input_result["entity_types"]
             ):
                 duration = round((time.perf_counter() - started) * 1000, 2)
@@ -365,7 +366,7 @@ async def chat(request: ChatRequest) -> dict:
                     "reply": "금지된 개인정보가 포함되어 요청을 처리하지 않았습니다.",
                     "guardrail": guardrail,
                 }
-            if GUARD_MODE == "enforce":
+            if GUARD_MODE == "prevent":
                 effective_message = str(input_result["sanitized_text"])
         except Exception as exc:
             # Analyzer 장애를 원문 통과로 처리하지 않는다. Enforce에서는 Model 호출 전에 닫는다.
@@ -389,7 +390,7 @@ async def chat(request: ChatRequest) -> dict:
                 }
             )
             emit({"event": "guardrail_chat", "request_id": request_id, **guardrail})
-            if GUARD_MODE == "enforce":
+            if GUARD_MODE == "prevent":
                 return {"reply": "privacy guardrail infrastructure unavailable", "guardrail": guardrail}
 
     # 2) Model 경로: NeMo가 연결되지 않았으면 로컬 Model로 우회하지 않고 닫는다.
@@ -440,7 +441,7 @@ async def chat(request: ChatRequest) -> dict:
         try:
             output_result = CORE.scan_output(effective_message, reply)
             output_checks.append(scan_metadata(output_result))
-            if GUARD_MODE == "enforce":
+            if GUARD_MODE == "prevent":
                 reply = str(output_result["sanitized_text"])
         except Exception as exc:
             # 출력 검사가 실패하면 검사되지 않은 Model 원문을 사용자에게 보내지 않는다.
@@ -468,7 +469,7 @@ async def chat(request: ChatRequest) -> dict:
                 }
             )
             emit({"event": "guardrail_chat", "request_id": request_id, **guardrail})
-            if GUARD_MODE == "enforce":
+            if GUARD_MODE == "prevent":
                 return {"reply": "privacy output could not be inspected", "guardrail": guardrail}
 
     # 4) 최종 집행: 안쪽 NeMo 차단을 가장 먼저 보존하고, 그다음 PII 변환을 표시한다.
@@ -482,7 +483,7 @@ async def chat(request: ChatRequest) -> dict:
     if inner_blocked:
         decision = "block"
         blocking_reason = inner_guardrail.get("blocking_reason")
-    elif pii_detected and GUARD_MODE == "enforce":
+    elif pii_detected and GUARD_MODE == "prevent":
         decision = "redact"
         blocking_reason = "pii_detected"
     else:
@@ -513,13 +514,13 @@ async def chat(request: ChatRequest) -> dict:
 
 
 def scan_response(result: dict, include_metadata: bool = False) -> dict:
-    """Return original content in audit mode and sanitized content in enforce mode."""
-    enforce = GUARD_ENGINE != "off" and GUARD_MODE == "enforce"
+    """Return original content in detection mode and sanitized content in prevent mode."""
+    prevent = GUARD_ENGINE != "off" and GUARD_MODE == "prevent"
     detected = not result["valid"]
-    result["application_decision"] = "redact" if enforce and detected else "allow"
-    result["blocking_reason"] = f"{result['direction']}:pii_detected" if enforce and detected else None
+    result["application_decision"] = "redact" if prevent and detected else "allow"
+    result["blocking_reason"] = f"{result['direction']}:pii_detected" if prevent and detected else None
     emit(result)
-    if enforce:
+    if prevent:
         content = {"sanitized_text": result["sanitized_text"]}
     else:
         content = {"original_text": result["original_text"]}

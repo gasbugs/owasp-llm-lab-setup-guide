@@ -67,7 +67,7 @@ Nova Lite와 로컬 서비스 Token만 만들고 Knowledge Base ID는 비워 둔
 bash llm-security-control-plane/deploy/build-images.sh
 ```
 
-기본 실행은 `GUARD_MODE=enforce`, `ASSURANCE_PROFILE=high-assurance`다. 모든 publish는
+기본 실행은 `GUARD_MODE=prevent`, `ASSURANCE_PROFILE=high-assurance`다. 모든 publish는
 WSL loopback에만 bind하며 18093~18096을 외부에 공개하지 않는다.
 
 ```bash
@@ -282,3 +282,7 @@ GitHub의 Module 08 workflow는 AWS 자격 증명이 필요 없는 결정적 Gat
 실제 Bedrock과 Browser 검증은 게시자 환경에서 `restore-module08-aws.sh --repair`, 실제
 control-plane E2E와 `tests/browser/run_control_plane_ui.py`를 순서대로 실행한다. Browser
 harness는 desktop·390px, theme, `bedrock_main` stage와 same-origin 경계를 확인한다.
+
+채팅 검사 모드는 `detection`(탐지만 수행)과 `prevent`(차단·비식별화 적용)를 사용한다.
+기존 환경 파일의 `audit`·`enforce`는 각각 새 이름으로 정규화하며 정책·응답에는 새 이름을 표시한다.
+평가 준비 스크립트는 `detection`으로 시작한다. 일반 통합 배포 기본값은 `prevent`를 유지한다.

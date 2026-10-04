@@ -34,7 +34,7 @@ class EvaluationContractTests(unittest.IsolatedAsyncioTestCase):
                                      principal={"subject": "public-reader", "roles": ["public_reader"]})
 
     async def test_same_input_has_distinct_inspection_and_enforcement(self):
-        for mode in ("off", "audit", "enforce"):
+        for mode in ("off", "detection", "prevent"):
             with self.subTest(mode=mode), patch.object(server, "GUARD_MODE", mode), \
                  patch.object(server, "analyze_privacy", AsyncMock(return_value=PRIVACY)) as privacy, \
                  patch.object(server, "run_input_rails", AsyncMock(return_value=BLOCK_RAIL)) as rails, \
@@ -42,7 +42,7 @@ class EvaluationContractTests(unittest.IsolatedAsyncioTestCase):
                  patch.object(server, "evaluate_output", AsyncMock(return_value=("masked-output", [], None))):
                 result = await server.chat(self.request(), AUTH)
                 guard = result["guardrail"]
-                if mode == "enforce":
+                if mode == "prevent":
                     self.assertEqual(guard["blocking_reason"], "input:application self check input")
                     self.assertFalse(guard["upstream_called"])
                     main.assert_not_awaited()
@@ -59,7 +59,7 @@ class EvaluationContractTests(unittest.IsolatedAsyncioTestCase):
                     rails.assert_awaited()
 
     async def test_output_block_happens_after_main(self):
-        server.GUARD_MODE = "enforce"
+        server.GUARD_MODE = "prevent"
         with patch.object(server, "analyze_privacy", AsyncMock(return_value=PRIVACY)), \
              patch.object(server, "run_input_rails", AsyncMock(return_value=SAFE_RAIL)), \
              patch.object(server, "call_main_model", AsyncMock(return_value="candidate")), \
@@ -70,7 +70,7 @@ class EvaluationContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(result["reply"], "candidate")
 
     async def test_audit_dependency_error_is_not_off(self):
-        server.GUARD_MODE = "audit"
+        server.GUARD_MODE = "detection"
         with patch.object(server, "analyze_privacy", AsyncMock(side_effect=RuntimeError)), \
              patch.object(server, "call_main_model", AsyncMock()) as main:
             result = await server.chat(self.request(), AUTH)
@@ -78,7 +78,7 @@ class EvaluationContractTests(unittest.IsolatedAsyncioTestCase):
         main.assert_not_awaited()
 
     async def test_internal_authentication_remains_in_every_mode(self):
-        for mode in ("off", "audit", "enforce"):
+        for mode in ("off", "detection", "prevent"):
             server.GUARD_MODE = mode
             with self.assertRaises(HTTPException) as raised:
                 await server.chat(self.request(), "Bearer wrong-token")

@@ -34,9 +34,10 @@ def env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-GUARD_MODE = os.getenv("GUARD_MODE", "enforce").strip().lower()
-if GUARD_MODE not in {"off", "audit", "enforce"}:
-    raise RuntimeError("GUARD_MODE must be off, audit, or enforce")
+GUARD_MODE = os.getenv("GUARD_MODE", "prevent").strip().lower()
+GUARD_MODE = {"audit": "detection", "enforce": "prevent"}.get(GUARD_MODE, GUARD_MODE)
+if GUARD_MODE not in {"off", "detection", "prevent"}:
+    raise RuntimeError("GUARD_MODE must be off, detection, or prevent")
 GUARD_ENGINE = os.getenv("GUARD_ENGINE", "nemo").strip().lower()
 if GUARD_ENGINE not in {"nemo", "off"}:
     raise RuntimeError("NeMo image supports GUARD_ENGINE=nemo or off")
@@ -349,7 +350,7 @@ async def chat(request: ChatRequest) -> dict:
                 request.message,
             )
             guard_model_calls += int(input_metrics["llm_calls_count"])
-            if input_blocked and GUARD_MODE == "enforce":
+            if input_blocked and GUARD_MODE == "prevent":
                 duration = round((time.perf_counter() - started) * 1000, 2)
                 guardrail = guardrail_record(
                     decision="block",
@@ -376,7 +377,7 @@ async def chat(request: ChatRequest) -> dict:
                 request.message, reply,
             )
             guard_model_calls += int(output_metrics["llm_calls_count"])
-            if output_blocked and GUARD_MODE == "enforce":
+            if output_blocked and GUARD_MODE == "prevent":
                 decision = "block"
                 blocking_reason = "output:self check output"
                 reply = checked_reply

@@ -34,7 +34,7 @@ def main():
     parser.add_argument("--evidence", required=True)
     args = parser.parse_args()
     evidence = {"image_id": docker("image", "inspect", args.image, "--format", "{{.Id}}"), "modes": {}}
-    for mode in ("audit", "enforce"):
+    for mode in ("detection", "prevent"):
         name = "presidio-mode-check-" + uuid.uuid4().hex[:10]
         try:
             docker("run", "-d", "--name", name, "-p", "127.0.0.1::8013",
@@ -60,7 +60,7 @@ def main():
             for label, path, body, detected in cases:
                 status, result = request(base, path, body)
                 assert status == 200, result
-                if mode == "enforce":
+                if mode == "prevent":
                     assert "sanitized_text" in result and "original_text" not in result, result
                     assert result["application_decision"] == ("redact" if detected else "allow")
                     expected = {"clean_input": CLEAN, "clean_output": CLEAN,
@@ -88,14 +88,14 @@ def main():
                 assert result["valid"] == (not detected)
                 assert result["upstream_called"] is False
                 results[label] = {"request": body, "response": result}
-            if mode == "enforce":
+            if mode == "prevent":
                 status, details = request(base, "/api/scan?include_metadata=true", {"text": PII})
                 assert status == 200
                 assert set(details["entity_types"]) == {"EMAIL_ADDRESS", "KR_RRN"}
                 assert details["sanitized_text"] == results["pii_input"]["response"]["sanitized_text"]
                 assert not {"original_text", "input_prompt", "effective_text"} & details.keys()
                 results["retrieval_metadata"] = details
-            for body in ({"text": PII, "guard_mode": "audit"}, {"text": PII, "entities": ["UNSUPPORTED_ENTITY"]}):
+            for body in ({"text": PII, "guard_mode": "detection"}, {"text": PII, "entities": ["UNSUPPORTED_ENTITY"]}):
                 status, result = request(base, "/api/scan", body)
                 assert status == 422, result
             logs = docker("logs", name)

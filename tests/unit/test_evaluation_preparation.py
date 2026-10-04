@@ -27,14 +27,14 @@ if name=='docker':
     if args[:2]==['rm','-f'] and os.environ.get('PREPARATION_FAILURE')=='remove': sys.exit(7)
 if name=='curl':
     if 'policy' in args[-1]:
-        print(json.dumps({'guard_mode':'audit' if os.environ.get('PREPARATION_FAILURE')=='policy' else 'enforce',
+        print(json.dumps({'guard_mode':'prevent' if os.environ.get('PREPARATION_FAILURE')=='policy' else 'detection',
             'assurance_profile':'high-assurance','presidio_failure_mode':'closed',
             'main_task':{'id':'account-security-support-v1'}}))
     else: print('{"ok":true}')
 if name=='jq':
     value=json.load(sys.stdin)
     valid=value.get('ok') is True if '.ok == true' in args else (
-        value.get('guard_mode')=='enforce' and value.get('assurance_profile')=='high-assurance'
+        value.get('guard_mode')=='detection' and value.get('assurance_profile')=='high-assurance'
         and value.get('presidio_failure_mode')=='closed'
         and value.get('main_task',{}).get('id')=='account-security-support-v1')
     sys.exit(0 if valid else 1)
@@ -64,7 +64,7 @@ class EvaluationPreparationTests(unittest.TestCase):
             tool=self.bin/name;tool.write_text(FAKE_TOOL);tool.chmod(0o755)
         self.calls = self.work / 'calls.jsonl'
         self.env = os.environ | {'HOME':str(self.home), 'PATH':str(self.bin)+':'+os.environ['PATH'],
-            'PREPARATION_CALLS':str(self.calls), 'GUARD_MODE':'off', 'LEGACY_STATIC_TOKEN_MODE':'true',
+            'PREPARATION_CALLS':str(self.calls), 'GUARD_MODE':'prevent', 'LEGACY_STATIC_TOKEN_MODE':'true',
             'BEDROCK_GATEWAY_TOKEN':'old-ambient-token'}
 
     def run_script(self, *args, failure='', answer='y\n'):
@@ -94,7 +94,9 @@ class EvaluationPreparationTests(unittest.TestCase):
         self.assertIn('평가 환경 준비 결과',second.stdout)
         self.assertIn('서비스: 4개 시작 및 health 확인 완료',second.stdout)
         self.assertIn('[8/8]',second.stdout)
-        self.assertEqual(values['GUARD_MODE'], 'enforce')
+        self.assertIn('mode=detection profile=high-assurance', second.stdout)
+        self.assertIn('JWT 인증·인가·Bedrock 자체 안전 기능 유지', second.stdout)
+        self.assertEqual(values['GUARD_MODE'], 'detection')
         self.assertEqual(values['LEGACY_STATIC_TOKEN_MODE'], 'false')
         self.assertEqual(values['MODULE08_KNOWLEDGE_BASE_ID'], 'AUTO123456')
         self.assertEqual(list((self.root / '.state/application-auth').iterdir()), [])

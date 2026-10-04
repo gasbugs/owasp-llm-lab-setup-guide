@@ -46,7 +46,7 @@ def main():
         try:
             docker("run", "-d", "--name", name, "--network", args.network,
                    "-p", "127.0.0.1::8013", "-e", "RUN_MODE=server",
-                   "-e", "GUARD_MODE=enforce", "-e", "ENABLE_LAB_ENDPOINTS=true",
+                   "-e", "GUARD_MODE=prevent", "-e", "ENABLE_LAB_ENDPOINTS=true",
                    "-e", "NEMO_GUARD_URL=" + args.nemo_url, args.image)
             base = "http://" + docker("port", name, "8013/tcp")
             policy = ready(base)

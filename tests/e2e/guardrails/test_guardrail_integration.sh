@@ -125,14 +125,14 @@ jq -se '
   (map(select(.case=="output-api-key"))[0].application_decision)=="redact"
 ' "$WORK/presidio-cli.jsonl" >/dev/null
 
-printf 'CLI Presidio: enforce fail-closed on analyzer failure\n'
-docker run --rm --network none -e GUARD_MODE=enforce \
+printf 'CLI Presidio: prevent fail-closed on analyzer failure\n'
+docker run --rm --network none -e GUARD_MODE=prevent \
   -v "$ROOT/tests/e2e/guardrails/check_fail_closed.py:/tmp/check_fail_closed.py:ro" \
   --entrypoint python "$PRESIDIO_IMAGE" \
   /tmp/check_fail_closed.py presidio
 
 printf 'HTTP Presidio: arbitrary scan and CLI parity\n'
-start_presidio enforce true
+start_presidio prevent true
 curl -fsS --max-time 240 -X POST http://127.0.0.1:18091/api/scan \
   -H 'Content-Type: application/json' \
   -d "$(jq -n --arg text "$PII" '{text:$text}')" \
@@ -147,30 +147,30 @@ jq '[.results[] | {case,decision:.application_decision}] | sort_by(.case)' \
   "$WORK/presidio-http-suite.json" > "$WORK/presidio-http-decisions.json"
 cmp "$WORK/presidio-cli-decisions.json" "$WORK/presidio-http-decisions.json"
 
-printf 'HTTP Presidio: off, audit, enforce\n'
+printf 'HTTP Presidio: off, detection, prevent\n'
 start_presidio off true
 chat http://127.0.0.1:18091 "$PII" | tee "$WORK/presidio-off.json" >/dev/null
 jq -e '.guardrail.mode=="off" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.input_checks|length)==0' \
   "$WORK/presidio-off.json" >/dev/null
-start_presidio audit true
-chat http://127.0.0.1:18091 "$PII" | tee "$WORK/presidio-audit.json" >/dev/null
-jq -e '.guardrail.mode=="audit" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and any(.guardrail.input_checks[]; .valid==false)' \
-  "$WORK/presidio-audit.json" >/dev/null
-start_presidio enforce true
-chat http://127.0.0.1:18091 "$PII" | tee "$WORK/presidio-enforce-risk.json" >/dev/null
-jq -e '.guardrail.mode=="enforce" and .guardrail.decision=="redact" and .guardrail.upstream_called==true and .guardrail.input_checks[0].entity_types==["EMAIL_ADDRESS"] and (.guardrail.input_checks[0] | has("original_text") | not) and (.guardrail.input_checks[0] | has("sanitized_text") | not)' \
-  "$WORK/presidio-enforce-risk.json" >/dev/null
-chat http://127.0.0.1:18091 "$BENIGN" | tee "$WORK/presidio-enforce-benign.json" >/dev/null
+start_presidio detection true
+chat http://127.0.0.1:18091 "$PII" | tee "$WORK/presidio-detection.json" >/dev/null
+jq -e '.guardrail.mode=="detection" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and any(.guardrail.input_checks[]; .valid==false)' \
+  "$WORK/presidio-detection.json" >/dev/null
+start_presidio prevent true
+chat http://127.0.0.1:18091 "$PII" | tee "$WORK/presidio-prevent-risk.json" >/dev/null
+jq -e '.guardrail.mode=="prevent" and .guardrail.decision=="redact" and .guardrail.upstream_called==true and .guardrail.input_checks[0].entity_types==["EMAIL_ADDRESS"] and (.guardrail.input_checks[0] | has("original_text") | not) and (.guardrail.input_checks[0] | has("sanitized_text") | not)' \
+  "$WORK/presidio-prevent-risk.json" >/dev/null
+chat http://127.0.0.1:18091 "$BENIGN" | tee "$WORK/presidio-prevent-benign.json" >/dev/null
 jq -e '.guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.output_checks|length)==1 and .guardrail.stage_order==["presidio_input","nemo_input","bedrock_main","nemo_output","presidio_output"]' \
-  "$WORK/presidio-enforce-benign.json" >/dev/null
+  "$WORK/presidio-prevent-benign.json" >/dev/null
 
 printf 'HTTP Presidio: lab gate, loopback bind, existing UI proxy\n'
-start_presidio enforce false
+start_presidio prevent false
 status="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18091/api/labs/suite)"
 test "$status" = 404
 ss -ltn | grep -F '127.0.0.1:18091' >/dev/null
 docker rm -f guardrails-presidio-api >/dev/null
-start_presidio enforce true
+start_presidio prevent true
 docker rm -f guardrails-guardrail-ui >/dev/null 2>&1 || true
 docker run -d --name guardrails-guardrail-ui \
   --network "$GUARDRAILS_NETWORK" \
@@ -180,9 +180,9 @@ docker run -d --name guardrails-guardrail-ui \
   -e PRESIDIO_URL=http://guardrails-presidio-api:8013 \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
-chat http://127.0.0.1:18090 "$PII" | tee "$WORK/ui-presidio-enforce.json" >/dev/null
+chat http://127.0.0.1:18090 "$PII" | tee "$WORK/ui-presidio-prevent.json" >/dev/null
 jq -e '.guardrail.engine=="presidio" and .guardrail.decision=="redact" and .guardrail.upstream_called==true' \
-  "$WORK/ui-presidio-enforce.json" >/dev/null
+  "$WORK/ui-presidio-prevent.json" >/dev/null
 ss -ltn | grep -F '127.0.0.1:18090' >/dev/null
 docker rm -f guardrails-guardrail-ui >/dev/null
 
@@ -194,14 +194,14 @@ docker run --rm --network "$GUARDRAILS_NETWORK" \
 jq -se '(map(select(.event=="guardrail_request")) | length)==5' \
   "$WORK/nemo-cli.jsonl" >/dev/null
 
-printf 'CLI NeMo: enforce fail-closed on rail failure\n'
-docker run --rm --network none -e GUARD_MODE=enforce \
+printf 'CLI NeMo: prevent fail-closed on rail failure\n'
+docker run --rm --network none -e GUARD_MODE=prevent \
   -v "$ROOT/tests/e2e/guardrails/check_fail_closed.py:/tmp/check_fail_closed.py:ro" \
   --entrypoint python "$NEMO_IMAGE" \
   /tmp/check_fail_closed.py nemo
 
 printf 'HTTP NeMo: arbitrary scan and CLI parity\n'
-start_nemo enforce true
+start_nemo prevent true
 curl -fsS --max-time 240 -X POST http://127.0.0.1:18092/api/scan \
   -H 'Content-Type: application/json' \
   -d "$(jq -n --arg text "$ATTACK" '{scanner:"input-rail",text:$text}')" \
@@ -216,22 +216,22 @@ jq '[.results[] | {case,decision:.policy_decision}] | sort_by(.case)' \
   "$WORK/nemo-http-suite.json" > "$WORK/nemo-http-decisions.json"
 cmp "$WORK/nemo-cli-decisions.json" "$WORK/nemo-http-decisions.json"
 
-printf 'HTTP NeMo: off, audit, enforce\n'
+printf 'HTTP NeMo: off, detection, prevent\n'
 start_nemo off true
 chat http://127.0.0.1:18092 "$ATTACK" | tee "$WORK/nemo-off.json" >/dev/null
 jq -e '.guardrail.mode=="off" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.input_checks|length)==0' \
   "$WORK/nemo-off.json" >/dev/null
-start_nemo audit true
-chat http://127.0.0.1:18092 "$ATTACK" | tee "$WORK/nemo-audit.json" >/dev/null
-jq -e '.guardrail.mode=="audit" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.input_checks|length)>0' \
-  "$WORK/nemo-audit.json" >/dev/null
-start_nemo enforce true
-chat http://127.0.0.1:18092 "$ATTACK" | tee "$WORK/nemo-enforce-risk.json" >/dev/null
-jq -e '.guardrail.mode=="enforce" and .guardrail.decision=="block" and .guardrail.upstream_called==false' \
-  "$WORK/nemo-enforce-risk.json" >/dev/null
-chat http://127.0.0.1:18092 "$BENIGN" | tee "$WORK/nemo-enforce-benign.json" >/dev/null
+start_nemo detection true
+chat http://127.0.0.1:18092 "$ATTACK" | tee "$WORK/nemo-detection.json" >/dev/null
+jq -e '.guardrail.mode=="detection" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.input_checks|length)>0' \
+  "$WORK/nemo-detection.json" >/dev/null
+start_nemo prevent true
+chat http://127.0.0.1:18092 "$ATTACK" | tee "$WORK/nemo-prevent-risk.json" >/dev/null
+jq -e '.guardrail.mode=="prevent" and .guardrail.decision=="block" and .guardrail.upstream_called==false' \
+  "$WORK/nemo-prevent-risk.json" >/dev/null
+chat http://127.0.0.1:18092 "$BENIGN" | tee "$WORK/nemo-prevent-benign.json" >/dev/null
 jq -e --arg input "$BENIGN" '.reply != $input and .guardrail.decision=="allow" and .guardrail.upstream_called==true and (.guardrail.output_checks|length)>0 and .guardrail.stage_order==["input_rail","bedrock_main","output_rail"]' \
-  "$WORK/nemo-enforce-benign.json" >/dev/null
+  "$WORK/nemo-prevent-benign.json" >/dev/null
 
 printf 'HTTP NeMo: Colang dialog, custom action, and retrieval PII rail\n'
 curl -fsS --max-time 240 -X POST http://127.0.0.1:18092/api/labs/dialog \
@@ -260,12 +260,12 @@ curl -fsS --max-time 240 -X POST http://127.0.0.1:18092/api/scan-output \
   | tee "$WORK/nemo-output.json" >/dev/null
 jq -e '.rail=="self check output" and .valid==false and .application_decision=="block"' \
   "$WORK/nemo-output.json" >/dev/null
-start_nemo enforce false
+start_nemo prevent false
 status="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18092/api/scan-output -H 'Content-Type: application/json' -d '{"prompt":"p","model_output":"o"}')"
 test "$status" = 404
 ss -ltn | grep -F '127.0.0.1:18092' >/dev/null
 docker rm -f llm-security-nemo-dialog-rails >/dev/null
-start_nemo enforce true
+start_nemo prevent true
 docker rm -f guardrails-guardrail-ui >/dev/null 2>&1 || true
 docker run -d --name guardrails-guardrail-ui \
   --network "$GUARDRAILS_NETWORK" \
@@ -275,12 +275,12 @@ docker run -d --name guardrails-guardrail-ui \
   -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   "$UI_IMAGE" >/dev/null
 wait_health http://127.0.0.1:18090/healthz
-chat http://127.0.0.1:18090 "$ATTACK" | tee "$WORK/ui-nemo-enforce.json" >/dev/null
+chat http://127.0.0.1:18090 "$ATTACK" | tee "$WORK/ui-nemo-prevent.json" >/dev/null
 jq -e '.guardrail.engine=="nemo" and .guardrail.decision=="block" and .guardrail.upstream_called==false' \
-  "$WORK/ui-nemo-enforce.json" >/dev/null
+  "$WORK/ui-nemo-prevent.json" >/dev/null
 
 printf 'SEQUENCE: OWASP app -> NeMo -> Bedrock, then add Presidio around the same path\n'
-start_nemo enforce true
+start_nemo prevent true
 docker rm -f guardrails-guardrail-ui >/dev/null 2>&1 || true
 docker run -d --name guardrails-guardrail-ui \
   --network "$GUARDRAILS_NETWORK" \
@@ -294,7 +294,7 @@ chat http://127.0.0.1:18090 "$BENIGN" | tee "$WORK/ui-nemo-first.json" >/dev/nul
 jq -e --arg input "$BENIGN" '.reply != $input and .guardrail.engine=="nemo" and .guardrail.decision=="allow" and .guardrail.upstream_called==true and .guardrail.stage_order==["input_rail","bedrock_main","output_rail"]' \
   "$WORK/ui-nemo-first.json" >/dev/null
 
-start_presidio_chained enforce true
+start_presidio_chained prevent true
 docker rm -f guardrails-guardrail-ui >/dev/null 2>&1 || true
 docker run -d --name guardrails-guardrail-ui \
   --network "$GUARDRAILS_NETWORK" \

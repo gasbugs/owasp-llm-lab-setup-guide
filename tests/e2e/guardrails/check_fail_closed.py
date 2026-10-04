@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inject a publisher-only guard failure and prove enforce skips main Ollama."""
+"""Inject a publisher-only guard failure and prove prevent skips main Ollama."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-# CUSTOM FILE: fixed task and input pair for off/audit/enforce comparison.
+# CUSTOM FILE: fixed task and input pair for off/detection/prevent comparison.
 # Format reference (MIT): https://www.promptfoo.dev/docs/configuration/reference/
 prompts:
   - "{{payload}}"

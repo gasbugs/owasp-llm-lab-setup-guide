@@ -56,7 +56,7 @@ docker rm -f llm-security-nemo-dialog-rails >/dev/null 2>&1 || true
 docker run -d --name llm-security-nemo-dialog-rails \
   --network llm-security-control-plane \
   -p 127.0.0.1:18092:8013 \
-  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
+  -e RUN_MODE=server -e GUARD_MODE=prevent -e ENABLE_LAB_ENDPOINTS=true \
   -e MODEL_GATEWAY_URL=http://llm-security-bedrock-gateway:8080 \
   -e BEDROCK_GATEWAY_TOKEN="$BEDROCK_GATEWAY_TOKEN" \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
@@ -81,7 +81,7 @@ docker rm -f guardrails-presidio-api >/dev/null 2>&1 || true
 docker run -d --name guardrails-presidio-api \
   --network llm-security-control-plane \
   -p 127.0.0.1:18091:8013 \
-  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
+  -e RUN_MODE=server -e GUARD_MODE=prevent -e ENABLE_LAB_ENDPOINTS=true \
   -e NEMO_GUARD_URL=http://llm-security-nemo-dialog-rails:8013 \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
   localhost/guardrails-presidio:2.2.362
@@ -102,7 +102,7 @@ docker run -d --name guardrails-guardrail-ui \
 `SHOW_GUARDRAIL_PANEL=true`는 Module 08 전용 화면에서만 판정 패널을 표시한다.
 일반 LLM01~10 Compose는 이 값을 `false`로 고정해 운영 내부 정보를 노출하지 않는다.
 UI의 `GUARD_ENGINE`은 `off`, `presidio`, `nemo` 중 하나다. 각 guard API의
-`GUARD_MODE`는 `off`, `audit`, `enforce` 중 하나다. 환경변수는 프로세스 시작 시
+`GUARD_MODE`는 `off`, `detection`, `prevent` 중 하나다. 환경변수는 프로세스 시작 시
 읽으므로 값을 바꾼 뒤 컨테이너를 재생성해야 한다.
 
 Presidio API는 `/healthz`, `/api/guardrails/policy`, `/api/scan`, `/api/chat`을

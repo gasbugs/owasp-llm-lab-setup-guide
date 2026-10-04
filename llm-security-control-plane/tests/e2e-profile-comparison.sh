@@ -26,7 +26,7 @@ run_case() {
 
 printf 'profile\tcase\tdecision\tupstream_called\tguard_model_calls\tduration_ms\n'
 for profile in standard high-assurance; do
-  ASSURANCE_PROFILE="$profile" GUARD_MODE=enforce \
+  ASSURANCE_PROFILE="$profile" GUARD_MODE=prevent \
     bash "$ROOT/deploy/start-stack.sh" >/dev/null
   login
   run_case "$profile" benign-quoted \

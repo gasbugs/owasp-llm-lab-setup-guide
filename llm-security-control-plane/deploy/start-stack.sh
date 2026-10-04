@@ -69,7 +69,7 @@ fi
 : "${APPLICATION_INTERNAL_TOKEN:?Run prepare-module08-runtime.sh to create module08-compose.env}"
 : "${BEDROCK_GATEWAY_TOKEN:?Run prepare-module08-runtime.sh to create module08-compose.env}"
 : "${AUTH_ADMIN_TOKEN:?Run prepare-module08-runtime.sh to create module08-compose.env}"
-GUARD_MODE="${GUARD_MODE:-enforce}"
+GUARD_MODE="${GUARD_MODE:-prevent}"
 ASSURANCE_PROFILE="${ASSURANCE_PROFILE:-high-assurance}"
 ENABLE_LAB_ENDPOINTS="${ENABLE_LAB_ENDPOINTS:-true}"
 IMAGE_VERSION="${IMAGE_VERSION:-1.0.0}"

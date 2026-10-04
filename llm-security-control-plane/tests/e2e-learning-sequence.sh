@@ -61,7 +61,7 @@ wait_json "http://127.0.0.1:${BEDROCK_HOST_PORT}/healthz" '.ok == true'
 
 docker run -d --name module08-learning-dialog --network "$NETWORK" \
   -p "127.0.0.1:${DIALOG_HOST_PORT}:8013" \
-  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
+  -e RUN_MODE=server -e GUARD_MODE=prevent -e ENABLE_LAB_ENDPOINTS=true \
   -e MODEL_GATEWAY_URL=http://module08-learning-bedrock:8080 \
   -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_TOKEN" \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
@@ -84,7 +84,7 @@ curl -fsS --max-time 60 -X POST "http://127.0.0.1:${DIALOG_HOST_PORT}/api/scan-o
 
 docker run -d --name module08-learning-presidio --network "$NETWORK" \
   -p "127.0.0.1:${PRESIDIO_HOST_PORT}:8013" \
-  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
+  -e RUN_MODE=server -e GUARD_MODE=prevent -e ENABLE_LAB_ENDPOINTS=true \
   localhost/guardrails-presidio:2.2.362 >/dev/null
 wait_json "http://127.0.0.1:${PRESIDIO_HOST_PORT}/healthz" '.ok == true and .upstream_path == "not-configured"'
 
@@ -99,7 +99,7 @@ jq -e '.guardrail.decision == "infra" and .guardrail.upstream_called == false an
 docker rm -f module08-learning-presidio >/dev/null 2>&1 || true
 docker run -d --name module08-learning-presidio --network "$NETWORK" \
   -p "127.0.0.1:${PRESIDIO_HOST_PORT}:8013" \
-  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
+  -e RUN_MODE=server -e GUARD_MODE=prevent -e ENABLE_LAB_ENDPOINTS=true \
   -e NEMO_GUARD_URL=http://module08-learning-dialog:8013 \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
   localhost/guardrails-presidio:2.2.362 >/dev/null
@@ -137,7 +137,7 @@ docker run -d --name module08-learning-hub --network "$NETWORK" \
   -e PRESIDIO_URL=http://module08-learning-spoke:8013 \
   -e MODEL_GATEWAY_URL=http://module08-learning-bedrock:8080 \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
-  -e GUARD_MODE=enforce -e ASSURANCE_PROFILE=high-assurance \
+  -e GUARD_MODE=prevent -e ASSURANCE_PROFILE=high-assurance \
   localhost/llm-security-nemo-policy-hub:1.0.0 >/dev/null
 wait_json "http://127.0.0.1:${HUB_HOST_PORT}/healthz" '.ok == true'
 

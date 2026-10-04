@@ -11,7 +11,7 @@ cleanup() {
 trap cleanup EXIT
 
 bash "$ROOT/deploy/prepare-policy-workspace.sh" "$WORK" >/dev/null
-POLICY_WORKSPACE="$WORK" ASSURANCE_PROFILE=standard GUARD_MODE=enforce \
+POLICY_WORKSPACE="$WORK" ASSURANCE_PROFILE=standard GUARD_MODE=prevent \
   bash "$ROOT/deploy/start-stack.sh" >/dev/null
 
 ACCESS_TOKEN="$(curl -fsS --max-time 30 -X POST http://127.0.0.1:18095/.well-known/login \

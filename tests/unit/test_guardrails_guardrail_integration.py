@@ -31,14 +31,14 @@ class GuardrailsGuardrailIntegrationTests(unittest.TestCase):
         namespace = {"emit": lambda result: None}
         exec(compile(ast.Module(body=nodes, type_ignores=[]), "scan-policy", "exec"), namespace)
         for engine in ("presidio", "off"):
-            for mode in ("audit", "enforce", "off"):
+            for mode in ("detection", "prevent", "off"):
                 for valid in (True, False):
                     with self.subTest(engine=engine, mode=mode, valid=valid):
                         namespace.update(GUARD_ENGINE=engine, GUARD_MODE=mode)
                         result = namespace["scan_response"]({"valid": valid, "direction": "input",
                             "original_text": "raw", "sanitized_text": "raw" if valid else "masked"})
-                        applied = engine == "presidio" and mode == "enforce" and not valid
-                        if engine == "presidio" and mode == "enforce":
+                        applied = engine == "presidio" and mode == "prevent" and not valid
+                        if engine == "presidio" and mode == "prevent":
                             self.assertEqual(result["sanitized_text"], "masked" if applied else "raw")
                             self.assertNotIn("original_text", result)
                         else:
@@ -55,6 +55,27 @@ class GuardrailsGuardrailIntegrationTests(unittest.TestCase):
                         self.assertEqual(result["direction"], "input")
         self.assertEqual(namespace["metadata_only"]({"checks": [{"sanitized_text": "secret", "valid": False}]}),
                          {"checks": [{"valid": False}]})
+
+    def test_mode_aliases_normalize_and_invalid_modes_fail(self) -> None:
+        for path in [PRESIDIO / "server.py", NEMO / "server.py",
+                     ROOT / "llm-security-control-plane/nemo-policy-hub/server.py"]:
+            tree = ast.parse(read(path))
+            nodes = [node for node in tree.body if
+                     isinstance(node, ast.Assign) and any(
+                         isinstance(t, ast.Name) and t.id == "GUARD_MODE" for t in node.targets)
+                     or isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+                     and isinstance(node.test.left, ast.Name) and node.test.left.id == "GUARD_MODE"]
+            code = compile(ast.Module(body=nodes, type_ignores=[]), "guard-mode", "exec")
+            import os
+            from unittest.mock import patch
+            for supplied, expected in [("audit", "detection"), ("enforce", "prevent"),
+                                       ("detection", "detection"), ("prevent", "prevent"), ("off", "off")]:
+                with self.subTest(server=path, mode=supplied), patch.dict(os.environ, {"GUARD_MODE": supplied}):
+                    scope = {"os": os}
+                    exec(code, scope)
+                    self.assertEqual(scope["GUARD_MODE"], expected)
+            with patch.dict(os.environ, {"GUARD_MODE": "invalid"}), self.assertRaises(RuntimeError):
+                exec(code, {"os": os})
 
     def test_presidio_cli_and_server_share_policy_core(self) -> None:
         cli = read(PRESIDIO / "scan_pii.py")
@@ -84,7 +105,7 @@ class GuardrailsGuardrailIntegrationTests(unittest.TestCase):
                 self.assertTrue(required.issubset(set(fragment for fragment in required if fragment in text)))
                 self.assertIn("ENABLE_LAB_ENDPOINTS", text)
                 self.assertIn("require_lab_endpoint()", text)
-                self.assertIn('GUARD_MODE not in {"off", "audit", "enforce"}', text)
+                self.assertIn('GUARD_MODE not in {"off", "detection", "prevent"}', text)
 
     def test_presidio_has_learner_visible_adjacent_secure_coding_boundary(self) -> None:
         server = read(PRESIDIO / "server.py")

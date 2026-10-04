@@ -40,9 +40,10 @@ def env_bool(name: str, default: bool) -> bool:
 
 
 # 모드와 Profile은 시작 시 확정한다. 잘못된 값은 조용히 기본값으로 낮추지 않는다.
-GUARD_MODE = os.getenv("GUARD_MODE", "enforce").strip().lower()
-if GUARD_MODE not in {"off", "audit", "enforce"}:
-    raise RuntimeError("GUARD_MODE must be off, audit, or enforce")
+GUARD_MODE = os.getenv("GUARD_MODE", "prevent").strip().lower()
+GUARD_MODE = {"audit": "detection", "enforce": "prevent"}.get(GUARD_MODE, GUARD_MODE)
+if GUARD_MODE not in {"off", "detection", "prevent"}:
+    raise RuntimeError("GUARD_MODE must be off, detection, or prevent")
 PRESIDIO_FAILURE_MODE = "closed"
 if PRESIDIO_FAILURE_MODE not in {"closed", "open"}:
     raise RuntimeError("PRESIDIO_FAILURE_MODE must be closed or open")
@@ -343,7 +344,7 @@ async def chat(
                     failure_reason=privacy_input.get("failure_reason"),
                 )
             )
-            if prohibited and GUARD_MODE == "enforce":
+            if prohibited and GUARD_MODE == "prevent":
                 result = result_record(
                     request_id=request.request_id,
                     reply="금지된 자격 증명 또는 고위험 식별자가 탐지되어 차단되었습니다.",
@@ -355,7 +356,7 @@ async def chat(
                 )
                 emit_metadata({"event": "hub_chat", **result["guardrail"], "request_id": request.request_id})
                 return result
-            if GUARD_MODE == "enforce":
+            if GUARD_MODE == "prevent":
                 message_for_model = privacy_input["sanitized_candidate"]
 
             input_rails = await run_input_rails(message_for_model, ASSURANCE_PROFILE)
@@ -368,7 +369,7 @@ async def chat(
                     metrics=input_rails["metrics"],
                 )
             )
-            if not input_rails["valid"] and GUARD_MODE == "enforce":
+            if not input_rails["valid"] and GUARD_MODE == "prevent":
                 result = result_record(
                     request_id=request.request_id,
                     reply="요청이 NeMo 입력 가드레일에 의해 차단되었습니다.",
@@ -406,7 +407,7 @@ async def chat(
                         detection_count=len(privacy_retrieval["detections"]),
                     )
                 )
-                if prohibited and GUARD_MODE == "enforce":
+                if prohibited and GUARD_MODE == "prevent":
                     result = result_record(
                         request_id=request.request_id,
                         reply="금지된 비밀값이 검색 문서에서 탐지되어 차단되었습니다.",
@@ -418,7 +419,7 @@ async def chat(
                     )
                     emit_metadata({"event": "hub_chat", **result["guardrail"], "request_id": request.request_id})
                     return result
-                if GUARD_MODE == "enforce" and retrieval_decision == "redact":
+                if GUARD_MODE == "prevent" and retrieval_decision == "redact":
                     context_for_model = privacy_retrieval["sanitized_candidate"]
                 else:
                     context_for_model = joined
@@ -451,7 +452,7 @@ async def chat(
             )
         )
 
-        if model_result["decision"] == "block" and GUARD_MODE == "enforce":
+        if model_result["decision"] == "block" and GUARD_MODE == "prevent":
             result = result_record(
                 request_id=request.request_id,
                 reply=reply,
@@ -475,11 +476,11 @@ async def chat(
                 allowed_exact_sources,
             )
             stages.extend(output_stages)
-            if output_reason and GUARD_MODE == "enforce":
+            if output_reason and GUARD_MODE == "prevent":
                 decision = "block"
                 blocking_reason = output_reason
                 final_reply = "생성 결과가 NeMo 출력 가드레일에 의해 차단되었습니다."
-            elif GUARD_MODE == "enforce":
+            elif GUARD_MODE == "prevent":
                 final_reply = checked_reply
                 if checked_reply != reply:
                     decision = "redact"

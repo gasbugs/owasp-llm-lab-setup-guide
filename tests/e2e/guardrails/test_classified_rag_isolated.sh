@@ -30,7 +30,7 @@ docker rm -f codex-classified-presidio >/dev/null 2>&1 || true
 docker run -d --name codex-classified-presidio \
   --network "$GUARDRAILS_NETWORK" \
   -p 127.0.0.1:28091:8013 \
-  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
+  -e RUN_MODE=server -e GUARD_MODE=prevent -e ENABLE_LAB_ENDPOINTS=true \
   "$PRESIDIO_IMAGE" >/dev/null
 
 docker rm -f codex-classified-nemo >/dev/null 2>&1 || true
@@ -38,7 +38,7 @@ docker rm -f codex-classified-nemo >/dev/null 2>&1 || true
 docker run -d --name codex-classified-nemo \
   --network "$GUARDRAILS_NETWORK" \
   -p 127.0.0.1:28092:8013 \
-  -e RUN_MODE=server -e GUARD_MODE=enforce -e ENABLE_LAB_ENDPOINTS=true \
+  -e RUN_MODE=server -e GUARD_MODE=prevent -e ENABLE_LAB_ENDPOINTS=true \
   -e OLLAMA_URL=http://lab-ollama:11434 \
   -e PRESIDIO_URL=http://codex-classified-presidio:8013 \
   -e CLASSIFIED_RAG_INTERNAL_TOKEN="$INTERNAL_TOKEN" \

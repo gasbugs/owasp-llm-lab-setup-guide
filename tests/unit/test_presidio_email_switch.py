@@ -19,7 +19,7 @@ class EmailSwitchTests(unittest.IsolatedAsyncioTestCase):
         self.upstream = AsyncMock(return_value=("Safe response", {"decision": "allow", "upstream_called": True}, ["nemo_input", "bedrock_main", "nemo_output"]))
         self.scope = {
             "ChatRequest": SimpleNamespace, "time": time, "uuid": uuid,
-            "GUARD_MODE": "enforce", "GUARD_ENGINE": "presidio", "BLOCK_EMAIL_INPUT": False,
+            "GUARD_MODE": "prevent", "GUARD_ENGINE": "presidio", "BLOCK_EMAIL_INPUT": False,
             "CORE": SimpleNamespace(settings=SimpleNamespace(input_enabled=True, output_enabled=False), scan_input=Mock(return_value=self.scan)),
             "NEMO_GUARD_URL": "http://nemo:8013", "call_model_path": self.upstream,
             "scan_metadata": lambda result: dict(result), "base_guardrail": lambda **kw: kw,
@@ -52,7 +52,7 @@ class EmailSwitchTests(unittest.IsolatedAsyncioTestCase):
         self.upstream.assert_awaited_once_with("Clean input")
 
     async def test_audit_does_not_enforce_switch(self):
-        self.scope.update(BLOCK_EMAIL_INPUT=True, GUARD_MODE="audit")
+        self.scope.update(BLOCK_EMAIL_INPUT=True, GUARD_MODE="detection")
         self.assertEqual((await self.invoke())["guardrail"]["decision"], "allow")
         self.upstream.assert_awaited_once_with("Email analyst@example.com.")
 

@@ -55,7 +55,7 @@ write_module08_compose_env() {
     printf 'GRAFANA_ADMIN_USER=admin\n'
     printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$grafana_password"
     printf 'AUTH_ADMIN_TOKEN=%s\n' "$auth_admin_token"
-    printf 'GUARD_MODE=enforce\n'
+    printf 'GUARD_MODE=prevent\n'
     printf 'ASSURANCE_PROFILE=high-assurance\n'
     printf 'ENABLE_LAB_ENDPOINTS=true\n'
     printf 'IMAGE_VERSION=1.0.0\n'

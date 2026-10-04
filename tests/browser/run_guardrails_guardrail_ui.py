@@ -74,11 +74,11 @@ def main() -> int:
     )
     checks = {
         "normal": normal["engine"] == "presidio"
-        and normal["mode"] == "enforce"
+        and normal["mode"] == "prevent"
         and normal["decision"] == "redact"
         and normal["upstream_called"] == "true",
         "attack": attack["engine"] == "presidio"
-        and attack["mode"] == "enforce"
+        and attack["mode"] == "prevent"
         and attack["decision"] == "block"
         and attack["upstream_called"] == "false"
         and attack["reason"] == "input:self check input",
