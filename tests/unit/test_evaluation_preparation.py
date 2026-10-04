@@ -16,7 +16,9 @@ name=Path(sys.argv[0]).name
 args=sys.argv[1:]
 with open(os.environ['PREPARATION_CALLS'], 'a') as log:
     log.write(json.dumps([name]+args)+'\n')
-if name=='aws' and os.environ.get('PREPARATION_FAILURE')=='aws': sys.exit(9)
+if name=='aws':
+    if os.environ.get('PREPARATION_FAILURE')=='aws': sys.exit(9)
+    if args[:2]==['bedrock-agent','get-knowledge-base']: print('ACTIVE')
 if name=='docker':
     if 'build' in args and os.environ.get('PREPARATION_FAILURE')=='build': sys.exit(8)
     if args[:2]==['ps','-aq']: print('owned-container-id')
@@ -46,6 +48,11 @@ class EvaluationPreparationTests(unittest.TestCase):
         (self.root / 'deploy').mkdir(parents=True)
         self.script = self.root / 'deploy/prepare-evaluation-environment.sh'
         shutil.copy2(SCRIPT, self.script)
+        (self.root / 'deploy/restore-module08-aws.sh').write_text(
+            '#!/usr/bin/env bash\nset -eu\n'
+            'test "${PREPARATION_FAILURE:-}" != kb\n'
+            'mkdir -p "$MODULE08_AWS_STATE_DIR"\n'
+            'printf "MODULE08_KNOWLEDGE_BASE_ID=AUTO123456\\n" > "$MODULE08_AWS_STATE_DIR/module08-aws.env"\n')
         self.home = self.work / 'home'
         (self.home / '.aws').mkdir(parents=True)
         (self.home / '.aws/credentials').write_text('untouched AWS fixture')
@@ -84,7 +91,7 @@ class EvaluationPreparationTests(unittest.TestCase):
         self.assertNotIn(values['BEDROCK_GATEWAY_TOKEN'], old)
         self.assertEqual(values['GUARD_MODE'], 'enforce')
         self.assertEqual(values['LEGACY_STATIC_TOKEN_MODE'], 'false')
-        self.assertEqual(values['MODULE08_KNOWLEDGE_BASE_ID'], '')
+        self.assertEqual(values['MODULE08_KNOWLEDGE_BASE_ID'], 'AUTO123456')
         self.assertEqual(list((self.root / '.state/application-auth').iterdir()), [])
         saved = list((self.root.parent / '.state').glob('control-plane-backup-*'))
         self.assertEqual((saved[0]/'application-auth/key').read_text(), 'previous signing key')
@@ -97,7 +104,7 @@ class EvaluationPreparationTests(unittest.TestCase):
 
     def test_preflight_and_build_failure_preserve_old_state_and_containers(self):
         self.seed_old_state()
-        for failure in ('aws','build'):
+        for failure in ('aws','build','kb'):
             with self.subTest(failure=failure):
                 self.calls.unlink(missing_ok=True)
                 result=self.run_script(failure=failure)

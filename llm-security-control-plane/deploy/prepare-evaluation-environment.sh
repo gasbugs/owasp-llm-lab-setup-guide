@@ -14,7 +14,7 @@ while [ "$#" -gt 0 ]; do
     --help)
       echo 'Usage: bash prepare-evaluation-environment.sh [--knowledge-base-id ID]'
       echo 'Builds four services, removes the six named lab containers, backs up .state, and creates fresh tokens.'
-      echo 'Keeps ~/.aws, AWS resources, images, networks, and learner work files.'
+      echo 'Keeps ~/.aws and learner work files; ensures the lab Knowledge Base when no ID is supplied.'
       exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
@@ -84,6 +84,23 @@ compose() {
 compose config --quiet
 compose build bedrock-gateway presidio nemo-hub application
 
+# Resolve AWS resources before removing the previous containers or local state.
+export AWS_PROFILE=default AWS_REGION=us-east-1
+export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials" AWS_CONFIG_FILE="$HOME/.aws/config"
+if [ -z "$KNOWLEDGE_BASE_ID" ]; then
+  MODULE08_AWS_STATE_DIR="$PREPARATION_DIR/aws" \
+    bash "$ROOT/deploy/restore-module08-aws.sh" --ensure
+  KNOWLEDGE_BASE_ID="$(sed -n 's/^MODULE08_KNOWLEDGE_BASE_ID=//p' "$PREPARATION_DIR/aws/module08-aws.env")"
+else
+  status="$(aws bedrock-agent get-knowledge-base --region us-east-1 \
+    --knowledge-base-id "$KNOWLEDGE_BASE_ID" --query 'knowledgeBase.status' --output text)"
+  [ "$status" = ACTIVE ] || { echo "Knowledge Base is not ACTIVE: $status" >&2; exit 1; }
+fi
+[[ "$KNOWLEDGE_BASE_ID" =~ ^[A-Za-z0-9]{10}$ ]] || { echo 'Knowledge Base resolution failed' >&2; exit 1; }
+sed -i "s/^MODULE08_KNOWLEDGE_BASE_ID=.*/MODULE08_KNOWLEDGE_BASE_ID=$KNOWLEDGE_BASE_ID/" "$ENV_FILE"
+export MODULE08_KNOWLEDGE_BASE_ID="$KNOWLEDGE_BASE_ID"
+printf 'evaluation-knowledge-base=%s region=us-east-1\n' "$KNOWLEDGE_BASE_ID"
+
 # Only explicitly named chapter containers can be removed; Docker errors propagate.
 for container in llm-security-application-gateway llm-security-nemo-hub \
   llm-security-presidio-spoke llm-security-bedrock-gateway \
@@ -102,6 +119,9 @@ fi
 mkdir -p "$ROOT/.state/application-auth"
 mv "$ENV_FILE" "$ROOT/.state/module08-compose.env"
 ENV_FILE="$ROOT/.state/module08-compose.env"
+if [ -f "$PREPARATION_DIR/aws/module08-aws.env" ]; then
+  cp "$PREPARATION_DIR/aws/module08-aws.env" "$ROOT/.state/module08-aws.env"
+fi
 compose up -d --force-recreate --wait --wait-timeout 180 \
   bedrock-gateway presidio nemo-hub application
 compose ps -a

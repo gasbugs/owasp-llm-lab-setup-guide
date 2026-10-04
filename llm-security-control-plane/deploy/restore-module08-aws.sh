@@ -6,8 +6,8 @@ set -euo pipefail
 
 MODE=${1:---repair}
 case "$MODE" in
-  --verify-only|--repair) ;;
-  *) echo "usage: $0 [--verify-only|--repair]" >&2; exit 2 ;;
+  --verify-only|--repair|--ensure) ;;
+  *) echo "usage: $0 [--verify-only|--repair|--ensure]" >&2; exit 2 ;;
 esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,7 +30,7 @@ KB_ROLE=${PREFIX}-knowledge-base-role
 KB_ROLE_POLICY=${PREFIX}-knowledge-base-runtime
 VECTOR_BUCKET_ARN="arn:aws:s3vectors:${AWS_REGION}:${ACCOUNT_ID}:bucket/${VECTOR_BUCKET}"
 VECTOR_INDEX_ARN="${VECTOR_BUCKET_ARN}/index/${VECTOR_INDEX}"
-STATE_DIR="$ROOT/.state"
+STATE_DIR="${MODULE08_AWS_STATE_DIR:-$ROOT/.state}"
 STATE_FILE="$STATE_DIR/module08-aws.env"
 COMPOSE_ENV_FILE="$STATE_DIR/module08-compose.env"
 
@@ -109,6 +109,34 @@ wait_for_data_source_available() {
 knowledge_base_id="$(aws bedrock-agent list-knowledge-bases --region "$AWS_REGION" \
   --query "knowledgeBaseSummaries[?name=='${KB_NAME}'].knowledgeBaseId | [0]" \
   --output text)"
+
+# Reuse a ready lab resource without uploading documents or restarting ingestion.
+# API errors stop preparation; they are not treated as a missing resource.
+if [ "$MODE" = --ensure ] && [ -n "$knowledge_base_id" ] && [ "$knowledge_base_id" != None ]; then
+  knowledge_base_status="$(aws bedrock-agent get-knowledge-base --region "$AWS_REGION" \
+    --knowledge-base-id "$knowledge_base_id" --query 'knowledgeBase.status' --output text)"
+  if [ "$knowledge_base_status" = ACTIVE ]; then
+    data_source_id="$(aws bedrock-agent list-data-sources --region "$AWS_REGION" \
+      --knowledge-base-id "$knowledge_base_id" \
+      --query "dataSourceSummaries[?name=='${DATA_SOURCE_NAME}'].dataSourceId | [0]" --output text)"
+    if [ -n "$data_source_id" ] && [ "$data_source_id" != None ]; then
+      data_source_status="$(aws bedrock-agent get-data-source --region "$AWS_REGION" \
+        --knowledge-base-id "$knowledge_base_id" --data-source-id "$data_source_id" \
+        --query 'dataSource.status' --output text)"
+      ingestion_status="$(aws bedrock-agent list-ingestion-jobs --region "$AWS_REGION" \
+        --knowledge-base-id "$knowledge_base_id" --data-source-id "$data_source_id" \
+        --max-results 1 --query 'ingestionJobSummaries[0].status' --output text)"
+      if [ "$data_source_status" = AVAILABLE ] && [ "$ingestion_status" = COMPLETE ]; then
+        install -d -m 0700 "$STATE_DIR"
+        (umask 077; printf 'MODULE08_KNOWLEDGE_BASE_ID=%s\nMODULE08_DATA_SOURCE_ID=%s\nAWS_REGION=%s\n' \
+          "$knowledge_base_id" "$data_source_id" "$AWS_REGION" > "$STATE_FILE")
+        printf 'module08-aws=READY knowledge_base_id=%s data_source_id=%s ingestion_status=%s region=%s\n' \
+          "$knowledge_base_id" "$data_source_id" "$ingestion_status" "$AWS_REGION"
+        exit 0
+      fi
+    fi
+  fi
+fi
 
 if [ "$MODE" = --verify-only ]; then
   test -n "$knowledge_base_id" && test "$knowledge_base_id" != None || {
