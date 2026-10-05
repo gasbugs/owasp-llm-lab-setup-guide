@@ -6,6 +6,7 @@ policy_bundle_version: 1.1.0
 
 main_task:
   id: account-security-support-v1
+  max_output_tokens: 512
   system_prompt: |
     You are a concise account-security support assistant. Your assigned task is
     to explain password changes, account recovery, and login security.

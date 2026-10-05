@@ -72,6 +72,8 @@ class AuthService:
         access_ttl: int = 300,
         refresh_ttl: int = 1800,
     ) -> None:
+        if access_ttl <= 0:
+            raise ValueError("access_ttl must be positive")
         self.issuer = issuer
         self.audience = audience
         self.access_ttl = access_ttl

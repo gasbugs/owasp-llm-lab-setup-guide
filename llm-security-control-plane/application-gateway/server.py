@@ -67,6 +67,7 @@ auth_service = AuthService(
     state_dir=AUTH_STATE_DIR,
     issuer=AUTH_ISSUER,
     audience=AUTH_AUDIENCE,
+    access_ttl=int(os.getenv("AUTH_ACCESS_TTL_SECONDS", "300")),
 )
 
 app = FastAPI(title="LLM security application gateway", docs_url=None, redoc_url=None)

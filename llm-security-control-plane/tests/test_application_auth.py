@@ -47,6 +47,13 @@ class ApplicationAuthTests(unittest.TestCase):
         self.assertEqual(claims["iss"], "https://issuer.example")
         self.assertEqual(claims["aud"], "application-audience")
 
+    def test_evaluation_ttl_is_encoded_in_new_token(self) -> None:
+        self.auth.access_ttl = 3600
+        pair = self.auth.issue_pair("reader")
+        claims = self.auth.verify_access(pair["access_token"])
+        self.assertEqual(pair["expires_in"], 3600)
+        self.assertEqual(claims["exp"] - claims["iat"], 3600)
+
     def test_wrong_password_is_rejected(self) -> None:
         with self.assertRaises(InvalidCredentials):
             self.auth.authenticate_password("reader", "wrong")

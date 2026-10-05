@@ -35,7 +35,8 @@ class EvaluationGuardrailLoopTests(unittest.TestCase):
         data = yaml.safe_load(
             (ROOT / "examples/guardrails/garak-guardrail/garak-config.yaml").read_text()
         )
-        self.assertEqual(data["run"]["soft_probe_prompt_cap"], 8)
+        self.assertEqual(data["run"]["soft_probe_prompt_cap"], 16)
+        self.assertEqual(data["run"]["generations"], 1)
         e2e = (ROOT / "tests/e2e/guardrails/test_guardrail_policy_loop.sh").read_text()
         self.assertIn("--config /work/garak-config.yaml", e2e)
 

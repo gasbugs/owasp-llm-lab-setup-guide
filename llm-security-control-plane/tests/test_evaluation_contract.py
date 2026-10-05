@@ -101,6 +101,18 @@ class EvaluationContractTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValidationError):
             server.HubChatRequest(message="hello", request_id="x", principal={}, main_task=task)
 
+    async def test_evaluation_output_budget_is_server_owned(self):
+        client = AsyncMock()
+        response = Mock()
+        response.json.return_value = {"choices": [{"message": {"content": "answer"}, "finish_reason": "stop"}]}
+        client.post.return_value = response
+        context = AsyncMock()
+        context.__aenter__.return_value = client
+        task = {"id": "evaluation", "system_prompt": "Account support", "max_output_tokens": 512}
+        with patch.object(hub_core, "MAIN_TASK", task), patch.object(hub_core.httpx, "AsyncClient", return_value=context):
+            await hub_core.call_main_model("hello", None)
+        self.assertEqual(client.post.call_args.kwargs["json"]["max_tokens"], 512)
+
     async def test_policy_endpoint_exposes_loaded_task(self):
         self.assertEqual((await server.policy())["main_task"], hub_core.MAIN_TASK)
 

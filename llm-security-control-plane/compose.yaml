@@ -106,6 +106,7 @@ services:
       NEMO_HUB_URL: http://llm-security-nemo-hub:8014
       MODEL_GATEWAY_URL: http://llm-security-bedrock-gateway:8080
       BEDROCK_GATEWAY_TOKEN: ${BEDROCK_GATEWAY_TOKEN:?Set BEDROCK_GATEWAY_TOKEN in the selected Compose env file}
+      AUTH_ACCESS_TTL_SECONDS: ${AUTH_ACCESS_TTL_SECONDS:-300}
       AUTH_EVENT_SINK: ${AUTH_EVENT_SINK:-stdout}
       AUTH_ADMIN_TOKEN: ${AUTH_ADMIN_TOKEN:?Set AUTH_ADMIN_TOKEN in the selected Compose env file}
       LEGACY_STATIC_TOKEN_MODE: ${LEGACY_STATIC_TOKEN_MODE:-false}

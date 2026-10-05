@@ -33,6 +33,9 @@ if (not isinstance(MAIN_TASK, dict)
         or not MAIN_TASK["system_prompt"].strip()):
     raise ValueError("main_task requires a nonempty id and system_prompt")
 
+if not 1 <= int(MAIN_TASK.get("max_output_tokens", 180)) <= 4096:
+    raise ValueError("main_task.max_output_tokens must be between 1 and 4096")
+
 MODEL_PROVIDER = "amazon-bedrock"
 MAIN_MODEL = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
 MODEL_GATEWAY_URL = os.getenv(
@@ -191,7 +194,7 @@ async def call_main_model(
             json={
                 "model": MAIN_MODEL,
                 "temperature": 0.0,
-                "max_tokens": 180,
+                "max_tokens": MAIN_TASK.get("max_output_tokens", 180),
                 "messages": [
                     {
                         "role": "system",
