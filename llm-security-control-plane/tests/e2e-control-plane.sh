@@ -130,6 +130,11 @@ docker run --rm --network none \
   docker.io/library/node:24.19.0-bookworm-slim \
   node /work/evaluation/test-contract.cjs
 
+docker run --rm --network none \
+  -v "$ROOT/tests/evaluation:/work/evaluation:ro" \
+  docker.io/library/node:24.19.0-bookworm-slim \
+  node /work/evaluation/test-redteam-contract.cjs
+
 bash "$ROOT/deploy/start-stack.sh"
 
 gateway_without_token="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
