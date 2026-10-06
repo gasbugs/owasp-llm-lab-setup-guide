@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ORIGINAL_ARGS=("$@")
 KNOWLEDGE_BASE_ID=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -44,6 +45,42 @@ finish() {
   [ -z "$PREPARATION_DIR" ] || rm -rf "$PREPARATION_DIR"
   exit "$result"
 }
+
+# Parse the updater before Git can replace this script on disk.
+refresh_setup() {
+# Update the complete checkout before loading policies or asking to remove resources.
+command -v git >/dev/null || { echo 'Required command missing: git' >&2; exit 1; }
+SETUP_ROOT="$(cd "$ROOT/.." && pwd)"
+[ "$(git -C "$SETUP_ROOT" rev-parse --show-toplevel)" = "$SETUP_ROOT" ] || {
+  echo '[ERR] setup 저장소 안의 스크립트를 실행하세요. 기존 실습 자원은 변경하지 않았습니다.' >&2; exit 1;
+}
+SETUP_BRANCH="$(git -C "$SETUP_ROOT" symbolic-ref --quiet --short HEAD || true)"
+case "$SETUP_BRANCH" in
+  main|"") ;; # A pinned detached checkout can advance without changing another branch.
+  *) echo '[ERR] main 또는 고정 커밋 작업본에서 실행하세요. 다른 작업 브랜치는 변경하지 않습니다.' >&2; exit 1 ;;
+esac
+if ! git -C "$SETUP_ROOT" diff --quiet HEAD --; then
+  echo '[ERR] setup 추적 파일에 로컬 수정이 있어 업데이트를 중단합니다. 수정 내용을 보존한 뒤 다시 실행하세요.' >&2
+  exit 1
+fi
+BEFORE_UPDATE="$(git -C "$SETUP_ROOT" rev-parse HEAD)"
+log '공식 setup main의 최신 버전을 확인합니다. 컨테이너·상태·AWS 자원은 아직 변경하지 않습니다.'
+if ! git -C "$SETUP_ROOT" fetch --no-tags https://github.com/gasbugs/owasp-llm-lab-setup-guide.git main; then
+  echo '[ERR] 최신 버전 확인 실패. 이전 코드로 설치하지 않고 중단합니다.' >&2; exit 1;
+fi
+if ! git -C "$SETUP_ROOT" merge-base --is-ancestor HEAD FETCH_HEAD || \
+   ! git -C "$SETUP_ROOT" merge --ff-only FETCH_HEAD; then
+  echo '[ERR] 최신 main으로 안전하게 갱신할 수 없습니다. 로컬 커밋·파일을 보존하고 중단합니다.' >&2; exit 1;
+fi
+SETUP_COMMIT="$(git -C "$SETUP_ROOT" rev-parse HEAD)"
+if [ "$BEFORE_UPDATE" != "$SETUP_COMMIT" ]; then
+  log "최신 버전으로 갱신했습니다: $SETUP_COMMIT. 최신 스크립트로 다시 실행합니다."
+  exec bash "$ROOT/deploy/prepare-evaluation-environment.sh" "${ORIGINAL_ARGS[@]}"
+fi
+log "최신 setup 확인 완료: $SETUP_COMMIT"
+
+}
+refresh_setup
 
 printf '평가 환경을 새로 준비합니다. 아래 컨테이너가 있으면 삭제합니다.\n'
 printf '삭제 조건: llm-security-control-plane network 소속이며 아래 이름에 일치하는 컨테이너만 대상입니다.\n'
@@ -220,6 +257,7 @@ log '로그인 Token 유효 시간 확인 완료: 3600초 (1시간)'
 printf 'evaluation-environment=READY app=http://127.0.0.1:18095 mode=detection profile=high-assurance auth=jwt presidio-failure=closed\n'
 printf '\n===== 평가 환경 준비 결과 =====\n'
 printf '결과: READY · 소요 시간: %s초\n' "$((SECONDS-START_SECONDS))"
+printf 'Setup 버전: %s (공식 main 최신 확인)\n' "$SETUP_COMMIT"
 printf '서비스: 4개 시작 및 health 확인 완료\n'
 printf 'Application: http://127.0.0.1:18095\nNeMo Hub: http://127.0.0.1:18094\nPresidio: http://127.0.0.1:18093\nBedrock Gateway: http://127.0.0.1:18096\n'
 printf 'Knowledge Base: %s · %s · us-east-1\n' "$KNOWLEDGE_BASE_ID" "$KB_ACTION"

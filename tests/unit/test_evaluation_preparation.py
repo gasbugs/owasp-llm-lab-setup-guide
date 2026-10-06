@@ -16,6 +16,22 @@ name=Path(sys.argv[0]).name
 args=sys.argv[1:]
 with open(os.environ['PREPARATION_CALLS'], 'a') as log:
     log.write(json.dumps([name]+args)+'\n')
+if name=='git':
+    args=args[2:]
+    failure=os.environ.get('PREPARATION_FAILURE')
+    marker=Path(os.environ['PREPARATION_GIT_HEAD'])
+    if args==['rev-parse','--show-toplevel']: print(os.environ['PREPARATION_SETUP_ROOT'])
+    elif args==['symbolic-ref','--quiet','--short','HEAD']:
+        if failure=='detached': sys.exit(1)
+        print('topic' if failure=='branch' else 'main')
+    elif args[:2]==['diff','--quiet'] and failure=='dirty': sys.exit(4)
+    elif args==['rev-parse','HEAD']: print('new-head' if marker.exists() else 'old-head')
+    elif args[0]=='fetch' and failure=='fetch': sys.exit(5)
+    elif args[0]=='merge-base' and failure=='diverged': sys.exit(6)
+    elif args[0]=='merge' and failure=='refresh' and not marker.exists():
+        marker.touch()
+        script=Path(os.environ['PREPARATION_SCRIPT'])
+        script.write_text(script.read_text().replace('set -euo pipefail', 'set -euo pipefail\n echo latest-script-executed',1))
 if name=='aws':
     if os.environ.get('PREPARATION_FAILURE')=='aws': sys.exit(9)
     if args[:2]==['bedrock-agent','get-knowledge-base']: print('ACTIVE')
@@ -65,11 +81,12 @@ class EvaluationPreparationTests(unittest.TestCase):
         (self.home / '.aws/credentials').write_text('untouched AWS fixture')
         self.bin = self.work / 'bin'
         self.bin.mkdir()
-        for name in ('aws', 'docker', 'curl', 'jq'):
+        for name in ('git', 'aws', 'docker', 'curl', 'jq'):
             tool=self.bin/name;tool.write_text(FAKE_TOOL);tool.chmod(0o755)
         self.calls = self.work / 'calls.jsonl'
         self.env = os.environ | {'HOME':str(self.home), 'PATH':str(self.bin)+':'+os.environ['PATH'],
-            'PREPARATION_CALLS':str(self.calls), 'GUARD_MODE':'prevent', 'LEGACY_STATIC_TOKEN_MODE':'true',
+            'PREPARATION_CALLS':str(self.calls), 'PREPARATION_GIT_HEAD':str(self.work/'git-head'),
+            'PREPARATION_SETUP_ROOT':str(self.root.parent), 'PREPARATION_SCRIPT':str(self.script), 'GUARD_MODE':'prevent', 'LEGACY_STATIC_TOKEN_MODE':'true',
             'BEDROCK_GATEWAY_TOKEN':'old-ambient-token'}
 
     def run_script(self, *args, failure='', answer='y\n'):
@@ -155,7 +172,7 @@ class EvaluationPreparationTests(unittest.TestCase):
                 result=self.run_script(answer=answer)
                 self.assertEqual(result.returncode,0,result.stderr)
                 self.assertIn('취소했습니다',result.stdout)
-                self.assertEqual(self.records(),[])
+                self.assertTrue(all(r[0]=='git' for r in self.records()))
                 self.assertTrue((self.root/'.state/application-auth/key').exists())
 
     def test_invalid_argument_has_no_external_calls(self):
@@ -163,6 +180,32 @@ class EvaluationPreparationTests(unittest.TestCase):
             with self.subTest(args=args):
                 self.assertEqual(self.run_script(*args).returncode,2)
         self.assertEqual(self.records(),[])
+
+    def test_latest_script_reexec_preserves_arguments_and_single_confirmation(self):
+        result=self.run_script('--knowledge-base-id','ABCDEF1234',failure='refresh')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('latest-script-executed',result.stdout)
+        self.assertEqual(result.stdout.count('계속하려면 y'),1)
+        self.assertIn('MODULE08_KNOWLEDGE_BASE_ID=ABCDEF1234',
+            (self.root/'.state/module08-compose.env').read_text())
+        self.assertIn('Setup 버전: new-head',result.stdout)
+
+    def test_pinned_detached_checkout_can_use_latest_version(self):
+        result=self.run_script(failure='detached',answer='n\n')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('최신 setup 확인 완료',result.stdout)
+        self.assertIn('취소했습니다',result.stdout)
+
+    def test_update_failures_preserve_resources_before_confirmation(self):
+        self.seed_old_state()
+        for failure in ('fetch','dirty','diverged','branch'):
+            with self.subTest(failure=failure):
+                self.calls.unlink(missing_ok=True)
+                result=self.run_script(failure=failure)
+                self.assertNotEqual(result.returncode,0)
+                self.assertNotIn('계속하려면 y',result.stdout)
+                self.assertTrue(all(r[0]=='git' for r in self.records()))
+                self.assertTrue((self.root/'.state/application-auth/key').exists())
 
     def test_wrong_token_lifetime_never_reports_ready(self):
         result=self.run_script(failure='ttl')
