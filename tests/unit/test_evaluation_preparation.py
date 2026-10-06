@@ -26,13 +26,18 @@ if name=='docker':
             print('owned-container-id')
     if args[:2]==['rm','-f'] and os.environ.get('PREPARATION_FAILURE')=='remove': sys.exit(7)
 if name=='curl':
-    if 'policy' in args[-1]:
+    if any('/.well-known/login' in arg for arg in args):
+        print(json.dumps({'expires_in':300 if os.environ.get('PREPARATION_FAILURE')=='ttl' else 3600,
+            'token_type':'Bearer','access_token':'test-login-token-never-display'}))
+    elif 'policy' in args[-1]:
         print(json.dumps({'guard_mode':'prevent' if os.environ.get('PREPARATION_FAILURE')=='policy' else 'detection',
             'assurance_profile':'high-assurance','presidio_failure_mode':'closed',
             'main_task':{'id':'account-security-support-v1'}}))
     else: print('{"ok":true}')
 if name=='jq':
     value=json.load(sys.stdin)
+    if any('.expires_in' in arg for arg in args):
+        sys.exit(0 if value.get('expires_in')==3600 and value.get('token_type')=='Bearer' and value.get('access_token') else 1)
     valid=value.get('ok') is True if '.ok == true' in args else (
         value.get('guard_mode')=='detection' and value.get('assurance_profile')=='high-assurance'
         and value.get('presidio_failure_mode')=='closed'
@@ -96,6 +101,9 @@ class EvaluationPreparationTests(unittest.TestCase):
         self.assertIn('[8/8]',second.stdout)
         self.assertIn('mode=detection profile=high-assurance', second.stdout)
         self.assertIn('JWT 인증·인가·Bedrock 자체 안전 기능 유지', second.stdout)
+        self.assertEqual(values['AUTH_ACCESS_TTL_SECONDS'], '3600')
+        self.assertNotIn('test-login-token-never-display', first.stdout+second.stdout+second.stderr)
+        self.assertIn('실제 발급 확인 완료', second.stdout)
         self.assertEqual(values['GUARD_MODE'], 'detection')
         self.assertEqual(values['LEGACY_STATIC_TOKEN_MODE'], 'false')
         self.assertEqual(values['MODULE08_KNOWLEDGE_BASE_ID'], 'AUTO123456')
@@ -155,6 +163,11 @@ class EvaluationPreparationTests(unittest.TestCase):
             with self.subTest(args=args):
                 self.assertEqual(self.run_script(*args).returncode,2)
         self.assertEqual(self.records(),[])
+
+    def test_wrong_token_lifetime_never_reports_ready(self):
+        result=self.run_script(failure='ttl')
+        self.assertNotEqual(result.returncode,0)
+        self.assertNotIn('evaluation-environment=READY',result.stdout)
 
     def test_wrong_policy_never_reports_ready(self):
         result=self.run_script(failure='policy')

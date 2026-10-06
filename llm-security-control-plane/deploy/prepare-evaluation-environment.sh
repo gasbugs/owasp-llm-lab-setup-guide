@@ -106,6 +106,7 @@ RETRIEVAL_SERVICE_TOKEN=$(openssl rand -hex 24)
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 18)
 AUTH_ADMIN_TOKEN=$(openssl rand -hex 24)
+AUTH_ACCESS_TTL_SECONDS=3600
 GUARD_MODE=detection
 ASSURANCE_PROFILE=high-assurance
 LEGACY_STATIC_TOKEN_MODE=false
@@ -210,6 +211,12 @@ done
 curl -fsS --max-time 10 http://127.0.0.1:18094/api/guardrails/policy \
   | jq -e '.guard_mode == "detection" and .assurance_profile == "high-assurance" and
            .presidio_failure_mode == "closed" and .main_task.id == "account-security-support-v1"' >/dev/null
+# Verify the issued lifetime, not only the Compose setting; never display the token.
+curl -fsS --max-time 10 -X POST http://127.0.0.1:18095/.well-known/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"public-reader","password":"public-reader-demo"}' \
+  | jq -e '.expires_in == 3600 and .token_type == "Bearer" and (.access_token | type == "string" and length > 0)' >/dev/null
+log '로그인 Token 유효 시간 확인 완료: 3600초 (1시간)'
 printf 'evaluation-environment=READY app=http://127.0.0.1:18095 mode=detection profile=high-assurance auth=jwt presidio-failure=closed\n'
 printf '\n===== 평가 환경 준비 결과 =====\n'
 printf '결과: READY · 소요 시간: %s초\n' "$((SECONDS-START_SECONDS))"
@@ -218,6 +225,7 @@ printf 'Application: http://127.0.0.1:18095\nNeMo Hub: http://127.0.0.1:18094\nP
 printf 'Knowledge Base: %s · %s · us-east-1\n' "$KNOWLEDGE_BASE_ID" "$KB_ACTION"
 printf '적용 정책: detection · high-assurance · Presidio 장애 시 closed\n'
 printf '검사 범위: NeMo·Presidio 탐지, 차단·비식별화 미적용. JWT 인증·인가·Bedrock 자체 안전 기능 유지\n'
+printf '로그인 Token: 3600초 (1시간) · 환경 파일에 저장 · 실제 발급 확인 완료\n'
 printf '업무 정책: account-security-support-v1 · 인증: JWT (새 인증 상태)\n'
 printf '이전 컨테이너: %s개 제거 · 상태 백업: %s\n' "$REMOVED_COUNT" "$BACKUP_DIR"
 printf '환경 파일: %s/.state/module08-compose.env (0600)\n' "$ROOT"
