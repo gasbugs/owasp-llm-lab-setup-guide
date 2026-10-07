@@ -69,3 +69,25 @@ class DurableSecurityDeliveryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SharedCollectorConsumerTests(unittest.TestCase):
+    def test_all_shared_collector_consumers_enable_its_persistent_storage(self):
+        import yaml
+        root = Path(__file__).resolve().parents[2]
+        consumers = []
+        for directory in (root / "examples", root / "tests/e2e"):
+            for path in directory.rglob("*.yaml"):
+                text = path.read_text()
+                if "/etc/alloy/config.alloy" not in text:
+                    continue
+                data = yaml.safe_load(text)
+                if not isinstance(data, dict):
+                    continue
+                for service in data.get("services", {}).values():
+                    if any("/etc/alloy/config.alloy" in str(v) for v in service.get("volumes", [])):
+                        consumers.append(path)
+                        self.assertIn("--stability.level=public-preview", service["command"], str(path))
+                        self.assertIn("--storage.path=/var/lib/alloy/data", service["command"], str(path))
+                        self.assertTrue(any("/var/lib/alloy/data" in str(v) for v in service.get("volumes", [])), str(path))
+        self.assertGreaterEqual(len(consumers), 3)

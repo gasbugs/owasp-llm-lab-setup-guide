@@ -13,8 +13,8 @@ services:
     tmpfs: ["/var/tempo:uid=10001,gid=10001"]
   alloy:
     image: docker.io/grafana/alloy:v1.18.0
-    command: [run, /etc/alloy/config.alloy]
-    volumes: [../../examples/security-monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro]
+    command: [run, --storage.path=/var/lib/alloy/data, --stability.level=public-preview, /etc/alloy/config.alloy]
+    volumes: [../../examples/security-monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro, alloy-data:/var/lib/alloy/data]
   prometheus:
     image: docker.io/prom/prometheus:v3.5.0
     command: [--config.file=/etc/prometheus/prometheus.yml, --web.enable-remote-write-receiver]
@@ -44,3 +44,6 @@ services:
 networks:
   default:
     internal: true
+
+volumes:
+  alloy-data: {}

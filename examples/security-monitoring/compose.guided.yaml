@@ -661,7 +661,7 @@ services:
   guided-alloy:
     image: docker.io/grafana/alloy:v1.18.0
     container_name: llm-security-guided-alloy
-    command: [run, --server.http.listen-addr=0.0.0.0:12345, /etc/alloy/config.alloy]
+    command: [run, --server.http.listen-addr=0.0.0.0:12345, --storage.path=/var/lib/alloy/data, --stability.level=public-preview, /etc/alloy/config.alloy]
     volumes: [./alloy/config.alloy:/etc/alloy/config.alloy:ro, guided-alloy-data:/var/lib/alloy/data]
     networks: {guided: {aliases: [alloy]}}
     depends_on: {guided-loki: {condition: service_healthy}, guided-tempo: {condition: service_healthy}}
