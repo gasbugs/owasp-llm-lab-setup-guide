@@ -42,6 +42,11 @@ Refined plan: do not fail open security decisions because telemetry is unavailab
 do not make logging a synchronous remote dependency; do not label a persistent
 queue as exactly-once or loss-free. Acknowledgement boundaries are explicit:
 Application -> Monitor DB -> Monitor log delivery -> Alloy queue -> backend.
+Alloy has no volatile batch processor before its persistent exporter queues: an
+HTTP acknowledgement must not commit only to a memory batch. Acceptance includes
+a direct receiver acknowledgement followed immediately by SIGKILL during a Loki
+outage, then replay of the same incident ID. Trace SDK batches remain a separate
+pre-ingress limitation.
 Monitor deduplicates producer retries. Backend retries can still duplicate logs;
 use event_id for investigations. Local disk loss and storage exhaustion remain
 visible residual risks; replication, legal retention, TLS/identity at collector
@@ -65,12 +70,12 @@ response before relying on this stack for longer investigations.
 
 ## Verified implementation (2026-10-07)
 
-- Python 3.12 unit suite: 1,721 tests, one existing skip.
+- Python 3.12 unit suite: 1,722 tests, one existing skip.
 - Actual Application/Monitor images: six boundary tests and two log delivery tests.
 - `tests/e2e/security-monitoring/check_mtl_reliability.py`: actual Loki, Tempo,
   Prometheus and pinned Alloy; producer/outbox/collector/backend restart cases
-  passed. Correlation request `831b145b-e5ff-416e-90ad-5dc20d57df9d`, Trace
-  `19a70434386750c1dab595f0b4ac8036`. This uses a fixture Hub, not AWS inference.
+  and immediate receiver acknowledgement/SIGKILL replay passed. Correlation request `e07be988-5943-4cc3-8e55-dfbb3727061f`, Trace
+  `1f57a107e49f0fdb90e90ce8accea390`. This uses a fixture Hub, not AWS inference.
 - Existing Module 09 Docker observability E2E: normal/block/redaction,
   Log/Trace, firing/resolved alert, collector failure drill and Grafana passed
   twice with `USE_REAL_BEDROCK=false RUN_FAILURE_DRILL=true`.

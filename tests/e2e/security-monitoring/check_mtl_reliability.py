@@ -97,7 +97,7 @@ scrape_configs:
             "gateway": {"image": "localhost/mtl-monitor:review", "environment": {**common,"LLM_MONITOR_TOKEN":token,"LLM_MONITOR_ADMIN_TOKEN":token},
                         "ports": ["127.0.0.1::8080"], "volumes": ["gateway-events:/data"]},
             "alloy": {"image":"docker.io/grafana/alloy:v1.18.0", "command":["run","--server.http.listen-addr=0.0.0.0:12345","--storage.path=/var/lib/alloy/data","--stability.level=public-preview","--disable-reporting","/etc/alloy/config.alloy"],
-                      "volumes":[f"{EXAMPLE}/alloy/config.alloy:/etc/alloy/config.alloy:ro","alloy-data:/var/lib/alloy/data"],"ports":["127.0.0.1::12345"]},
+                      "volumes":[f"{EXAMPLE}/alloy/config.alloy:/etc/alloy/config.alloy:ro","alloy-data:/var/lib/alloy/data"],"ports":["127.0.0.1::12345","127.0.0.1::4318"]},
             "loki":{"image":"docker.io/grafana/loki:3.5.3","command":["-config.file=/etc/loki/config.yaml"],
                     "volumes":[f"{EXAMPLE}/loki-config.yaml:/etc/loki/config.yaml:ro","loki-data:/loki"],"ports":["127.0.0.1::3100"]},
             "tempo":{"image":"docker.io/grafana/tempo:3.0.2","command":["-target=all","-config.file=/etc/tempo/config.yaml"],
@@ -171,6 +171,19 @@ scrape_configs:
             loki, tempo = url("loki",3100), url("tempo",3200)
             wait(lambda: logs_for(third["request_id"]), "persistent Alloy log replay")
             wait(lambda: request(tempo+"/api/traces/"+third["trace_id"])[0]==200, "persistent Alloy trace replay")
+            # Prove the receiver never acknowledges a log held only in a volatile batch.
+            compose("stop", "loki")
+            immediate_id = str(uuid.uuid4())
+            immediate = {"request_id": immediate_id, "id": str(uuid.uuid4()), "raw_stored": False}
+            otlp = {"resourceLogs": [{"resource": {"attributes": [
+                {"key": "service.name", "value": {"stringValue": "llm-security-gateway"}}]},
+                "scopeLogs": [{"logRecords": [{"timeUnixNano": str(time.time_ns()),
+                    "body": {"stringValue": json.dumps(immediate)}}]}]}]}
+            assert request(url("alloy", 4318)+"/v1/logs", otlp)[0] == 200
+            compose("kill", "-s", "SIGKILL", "alloy")
+            compose("start", "alloy", "loki")
+            loki, alloy = url("loki", 3100), url("alloy", 12345)
+            wait(lambda: logs_for(immediate_id), "receiver acknowledgement survives immediate SIGKILL")
             bodies=json.dumps(events())
             assert "normal-secret-payload" not in bodies and "private@example.com" not in bodies
             assert login["access_token"] not in bodies
@@ -179,7 +192,7 @@ scrape_configs:
             assert float(metrics[0]["value"][1])>=1
             print(json.dumps({"result":"PASS","project":PROJECT,"request_id":request_id,"trace_id":trace_id,
                               "cases":["Application outbox restart","Monitor log outbox restart","Alloy persistent log and trace queue restart",
-                                       "stage and policy correlation","metadata privacy","actual Prometheus decision metric"]},indent=2))
+                                       "acknowledgement then immediate SIGKILL replay", "stage and policy correlation","metadata privacy","actual Prometheus decision metric"]},indent=2))
         finally:
             diagnostics=compose("logs","--tail","30")
             Path("/tmp/mtl-acceptance-diagnostics.log").write_text(diagnostics)
