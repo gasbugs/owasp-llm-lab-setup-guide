@@ -31,4 +31,4 @@ RUN install -d -o 65532 -g 65532 -m 0700 /app/state
 USER 65532:65532
 EXPOSE 8000
 # Application은 외부 요청을 받고 정책·Presidio·NeMo·Bedrock 내부 호출 순서를 조정한다.
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning", "--no-proxy-headers"]

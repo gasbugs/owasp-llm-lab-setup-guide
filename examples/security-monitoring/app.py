@@ -984,6 +984,7 @@ def collect_guardrail_event(
             **{key: payload[key] for key in (
                 "stage_name", "stage_order", "policy_bundle_version", "assurance_profile",
                 "classification", "subject_hash", "auth_action", "http_status",
+                "user_id", "attempted_user_id", "client_ip", "client_ip_source", "http_method", "http_path",
                 "source_service", "source_version", "occurred_at_ns",
                 "input_hmac_sha256", "main_stop_reason", "model_id", "roles", "token_hash", "client_ip_hash", "application_stages", "application_policy_id", "retrieval_called",
             ) if key in payload},

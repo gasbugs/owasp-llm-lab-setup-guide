@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from urllib.request import Request, urlopen
 
 FIELDS = {
+    "user_id", "attempted_user_id", "client_ip", "client_ip_source", "http_method", "http_path",
     "event", "engine", "direction", "decision", "blocking_reason", "request_id",
     "trace_id", "guard_mode", "guard_model_calls", "upstream_called", "duration_ms",
     "entity_types", "stage_name", "stage_order", "policy_bundle_version",
@@ -65,7 +66,7 @@ class AuditDelivery:
         event_id = str(uuid.uuid4())
         event["event_id"] = event_id
         event.setdefault("occurred_at_ns", str(time.time_ns()))
-        # Authentication identity is pseudonymous. User content is never allowlisted.
+        # Server-verified identity and transport peer accompany pseudonymous correlation keys. User content is never allowlisted.
         if "subject" in payload:
             event["subject_hash"] = self.identity(payload["subject"])
         if "client_ip" in payload:

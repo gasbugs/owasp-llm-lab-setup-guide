@@ -29,7 +29,7 @@ class ApplicationAuditPaths(unittest.TestCase):
     def setUp(self):
         with sqlite3.connect(Path(TEMP.name) / "audit-outbox.db") as db:
             db.execute("DELETE FROM pending")
-        self.client = TestClient(server.app)
+        self.client = TestClient(server.app, client=("203.0.113.10", 49152))
         login = self.client.post("/.well-known/login", json={"username": "public-reader", "password": "public-reader-demo"})
         self.assertEqual(login.status_code, 200)
         self.headers = {"Authorization": "Bearer " + login.json()["access_token"]}
@@ -51,6 +51,46 @@ class ApplicationAuditPaths(unittest.TestCase):
         self.assertFalse(event["upstream_called"])
         self.assertEqual(event["classification"], "internal")
         self.assertEqual(len(event["subject_hash"]), 64)
+    def test_transport_ip_and_authenticated_account_are_retained_without_spoofing(self):
+        headers = {**self.headers, "X-Forwarded-For": "198.51.100.99", "Forwarded": "for=198.51.100.99"}
+        self.client.post("/api/chat", json={"message": "internal", "classification": "internal", "purpose": "incident_response"}, headers=headers)
+        event = self.events()[-1]
+        self.assertEqual(event["client_ip"], "203.0.113.10")
+        self.assertEqual(event["client_ip_source"], "transport_peer")
+        self.assertEqual(event["user_id"], "public-reader")
+        self.assertEqual(event["http_path"], "/api/chat")
+        self.assertEqual(event["http_method"], "POST")
+        self.assertEqual(event["http_status"], 200)
+        self.assertEqual(len(event["client_ip_hash"]), 64)
+        self.assertNotIn(self.headers["Authorization"], json.dumps(self.events()))
+        self.client.post("/.well-known/login", json={"username": "claimed-admin", "password": "secret-password"})
+        failed = [item for item in self.events() if item.get("attempted_user_id") == "claimed-admin"][0]
+        self.assertNotIn("user_id", failed)
+        self.assertEqual(failed["http_status"], 401)
+        self.assertEqual(failed["client_ip"], "203.0.113.10")
+        self.assertNotIn("secret-password", json.dumps(self.events()))
+
+    def test_identity_reaches_all_normal_and_guardrail_decision_events(self):
+        real_client = httpx.AsyncClient
+        for blocked in (False, True):
+            def upstream(request):
+                payload = json.loads(request.content)
+                return httpx.Response(200, request=request, json={
+                    "request_id": payload["request_id"], "reply": "fixture response",
+                    "guardrail": {"decision": "block" if blocked else "allow", "mode": "prevent",
+                                  "upstream_called": not blocked, "guard_model_calls": 0,
+                                  "stages": [{"stage": "presidio_input", "engine": "presidio", "decision": "block" if blocked else "allow"}]}})
+            transport = httpx.MockTransport(upstream)
+            with patch.object(server.httpx, "AsyncClient", side_effect=lambda **kw: real_client(transport=transport, **kw)):
+                result = self.client.post("/api/chat", json={"message": "fixture"}, headers=self.headers).json()
+            events = [e for e in self.events() if e["request_id"] == result["request_id"]]
+            self.assertEqual({e["event"] for e in events}, {"control_plane_decision", "control_plane_stage"})
+            for event in events:
+                self.assertEqual(event["user_id"], "public-reader")
+                self.assertEqual(event["client_ip"], "203.0.113.10")
+                self.assertEqual(len(event["token_hash"]), 64)
+                self.assertEqual(event["http_path"], "/api/chat")
+
     def test_upstream_http_error_is_recorded_as_unknown_not_no_execution(self):
         real_client = httpx.AsyncClient
         transport = httpx.MockTransport(lambda request: httpx.Response(503, request=request))

@@ -38,11 +38,14 @@ class DurableSecurityDeliveryTests(unittest.TestCase):
     def test_metadata_allowlist_and_pseudonymous_identity(self):
         event_id = self.queue.enqueue({"subject": "reader@example.com", "request_id": "r001",
                                       "message": "secret prompt", "password": "password-secret",
-                                      "access_token": "token-secret", "client_ip": "192.0.2.2"})
+                                      "access_token": "token-secret", "client_ip": "192.0.2.2", "user_id": "public-reader"})
         body = self.rows()[0][1]
         self.assertEqual(json.loads(body)["event_id"], event_id)
         self.assertEqual(len(json.loads(body)["subject_hash"]), 64)
-        for secret in ("reader@example.com", "secret prompt", "password-secret", "token-secret", "192.0.2.2"):
+        self.assertEqual(json.loads(body)["client_ip"], "192.0.2.2")
+        self.assertEqual(json.loads(body)["user_id"], "public-reader")
+        self.assertEqual(len(json.loads(body)["client_ip_hash"]), 64)
+        for secret in ("reader@example.com", "secret prompt", "password-secret", "token-secret"):
             self.assertNotIn(secret, body)
     def test_failed_delivery_survives_restart_and_replays_same_id(self):
         event_id = self.queue.enqueue({"request_id": "r001"})

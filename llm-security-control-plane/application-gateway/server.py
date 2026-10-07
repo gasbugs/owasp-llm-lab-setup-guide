@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
+from contextvars import ContextVar
 from html import escape
 import json
 import os
@@ -104,6 +106,9 @@ def audit_metrics():
     return audit_delivery.metrics() + generate_latest().decode()
 
 
+audit_request_context = ContextVar("audit_request_context", default=None)
+
+
 HTTP_REQUESTS = Counter("llm_application_http_requests_total", "Application HTTP outcomes", ["route", "method", "status_class"])
 HTTP_DURATION = Histogram("llm_application_http_duration_seconds", "Application request duration", ["route", "method"])
 
@@ -112,11 +117,26 @@ HTTP_DURATION = Histogram("llm_application_http_duration_seconds", "Application 
 async def observe_http_outcome(request: Request, call_next):
     started = time.perf_counter()
     status = 500
+    peer = request.client.host if request.client else None
+    try:
+        client_ip = str(ipaddress.ip_address(peer)) if peer else None
+    except ValueError:
+        client_ip = None
+    context = audit_request_context.set({
+        "client_ip": client_ip,
+        "client_ip_source": "transport_peer",
+        "http_method": request.method,
+        "http_path": request.url.path if request.url.path in {
+            "/api/chat", "/.well-known/login", "/api/auth/refresh", "/api/auth/logout",
+            "/api/auth/keys/rotate", "/api/security/policy", "/.well-known/jwks.json",
+        } else "other",
+    })
     try:
         response = await call_next(request)
         status = response.status_code
         return response
     finally:
+        audit_request_context.reset(context)
         route = getattr(request.scope.get("route"), "path", "other")
         if route not in {"/metrics", "/healthz", "/"}:
             method = request.method if request.method in {"GET", "POST"} else "other"
@@ -134,8 +154,8 @@ def audit_application_stages(result: dict) -> list[dict]:
 def queue_audit_event(payload: dict) -> None:
     if not SECURITY_MONITOR_URL or not TELEMETRY_INGEST_TOKEN:
         return
-    payload = {"trace_id": current_trace_id(), "source_service": "application",
-               "source_version": RELEASE_VERSION, "application_policy_id": public_policy()["policy_id"], **payload}
+    payload = {**(audit_request_context.get() or {}), "trace_id": current_trace_id(), "source_service": "application",
+               "source_version": RELEASE_VERSION, "http_status": 200, "application_policy_id": public_policy()["policy_id"], **payload}
     try:
         if audit_delivery.enqueue(payload) is None:
             emit_metadata({"event": "audit_delivery_queue_full"})
@@ -209,7 +229,7 @@ async def emit_auth_event(event: dict) -> None:
         **event,
     }
     if "stdout" in AUTH_EVENT_SINK:
-        safe = {key: value for key, value in payload.items() if key not in {"subject", "client_ip", "jti", "token_fingerprint"}}
+        safe = {key: value for key, value in payload.items() if key not in {"subject", "jti", "token_fingerprint"}}
         safe["subject_hash"] = audit_delivery.identity(payload.get("subject"))
         emit_metadata(safe)
     if "monitor" in AUTH_EVENT_SINK:
@@ -250,6 +270,7 @@ async def observe_guardrail(result: dict) -> None:
         "classification": result.get("classification"),
         "input_hmac_sha256": result.get("input_hmac_sha256"),
         "subject_hash": audit_delivery.identity(result.get("authenticated_subject")),
+        "user_id": result.get("authenticated_subject"),
         "roles": result.get("authenticated_roles"),
         "application_stages": audit_application_stages(result),
         "retrieval_called": result.get("retrieval_called"),
@@ -296,6 +317,7 @@ async def observe_application_decision(result: dict, direction: str) -> None:
         "classification": result.get("classification"),
         "input_hmac_sha256": result.get("input_hmac_sha256"),
         "subject_hash": audit_delivery.identity(result.get("authenticated_subject")),
+        "user_id": result.get("authenticated_subject"),
         "roles": result.get("authenticated_roles"),
         "application_stages": audit_application_stages(result),
         "retrieval_called": result.get("retrieval_called"),
@@ -340,9 +362,9 @@ async def login(credentials: LoginRequest, request: Request) -> Response:
             "request_id": request_id,
             "trace_id": trace_id,
             "decision": "block",
+            "http_status": 401,
             "blocking_reason": str(exc),
-            "subject": credentials.username,
-            "client_ip": request.client.host if request.client else None,
+            "attempted_user_id": credentials.username,
         })
         raise HTTPException(
             status_code=401,
@@ -353,8 +375,8 @@ async def login(credentials: LoginRequest, request: Request) -> Response:
         "request_id": request_id,
         "decision": "allow",
         "subject": pair["subject"],
+        "user_id": pair["subject"],
         "jti": pair["access_jti"],
-        "client_ip": request.client.host if request.client else None,
     })
     response = JSONResponse({
         "access_token": pair["access_token"],
@@ -382,25 +404,25 @@ async def refresh(
         await emit_auth_event({
             "request_id": request_id,
             "decision": "block",
+            "http_status": 401,
             "blocking_reason": str(exc),
-            "client_ip": request.client.host if request.client else None,
         })
         raise HTTPException(status_code=401, detail="refresh token reuse detected") from exc
     except AuthError as exc:
         await emit_auth_event({
             "request_id": request_id,
             "decision": "block",
+            "http_status": 401,
             "blocking_reason": str(exc),
-            "client_ip": request.client.host if request.client else None,
         })
         raise HTTPException(status_code=401, detail="invalid refresh token") from exc
     await emit_auth_event({
         "request_id": request_id,
         "decision": "allow",
         "subject": pair["subject"],
+        "user_id": pair["subject"],
         "jti": pair["access_jti"],
         "auth_action": "refresh",
-        "client_ip": request.client.host if request.client else None,
     })
     response = JSONResponse({
         "access_token": pair["access_token"],
@@ -435,8 +457,9 @@ async def logout(
         "request_id": str(uuid.uuid4()),
         "decision": "allow",
         "subject": subject,
+        "user_id": subject,
         "auth_action": "logout",
-        "client_ip": request.client.host if request.client else None,
+        "http_status": 204,
     })
     response = Response(status_code=204)
     response.delete_cookie("__Host-lab_refresh", path="/")
@@ -488,12 +511,18 @@ async def chat(
         await emit_auth_event({
             "request_id": request_id,
             "decision": "block",
+            "http_status": 401,
             "blocking_reason": str(exc),
             "token_fingerprint": token_fingerprint(authorization),
-            "client_ip": request_context.client.host if request_context.client else None,
         })
         raise HTTPException(status_code=401, detail=str(exc),
                             headers={"X-Request-ID": request_id, "X-Trace-ID": current_trace_id() or ""}) from exc
+
+    identity = audit_request_context.get()
+    if identity is not None:
+        identity["user_id"] = principal.subject
+        identity["roles"] = sorted(principal.roles)
+        identity["token_hash"] = token_fingerprint(authorization)
 
     # 2) 인증된 Principal의 역할·목적·데이터 등급으로 RAG 접근을 인가한다.
     # 차단 시 NeMo Hub와 Main Model은 호출되지 않는다.

@@ -37,7 +37,9 @@ class MonitorAuditPaths(unittest.TestCase):
                       "trace_id": "a"*32, "engine": "nemo", "direction": "input", "decision": "block",
                       "stage_name": "application_self_check_input", "policy_bundle_version": "1.1.0",
                       "guard_model_calls": 1, "message": "secret-prompt", "original_text": "secret-original",
-                      "access_token": "secret-token", "subject_hash": "b"*64}
+                      "access_token": "secret-token", "subject_hash": "b"*64,
+                      "user_id": "public-reader", "client_ip": "203.0.113.10",
+                      "client_ip_source": "transport_peer", "http_method": "POST", "http_path": "/api/chat"}
     def tearDown(self):
         self.client.__exit__(None, None, None)
     def send(self):
@@ -56,6 +58,9 @@ class MonitorAuditPaths(unittest.TestCase):
             self.assertNotIn(secret, body)
         self.assertIn("application_self_check_input", body)
         self.assertIn("1.1.0", body)
+        self.assertIn("203.0.113.10", body)
+        self.assertIn("public-reader", body)
+        self.assertIn("transport_peer", body)
     def test_committed_log_replays_after_exporter_restart(self):
         self.send()
         with patch.object(log_delivery, "urlopen", side_effect=OSError("down")):
