@@ -51,6 +51,7 @@ services:
       - --server.http.listen-addr=0.0.0.0:12345
       - --storage.path=/var/lib/alloy/data
       - --disable-reporting
+      - --stability.level=public-preview
       - /etc/alloy/config.alloy
     ports:
       - 127.0.0.1:${ALLOY_HOST_PORT:-12345}:12345
@@ -76,6 +77,7 @@ services:
     volumes:
       - ${PROMETHEUS_CONFIG_SOURCE:-./prometheus.yml}:/etc/prometheus/prometheus.yml:ro
       - ${PROMETHEUS_RULES_SOURCE:-./alert-rules.yml}:/etc/prometheus/alert-rules.yml:ro
+      - ./application-targets.json:/etc/prometheus/application-targets.json:ro
       - prometheus-data:/prometheus
     networks: [default]
     security_opt: [no-new-privileges]

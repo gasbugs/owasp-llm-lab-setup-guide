@@ -6,5 +6,5 @@ name: llm-security-module10
 include:
   - path: ../../llm-security-control-plane/compose.yaml
     env_file: ../../llm-security-control-plane/.state/module10-compose.env
-  - path: ./compose.yaml
+  - path: [./compose.yaml, ./compose.application-metrics.yaml]
     env_file: ../../llm-security-control-plane/.state/module10-compose.env

@@ -17,6 +17,10 @@ scrape_configs:
     static_configs:
       - targets: ["gateway:8080"]
 
+  - job_name: llm-security-application
+    file_sd_configs:
+      - files: ["/etc/prometheus/application-targets.json"]
+
   - job_name: amazon-bedrock-gateway
     static_configs:
       - targets: ["llm-security-bedrock-gateway:8080"]

@@ -1,0 +1,5 @@
+# CUSTOM FILE: add the actual Application scrape target only in the integrated stack.
+services:
+  prometheus:
+    volumes:
+      - ./application-targets.integrated.json:/etc/prometheus/application-targets.json:ro

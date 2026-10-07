@@ -21,6 +21,7 @@ COPY --chmod=0444 policies/application-policy.yaml /app/policies/application-pol
 COPY --chmod=0444 policies/application-users.yaml /app/policies/application-users.yaml
 COPY --chmod=0444 application-gateway/auth.py /app/auth.py
 COPY --chmod=0444 application-gateway/policy.py /app/policy.py
+COPY --chmod=0444 application-gateway/audit_delivery.py /app/audit_delivery.py
 COPY --chmod=0444 application-gateway/server.py /app/server.py
 COPY --chmod=0444 application-gateway/index.html /app/index.html
 # 런타임 상태만 non-root 프로세스가 쓰도록 전용 디렉터리 권한을 제한한다.

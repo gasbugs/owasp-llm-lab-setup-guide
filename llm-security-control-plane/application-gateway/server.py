@@ -21,7 +21,12 @@ from typing import Optional
 
 import httpx
 from fastapi import Cookie, FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler, http_exception_handler
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from prometheus_client import Counter, Histogram, generate_latest
+from audit_delivery import AuditDelivery, PublicTraceBoundary
 from pydantic import BaseModel, ConfigDict, Field
 
 from auth import AuthError, AuthService, InvalidCredentials, TokenReplay
@@ -73,6 +78,100 @@ auth_service = AuthService(
 app = FastAPI(title="LLM security application gateway", docs_url=None, redoc_url=None)
 configure_telemetry(app, "llm-security-application-gateway")
 
+# Delivery persistence is independent of security decisions and remote availability.
+identity_key = os.getenv("TELEMETRY_HMAC_KEY", "")
+if SECURITY_MONITOR_URL and not identity_key:
+    raise RuntimeError("TELEMETRY_HMAC_KEY required for connected audit delivery")
+audit_delivery = AuditDelivery(
+    Path(AUTH_STATE_DIR) / "audit-outbox.db",
+    f"{SECURITY_MONITOR_URL}/api/events/guardrail" if SECURITY_MONITOR_URL else "",
+    TELEMETRY_INGEST_TOKEN, identity_key,
+)
+
+
+@app.on_event("startup")
+def start_audit_delivery():
+    audit_delivery.start()
+
+
+@app.on_event("shutdown")
+def stop_audit_delivery():
+    audit_delivery.stop()
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def audit_metrics():
+    return audit_delivery.metrics() + generate_latest().decode()
+
+
+HTTP_REQUESTS = Counter("llm_application_http_requests_total", "Application HTTP outcomes", ["route", "method", "status_class"])
+HTTP_DURATION = Histogram("llm_application_http_duration_seconds", "Application request duration", ["route", "method"])
+
+
+@app.middleware("http")
+async def observe_http_outcome(request: Request, call_next):
+    started = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        route = getattr(request.scope.get("route"), "path", "other")
+        if route not in {"/metrics", "/healthz", "/"}:
+            method = request.method if request.method in {"GET", "POST"} else "other"
+            status_class = f"{status // 100}xx"
+            HTTP_REQUESTS.labels(route=route, method=method, status_class=status_class).inc()
+            HTTP_DURATION.labels(route=route, method=method).observe(time.perf_counter()-started)
+
+
+
+def audit_application_stages(result: dict) -> list[dict]:
+    return [{key: stage[key] for key in ("stage", "decision", "classification", "hit_count", "chunk_count") if key in stage}
+            for stage in result.get("application_stages", [])]
+
+
+def queue_audit_event(payload: dict) -> None:
+    if not SECURITY_MONITOR_URL or not TELEMETRY_INGEST_TOKEN:
+        return
+    payload = {"trace_id": current_trace_id(), "source_service": "application",
+               "source_version": RELEASE_VERSION, "application_policy_id": public_policy()["policy_id"], **payload}
+    try:
+        if audit_delivery.enqueue(payload) is None:
+            emit_metadata({"event": "audit_delivery_queue_full"})
+    except Exception:
+        audit_delivery.storage_errors += 1
+        emit_metadata({"event": "audit_delivery_storage_error"})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def observe_http_error(request: Request, exc: StarletteHTTPException):
+    request_id = (exc.headers or {}).get("X-Request-ID") or str(uuid.uuid4())
+    trace_id = current_trace_id()
+    queue_audit_event({"event": "application_http_error", "engine": "application",
+                      "direction": "input", "decision": "block" if exc.status_code < 500 else "infra",
+                      "request_id": request_id, "http_status": exc.status_code,
+                      "stage_name": "http_response", "blocking_reason": f"http-{exc.status_code}"})
+    response = await http_exception_handler(request, exc)
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Trace-ID"] = trace_id or ""
+    return response
+
+
+@app.exception_handler(RequestValidationError)
+async def observe_invalid_request(request: Request, exc: RequestValidationError):
+    # Do not export validation errors: they contain rejected body values.
+    request_id = str(uuid.uuid4())
+    queue_audit_event({"event": "application_validation", "engine": "application",
+                      "direction": "input", "decision": "block", "http_status": 422,
+                      "request_id": request_id, "stage_name": "request_validation",
+                      "blocking_reason": "invalid-request-schema", "upstream_called": False})
+    response = await request_validation_exception_handler(request, exc)
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Trace-ID"] = current_trace_id() or ""
+    return response
+
+
 
 class ChatRequest(BaseModel):
     # extra="forbid"는 공격자가 정의되지 않은 권한·Tenant 필드를 끼워 넣지 못하게 한다.
@@ -94,7 +193,7 @@ def emit_metadata(event: dict) -> None:
 
 def token_fingerprint(authorization: Optional[str]) -> Optional[str]:
     token = (authorization or "").partition(" ")[2]
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:16] if token else None
+    return audit_delivery.identity(token) if token else None
 
 
 async def emit_auth_event(event: dict) -> None:
@@ -102,26 +201,19 @@ async def emit_auth_event(event: dict) -> None:
         "event": "application_authentication",
         "engine": "application-auth",
         "direction": "authentication",
+        "trace_id": current_trace_id(),
+        "stage_name": "application_authentication",
+        "auth_action": event.get("auth_action", "authenticate"),
+        "token_hash": event.get("token_fingerprint"),
+        "upstream_called": False,
         **event,
     }
     if "stdout" in AUTH_EVENT_SINK:
-        emit_metadata(payload)
-    if (
-        "monitor" not in AUTH_EVENT_SINK
-        or not SECURITY_MONITOR_URL
-        or not TELEMETRY_INGEST_TOKEN
-    ):
-        return
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            response = await client.post(
-                f"{SECURITY_MONITOR_URL}/api/events/guardrail",
-                headers={"X-Telemetry-Token": TELEMETRY_INGEST_TOKEN},
-                json=payload,
-            )
-            response.raise_for_status()
-    except httpx.HTTPError:
-        emit_metadata({"event": "auth_event_delivery_failed", "request_id": payload.get("request_id")})
+        safe = {key: value for key, value in payload.items() if key not in {"subject", "client_ip", "jti", "token_fingerprint"}}
+        safe["subject_hash"] = audit_delivery.identity(payload.get("subject"))
+        emit_metadata(safe)
+    if "monitor" in AUTH_EVENT_SINK:
+        queue_audit_event(payload)
 
 
 def require_browser_origin(origin: Optional[str]) -> None:
@@ -151,11 +243,21 @@ async def observe_guardrail(result: dict) -> None:
         "trace_id": result.get("trace_id"),
         "guard_mode": guardrail.get("mode"),
         "upstream_called": guardrail.get("upstream_called"),
-        "guard_model_calls": guardrail.get("guard_model_calls", 0),
+        "guard_model_calls": 0,
+        "policy_bundle_version": guardrail.get("policy_bundle_version"),
+        "assurance_profile": guardrail.get("assurance_profile"),
+        "stage_order": guardrail.get("stage_order"),
+        "classification": result.get("classification"),
+        "input_hmac_sha256": result.get("input_hmac_sha256"),
+        "subject_hash": audit_delivery.identity(result.get("authenticated_subject")),
+        "roles": result.get("authenticated_roles"),
+        "application_stages": audit_application_stages(result),
+        "retrieval_called": result.get("retrieval_called"),
     }
     events = [{
         **common,
         "event": "control_plane_decision",
+        "guard_model_calls": guardrail.get("guard_model_calls", 0),
         "engine": "nemo",
         "direction": "chat",
         "decision": guardrail.get("decision", "infra"),
@@ -171,22 +273,18 @@ async def observe_guardrail(result: dict) -> None:
         events.append({
             **common,
             "event": "control_plane_stage",
+            "stage_name": stage.get("stage"),
+            "blocking_reason": stage.get("blocking_reason"),
+            "main_stop_reason": stage.get("stop_reason"),
+            "model_id": stage.get("model"),
             "engine": engine,
             "direction": direction,
             "decision": decision,
             "duration_ms": stage.get("duration_ms", 0),
             "entity_types": stage.get("entity_types", []),
         })
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            for event in events:
-                await client.post(
-                    f"{SECURITY_MONITOR_URL}/api/events/guardrail",
-                    headers={"X-Telemetry-Token": TELEMETRY_INGEST_TOKEN},
-                    json=event,
-                )
-    except httpx.HTTPError:
-        emit_metadata({"event": "telemetry_delivery_failed", "request_id": result.get("request_id")})
+    for event in events:
+        queue_audit_event(event)
 
 
 async def observe_application_decision(result: dict, direction: str) -> None:
@@ -194,6 +292,13 @@ async def observe_application_decision(result: dict, direction: str) -> None:
         return
     payload = {
         "event": "application_decision",
+        "stage_name": direction,
+        "classification": result.get("classification"),
+        "input_hmac_sha256": result.get("input_hmac_sha256"),
+        "subject_hash": audit_delivery.identity(result.get("authenticated_subject")),
+        "roles": result.get("authenticated_roles"),
+        "application_stages": audit_application_stages(result),
+        "retrieval_called": result.get("retrieval_called"),
         "engine": "application",
         "direction": direction,
         "request_id": result.get("request_id"),
@@ -204,16 +309,7 @@ async def observe_application_decision(result: dict, direction: str) -> None:
         "guard_model_calls": 0,
         "duration_ms": result.get("duration_ms", 0),
     }
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            response = await client.post(
-                f"{SECURITY_MONITOR_URL}/api/events/guardrail",
-                headers={"X-Telemetry-Token": TELEMETRY_INGEST_TOKEN},
-                json=payload,
-            )
-            response.raise_for_status()
-    except httpx.HTTPError:
-        emit_metadata({"event": "telemetry_delivery_failed", "request_id": result.get("request_id")})
+    queue_audit_event(payload)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -375,6 +471,8 @@ async def chat(
     started = time.perf_counter()
     request_id = str(uuid.uuid4())
     application_stages: list[dict] = []
+    input_identity = audit_delivery.identity(request.message)
+    retrieval_called = False
 
     # 1) 인증은 모델을 호출하기 전에 Application이 결정한다.
     try:
@@ -394,7 +492,8 @@ async def chat(
             "token_fingerprint": token_fingerprint(authorization),
             "client_ip": request_context.client.host if request_context.client else None,
         })
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+        raise HTTPException(status_code=401, detail=str(exc),
+                            headers={"X-Request-ID": request_id, "X-Trace-ID": current_trace_id() or ""}) from exc
 
     # 2) 인증된 Principal의 역할·목적·데이터 등급으로 RAG 접근을 인가한다.
     # 차단 시 NeMo Hub와 Main Model은 호출되지 않는다.
@@ -411,6 +510,7 @@ async def chat(
         if retrieval:
             # 인증·인가가 끝난 뒤에만 자격 증명 격리 Gateway에 검색을 요청한다.
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+                retrieval_called = None
                 response = await client.post(
                     f"{MODEL_GATEWAY_URL}/v1/retrieve",
                     headers={"Authorization": f"Bearer {BEDROCK_GATEWAY_TOKEN}"},
@@ -418,6 +518,7 @@ async def chat(
                 )
                 response.raise_for_status()
                 hits = response.json().get("hits", [])
+                retrieval_called = True
             application_stages.append(
                 {
                     "stage": "knowledge_base_retrieval",
@@ -455,6 +556,14 @@ async def chat(
             "upstream_called": False,
             "application_stages": application_stages,
         }
+        result["trace_id"] = current_trace_id()
+        result["duration_ms"] = round((time.perf_counter()-started)*1000, 2)
+        result["retrieval_called"] = retrieval_called
+        result["input_hmac_sha256"] = input_identity
+        result["classification"] = request.classification
+        result["authenticated_subject"] = principal.subject
+        result["authenticated_roles"] = sorted(principal.roles)
+        await observe_application_decision(result, "chat")
         emit_metadata({"event": "application_chat", **result, "reply": None})
         return result
     except AuthorizationError as exc:
@@ -475,6 +584,11 @@ async def chat(
             "upstream_called": False,
             "application_stages": application_stages,
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            "classification": request.classification,
+            "authenticated_subject": principal.subject,
+            "authenticated_roles": sorted(principal.roles),
+            "input_hmac_sha256": input_identity,
+            "retrieval_called": retrieval_called,
         }
         emit_metadata({"event": "application_chat", **result, "reply": None})
         await observe_application_decision(result, "authorization")
@@ -502,29 +616,50 @@ async def chat(
             "reply": "guardrail infrastructure unavailable",
             "application_decision": "infra",
             "blocking_reason": f"nemo-hub:{type(exc).__name__}",
-            "upstream_called": False,
+            "upstream_called": None,
             "application_stages": application_stages,
         }
+        result["trace_id"] = current_trace_id()
+        result["duration_ms"] = round((time.perf_counter()-started)*1000, 2)
+        result["retrieval_called"] = retrieval_called
+        result["input_hmac_sha256"] = input_identity
+        result["classification"] = request.classification
+        result["authenticated_subject"] = principal.subject
+        result["authenticated_roles"] = sorted(principal.roles)
+        await observe_application_decision(result, "chat")
         emit_metadata({"event": "application_chat", **result, "reply": None})
         return result
 
     # 4) 내부 서비스 응답도 신뢰하지 않는다. request_id와 필수 계약을 검증하고
     # 계약이 깨지면 응답을 사용자에게 전달하지 않고 fail closed 한다.
-    guardrail = hub.get("guardrail")
+    guardrail = hub.get("guardrail") if isinstance(hub, dict) else None
     if (
-        hub.get("request_id") != request_id
+        not isinstance(hub, dict)
+        or hub.get("request_id") != request_id
         or not isinstance(hub.get("reply"), str)
         or not isinstance(guardrail, dict)
         or guardrail.get("decision") not in {"allow", "redact", "block", "infra"}
+        or not isinstance(guardrail.get("upstream_called"), bool)
+        or not isinstance(guardrail.get("stages", []), list)
+        or any(not isinstance(stage, dict) or not isinstance(stage.get("stage"), str)
+               for stage in guardrail.get("stages", []))
     ):
         result = {
             "request_id": request_id,
             "reply": "guardrail infrastructure unavailable",
             "application_decision": "infra",
             "blocking_reason": "nemo-hub:invalid-contract",
-            "upstream_called": False,
+            "upstream_called": None,
             "application_stages": application_stages,
         }
+        result["trace_id"] = current_trace_id()
+        result["duration_ms"] = round((time.perf_counter()-started)*1000, 2)
+        result["retrieval_called"] = retrieval_called
+        result["input_hmac_sha256"] = input_identity
+        result["classification"] = request.classification
+        result["authenticated_subject"] = principal.subject
+        result["authenticated_roles"] = sorted(principal.roles)
+        await observe_application_decision(result, "chat")
         emit_metadata({"event": "application_chat", **result, "reply": None})
         return result
 
@@ -543,6 +678,9 @@ async def chat(
         "blocking_reason": guardrail.get("blocking_reason"),
         "upstream_called": bool(guardrail.get("upstream_called")),
         "authenticated_subject": principal.subject,
+        "authenticated_roles": sorted(principal.roles),
+        "input_hmac_sha256": input_identity,
+        "retrieval_called": retrieval_called,
         "classification": request.classification,
         "application_stages": application_stages,
         "guardrail": guardrail,
@@ -562,3 +700,6 @@ async def chat(
     )
     await observe_guardrail(result)
     return result
+
+
+app = PublicTraceBoundary(app)

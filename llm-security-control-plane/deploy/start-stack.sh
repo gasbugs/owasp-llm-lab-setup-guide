@@ -124,6 +124,8 @@ if docker container inspect llm-sec-alloy >/dev/null 2>&1 && \
   OTEL_ARGS+=(
     -e SECURITY_MONITOR_URL=http://llm-sec-gateway:8080
     -e "TELEMETRY_INGEST_TOKEN=$TELEMETRY_INGEST_TOKEN"
+    -e "TELEMETRY_HMAC_KEY=${TELEMETRY_HMAC_KEY:?Connected telemetry requires its HMAC key}"
+    -e OTEL_TRACES_SAMPLER=always_on
     -e OTEL_EXPORTER_OTLP_ENDPOINT=http://llm-sec-alloy:4318
   )
   AUTH_EVENT_SINK="${AUTH_EVENT_SINK:-stdout,monitor}"

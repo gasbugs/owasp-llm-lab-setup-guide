@@ -41,6 +41,8 @@ except ImportError:  # Unit policy tests do not install the runtime extras.
     Status = None
     StatusCode = None
 
+from log_delivery import LogDelivery
+
 from policy_engine import (
     Decision,
     PolicyError,
@@ -196,14 +198,6 @@ def configure_telemetry() -> Any:
     )
     trace.set_tracer_provider(tracer_provider)
 
-    logger_provider = LoggerProvider(resource=resource)
-    logger_provider.add_log_record_processor(
-        BatchLogRecordProcessor(OTLPLogExporter(endpoint=f"{OTEL_ENDPOINT}/v1/logs"))
-    )
-    SECURITY_LOGGER.setLevel(logging.INFO)
-    SECURITY_LOGGER.handlers.clear()
-    SECURITY_LOGGER.addHandler(LoggingHandler(level=logging.INFO, logger_provider=logger_provider))
-    SECURITY_LOGGER.propagate = False
     return trace.get_tracer("llm-security-gateway")
 
 
@@ -234,10 +228,25 @@ def current_trace_id() -> str:
     return f"{context.trace_id:032x}" if context.is_valid else "0" * 32
 
 app = FastAPI(title="LLM Security Observability Gateway", version="3.0.0")
+log_delivery = LogDelivery(DATABASE_PATH, OTEL_ENDPOINT)
+
+
+@app.on_event("startup")
+def start_log_delivery():
+    with connect() as db:
+        LogDelivery.prepare(db)
+    log_delivery.start()
+
+
+@app.on_event("shutdown")
+def stop_log_delivery():
+    log_delivery.stop()
+
 
 
 class SecurityEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    delivery_event_id: str | None = None
     request_id: str = Field(min_length=3, max_length=128)
     stage: Literal["input", "retrieval", "tool", "output", "guardrail", "runtime"]
     event_type: str = Field(min_length=2, max_length=128)
@@ -269,7 +278,8 @@ class OutputCandidate(BaseModel):
     request_id: str | None = Field(default=None, min_length=3, max_length=128)
 
 
-def connect() -> sqlite3.Connection:
+@contextmanager
+def connect():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
@@ -301,8 +311,16 @@ def connect() -> sqlite3.Connection:
         )
         """
     )
+    LogDelivery.prepare(connection)
     connection.commit()
-    return connection
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
@@ -321,10 +339,13 @@ def persist(event: SecurityEvent, decision: Decision) -> dict[str, Any]:
         POLICY["sensitive_data"].get("patterns"),
     )
     attributes = dict(event.attributes)
+    supplied_digest = attributes.pop("input_hmac_sha256", None)
+    if isinstance(supplied_digest, str) and re.fullmatch(r"[a-f0-9]{64}", supplied_digest):
+        digest = supplied_digest
     if inferred_entities:
         attributes["redacted_entities"] = inferred_entities
     record = {
-        "id": str(uuid.uuid4()),
+        "id": event.delivery_event_id or str(uuid.uuid4()),
         "timestamp_ms": int(time.time() * 1000),
         "request_id": event.request_id,
         "stage": event.stage,
@@ -348,6 +369,12 @@ def persist(event: SecurityEvent, decision: Decision) -> dict[str, Any]:
         "attributes": {**attributes, "trace_id": attributes.get("trace_id") or current_trace_id()},
     }
     with connect() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        prior = connection.execute("SELECT * FROM events_v2 WHERE id=?", (record["id"],)).fetchone()
+        if prior is not None:
+            return {**row_to_dict(prior), "delivery_event_id": record["id"], "duplicate": True}
+        if OTEL_ENDPOINT and connection.execute("SELECT COUNT(*) FROM log_outbox").fetchone()[0] >= 10000:
+            raise HTTPException(status_code=503, detail="incident log backlog full")
         connection.execute(
             """
             INSERT INTO events_v2 VALUES (
@@ -367,6 +394,14 @@ def persist(event: SecurityEvent, decision: Decision) -> dict[str, Any]:
                 "attributes_json": json.dumps(record["attributes"], ensure_ascii=False, separators=(",", ":")),
             },
         )
+        log_record = {"event": "llm_security_event", **record,
+                      "trace_id": record["attributes"].get("trace_id")}
+        if OTEL_ENDPOINT:
+            connection.execute("INSERT INTO log_outbox VALUES (?, ?, ?)", (
+                record["id"], json.dumps(log_record, ensure_ascii=False, separators=(",", ":")), time.time()))
+        # Pending incidents are never deleted by retention while a backend is unavailable.
+        connection.execute("DELETE FROM events_v2 WHERE timestamp_ms < ? AND id NOT IN (SELECT event_id FROM log_outbox)",
+                           (int((time.time()-86400)*1000),))
         connection.commit()
     log_record = {
         "event": "llm_security_event",
@@ -375,9 +410,7 @@ def persist(event: SecurityEvent, decision: Decision) -> dict[str, Any]:
     }
     serialized = json.dumps(log_record, ensure_ascii=False, separators=(",", ":"))
     print(serialized, flush=True)
-    if OTEL_ENDPOINT:
-        SECURITY_LOGGER.info(serialized)
-    return record
+    return {**record, "delivery_event_id": record["id"], "duplicate": False}
 
 
 def principal_from_authorization(authorization: str | None) -> dict[str, Any]:
@@ -514,7 +547,8 @@ def observed_decision(event: SecurityEvent) -> Decision:
 
 @app.on_event("startup")
 def initialize_database() -> None:
-    connect().close()
+    with connect():
+        pass
 
 
 @app.get("/healthz")
@@ -904,13 +938,16 @@ def collect_guardrail_event(
     payload: dict[str, Any],
     _authorized: None = Depends(require_telemetry_ingest_token),
 ) -> dict[str, Any]:
+    if len(json.dumps(payload).encode()) > 16384:
+        raise HTTPException(status_code=413, detail="telemetry event too large")
+    delivery_event_id = payload.get("event_id")
+    if delivery_event_id is not None:
+        try:
+            delivery_event_id = str(uuid.UUID(str(delivery_event_id)))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="invalid event ID") from exc
     request_id = str(payload.get("request_id") or f"guard-{uuid.uuid4()}")
-    original = str(
-        payload.get("original_text")
-        or payload.get("input")
-        or payload.get("message")
-        or ""
-    )
+    original = ""
     decision = bounded_guardrail_label(
         payload.get("application_decision")
         or payload.get("policy_decision")
@@ -929,17 +966,10 @@ def collect_guardrail_event(
         payload.get("direction") or "chat", GUARDRAIL_DIRECTION_LABELS
     )
     duration_ms = float(payload.get("duration_ms") or 0.0)
-    GUARDRAIL_DECISIONS.labels(
-        engine=engine, direction=direction, decision=decision
-    ).inc()
-    GUARDRAIL_DURATION.labels(engine=engine, direction=direction).observe(
-        duration_ms / 1000.0
-    )
     guard_model_calls = int(payload.get("guard_model_calls") or 0)
-    if guard_model_calls > 0:
-        GUARDRAIL_MODEL_CALLS.labels(engine=engine).inc(guard_model_calls)
     reason = payload.get("blocking_reason") or payload.get("blocked_stage")
     event = SecurityEvent(
+        delivery_event_id=delivery_event_id,
         request_id=request_id,
         stage="guardrail",
         event_type=str(payload.get("event") or "guardrail_decision"),
@@ -951,6 +981,12 @@ def collect_guardrail_event(
         application_decision=str(decision),
         policy_rule=str(reason or "guardrail-observation"),
         attributes={
+            **{key: payload[key] for key in (
+                "stage_name", "stage_order", "policy_bundle_version", "assurance_profile",
+                "classification", "subject_hash", "auth_action", "http_status",
+                "source_service", "source_version", "occurred_at_ns",
+                "input_hmac_sha256", "main_stop_reason", "model_id", "roles", "token_hash", "client_ip_hash", "application_stages", "application_policy_id", "retrieval_called",
+            ) if key in payload},
             "trace_id": payload.get("trace_id"),
             "guard_engine": engine,
             "guard_mode": payload.get("guard_mode") or payload.get("mode"),
@@ -958,7 +994,13 @@ def collect_guardrail_event(
             "guard_model_calls": guard_model_calls,
         },
     )
-    return persist(event, observed_decision(event))
+    record = persist(event, observed_decision(event))
+    if not record.get("duplicate") and payload.get("stage_name") != "bedrock_main":
+        GUARDRAIL_DECISIONS.labels(engine=engine, direction=direction, decision=decision).inc()
+        GUARDRAIL_DURATION.labels(engine=engine, direction=direction).observe(duration_ms / 1000.0)
+        if guard_model_calls > 0:
+            GUARDRAIL_MODEL_CALLS.labels(engine=engine).inc(guard_model_calls)
+    return record
 
 
 def query_records(where: str = "", parameters: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
@@ -1135,7 +1177,7 @@ def metrics() -> str:
             lines.append(
                 f'llm_upstream_calls_total{{decision="{prometheus_escape(decision)}"}} {count}'
             )
-    return "\n".join(lines) + "\n" + generate_latest().decode("utf-8")
+    return "\n".join(lines) + "\n" + log_delivery.metrics() + generate_latest().decode("utf-8")
 
 
 @app.delete("/api/labs/events")

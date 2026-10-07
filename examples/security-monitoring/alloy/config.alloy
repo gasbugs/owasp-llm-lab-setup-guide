@@ -26,6 +26,68 @@ otelcol.processor.memory_limiter "application" {
 
   output {
     logs   = [otelcol.processor.batch.application.input]
+    traces = [otelcol.processor.attributes.privacy.input]
+  }
+}
+
+otelcol.processor.attributes "privacy" {
+  action {
+    key = "http.url"
+    action = "delete"
+  }
+  action {
+    key = "url.full"
+    action = "delete"
+  }
+  action {
+    key = "url.query"
+    action = "delete"
+  }
+  action {
+    key = "http.target"
+    action = "delete"
+  }
+  action {
+    key = "client.address"
+    action = "delete"
+  }
+  action {
+    key = "net.peer.ip"
+    action = "delete"
+  }
+  action {
+    key = "network.peer.address"
+    action = "delete"
+  }
+  action {
+    key = "http.request.header.authorization"
+    action = "delete"
+  }
+  action {
+    key = "http.request.header.cookie"
+    action = "delete"
+  }
+  action {
+    key = "http.response.header.set_cookie"
+    action = "delete"
+  }
+  action {
+    key = "gen_ai.prompt"
+    action = "delete"
+  }
+  action {
+    key = "gen_ai.completion"
+    action = "delete"
+  }
+  action {
+    key = "gen_ai.input.messages"
+    action = "delete"
+  }
+  action {
+    key = "gen_ai.output.messages"
+    action = "delete"
+  }
+  output {
     traces = [otelcol.processor.batch.application.input]
   }
 }
@@ -41,6 +103,10 @@ otelcol.processor.batch "application" {
   }
 }
 
+otelcol.storage.file "security_queue" {
+  directory = "/var/lib/alloy/data/security-queue"
+}
+
 otelcol.exporter.otlphttp "loki" {
   logs_endpoint = "http://loki:3100/otlp/v1/logs"
 
@@ -52,13 +118,14 @@ otelcol.exporter.otlphttp "loki" {
     enabled       = true
     num_consumers = 2
     queue_size    = 2048
+    storage       = otelcol.storage.file.security_queue.handler
   }
 
   retry_on_failure {
     enabled          = true
     initial_interval = "1s"
     max_interval     = "30s"
-    max_elapsed_time = "5m"
+    max_elapsed_time = "0s"
   }
 }
 
@@ -73,12 +140,13 @@ otelcol.exporter.otlphttp "tempo" {
     enabled       = true
     num_consumers = 2
     queue_size    = 2048
+    storage       = otelcol.storage.file.security_queue.handler
   }
 
   retry_on_failure {
     enabled          = true
     initial_interval = "1s"
     max_interval     = "30s"
-    max_elapsed_time = "5m"
+    max_elapsed_time = "0s"
   }
 }

@@ -1,0 +1,33 @@
+name: Security MTL audit reliability
+
+on:
+  push:
+    branches: [main]
+    paths: ["llm-security-control-plane/application-gateway/**", "llm-security-control-plane/shared/**", "examples/security-monitoring/**", "tests/e2e/security-monitoring/**", "tests/unit/test_security_telemetry_delivery.py", ".github/workflows/mtl-audit-e2e.yml"]
+  pull_request:
+    paths: ["llm-security-control-plane/application-gateway/**", "llm-security-control-plane/shared/**", "examples/security-monitoring/**", "tests/e2e/security-monitoring/**", "tests/unit/test_security_telemetry_delivery.py", ".github/workflows/mtl-audit-e2e.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  audit-reliability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build isolated audit images
+        run: |
+          docker build -f llm-security-control-plane/application-gateway/Containerfile -t localhost/mtl-application:review llm-security-control-plane
+          docker build -f examples/security-monitoring/Containerfile -t localhost/mtl-monitor:review examples/security-monitoring
+      - name: Verify real Application and Monitor boundary paths
+        run: |
+          python3 -m unittest discover -s tests/unit -p test_security_telemetry_delivery.py -v
+          docker run --rm --network none -v "$GITHUB_WORKSPACE:/repo:ro" --entrypoint python localhost/mtl-application:review /repo/tests/e2e/security-monitoring/test_application_audit.py
+          docker run --rm --network none -v "$GITHUB_WORKSPACE:/repo:ro" --entrypoint python localhost/mtl-monitor:review /repo/tests/e2e/security-monitoring/test_monitor_audit.py
+      - name: Validate pinned collector and rules
+        run: |
+          docker run --rm --network none -v "$GITHUB_WORKSPACE/examples/security-monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro" docker.io/grafana/alloy:v1.18.0 validate --stability.level=public-preview /etc/alloy/config.alloy
+          docker run --rm --network none -v "$GITHUB_WORKSPACE/examples/security-monitoring/alert-rules.yml:/tmp/rules.yml:ro" --entrypoint promtool docker.io/prom/prometheus:v3.5.0 check rules /tmp/rules.yml
+      - name: Verify durable delivery and correlation through real stores
+        run: python3 tests/e2e/security-monitoring/check_mtl_reliability.py

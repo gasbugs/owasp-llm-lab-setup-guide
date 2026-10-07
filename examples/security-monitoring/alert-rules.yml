@@ -37,7 +37,7 @@ groups:
           runbook: Compare attack traffic with recent policy or model changes
 
       - alert: LLMGatewayUnavailable
-        expr: up{job=~"llm-security-gateway|llm-security-retrieval"} == 0
+        expr: up{job=~"llm-security-gateway|llm-security-retrieval|llm-security-application|amazon-bedrock-gateway"} == 0
         for: 30s
         labels:
           severity: critical
@@ -98,3 +98,35 @@ groups:
         annotations:
           summary: LLM chat p95 latency exceeds ten seconds
           runbook: Compare Bedrock Converse latency, token counts, errors, and estimated cost
+
+      - alert: SecurityAuditDeliveryStalled
+        expr: llm_audit_oldest_pending_seconds > 30 or llm_log_oldest_pending_seconds > 30
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: Committed security events are waiting for collector acknowledgement
+
+      - alert: SecurityAuditQueueRejected
+        expr: increase(llm_audit_delivery_total{result="rejected"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Security event outbox reached its bounded capacity
+
+      - alert: OTLPExporterDeliveryFailure
+        expr: sum(increase(otelcol_exporter_send_failed_log_records_total[5m])) + sum(increase(otelcol_exporter_send_failed_spans_total[5m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Alloy is retrying failed backend telemetry deliveries
+
+      - alert: SecurityAuditStorageUnavailable
+        expr: llm_audit_database_available == 0 or increase(llm_audit_storage_errors_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Application cannot commit its security audit events
