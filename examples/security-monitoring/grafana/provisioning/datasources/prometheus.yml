@@ -50,12 +50,3 @@ datasources:
         tags:
           - key: service.name
             value: service
-
-  - name: Alertmanager
-    type: alertmanager
-    uid: llm-security-alertmanager
-    access: proxy
-    url: http://alertmanager:9093
-    editable: false
-    jsonData:
-      implementation: prometheus

@@ -329,7 +329,7 @@ wait_json_basic_auth() {
   done
 }
 wait_json_basic_auth "$GRAFANA_URL/api/search?query=LLM%20Security%20Observability%20Center" 'any(.[]; .uid == "llm-security-monitoring")'
-wait_json_basic_auth "$GRAFANA_URL/api/datasources" 'any(.[]; .uid == "llm-security-prometheus") and any(.[]; .uid == "llm-security-loki") and any(.[]; .uid == "llm-security-tempo")'
+wait_json_basic_auth "$GRAFANA_URL/api/datasources" 'any(.[]; .uid == "llm-security-prometheus") and any(.[]; .uid == "llm-security-loki") and any(.[]; .uid == "llm-security-tempo") and all(.[]; .uid != "llm-security-alertmanager")'
 
 wait_json "$PROMETHEUS_URL/api/v1/query?query=bedrock_requests_total" '.status == "success" and (.data.result | length) >= 1'
 

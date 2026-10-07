@@ -260,6 +260,16 @@ class SecurityMonitoringPolicyTests(unittest.TestCase):
         self.assertIn('"raw_query_stored": False', source)
         self.assertIn("x_service_token", source)
 
+    def test_grafana_provisions_only_supported_explore_data_sources(self) -> None:
+        source = (
+            EXAMPLE / "grafana" / "provisioning" / "datasources" / "prometheus.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("uid: llm-security-prometheus", source)
+        self.assertIn("uid: llm-security-loki", source)
+        self.assertIn("uid: llm-security-tempo", source)
+        self.assertNotIn("type: alertmanager", source)
+        self.assertNotIn("uid: llm-security-alertmanager", source)
+
     def test_dashboard_correlates_metrics_logs_traces_and_bedrock(self) -> None:
         dashboard = json.loads(
             (EXAMPLE / "grafana" / "dashboards" / "llm-security.json").read_text(
