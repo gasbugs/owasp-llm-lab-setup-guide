@@ -1,0 +1,37 @@
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+evaluation_interval: 5s
+tests:
+  - name: log delivery failure is visible even before any span failure series exists
+    interval: 5s
+    input_series:
+      - series: otelcol_exporter_send_failed_log_records_total
+        values: "0 0 1 1 1"
+    alert_rule_test:
+      - eval_time: 20s
+        alertname: OTLPExporterDeliveryFailure
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: Alloy is retrying failed backend telemetry deliveries
+  - name: span reception failure is visible without log or Loki drop series
+    interval: 5s
+    input_series:
+      - series: otelcol_receiver_failed_spans_total
+        values: "0 0 1 1 1"
+    alert_rule_test:
+      - eval_time: 20s
+        alertname: TelemetryDataDropped
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: Alloy failed to receive or deliver telemetry data
+              runbook: Inspect receiver failures, Loki drop reasons, and exporter destination health
+  - name: missing failure series alone never proves data loss
+    alert_rule_test:
+      - eval_time: 20s
+        alertname: OTLPExporterDeliveryFailure
+        exp_alerts: []
+      - eval_time: 20s
+        alertname: TelemetryDataDropped
+        exp_alerts: []

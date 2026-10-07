@@ -64,7 +64,7 @@ groups:
           runbook: Inspect Alertmanager notification errors and receiver connectivity
 
       - alert: TelemetryDataDropped
-        expr: sum(increase(otelcol_receiver_failed_log_records_total[5m])) + sum(increase(otelcol_receiver_failed_spans_total[5m])) + sum(increase(loki_write_dropped_entries_total[5m])) > 0
+        expr: (sum(increase(otelcol_receiver_failed_log_records_total[5m])) or vector(0)) + (sum(increase(otelcol_receiver_failed_spans_total[5m])) or vector(0)) + (sum(increase(loki_write_dropped_entries_total[5m])) or vector(0)) > 0
         for: 0m
         labels:
           severity: critical
@@ -79,7 +79,7 @@ groups:
           severity: warning
         annotations:
           summary: An Alloy OTLP exporter queue is more than eighty percent full
-          runbook: Inspect the destination backend before the in-memory queue begins dropping data
+          runbook: Inspect the destination backend before the bounded persistent queue fills
 
       - alert: BedrockUpstreamFailure
         expr: increase(llm_upstream_calls_total{decision="infra"}[5m]) > 0
@@ -116,7 +116,7 @@ groups:
           summary: Security event outbox reached its bounded capacity
 
       - alert: OTLPExporterDeliveryFailure
-        expr: sum(increase(otelcol_exporter_send_failed_log_records_total[5m])) + sum(increase(otelcol_exporter_send_failed_spans_total[5m])) > 0
+        expr: (sum(increase(otelcol_exporter_send_failed_log_records_total[5m])) or vector(0)) + (sum(increase(otelcol_exporter_send_failed_spans_total[5m])) or vector(0)) > 0
         for: 0m
         labels:
           severity: warning

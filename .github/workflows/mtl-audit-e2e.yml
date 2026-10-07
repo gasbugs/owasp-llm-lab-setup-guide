@@ -29,5 +29,6 @@ jobs:
         run: |
           docker run --rm --network none -v "$GITHUB_WORKSPACE/examples/security-monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro" docker.io/grafana/alloy:v1.18.0 validate --stability.level=public-preview /etc/alloy/config.alloy
           docker run --rm --network none -v "$GITHUB_WORKSPACE/examples/security-monitoring/alert-rules.yml:/tmp/rules.yml:ro" --entrypoint promtool docker.io/prom/prometheus:v3.5.0 check rules /tmp/rules.yml
+          docker run --rm --network none -v "$GITHUB_WORKSPACE/examples/security-monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro" -v "$GITHUB_WORKSPACE/tests/e2e/security-monitoring/audit-alerts.test.yml:/tmp/audit-alerts.test.yml:ro" --entrypoint promtool docker.io/prom/prometheus:v3.5.0 test rules /tmp/audit-alerts.test.yml
       - name: Verify durable delivery and correlation through real stores
         run: python3 tests/e2e/security-monitoring/check_mtl_reliability.py
