@@ -207,10 +207,11 @@ class ExpectedCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     case_id: str
     scenario: Literal["preflight", "normal", "risk"]
+    client_id: str
     execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
     requested_max_output_tokens: object = None
-    expected_status: Literal[200, 422]
+    expected_status: Literal[200, 422, 429]
     observed_status: int
 
 
@@ -342,7 +343,7 @@ def err_envelope(request: VerifyRequest, reason: str) -> dict:
         "lab_id": "01-nova",
         "activity_id": "P01",
         "internal_activity_id": "H01",
-        "contract_version": 2,
+        "contract_version": 3,
         "task_completed": False,
         "security_verdict": "ERR",
         "execution_id": request.suite_id,
@@ -609,7 +610,8 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
         return err_envelope(request, "execution IDs must be unique within the suite")
     for expected in request.cases:
         definition = definitions[expected.case_id]
-        if expected.scenario != definition["scenario"] or expected.expected_status != definition["expected_status"] or json.dumps(expected.requested_max_output_tokens) != json.dumps(definition["body"].get("max_output_tokens")):
+        expected_client_id = f"{definition['client_id']}-{request.suite_id[:8]}"
+        if expected.scenario != definition["scenario"] or expected.client_id != expected_client_id or expected.expected_status != definition["expected_status"] or json.dumps(expected.requested_max_output_tokens) != json.dumps(definition["body"].get("max_output_tokens")):
             return err_envelope(request, "case parameters differ from the server-owned contract")
 
     try:
@@ -644,7 +646,7 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
                 execution.get("closed") is True,
                 execution.get("activity_id") == "P01",
                 execution.get("internal_activity_id") == "H01",
-                execution.get("contract_version") == 2,
+                execution.get("contract_version") == 3,
                 execution.get("execution_id") == expected.execution_id,
                 execution.get("started_at") == expected.started_at,
                 execution.get("scenario") == expected.scenario,
@@ -659,7 +661,7 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
                 headers={"Authorization": f"Bearer {LAB_TOKEN}"},
                 timeout=5.0,
             )
-            if expected.expected_status == 422:
+            if expected.expected_status in {422, 429}:
                 if receipt_response.status_code != 404 or not all((
                     type(execution.get("invocation_attempts")) is int,
                     execution.get("invocation_attempts") == 0,
@@ -668,14 +670,23 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
                     type(execution.get("provider_results")) is int,
                     execution.get("provider_results") == 0,
                     execution.get("provider_request_ids") == [],
+                    execution.get("client_id") == expected.client_id,
                 )):
                     return err_envelope(request, f"{expected.case_id} reached the Provider path")
+                if expected.expected_status == 422 and execution.get("budget_events") != []:
+                    return err_envelope(request, f"{expected.case_id} reached the budget ledger")
+                if expected.expected_status == 429 and execution.get("budget_events") != [{
+                    "event": "reject", "client_id": expected.client_id,
+                    "requested_tokens": definition["effective_max_tokens"],
+                }]:
+                    return err_envelope(request, f"{expected.case_id} budget rejection evidence is missing")
                 verified_cases.append(
                     {
                         "case_id": expected.case_id,
                         "execution_id": expected.execution_id,
-                        "http_status": 422,
+                        "http_status": expected.expected_status,
                         "upstream_called": False,
+                        "client_id": expected.client_id,
                     }
                 )
                 continue
@@ -696,7 +707,7 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
                     receipt.get("execution_id") == expected.execution_id,
                     receipt.get("activity_id") == "P01",
                     receipt.get("internal_activity_id") == "H01",
-                    receipt.get("contract_version") == 2,
+                    receipt.get("contract_version") == 3,
                     execution.get("provider_request_ids") == [provider_id],
                     type(execution.get("invocation_attempts")) is int,
                     execution.get("invocation_attempts") == 1,
@@ -715,6 +726,8 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
                     receipt.get("forwarded_parameters", {}).get("temperature") == 0.0,
                     receipt.get("forwarded_messages") == [{"role": "user", "content": [{"text": definition["body"]["message"]}]}],
                     receipt.get("upstream_called") is True,
+                    receipt.get("client_id") == expected.client_id,
+                    [event.get("event") for event in receipt.get("budget_events", [])] == ["reserve", "settle"],
                     type(effective) is int,
                     type(usage.get("outputTokens")) is int,
                     0 <= usage.get("outputTokens", -1) <= effective,
@@ -790,7 +803,7 @@ def verify(request: VerifyRequest, _authorized: None = Depends(require_control))
         "lab_id": "01-nova",
         "activity_id": "P01",
         "internal_activity_id": "H01",
-        "contract_version": 2,
+        "contract_version": 3,
         "task_completed": request.suite_kind == "hands_on" and verdict == "PASS",
         "security_verdict": verdict,
         "execution_id": request.suite_id,
@@ -3875,25 +3888,29 @@ def verify_h16(request: H13VerifyRequest, _authorized: None = Depends(require_co
     try: response=httpx.get(f"{LAB16_URL}/v1/receipts/{request.suite_id}",headers={"Authorization":f"Bearer {LAB16_TOKEN}"},timeout=10)
     except httpx.RequestError: return tool_err("H16",request,"정책 audit ledger에 연결할 수 없습니다.")
     if response.status_code != 200: return tool_err("H16",request,"현재 정책 승격 receipt가 없습니다.")
-    data=response.json(); events=data.get('events',[]); result={"baseline_digest":data.get('baseline_digest'),"sandbox_digest":data.get('sandbox_digest'),"active_digest":data.get('active_digest'),"baseline_risk_hit":data.get('baseline_risk_hit'),"normal_decision":data.get('normal_decision'),"risk_decision":data.get('risk_decision'),"events":events}
+    data=response.json(); events=data.get('events',[]); cases=data.get('cases',[]); result={"baseline_digest":data.get('baseline_digest'),"sandbox_digest":data.get('sandbox_digest'),"active_digest":data.get('active_digest'),"baseline_risk_hit":data.get('baseline_risk_hit'),"cases":cases,"regression_passed":data.get('regression_passed'),"events":events}
     if data.get('started_at') != request.started_at: return tool_err("H16",request,"현재 suite의 승격 증거가 아닙니다.",result)
     if not data.get('sandbox_digest'): return tool_err("H16",request,"현재 실행한 정책의 digest가 없습니다.",result)
-    if data.get('normal_decision') == 'allow' and data.get('risk_decision') == 'allow' and events == []:
-        if not (data.get('baseline_risk_hit') is True and data.get('normal_decision') == 'allow' and data.get('risk_decision') == 'allow' and events == []):
+    expected_ids=['normal-business','normal-explanation','risk-marker','risk-paraphrase']
+    decisions=[item.get('decision') for item in cases]
+    if [item.get('case_id') for item in cases] != expected_ids:
+        return tool_err("H16",request,"서버 고정 회귀 사례 네 개가 완전하지 않습니다.",result)
+    if decisions == ['allow','allow','allow','allow'] and events == []:
+        if not (data.get('baseline_risk_hit') is True and data.get('regression_passed') is False):
             return tool_err("H16",request,"Starter의 기본 허용 영향과 승격 없음 증거가 일치하지 않습니다.",result)
         return {
             **tool_err("H16",request,"",result),
             "course_verdict":"HIT",
             "stage_calls":[
-                {"stage":"sandbox_regression","attempted":True,"outcome":"risk-allowed","evidence_id":data['sandbox_digest']},
+                {"stage":"sandbox_regression","attempted":True,"outcome":"two-risks-allowed","evidence_id":data['sandbox_digest']},
                 {"stage":"promotion_ledger","attempted":False,"outcome":"not-promoted","evidence_id":request.suite_id},
             ],
             "evidence":[{"source":"h16-policy-store","kind":"sandbox-receipt","id":request.suite_id}],
             "reason":"Starter의 기본 허용 정책이 정상 요청뿐 아니라 H16 위험 요청도 허용했습니다. 승격 event는 없지만 Sandbox에서 위험 영향이 직접 확인됐습니다.",
             "next_check":"policy.py에서 H16-OVERRIDE를 명시적으로 차단한 뒤 같은 정상·위험 suite를 다시 실행합니다.",
         }
-    if not (data.get('normal_decision')=='allow' and data.get('risk_decision')=='block' and [x.get('event') for x in events]==['promote','rollback','promote'] and data.get('active_digest')==data.get('sandbox_digest')): return tool_err("H16",request,"normal+risk suite, CAS 승격, rollback 원장이 완전하지 않습니다.",result)
-    return {**tool_err("H16",request,"",result),"course_verdict":"PASS","stage_calls":[{"stage":"sandbox_regression","attempted":True,"outcome":"normal-and-risk-pass","evidence_id":data['sandbox_digest']},{"stage":"promotion_ledger","attempted":True,"outcome":"promote-rollback-promote","evidence_id":events[-1]['at']}],"evidence":[{"source":"h16-policy-store","kind":"audit-ledger","id":request.suite_id}],"reason":"정상 기능과 위험 차단을 Sandbox에서 함께 통과한 digest만 active가 되었고 rollback과 재승격 audit event까지 확인했습니다."}
+    if not (decisions==['allow','allow','block','block'] and data.get('regression_passed') is True and [x.get('event') for x in events]==['promote','rollback','promote'] and data.get('active_digest')==data.get('sandbox_digest')): return tool_err("H16",request,"정상 2개·공격 2개 회귀, CAS 승격, rollback 원장이 완전하지 않습니다.",result)
+    return {**tool_err("H16",request,"",result),"course_verdict":"PASS","stage_calls":[{"stage":"sandbox_regression","attempted":True,"outcome":"four-cases-pass","evidence_id":data['sandbox_digest']},{"stage":"promotion_ledger","attempted":True,"outcome":"promote-rollback-promote","evidence_id":events[-1]['at']}],"evidence":[{"source":"h16-policy-store","kind":"audit-ledger","id":request.suite_id}],"reason":"정상 업무·공격 문자열 설명은 허용하고 원문·변형 공격은 차단한 digest만 active가 되었으며 rollback과 재승격 audit event까지 확인했습니다."}
 
 
 def verify_p18_queries(request: H13VerifyRequest) -> dict:

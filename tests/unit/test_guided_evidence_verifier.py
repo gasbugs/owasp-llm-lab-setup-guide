@@ -423,6 +423,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             "cases": [
                 {
                     "case_id": case["case_id"], "scenario": case["scenario"],
+                    "client_id": f"{case['client_id']}-aaaaaaaa",
                     "execution_id": original_ids.get(case["case_id"], str(uuid.UUID(int=index + 100))),
                     "started_at": "2026-09-22T10:00:00+00:00",
                     "requested_max_output_tokens": case["body"].get("max_output_tokens"),
@@ -432,9 +433,9 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             ],
         }
 
-    def fake_get(self, risk_effective: int):
+    def fake_get(self, risk_effective: int, suite_body=None):
         definitions = {item["case_id"]: item for item in self.server.P01_CONTRACT["cases"]}
-        expected_cases = {item["execution_id"]: item for item in self.body()["cases"]}
+        expected_cases = {item["execution_id"]: item for item in (suite_body or self.body())["cases"]}
         cases = {}
         for execution_id, expected in expected_cases.items():
             if expected["expected_status"] == 200:
@@ -447,20 +448,25 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                                      "runner_digests": self.server.P01_RUNNER_DIGESTS})
             execution_id = url.rsplit("/", 1)[-1]
             if "/v1/executions/" in url:
-                expected = next(item for item in self.body()["cases"] if item["execution_id"] == execution_id)
+                expected = expected_cases[execution_id]
                 called = expected["expected_status"] == 200
                 effective = cases[execution_id][2] if called else None
                 return FakeResponse({
                     "execution_id": execution_id, "started_at": expected["started_at"],
                     "scenario": expected["scenario"], "source_digest": "b" * 64,
                     "runner_digests": self.server.P01_RUNNER_DIGESTS,
-                    "activity_id": "P01", "internal_activity_id": "H01", "contract_version": 2,
+                    "activity_id": "P01", "internal_activity_id": "H01", "contract_version": 3,
                     "closed": True, "http_status": expected["expected_status"], "provider_mode": "contract",
                     "invocation_attempts": int(called), "provider_attempts": int(called), "provider_results": int(called),
                     "provider_request_ids": [f"request-{execution_id}-{effective}"] if called else [],
+                    "client_id": expected["client_id"],
+                    "budget_events": ([{"event": "reserve"}, {"event": "settle"}] if called else
+                                      [{"event": "reject", "client_id": expected["client_id"],
+                                        "requested_tokens": definitions[expected["case_id"]]["effective_max_tokens"]}]
+                                      if expected["expected_status"] == 429 else []),
                     "request_digest": hashlib.sha256(json.dumps(definitions[expected["case_id"]]["body"], sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest(),
                 })
-            if expected_cases[execution_id]["expected_status"] == 422:
+            if expected_cases[execution_id]["expected_status"] in {422, 429}:
                 return FakeResponse({"detail": "receipt not found"}, status_code=404)
             scenario, requested, effective, output = cases[execution_id]
             provider_id = f"request-{execution_id}-{effective}"
@@ -468,7 +474,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                 {
                     "execution_id": execution_id,
                     "started_at": "2026-09-22T10:00:00+00:00",
-                    "activity_id": "P01", "internal_activity_id": "H01", "contract_version": 2,
+                    "activity_id": "P01", "internal_activity_id": "H01", "contract_version": 3,
                     "scenario": scenario,
                     "requested_max_output_tokens": requested,
                     "effective_max_output_tokens": effective,
@@ -485,6 +491,8 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                     "stop_reason": "max_tokens",
                     "response_text": "검증된 응답",
                     "upstream_called": True,
+                    "client_id": expected_cases[execution_id]["client_id"],
+                    "budget_events": [{"event": "reserve"}, {"event": "settle"}],
                 }
             )
 
@@ -502,7 +510,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             response = self.verify(self.body())
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(len(response.json()["result"]["cases"]), 21)
+        self.assertEqual(len(response.json()["result"]["cases"]), 23)
         self.assertTrue(response.json()["task_completed"])
         self.assertEqual(response.json()["security_verdict"], "PASS")
 
@@ -556,7 +564,9 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
     def test_implementation_without_limit_is_hit_when_impact_is_observed(self):
         body = self.body()
         body["suite_id"] = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-        with patch.object(self.server.httpx, "get", self.fake_get(512)):
+        for case in body["cases"]:
+            case["client_id"] = case["client_id"].removesuffix("-aaaaaaaa") + "-bbbbbbbb"
+        with patch.object(self.server.httpx, "get", self.fake_get(512, body)):
             response = self.verify(body)
         self.assertEqual(response.json()["course_verdict"], "HIT")
         self.assertFalse(response.json()["task_completed"])

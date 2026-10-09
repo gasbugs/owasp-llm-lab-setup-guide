@@ -54,7 +54,7 @@ def main():
             if complete:
                 assert rendered == result
                 assert result['result']['source_digest'] == args.source_digest
-                assert len(result['result']['cases']) == 21
+                assert len(result['result']['cases']) == 23
                 assert page.locator('#requested-max').inner_text() == '512'
                 assert page.locator('#forwarded-max').inner_text() == '128'
             else:

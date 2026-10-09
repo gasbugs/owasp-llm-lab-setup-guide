@@ -12,7 +12,8 @@ class InvocationError(RuntimeError):
 
 
 class RecordingClient:
-    def __init__(self, execution_id, sdk_client=None, sdk_client_factory=None):
+    def __init__(self, execution_id, sdk_client=None, sdk_client_factory=None,
+                 budget=None, client_id=None):
         self.execution_id = execution_id
         self.sdk_client = sdk_client
         self.sdk_client_factory = sdk_client_factory
@@ -20,6 +21,27 @@ class RecordingClient:
         self.results = []
         self.attempts = 0
         self.provider_attempts = 0
+        self.budget = budget
+        self.client_id = client_id
+        self.budget_events = []
+
+    def reserve_budget(self, max_tokens):
+        try:
+            reservation = self.budget.reserve(self.client_id, max_tokens)
+        except Exception:
+            self.budget_events.append({"event": "reject", "client_id": self.client_id,
+                                       "requested_tokens": max_tokens})
+            raise
+        self.budget_events.append({"event": "reserve", **reservation})
+        return reservation["reservation_id"]
+
+    def settle_budget(self, reservation_id, actual_tokens):
+        settlement = self.budget.settle(reservation_id, actual_tokens)
+        self.budget_events.append({"event": "settle", **settlement})
+
+    def cancel_budget(self, reservation_id):
+        cancellation = self.budget.cancel(reservation_id)
+        self.budget_events.append({"event": "cancel", **cancellation})
 
     def converse(self, **kwargs):
         self.attempts += 1

@@ -171,11 +171,11 @@ def main():
                 assert records[0]['provider_attempts'] == 0 and receipts == []
             else:
                 assert status == 200 and response['task_completed'] is True and response['security_verdict'] == 'PASS'
-                assert len(records) == 21 and len(receipts) == 7
-                assert sum(r['provider_attempts'] for r in records) == 7
+                assert len(records) == 23 and len(receipts) == 8
+                assert sum(r['provider_attempts'] for r in records) == 8
                 assert all(r['closed'] and r['source_digest'] == source_digest for r in records)
                 assert all(r['provider_mode'] == mode for r in receipts)
-                assert len({r['provider_request_id'] for r in receipts}) == 7
+                assert len({r['provider_request_id'] for r in receipts}) == 8
             if args.progress_restart:
                 subprocess.run(['docker', 'restart', project + '-control-center'], check=True)
                 deadline = time.monotonic() + 30

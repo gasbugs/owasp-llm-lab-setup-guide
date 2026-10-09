@@ -1,6 +1,6 @@
 {
   "format": "CUSTOM FILE",
-  "contract_version": 2,
+  "contract_version": 3,
   "activity_id": "P01",
   "internal_activity_id": "H01",
   "preflight": [
@@ -12,7 +12,8 @@
         "max_output_tokens": 2
       },
       "expected_status": 200,
-      "effective_max_tokens": 2
+      "effective_max_tokens": 2,
+      "client_id": "preflight-client"
     }
   ],
   "cases": [
@@ -24,7 +25,8 @@
         "max_output_tokens": 64
       },
       "expected_status": 200,
-      "effective_max_tokens": 64
+      "effective_max_tokens": 64,
+      "client_id": "team-a"
     },
     {
       "case_id": "risk-512",
@@ -34,7 +36,8 @@
         "max_output_tokens": 512
       },
       "expected_status": 200,
-      "effective_max_tokens": 128
+      "effective_max_tokens": 128,
+      "client_id": "team-a"
     },
     {
       "case_id": "normal-1",
@@ -44,7 +47,8 @@
         "max_output_tokens": 1
       },
       "expected_status": 200,
-      "effective_max_tokens": 1
+      "effective_max_tokens": 1,
+      "client_id": "team-a"
     },
     {
       "case_id": "normal-37",
@@ -54,7 +58,8 @@
         "max_output_tokens": 37
       },
       "expected_status": 200,
-      "effective_max_tokens": 37
+      "effective_max_tokens": 37,
+      "client_id": "team-a"
     },
     {
       "case_id": "normal-128",
@@ -64,7 +69,8 @@
         "max_output_tokens": 128
       },
       "expected_status": 200,
-      "effective_max_tokens": 128
+      "effective_max_tokens": 128,
+      "client_id": "team-a"
     },
     {
       "case_id": "limit-129",
@@ -74,7 +80,8 @@
         "max_output_tokens": 129
       },
       "expected_status": 200,
-      "effective_max_tokens": 128
+      "effective_max_tokens": 128,
+      "client_id": "team-a"
     },
     {
       "case_id": "message-4000",
@@ -84,7 +91,8 @@
         "max_output_tokens": 1
       },
       "expected_status": 200,
-      "effective_max_tokens": 1
+      "effective_max_tokens": 1,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-empty-message",
@@ -94,7 +102,8 @@
         "max_output_tokens": 64
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-blank-message",
@@ -104,7 +113,8 @@
         "max_output_tokens": 64
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-long-message",
@@ -114,7 +124,8 @@
         "max_output_tokens": 64
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-message-type",
@@ -124,7 +135,8 @@
         "max_output_tokens": 64
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "missing-message",
@@ -133,7 +145,8 @@
         "max_output_tokens": 64
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "missing-limit",
@@ -142,7 +155,8 @@
         "message": "hello"
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-zero-limit",
@@ -152,7 +166,8 @@
         "max_output_tokens": 0
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-negative-limit",
@@ -162,7 +177,8 @@
         "max_output_tokens": -1
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-large-limit",
@@ -172,7 +188,8 @@
         "max_output_tokens": 513
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-bool-limit",
@@ -182,7 +199,8 @@
         "max_output_tokens": true
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-string-limit",
@@ -192,7 +210,8 @@
         "max_output_tokens": "64"
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-fractional-limit",
@@ -202,14 +221,19 @@
         "max_output_tokens": 1.5
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "invalid-integral-float-limit",
       "scenario": "normal",
-      "body": {"message": "hello", "max_output_tokens": 1.0},
+      "body": {
+        "message": "hello",
+        "max_output_tokens": 1.0
+      },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
     },
     {
       "case_id": "reject-model-override",
@@ -220,7 +244,30 @@
         "model": "client-selected-model"
       },
       "expected_status": 422,
-      "effective_max_tokens": null
+      "effective_max_tokens": null,
+      "client_id": "team-a"
+    },
+    {
+      "case_id": "budget-first-token",
+      "scenario": "normal",
+      "client_id": "budget-one-token",
+      "body": {
+        "message": "예산 원장의 첫 요청입니다.",
+        "max_output_tokens": 1
+      },
+      "expected_status": 200,
+      "effective_max_tokens": 1
+    },
+    {
+      "case_id": "budget-exhausted",
+      "scenario": "normal",
+      "client_id": "budget-one-token",
+      "body": {
+        "message": "예산을 초과하는 두 번째 요청입니다.",
+        "max_output_tokens": 1
+      },
+      "expected_status": 429,
+      "effective_max_tokens": 1
     }
   ]
 }

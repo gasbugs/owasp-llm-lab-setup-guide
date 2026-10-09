@@ -7,6 +7,8 @@ import hmac
 import json
 import os
 import sqlite3
+import time
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -52,6 +54,99 @@ with connect() as database:
         "CREATE TABLE IF NOT EXISTS executions "
         "(execution_id TEXT PRIMARY KEY, record_json TEXT NOT NULL)"
     )
+    database.execute(
+        "CREATE TABLE IF NOT EXISTS budgets "
+        "(client_id TEXT PRIMARY KEY, window_start INTEGER NOT NULL, "
+        "used_tokens INTEGER NOT NULL, reserved_tokens INTEGER NOT NULL)"
+    )
+    database.execute(
+        "CREATE TABLE IF NOT EXISTS reservations "
+        "(reservation_id TEXT PRIMARY KEY, client_id TEXT NOT NULL, "
+        "reserved_tokens INTEGER NOT NULL, actual_tokens INTEGER, status TEXT NOT NULL)"
+    )
+
+
+class BudgetExceededError(RuntimeError):
+    pass
+
+
+class BudgetLedger:
+    """Atomic one-hour output-token reservations with actual-use settlement."""
+
+    @staticmethod
+    def limit(client_id: str) -> int:
+        return 1 if client_id.startswith("budget-one-token-") else 1000
+
+    def reserve(self, client_id: str, tokens: int) -> dict:
+        window_start = int(time.time() // 3600 * 3600)
+        reservation_id = str(uuid.uuid4())
+        with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
+            row = database.execute(
+                "SELECT window_start,used_tokens,reserved_tokens FROM budgets WHERE client_id=?",
+                (client_id,),
+            ).fetchone()
+            if row is None or row["window_start"] != window_start:
+                used = reserved = 0
+                database.execute(
+                    "INSERT OR REPLACE INTO budgets VALUES(?,?,?,?)",
+                    (client_id, window_start, used, reserved),
+                )
+            else:
+                used, reserved = row["used_tokens"], row["reserved_tokens"]
+            if used + reserved + tokens > self.limit(client_id):
+                raise BudgetExceededError("hourly output-token budget exhausted")
+            database.execute(
+                "UPDATE budgets SET reserved_tokens=reserved_tokens+? WHERE client_id=?",
+                (tokens, client_id),
+            )
+            database.execute(
+                "INSERT INTO reservations VALUES(?,?,?,?,?)",
+                (reservation_id, client_id, tokens, None, "reserved"),
+            )
+        return {"reservation_id": reservation_id, "client_id": client_id,
+                "reserved_tokens": tokens, "window_start": window_start,
+                "limit_tokens": self.limit(client_id)}
+
+    def settle(self, reservation_id: str, actual_tokens: int) -> dict:
+        with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
+            row = database.execute(
+                "SELECT client_id,reserved_tokens,status FROM reservations WHERE reservation_id=?",
+                (reservation_id,),
+            ).fetchone()
+            if row is None or row["status"] != "reserved" or type(actual_tokens) is not int:
+                raise RuntimeError("invalid budget settlement")
+            database.execute(
+                "UPDATE budgets SET reserved_tokens=reserved_tokens-?,used_tokens=used_tokens+? WHERE client_id=?",
+                (row["reserved_tokens"], actual_tokens, row["client_id"]),
+            )
+            database.execute(
+                "UPDATE reservations SET actual_tokens=?,status='settled' WHERE reservation_id=?",
+                (actual_tokens, reservation_id),
+            )
+        return {"reservation_id": reservation_id, "client_id": row["client_id"],
+                "reserved_tokens": row["reserved_tokens"], "actual_tokens": actual_tokens}
+
+    def cancel(self, reservation_id: str) -> dict:
+        with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
+            row = database.execute(
+                "SELECT client_id,reserved_tokens,status FROM reservations WHERE reservation_id=?",
+                (reservation_id,),
+            ).fetchone()
+            if row is None or row["status"] != "reserved":
+                raise RuntimeError("invalid budget cancellation")
+            database.execute(
+                "UPDATE budgets SET reserved_tokens=reserved_tokens-? WHERE client_id=?",
+                (row["reserved_tokens"], row["client_id"]),
+            )
+            database.execute(
+                "UPDATE reservations SET status='cancelled' WHERE reservation_id=?",
+                (reservation_id,),
+            )
+        return {"reservation_id": reservation_id, "client_id": row["client_id"],
+                "reserved_tokens": row["reserved_tokens"]}
 
 
 class ChatRequest(BaseModel):
@@ -59,6 +154,7 @@ class ChatRequest(BaseModel):
     execution_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
     started_at: str
     scenario: Literal["normal", "risk", "preflight", "chat"]
+    client_id: str = Field(pattern=r"^[a-z0-9-]{1,64}$")
 
 
 def bearer(expected: str, authorization: str | None) -> None:
@@ -103,7 +199,7 @@ def begin_execution(request: ChatRequest) -> dict:
         "execution_id": request.execution_id, "started_at": request.started_at,
         "scenario": request.scenario, "source_digest": source_digest(),
         "runner_digests": runner_digests(),
-        "activity_id": "P01", "internal_activity_id": "H01", "contract_version": 2,
+        "activity_id": "P01", "internal_activity_id": "H01", "contract_version": 3,
         "closed": False, "provider_mode": PROVIDER_MODE,
         "request_digest": hashlib.sha256(json.dumps(request.model_extra or {}, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest(),
     }
@@ -124,6 +220,7 @@ def close_execution(record: dict, recorder: RecordingClient, status: int) -> Non
         invocation_attempts=recorder.attempts, provider_attempts=recorder.provider_attempts,
         provider_results=len(recorder.results),
         provider_request_ids=[item.get("ResponseMetadata", {}).get("RequestId") for item in recorder.results],
+        client_id=recorder.client_id, budget_events=recorder.budget_events,
     )
     with connect() as database:
         database.execute("UPDATE executions SET record_json=? WHERE execution_id=?", (json.dumps(record), record["execution_id"]))
@@ -153,6 +250,7 @@ def chat(request: ChatRequest, _authorized: None = Depends(require_control)) -> 
     recorder = RecordingClient(
         request.execution_id,
         sdk_client_factory=(lambda: boto3.client("bedrock-runtime", region_name=REGION)) if PROVIDER_MODE == "aws" else None,
+        budget=BudgetLedger(), client_id=request.client_id,
     )
     try:
         result = recorder.observed_result(learner.handle_request(body, recorder))
@@ -165,6 +263,9 @@ def chat(request: ChatRequest, _authorized: None = Depends(require_control)) -> 
         if recorder.attempts:
             raise HTTPException(status_code=502, detail="request rejected after provider invocation") from exc
         raise HTTPException(status_code=422, detail="invalid chat request") from exc
+    except BudgetExceededError as exc:
+        close_execution(record, recorder, 429)
+        raise HTTPException(status_code=429, detail="hourly output-token budget exhausted") from exc
     except (BotoCoreError, ClientError, InvocationError) as exc:
         close_execution(record, recorder, 502)
         code = "provider_error"
@@ -206,8 +307,10 @@ def chat(request: ChatRequest, _authorized: None = Depends(require_control)) -> 
         "response_text": "".join(part.get("text", "") for part in result.get("output", {}).get("message", {}).get("content", [])),
         "activity_id": "P01",
         "internal_activity_id": "H01",
-        "contract_version": 2,
+        "contract_version": 3,
         "upstream_called": True,
+        "client_id": request.client_id,
+        "budget_events": recorder.budget_events,
     }
     save_receipt(receipt)
     close_execution(record, recorder, 200)

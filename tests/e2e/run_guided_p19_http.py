@@ -114,6 +114,39 @@ def main():
                 assert verified['result']['failed_requirement'] == failed_requirement
             assert len(verified['result']['products']) == 3
             proof['http_verification'] = verified
+        hunt_queries = {
+            'by_ip_rule': 'sum by (client_ip, policy_rule) (count_over_time({service_name="guided-h19-investigation"} | json | decision="block" | __error__="" [15m]))',
+            'blocked_ip': '{service_name="guided-h19-investigation"} | json | client_ip="192.0.2.20" | decision="block"',
+            'authenticated_user': '{service_name="guided-h19-investigation"} | json | user_id="reader"',
+        }
+        hunts = {}
+        for name, query in hunt_queries.items():
+            is_metric = name == 'by_ip_rule'
+            url = 'http://loki:3100/loki/api/v1/' + ('query' if is_metric else 'query_range')
+            params = {'query': query}
+            if not is_metric:
+                params.update(start=min(row['started_ns'] for row in ledger['cases']),
+                              end=max(row['finished_ns'] for row in ledger['cases']), limit=100)
+            raw = client.get(url, params=params)
+            raw.raise_for_status()
+            value = raw.json()
+            assert value['status'] == 'success', value
+            if is_metric:
+                rules = {row['metric']['policy_rule']: row for row in value['data']['result']}
+                assert set(rules) == {'notice-read-only', 'authentication-required'}, value
+                assert all(row['metric']['client_ip'] == '192.0.2.20'
+                           and float(row['value'][1]) == 1 for row in rules.values()), value
+            else:
+                events = [json.loads(row[1]) for stream in value['data']['result'] for row in stream['values']]
+                assert len(events) == 2, value
+                if name == 'blocked_ip':
+                    assert {row['user_id'] for row in events} == {'reader', None}, value
+                    assert all(row['decision'] == 'block' for row in events), value
+                else:
+                    assert {row['decision'] for row in events} == {'allow', 'block'}, value
+                    assert all(row['user_id'] == 'reader' for row in events), value
+            hunts[name] = {'query': query, 'response': value}
+        proof['hunting_queries'] = hunts
         args.output.write_text(json.dumps(proof, ensure_ascii=False, indent=2))
         print(json.dumps({'scope': proof['scope'], 'suite_id': body['suite_id'],
                           'analysis_executions': 10, 'task_completed': args.expect_complete,

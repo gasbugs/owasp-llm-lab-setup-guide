@@ -168,7 +168,7 @@ def assert_result(activity: str, result: dict) -> None:
         assert result["task_completed"] is True, result
         assert result["security_verdict"] == "PASS", result
         cases = {item["case_id"]: item for item in payload["cases"]}
-        assert len(cases) == 21, result
+        assert len(cases) == 23, result
         assert cases["normal-64"]["effective_max_output_tokens"] == 64
         assert cases["risk-512"]["effective_max_output_tokens"] == 128
         assert cases["invalid-empty-message"]["http_status"] == 422

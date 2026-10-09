@@ -11,9 +11,17 @@ def handle_request(body: dict, client) -> dict:
     if type(tokens) is not int or not 1 <= tokens <= 512:
         raise ValueError("출력 요청 형식 오류")
 
-    # ① 허용한 요청은 원문을 유지하고 출력 상한만 제한한다.
-    return client.converse(
-        modelId="us.amazon.nova-lite-v1:0",
-        messages=[{"role": "user", "content": [{"text": message}]}],
-        inferenceConfig={"maxTokens": min(tokens, 128), "temperature": 0.0},
-    )
+    # ① Provider 호출 전에 최대 사용량을 예약하고 실제 사용량으로 정산한다.
+    effective = min(tokens, 128)
+    reservation = client.reserve_budget(effective)
+    try:
+        result = client.converse(
+            modelId="us.amazon.nova-lite-v1:0",
+            messages=[{"role": "user", "content": [{"text": message}]}],
+            inferenceConfig={"maxTokens": effective, "temperature": 0.0},
+        )
+    except Exception:
+        client.cancel_budget(reservation)
+        raise
+    client.settle_budget(reservation, result["usage"]["outputTokens"])
+    return result

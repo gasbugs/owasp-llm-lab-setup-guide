@@ -21,6 +21,8 @@ class NoticeStore:
 
 
 def handle_request(principal, action, tracer, logger, store):
+    client_ip = "192.0.2.10" if action == "notice_lookup" and principal == "reader" else "192.0.2.20"
+    user_id = principal if principal == "reader" else None
     request_id = str(uuid.uuid4())
     started_ns = time.time_ns()
     sequence = 0
@@ -58,8 +60,14 @@ def handle_request(principal, action, tracer, logger, store):
         root.set_attribute('decision', decision)
         root.set_attribute('stop_stage', stop_stage or '')
         root.set_attribute('stage_count', sequence)
+        policy_rule = ('notice-read-only' if stop_stage == 'authorize'
+                       else 'authentication-required' if stop_stage else 'notice-lookup-allowed')
+        root.set_attribute('client_ip', client_ip)
+        root.set_attribute('user_id', user_id or '')
+        root.set_attribute('policy_rule', policy_rule)
         event = {'request_id': request_id, 'trace_id': trace_id, 'decision': decision,
-                 'stop_stage': stop_stage, 'fixture': 'notice-authorization'}
+                 'stop_stage': stop_stage, 'fixture': 'notice-authorization',
+                 'client_ip': client_ip, 'user_id': user_id, 'policy_rule': policy_rule}
         logger.info(json.dumps(event, ensure_ascii=False), extra={
             'request_id': request_id, 'trace_id': trace_id, 'hands_on': 'H19',
         })

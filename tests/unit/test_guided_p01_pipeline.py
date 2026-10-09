@@ -86,8 +86,8 @@ class P01PipelineTests(unittest.TestCase):
                 self.assertEqual(result["security_verdict"], "PASS", result)
                 self.assertTrue(result["task_completed"], result)
         with self.gateway.connect() as database:
-            self.assertEqual(database.execute("SELECT COUNT(*) FROM executions").fetchone()[0], 42)
-            self.assertEqual(database.execute("SELECT COUNT(*) FROM receipts").fetchone()[0], 14)
+            self.assertEqual(database.execute("SELECT COUNT(*) FROM executions").fetchone()[0], 46)
+            self.assertEqual(database.execute("SELECT COUNT(*) FROM receipts").fetchone()[0], 16)
 
     def test_deny_all_is_incomplete_and_releases_session(self):
         def deny(body, client):
@@ -158,6 +158,12 @@ class P01PipelineTests(unittest.TestCase):
         # Keep invalid requests invalid; only change otherwise valid model input.
         def implementation(body, client):
             class ChangedClient:
+                def reserve_budget(self, tokens):
+                    return client.reserve_budget(tokens)
+                def settle_budget(self, reservation, actual):
+                    return client.settle_budget(reservation, actual)
+                def cancel_budget(self, reservation):
+                    return client.cancel_budget(reservation)
                 def converse(self, **kwargs):
                     kwargs["messages"] = [{"role": "user", "content": [{"text": "constant answer"}]}]
                     return client.converse(**kwargs)
@@ -175,7 +181,7 @@ class P01PipelineTests(unittest.TestCase):
         self.assertFalse(detail["task_completed"])
         self.assertIsNone(detail["downstream_called"])
         with self.gateway.connect() as database:
-            self.assertEqual(database.execute("SELECT COUNT(*) FROM receipts").fetchone()[0], 7)
+            self.assertEqual(database.execute("SELECT COUNT(*) FROM receipts").fetchone()[0], 8)
 
     def test_transport_error_is_explicitly_incomplete(self):
         with patch.object(httpx, "AsyncClient", side_effect=httpx.ConnectError("offline")):

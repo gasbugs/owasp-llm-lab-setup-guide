@@ -57,7 +57,10 @@ def normalize(products, case):
             require(all(event.get(key) == value for key, value in identity.items()), 'foreign log identity')
             require(event.get('decision') == case['decision'] and event.get('stop_stage') == case['stop_stage'],
                     'decision log differs from execution')
-            logs.append({**identity, 'decision': event['decision'], 'stop_stage': event['stop_stage']})
+            context = {key: case[key] for key in ('client_ip', 'user_id', 'policy_rule') if key in case}
+            require(all(key in event and event[key] == value for key, value in context.items()),
+                    'investigation context differs from execution')
+            logs.append({**identity, 'decision': event['decision'], 'stop_stage': event['stop_stage'], **context})
     if not logs:
         raise NotReady('current log not collected')
     require(len(logs) == 1, 'duplicate decision log')
@@ -78,6 +81,9 @@ def normalize(products, case):
     root_attrs = attributes(root.get('attributes', []))
     require(root_attrs.get('decision') == case['decision']
             and root_attrs.get('stop_stage') == (case['stop_stage'] or ''), 'root decision differs')
+    require(all(root_attrs.get(key) == (case[key] or '')
+                for key in ('client_ip', 'user_id', 'policy_rule') if key in case),
+            'root investigation context differs')
     count = root_attrs.get('stage_count')
     require(type(count) is int and 1 <= count <= 3, 'invalid exported stage count')
     if count > len(spans) - 1:

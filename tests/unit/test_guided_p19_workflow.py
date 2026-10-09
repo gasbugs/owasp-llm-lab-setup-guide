@@ -89,6 +89,21 @@ class P19WorkflowTests(unittest.TestCase):
             self.assertEqual(analysis['stop_stage'], case['stop_stage'])
             self.assertEqual(analysis['downstream_count'], case['downstream_count'])
 
+    def test_investigation_context_is_server_owned_and_exported(self):
+        cases = self.run_requests()
+        self.assertEqual([case['client_ip'] for case in cases],
+                         ['192.0.2.10', '192.0.2.20', '192.0.2.20'])
+        self.assertEqual([case['user_id'] for case in cases], ['reader', 'reader', None])
+        self.assertEqual([case['policy_rule'] for case in cases],
+                         ['notice-lookup-allowed', 'notice-read-only', 'authentication-required'])
+        events = [json.loads(call.args[0]) for call in self.logger.info.call_args_list]
+        roots = {f'{span.context.trace_id:032x}': span
+                 for span in self.exporter.get_finished_spans() if span.name == 'security.request'}
+        for case, event in zip(cases, events):
+            for key in ('client_ip', 'user_id', 'policy_rule'):
+                self.assertEqual(event[key], case[key])
+                self.assertEqual(roots[case['trace_id']].attributes[key], case[key] or '')
+
     def test_provider_error_does_not_become_closed_success(self):
         self.store.lookup = Mock(side_effect=RuntimeError('provider unavailable'))
         with self.assertRaises(RuntimeError):

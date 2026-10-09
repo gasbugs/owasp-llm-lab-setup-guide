@@ -47,13 +47,23 @@ tabs:
 hands_on_H13: {executor: guided-h13-promptfoo, verifier: guided-evidence-verifier, native_artifact: promptfoo-json}
 hands_on_H14: {executor: guided-h14-garak, verifier: guided-evidence-verifier, native_artifact: garak-report-jsonl}
 hands_on_H15: {executor: guided-h15-pyrit, verifier: guided-evidence-verifier, native_artifact: pyrit-conversation}
-hands_on_H16: {executor: guided-h16-policy-promotion, verifier: guided-evidence-verifier, evidence: [sandbox-digest, active-digest, promotion-ledger]}
+hands_on_H16: {public_id: P16, contract_version: 3, executor: guided-h16-policy-promotion, verifier: guided-evidence-verifier, regression_cases: [normal-business, normal-explanation, risk-marker, risk-paraphrase], evidence: [sandbox-digest, active-digest, promotion-ledger]}
 hands_on_H17: {executor: guided-h17-telemetry, verifier: guided-evidence-verifier, stores: [loki, tempo, prometheus], learner_function: observe_request, public_id: P17, contract_version: 2}
 hands_on_H18: {executor: guided-h18-queries, verifier: guided-evidence-verifier, queries: [logql, trace-id, promql]}
-hands_on_H19: {executor: guided-h19-investigation, verifier: guided-evidence-verifier, learner_function: analyze_incident, public_id: P19, contract_version: 2}
+hands_on_H19:
+  executor: guided-h19-investigation
+  verifier: guided-evidence-verifier
+  learner_function: analyze_incident
+  public_id: P19
+  contract_version: 2
+  investigation_context: [client_ip, user_id, policy_rule]
+  client_ip_source: server-owned-documentation-address-fixture
+  context_evidence: [closed-execution-ledger, raw-loki-log, tempo-root-span]
 hands_on_H20: {public_id: P20, contract_version: 2, executor: guided-h20-alerts, verifier: guided-evidence-verifier, learner_artifacts: [rules.yaml, dashboard.json], products: [guided-h20-prometheus, guided-h20-alertmanager, guided-h20-grafana], evidence: [execution-build, checkpoints, pending, firing, resolved, dashboard-query]}
 
 hands_on_H01:
+  public_id: P01
+  contract_version: 3
   executor: guided-h01-gateway
   verifier: guided-evidence-verifier
   provider: amazon-bedrock
@@ -62,6 +72,8 @@ hands_on_H01:
     - provider_request_id
     - forwarded_parameters.maxTokens
     - usage.outputTokens
+    - budget-reservation-and-settlement
+    - budget-exhausted-429-before-provider
     - source_digest
     - normal-64
     - risk-512

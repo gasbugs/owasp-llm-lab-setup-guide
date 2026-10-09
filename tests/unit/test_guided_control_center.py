@@ -180,6 +180,8 @@ class FakeAsyncClient:
             message, tokens = json.get("message"), json.get("max_output_tokens")
             if not isinstance(message, str) or not message.strip() or len(message) > 4000 or type(tokens) is not int or not 1 <= tokens <= 512 or "model" in json:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
+            if message.startswith("예산을 초과하는"):
+                return FakeResponse({"detail": "hourly output-token budget exhausted"}, status_code=429)
             return FakeResponse(
                 {
                     "execution_id": json["execution_id"],
@@ -411,7 +413,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(response.json()["course_verdict"], "PASS")
         self.assertEqual(response.json()["activity_id"], "P01")
         self.assertEqual(response.json()["internal_activity_id"], "H01")
-        self.assertEqual(len(FakeAsyncClient.calls), 22)
+        self.assertEqual(len(FakeAsyncClient.calls), 24)
         self.assertEqual(FakeAsyncClient.calls[-1]["json"]["suite_kind"], "hands_on")
         self.assertNotIn("unit-control-verifier", response.text)
 
@@ -441,7 +443,7 @@ class GuidedControlCenterTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["course_verdict"], "PASS")
-        self.assertEqual(len(FakeAsyncClient.calls), 22)
+        self.assertEqual(len(FakeAsyncClient.calls), 24)
         normal_call, risk_call = FakeAsyncClient.calls[:2]
         invalid_call, override_call, verifier_call = FakeAsyncClient.calls[7], FakeAsyncClient.calls[20], FakeAsyncClient.calls[-1]
         self.assertEqual(normal_call["json"]["max_output_tokens"], 64)
@@ -449,7 +451,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(invalid_call["json"]["message"], "")
         self.assertEqual(override_call["json"]["model"], "client-selected-model")
         self.assertEqual(verifier_call["json"]["suite_kind"], "hands_on")
-        self.assertEqual(len(verifier_call["json"]["cases"]), 21)
+        self.assertEqual(len(verifier_call["json"]["cases"]), 23)
         self.assertNotIn("course_verdict", verifier_call["json"])
         self.assertNotIn("unit-control-lab", response.text)
         self.assertNotIn("unit-control-verifier", response.text)

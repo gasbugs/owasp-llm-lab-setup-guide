@@ -61,8 +61,10 @@ def main():
                 raise RuntimeError("P16 did not become ready")
             receipt = json.loads(subprocess.check_output(
                 ["docker", "exec", name, "python", "-c", HTTP_CHECK], text=True))
-            assert receipt["normal_decision"] == "allow"
-            assert receipt["risk_decision"] == ("block" if variant == "solution" else "allow")
+            self_expected = (["allow", "allow", "block", "block"] if variant == "solution"
+                             else ["allow", "allow", "allow", "allow"])
+            assert [item["decision"] for item in receipt["cases"]] == self_expected
+            assert receipt["regression_passed"] is (variant == "solution")
             assert [item["event"] for item in receipt["events"]] == (
                 ["promote", "rollback", "promote"] if variant == "solution" else [])
             if variant == "solution":

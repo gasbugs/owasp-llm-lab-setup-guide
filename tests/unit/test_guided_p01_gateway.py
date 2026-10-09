@@ -29,11 +29,19 @@ def valid(body, client):
         raise ValueError("message")
     if type(tokens) is not int or not 1 <= tokens <= 512:
         raise ValueError("tokens")
-    return client.converse(
-        modelId="us.amazon.nova-lite-v1:0",
-        messages=[{"role": "user", "content": [{"text": message}]}],
-        inferenceConfig={"maxTokens": min(tokens, 128), "temperature": 0.0},
-    )
+    effective = min(tokens, 128)
+    reservation = client.reserve_budget(effective)
+    try:
+        result = client.converse(
+            modelId="us.amazon.nova-lite-v1:0",
+            messages=[{"role": "user", "content": [{"text": message}]}],
+            inferenceConfig={"maxTokens": effective, "temperature": 0.0},
+        )
+    except Exception:
+        client.cancel_budget(reservation)
+        raise
+    client.settle_budget(reservation, result["usage"]["outputTokens"])
+    return result
 
 
 def alternate(body, client):
@@ -48,8 +56,15 @@ def alternate(body, client):
     if count > 128:
         count = 128
     parameters = dict(maxTokens=count, temperature=0.0)
-    return client.converse(modelId="us.amazon.nova-lite-v1:0", inferenceConfig=parameters,
-                           messages=[dict(role="user", content=[dict(text=text)])])
+    reservation = client.reserve_budget(count)
+    try:
+        result = client.converse(modelId="us.amazon.nova-lite-v1:0", inferenceConfig=parameters,
+                                 messages=[dict(role="user", content=[dict(text=text)])])
+    except Exception:
+        client.cancel_budget(reservation)
+        raise
+    client.settle_budget(reservation, result["usage"]["outputTokens"])
+    return result
 
 
 class P01GatewayTests(unittest.TestCase):
@@ -79,8 +94,9 @@ class P01GatewayTests(unittest.TestCase):
         with patch.object(self.server.learner, "handle_request", function), TestClient(self.server.app) as client:
             yield client
 
-    def request(self, client, body, token="unit-control"):
-        metadata = dict(execution_id=str(uuid.uuid4()), started_at=datetime.now(timezone.utc).isoformat(), scenario="normal")
+    def request(self, client, body, token="unit-control", client_id=None):
+        metadata = dict(execution_id=str(uuid.uuid4()), started_at=datetime.now(timezone.utc).isoformat(), scenario="normal",
+                        client_id=client_id or f"unit-{uuid.uuid4().hex}")
         return client.post("/v1/chat", json={**metadata, **body}, headers={"Authorization": f"Bearer {token}"})
 
     def test_starter_is_incomplete_without_model_call(self):
@@ -114,7 +130,7 @@ class P01GatewayTests(unittest.TestCase):
                     receipt = response.json()
                     self.assertEqual(receipt["forwarded_parameters"], {"maxTokens": min(tokens, 128), "temperature": 0.0})
                     self.assertEqual(receipt["forwarded_messages"][0]["content"][0]["text"], f"문장 {tokens}")
-                    self.assertEqual((receipt["activity_id"], receipt["internal_activity_id"], receipt["contract_version"]), ("P01", "H01", 2))
+                    self.assertEqual((receipt["activity_id"], receipt["internal_activity_id"], receipt["contract_version"]), ("P01", "H01", 3))
                     self.assertEqual(receipt["provider_mode"], "contract")
                     saved = client.get(f'/v1/receipts/{receipt["execution_id"]}', headers={"Authorization": "Bearer unit-verifier"})
                     self.assertEqual(saved.json(), receipt)
@@ -131,12 +147,13 @@ class P01GatewayTests(unittest.TestCase):
 
     def test_shared_published_contract_against_both_real_implementations(self):
         contract = json.loads((LAB.parents[1] / "guided-contracts/p01.json").read_text())
-        self.assertEqual(len(contract["cases"]), 21)
+        self.assertEqual(len(contract["cases"]), 23)
         for implementation in (valid, alternate):
             with self.implementation(implementation) as client:
+                suffix = uuid.uuid4().hex[:8]
                 for case in contract["cases"]:
                     with self.subTest(implementation=implementation.__name__, case=case["case_id"]):
-                        response = self.request(client, case["body"])
+                        response = self.request(client, case["body"], client_id=f"{case['client_id']}-{suffix}")
                         self.assertEqual(response.status_code, case["expected_status"])
                         if case["expected_status"] == 200:
                             self.assertEqual(response.json()["effective_max_output_tokens"], case["effective_max_tokens"])
@@ -212,7 +229,7 @@ class P01GatewayTests(unittest.TestCase):
 
     def test_rejected_request_has_closed_zero_call_record(self):
         execution_id = str(uuid.uuid4())
-        body = dict(execution_id=execution_id, started_at=datetime.now(timezone.utc).isoformat(), scenario="normal", message="", max_output_tokens=64)
+        body = dict(execution_id=execution_id, started_at=datetime.now(timezone.utc).isoformat(), scenario="normal", client_id="unit-rejected", message="", max_output_tokens=64)
         with self.implementation(valid) as client:
             response = client.post("/v1/chat", json=body, headers={"Authorization": "Bearer unit-control"})
             self.assertEqual(response.status_code, 422)
@@ -225,7 +242,7 @@ class P01GatewayTests(unittest.TestCase):
     def test_provider_error_is_recorded_not_treated_as_no_call(self):
         from botocore.exceptions import BotoCoreError
         execution_id = str(uuid.uuid4())
-        body = dict(execution_id=execution_id, started_at=datetime.now(timezone.utc).isoformat(), scenario="normal", message="hello", max_output_tokens=64)
+        body = dict(execution_id=execution_id, started_at=datetime.now(timezone.utc).isoformat(), scenario="normal", client_id="unit-provider-error", message="hello", max_output_tokens=64)
         with self.implementation(valid) as client, patch.object(self.server, "PROVIDER_MODE", "aws"), patch.object(self.server.boto3, "client") as sdk:
             sdk.return_value.converse.side_effect = BotoCoreError()
             response = client.post("/v1/chat", json=body, headers={"Authorization": "Bearer unit-control"})
@@ -233,10 +250,28 @@ class P01GatewayTests(unittest.TestCase):
             record = client.get(f"/v1/executions/{execution_id}", headers={"Authorization": "Bearer unit-verifier"}).json()
             self.assertTrue(record["closed"])
             self.assertEqual((record["http_status"], record["provider_attempts"], record["provider_results"]), (502, 1, 0))
+            self.assertEqual([event["event"] for event in record["budget_events"]], ["reserve", "cancel"])
+
+    def test_one_token_budget_reservation_is_atomic(self):
+        client_id = f"budget-one-token-{uuid.uuid4().hex[:8]}"
+        ledger = self.server.BudgetLedger()
+
+        def reserve_once():
+            try:
+                return ("reserved", ledger.reserve(client_id, 1))
+            except self.server.BudgetExceededError:
+                return ("rejected", None)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: reserve_once(), range(2)))
+
+        self.assertEqual(sorted(status for status, _ in results), ["rejected", "reserved"])
+        reservation = next(value for status, value in results if status == "reserved")
+        ledger.cancel(reservation["reservation_id"])
 
     def test_simultaneous_duplicate_execution_is_reserved_before_invocation(self):
         entered, release = threading.Event(), threading.Event()
-        request = self.server.ChatRequest(execution_id=str(uuid.uuid4()), started_at=datetime.now(timezone.utc).isoformat(), scenario="normal", message="hello", max_output_tokens=64)
+        request = self.server.ChatRequest(execution_id=str(uuid.uuid4()), started_at=datetime.now(timezone.utc).isoformat(), scenario="normal", client_id="unit-duplicate", message="hello", max_output_tokens=64)
         def slow(body, client):
             entered.set()
             if not release.wait(5):

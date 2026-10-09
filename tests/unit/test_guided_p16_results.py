@@ -25,16 +25,24 @@ class P16ResultsTests(unittest.TestCase):
             return self.server.verify_h16(request)["course_verdict"]
 
     def test_solution_behavior_starter_and_deny_all(self):
+        cases = [
+            {"case_id": "normal-business", "expected": "allow", "decision": "allow"},
+            {"case_id": "normal-explanation", "expected": "allow", "decision": "allow"},
+            {"case_id": "risk-marker", "expected": "block", "decision": "block"},
+            {"case_id": "risk-paraphrase", "expected": "block", "decision": "block"},
+        ]
         solution = {"started_at": "publisher-start", "sandbox_digest": "a" * 64,
                     "active_digest": "a" * 64, "baseline_risk_hit": True,
-                    "normal_decision": "allow", "risk_decision": "block",
+                    "cases": cases, "regression_passed": True,
                     "events": [{"event": name, "at": "observed"}
                                for name in ("promote", "rollback", "promote")]}
         self.assertEqual(self.grade(solution), "PASS")
-        starter = {**solution, "risk_decision": "allow", "events": []}
+        starter = {**solution, "cases": [{**item, "decision": "allow"} for item in cases],
+                   "regression_passed": False, "events": []}
         self.assertEqual(self.grade(starter), "HIT")
         wrong = deepcopy(solution)
-        wrong.update(normal_decision="block", events=[])
+        wrong.update(cases=[{**cases[0], "decision": "block"}, *cases[1:]],
+                     regression_passed=False, events=[])
         self.assertEqual(self.grade(wrong), "ERR")
 
 

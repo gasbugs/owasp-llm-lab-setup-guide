@@ -16,5 +16,11 @@ def handle_request(body, client):
         inferenceConfig=dict(temperature=0.0, maxTokens=actual_limit),
         messages=[dict(role='user', content=[dict(text=text)])],
     )
-    response = client.converse(**arguments)
+    reservation = client.reserve_budget(actual_limit)
+    try:
+        response = client.converse(**arguments)
+    except Exception:
+        client.cancel_budget(reservation)
+        raise
+    client.settle_budget(reservation, response['usage']['outputTokens'])
     return response

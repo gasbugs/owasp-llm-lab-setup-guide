@@ -40,7 +40,7 @@ def main():
         response = proof["response"]
         assert response["task_completed"] is True and response["security_verdict"] == "PASS"
         cases = {case["case_id"]: case for case in response["result"]["cases"]}
-        assert len(cases) == 21
+        assert len(cases) == 23
         examples = [json.loads(block) for block in re.findall(
             r"^출력 예시:\s*\n```json\n(.*?)^```$", parts[1], re.MULTILINE | re.DOTALL)]
         assert {example.get("case_id") for example in examples} == {
@@ -58,7 +58,7 @@ def main():
             self.assertEqual(result["security_verdict"], "PASS", result)
             self.assertTrue(result["task_completed"], result)
             with self.gateway.connect() as database:
-                self.assertEqual(database.execute("SELECT COUNT(*) FROM executions").fetchone()[0], 21)
+                self.assertEqual(database.execute("SELECT COUNT(*) FROM executions").fetchone()[0], 23)
                 self.assertEqual(database.execute("SELECT COUNT(*) FROM receipts").fetchone()[0], 7)
 
     suite = unittest.TestSuite([MarkdownSolution("test_document_solution")])

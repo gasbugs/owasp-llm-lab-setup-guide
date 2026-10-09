@@ -46,6 +46,28 @@ class P19CollectionTests(unittest.TestCase):
         self.assertEqual(spans[0]['sequence'], 1)
         self.assertEqual(self.raw, before)
 
+    def test_investigation_context_must_match_log_root_and_execution(self):
+        context = {'client_ip': '192.0.2.20', 'user_id': None,
+                   'policy_rule': 'authentication-required'}
+        self.case.update(context)
+        values = self.raw['loki']['data']['result'][0]['values']
+        values[0][1] = json.dumps(self.case)
+        root = self.raw['tempo']['batches'][0]['scopeSpans'][0]['spans'][1]
+        root['attributes'].extend({'key': key, 'value': {'stringValue': value or ''}}
+                                  for key, value in context.items())
+        logs, _ = collection.normalize(self.raw, self.case)
+        self.assertEqual({key: logs[0][key] for key in context}, context)
+        for key in context:
+            raw = copy.deepcopy(self.raw)
+            event = json.loads(raw['loki']['data']['result'][0]['values'][0][1])
+            event[key] = 'forged'
+            raw['loki']['data']['result'][0]['values'][0][1] = json.dumps(event)
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                collection.normalize(raw, self.case)
+        root['attributes'][-1]['value']['stringValue'] = 'forged'
+        with self.assertRaises(ValueError):
+            collection.normalize(self.raw, self.case)
+
     def test_wrong_parent_identity_window_and_duplicate_spans_are_rejected(self):
         for field, value in [('parentSpanId', '3' * 16), ('traceId', 'b' * 32),
                              ('startTimeUnixNano', '0'), ('endTimeUnixNano', '11')]:

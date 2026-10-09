@@ -453,12 +453,14 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
             for definition in definitions:
                 execution_id = str(uuid.uuid4())
                 started_at = datetime.now(timezone.utc).isoformat()
+                client_id = f"{definition['client_id']}-{suite_id[:8]}"
                 lab_response = await client.post(
                     f"{LAB_URL}/v1/chat",
                     json={
                         "execution_id": execution_id,
                         "started_at": started_at,
                         "scenario": definition["scenario"],
+                        "client_id": client_id,
                         **definition["body"],
                     },
                     headers={"Authorization": f"Bearer {LAB_TOKEN}"},
@@ -491,6 +493,7 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                     {
                         "case_id": definition["case_id"],
                         "scenario": definition["scenario"],
+                        "client_id": client_id,
                         "execution_id": execution_id,
                         "started_at": started_at,
                         "requested_max_output_tokens": definition["body"].get("max_output_tokens"),
