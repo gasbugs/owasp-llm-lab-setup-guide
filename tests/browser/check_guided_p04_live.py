@@ -65,7 +65,11 @@ def main():
             assert rejected == 422
             for width in (1440, 390):
                 page.set_viewport_size({'width': width, 'height': 1000})
-                for action in ('h04-provision', 'h04-verify'):
+                page.locator('#h23-experience-tab').click()
+                expect(page.locator('#h04-provision')).to_be_visible()
+                assert page.locator('#h04-provision').get_attribute('title') == 'AWS 자원 준비'
+                page.locator('#h23-grade-tab').click()
+                for action in ('h04-verify',):
                     page.locator('#' + action).focus()
                     page.locator('#' + action + '-help').wait_for(state='visible')
                     assert page.evaluate('''(id) => {
