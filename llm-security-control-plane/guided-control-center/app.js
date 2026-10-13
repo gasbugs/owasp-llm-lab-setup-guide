@@ -1011,6 +1011,7 @@ async function request(path, body = undefined) {
   if (payload !== null && typeof payload === "object") rawResponses.set(payload, formatRawJson(text));
   if (!response.ok) {
     const error = new Error(JSON.stringify(payload));
+    error.rawResponse = formatRawJson(text);
     const diagnostic = payload.diagnosis;
     const original = typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail);
     error.detail = diagnostic ? [original, diagnostic.cause, `수정 파일: ${diagnostic.file}`, diagnostic.field ? `확인 항목: ${diagnostic.field}` : "", `모델 호출: ${diagnostic.model_calls}`, `다음 행동: ${diagnostic.next_action}`, diagnostic.log_command ? `실행 로그 확인:\n${diagnostic.log_command}` : ""].filter(Boolean).join("\n") : payload.detail;
@@ -1369,6 +1370,7 @@ function renderError(error) {
     payload.task_completed = false;
     if (!("client_error" in error.detail)) payload.client_error = true;
   }
+  if (error.rawResponse) rawResponses.set(payload, error.rawResponse);
   renderEnvelope(payload);
 }
 

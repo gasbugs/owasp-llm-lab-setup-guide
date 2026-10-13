@@ -53,9 +53,10 @@ def main():
                 assert page.locator('#completion-toast').is_hidden()
             expect(page.locator('#raw')).to_contain_text('{')
             rendered = json.loads(page.locator('#raw').text_content())
-            # Error rendering adds a next-check default but must preserve every
-            # server-provided field; successful evidence is byte-value complete.
-            assert all(rendered.get(key) == value for key, value in result.items())
+            # Failed HTTP responses retain their complete server envelope so
+            # large evidence identifiers are not rounded by JavaScript.
+            displayed_result = rendered.get('detail', rendered)
+            assert all(displayed_result.get(key) == value for key, value in result.items())
             if complete:
                 assert rendered == result
                 assert result['result']['source_digest'] == args.source_digest

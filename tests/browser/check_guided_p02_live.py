@@ -55,6 +55,7 @@ def main():
             for width in (1440, 390):
                 page.set_viewport_size({"width": width, "height": 1000})
                 for action in ("h02-provision", "h02-verify"):
+                    page.locator('#h23-experience-tab' if action.endswith('provision') else '#h23-grade-tab').click()
                     page.locator("#" + action).focus()
                     page.locator("#" + action + "-help").wait_for(state="visible")
                     assert page.evaluate('''(id) => {
