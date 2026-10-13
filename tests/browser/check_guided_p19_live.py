@@ -39,6 +39,7 @@ def main():
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin, wait_until='networkidle')
+            page.wait_for_function('document.querySelector("#home-next").dataset.problem')
             page.locator('#home-next').click()
             page.locator('#mission-menu-toggle').click()
             page.locator('#practice-menu-P19').click()
