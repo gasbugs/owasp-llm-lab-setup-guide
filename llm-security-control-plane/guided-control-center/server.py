@@ -18,7 +18,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -65,6 +65,8 @@ if not P01_PATH.exists():
 P01_CONTRACT = json.loads(P01_PATH.read_text())
 APP_VERSION = os.getenv("RELEASE_VERSION", os.getenv("APP_VERSION", "dev"))
 SESSION_SECRET = os.environ["GUIDED_SESSION_SECRET"].encode()
+ADMIN_TOKEN = os.environ["GUIDED_ADMIN_TOKEN"].encode()
+ADMIN_ANSWERS = ROOT / "admin-answers"
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
 LAB03_URL = os.getenv("GUIDED_LAB03_URL", "http://guided-h03-sync-app:8000")
@@ -311,30 +313,49 @@ async def boundary_middleware(request: Request, call_next):
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request) -> HTMLResponse:
+def index(request: Request, mode: str | None = None, admin_token: str | None = None) -> Response:
+    session = None
     try:
-        session_from_cookie(request.cookies.get("guided_session"))
+        session = session_from_cookie(request.cookies.get("guided_session"))
     except HTTPException:
         pass
+    if session is None:
+        while len(SESSIONS) >= MAX_SESSIONS:
+            oldest_idle = next(
+                (candidate for candidate in SESSIONS if candidate not in ACTIVE_SESSIONS),
+                None,
+            )
+            if oldest_idle is None:
+                raise HTTPException(status_code=503, detail="all guided sessions are busy")
+            SESSIONS.pop(oldest_idle, None)
+        session_id = secrets.token_urlsafe(24)
+        previous_id, separator, signature = request.cookies.get("guided_session", "").partition(".")
+        expected = hmac.new(SESSION_SECRET, previous_id.encode(), hashlib.sha256).hexdigest()
+        if previous_id and separator and hmac.compare_digest(signature, expected):
+            session_id = previous_id
+        state = {
+            "csrf": secrets.token_urlsafe(24),
+            "p00_token": secrets.token_urlsafe(32),
+            "admin": False,
+        }
+        SESSIONS[session_id] = state
+        session = (session_id, state)
+    session_id, state = session
+    if mode == "admin":
+        if admin_token is not None:
+            if not hmac.compare_digest(admin_token.encode(), ADMIN_TOKEN):
+                raise HTTPException(status_code=403, detail="admin token is invalid")
+            state["admin"] = True
+            response = RedirectResponse(url="/?mode=admin", status_code=303)
+            response.set_cookie(
+                "guided_session", sign(session_id), httponly=True, samesite="strict",
+                secure=False, path="/", max_age=SESSION_COOKIE_SECONDS,
+            )
+            return response
+        if not state.get("admin"):
+            raise HTTPException(status_code=403, detail="admin token is required")
     else:
-        return HTMLResponse((ROOT / "index.html").read_text(encoding="utf-8").replace("__APP_VERSION__", APP_VERSION))
-    while len(SESSIONS) >= MAX_SESSIONS:
-        oldest_idle = next(
-            (candidate for candidate in SESSIONS if candidate not in ACTIVE_SESSIONS),
-            None,
-        )
-        if oldest_idle is None:
-            raise HTTPException(status_code=503, detail="all guided sessions are busy")
-        SESSIONS.pop(oldest_idle, None)
-    session_id = secrets.token_urlsafe(24)
-    previous_id, separator, signature = request.cookies.get("guided_session", "").partition(".")
-    expected = hmac.new(SESSION_SECRET, previous_id.encode(), hashlib.sha256).hexdigest()
-    if previous_id and separator and hmac.compare_digest(signature, expected):
-        session_id = previous_id
-    SESSIONS[session_id] = {
-        "csrf": secrets.token_urlsafe(24),
-        "p00_token": secrets.token_urlsafe(32),
-    }
+        state["admin"] = False
     html = (ROOT / "index.html").read_text(encoding="utf-8").replace(
         "__APP_VERSION__", APP_VERSION
     )
@@ -414,6 +435,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
     payload = {
         "resource_total_steps": RESOURCE_TOTAL_STEPS, "csrf_token": session[1]["csrf"],
         "p00_submission_token": session[1]["p00_token"],
+        "admin_mode": bool(session[1].get("admin")),
         "workspace": "practice",
         "course": {
             "tabs": 13,
@@ -541,6 +563,18 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
         item['internal_activity_id'] = item['hands_on_id']
         item['practice_id'] = 'P' + item['hands_on_id'][1:]
     return payload
+
+
+@app.get("/api/admin/answers/{problem}")
+def admin_answer(problem: str, session: tuple[str, dict] = Depends(require_session)) -> dict:
+    if not session[1].get("admin"):
+        raise HTTPException(status_code=403, detail="admin mode is required")
+    if problem not in {f"P{number:02d}" for number in range(24)}:
+        raise HTTPException(status_code=404, detail="answer does not exist")
+    answer_path = ADMIN_ANSWERS / f"{problem}.md"
+    if not answer_path.is_file():
+        raise HTTPException(status_code=404, detail="answer does not exist")
+    return {"problem": problem, "answer": answer_path.read_text(encoding="utf-8")}
 
 
 async def execute_suite(session_id: str, suite_kind: str) -> dict:

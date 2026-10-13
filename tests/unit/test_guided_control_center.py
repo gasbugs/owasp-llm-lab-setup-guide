@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTROL = ROOT / "llm-security-control-plane"
 COMPOSE = ROOT / "examples/security-monitoring/compose.guided.yaml"
 os.environ.setdefault("GUIDED_SESSION_SECRET", "unit-session-secret")
+os.environ.setdefault("GUIDED_ADMIN_TOKEN", "unit-admin-token")
 os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
 os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
 os.environ.setdefault("GUIDED_CONTROL_LAB03_TOKEN", "unit-control-lab03")
@@ -1484,10 +1485,43 @@ class GuidedControlCenterTests(unittest.TestCase):
     def test_only_named_public_assets_are_served_not_source_or_course_files(self):
         paths = ("/server.py", "/p01.json", "/Containerfile", "/requirements.txt",
                  "/solutions/p01.py", "/index.html", "/.state/guided-course.env",
-                 "/guided-labs/h01-bedrock-gateway/learner.py", "/api/solutions")
+                 "/guided-labs/h01-bedrock-gateway/learner.py", "/api/solutions",
+                 "/admin-answers/P01.md")
         for path in paths:
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 404)
+
+    def test_admin_url_enables_answers_without_exposing_them_to_normal_sessions(self):
+        self.assertFalse(self.bootstrap["admin_mode"])
+        self.assertEqual(self.client.get("/api/admin/answers/P01").status_code, 403)
+
+        admin = TestClient(self.server.app)
+        response = admin.get("/?mode=admin&admin_token=unit-admin-token")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.url.query, b"mode=admin")
+        self.assertTrue(admin.get("/api/bootstrap").json()["admin_mode"])
+        answer = admin.get("/api/admin/answers/P01")
+        self.assertEqual(answer.status_code, 200)
+        self.assertEqual(answer.json()["problem"], "P01")
+        self.assertIn("P01", answer.json()["answer"])
+        self.assertEqual(admin.get("/api/admin/answers/P99").status_code, 404)
+
+        admin.get("/")
+        self.assertFalse(admin.get("/api/bootstrap").json()["admin_mode"])
+        self.assertEqual(admin.get("/api/admin/answers/P01").status_code, 403)
+
+    def test_invalid_or_missing_admin_token_is_rejected(self):
+        browser = TestClient(self.server.app)
+        self.assertEqual(browser.get("/?mode=admin", follow_redirects=False).status_code, 403)
+        self.assertEqual(
+            browser.get("/?mode=admin&admin_token=wrong", follow_redirects=False).status_code,
+            403,
+        )
+
+    def test_admin_answer_renderer_uses_text_content(self):
+        javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
+        self.assertIn('output.textContent = payload.answer', javascript)
+        self.assertNotIn('innerHTML = payload.answer', javascript)
 
     def test_web_code_blocks_only_contain_apply_commands_and_resource_templates(self):
         html = self.home.text
@@ -1647,11 +1681,10 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn('@app.post("/v1/chat")', source)
         self.assertIn('boto3.client("bedrock-runtime", region_name=REGION)', source)
         self.assertIn("learner.handle_request(body, recorder)", source)
-        # Check the published Starter without overwriting the learner's local solution.
-        learner_source = subprocess.check_output(
-            ["git", "show", "HEAD:llm-security-control-plane/guided-labs/h01-bedrock-gateway/learner.py"],
-            cwd=ROOT, text=True,
-        )
+        # Check the Starter that the next image build will publish.
+        learner_source = (
+            CONTROL / "guided-labs/h01-bedrock-gateway/learner.py"
+        ).read_text(encoding="utf-8")
         self.assertIn("raise NotImplementedError", learner_source)
         self.assertNotIn("min(", learner_source)
 

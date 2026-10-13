@@ -704,3 +704,11 @@ html[data-theme="dark"] .aws-status-problem { color:#ff8585; }
 .case-id-row { display: flex; align-items: start; gap: 8px; margin-top: 6px; }
 .case-id-row code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .8rem; }
 .case-copy-id { flex: 0 0 auto; padding: 3px 8px; font-size: .75rem; }
+details.admin-answer {
+  margin: 1.5rem 0 0;
+  padding: 1rem;
+  border: 2px solid var(--accent, #6f5bd3);
+  border-radius: 0.75rem;
+}
+details.admin-answer > summary { cursor: pointer; font-weight: 700; }
+details.admin-answer > pre { max-height: 65vh; overflow: auto; white-space: pre-wrap; }

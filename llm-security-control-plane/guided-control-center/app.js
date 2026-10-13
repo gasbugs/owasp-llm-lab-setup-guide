@@ -25,6 +25,9 @@ const celebratedPractices = new Set();
 let celebrationTimer = null;
 let progressRequest = 0;
 let csrfToken = "";
+let adminMode = false;
+let adminAnswerPanel = null;
+let adminAnswerRequest = 0;
 let activeTab = 0;
 let activeProblem = "P01";
 let sidebarPinned = false;
@@ -513,7 +516,37 @@ function selectWorkspace(name) {
     renderBreadcrumb("P00");
     setText("current-station", "P00");
     setText("current-station-name", "첫 미션 튜토리얼");
+    showAdminAnswer("P00");
   }
+}
+
+async function showAdminAnswer(problem) {
+  if (!adminMode || !adminAnswerPanel) return;
+  const requestNumber = ++adminAnswerRequest;
+  const host = problem === "P00" ? byId("tutorial-panel") : byId(`h${problem.slice(1)}-work`);
+  host.append(adminAnswerPanel);
+  adminAnswerPanel.open = false;
+  const output = adminAnswerPanel.querySelector("pre");
+  output.textContent = "관리자 답안을 불러오는 중입니다…";
+  try {
+    const response = await fetch(`/api/admin/answers/${problem}`);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "관리자 답안을 불러오지 못했습니다.");
+    if (requestNumber === adminAnswerRequest) output.textContent = payload.answer;
+  } catch (error) {
+    if (requestNumber === adminAnswerRequest) output.textContent = error.message;
+  }
+}
+
+function prepareAdminAnswers() {
+  if (!adminMode) return;
+  adminAnswerPanel = document.createElement("details");
+  adminAnswerPanel.className = "admin-answer";
+  const title = document.createElement("summary"); title.textContent = "관리자 답안";
+  const note = document.createElement("p");
+  note.textContent = "현재 문제의 제한된 조건과 Starter만 사용한 독립 풀이입니다.";
+  const output = document.createElement("pre");
+  adminAnswerPanel.append(title, note, output);
 }
 
 function prepareMissionPanes() {
@@ -701,6 +734,7 @@ function selectTab(index, problem = practiceGroups[index][0]) {
   window.scrollTo({top: 0, left: 0, behavior: "instant"});
   byId("mission-guidance").scrollTop = 0;
   byId("mission-execution").scrollTop = 0;
+  showAdminAnswer(problem);
   const h09 = index === 5;
   const h22 = index === 12;
   setText("current-station", missionLabel(activeProblem));
@@ -1673,6 +1707,8 @@ async function bootstrap() {
   if (!response.ok) throw new Error("세션을 시작하지 못했습니다.");
   const payload = await response.json();
   csrfToken = payload.csrf_token;
+  adminMode = payload.admin_mode === true;
+  if (adminMode) history.replaceState(history.state, "", "/?mode=admin");
   const catalogResponse = await fetch("/api/case-catalog");
   if (catalogResponse.ok) caseCatalog = await catalogResponse.json();
   resourceTotals = payload.resource_total_steps || {};
@@ -1682,6 +1718,7 @@ async function bootstrap() {
   --data-binary @"$HOME/work/control-center-tutorial/request.json" | jq`);
   renderOfficialUis(payload.official_uis);
   prepareMissionPanes();
+  prepareAdminAnswers();
   applyMissionDisplayLabels();
   restoreGradingResults();
   selectTab(0);

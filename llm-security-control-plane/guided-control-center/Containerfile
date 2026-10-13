@@ -11,6 +11,8 @@ COPY --chmod=0444 guided-control-center/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chmod=0444 guided-control-center/server.py guided-control-center/progress.py guided-control-center/diagnostics.py guided-control-center/index.html \
     guided-control-center/app.css guided-control-center/app.js guided-control-center/experience.json guided-control-center/case-catalog.json ./
+COPY guided-control-center/admin-answers/ /app/admin-answers/
+RUN chmod 0555 /app/admin-answers && chmod 0444 /app/admin-answers/*
 COPY guided-control-center/fonts/IBMPlexMono-SemiBold.woff2 guided-control-center/fonts/LICENSE.txt /app/fonts/
 RUN chmod 0755 /app/fonts && chmod 0444 /app/fonts/*
 RUN install -d -o 65532 -g 65532 -m 0700 /state

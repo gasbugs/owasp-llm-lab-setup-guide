@@ -10,14 +10,7 @@ models:
       temperature: 0.0
       max_tokens: 120
 
-  - type: content_safety
-    engine: openai
-    model: us.amazon.nova-lite-v1:0#h07-content-safety
-    parameters:
-      temperature: 0.0
-      max_tokens: 120
-
+# TODO(H07): content_safety 모델과 정확한 input flow를 연결한다.
 rails:
   input:
-    flows:
-      - content safety check input $model=content_safety
+    flows: []

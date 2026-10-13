@@ -6,15 +6,13 @@ from importlib.metadata import version
 
 from presidio_analyzer import AnalyzerEngine
 from presidio_analyzer.nlp_engine import NlpEngineProvider
-from presidio_analyzer.predefined_recognizers import KrRrnRecognizer
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 
 
 FRAMEWORK_VERSION = version("presidio-analyzer")
 LANGUAGE = "en"
-# KrRrnRecognizer가 반환하는 엔티티 타입인 KR_RRN을 포함합니다.
-ENTITIES = ("EMAIL_ADDRESS", "KR_RRN")
+ENTITIES = ("EMAIL_ADDRESS",)
 
 
 def build_engines() -> tuple[AnalyzerEngine, AnonymizerEngine]:
@@ -26,8 +24,7 @@ def build_engines() -> tuple[AnalyzerEngine, AnonymizerEngine]:
         }
     ).create_engine()
     analyzer = AnalyzerEngine(nlp_engine=nlp, supported_languages=[LANGUAGE])
-    # 영어 Analyzer에서도 공식 한국 주민번호 인식기가 실제 선택되게 언어를 맞춥니다.
-    analyzer.registry.add_recognizer(KrRrnRecognizer(supported_language=LANGUAGE))
+    # Starter weakness: the official KrRrnRecognizer is not registered yet.
     return analyzer, AnonymizerEngine()
 
 
@@ -83,6 +80,6 @@ def apply_privacy_policy(*, stage: str, text: str) -> dict:
         "operator": "replace",
         "detections": detections,
         "sanitized_candidate": sanitized,
-        # 원문 대신 비식별화된 sanitized 문자열 전달
-        "released_text": sanitized,
+        # Starter weakness: Presidio ran, but the application releases the raw text.
+        "released_text": text,
     }

@@ -61,6 +61,20 @@ else
   printf '기존 환경 파일을 재사용합니다: %s\n' "$ENV_FILE"
 fi
 
+# Compose에 새 필수값이 추가되어도 기존 Token과 volume은 보존하고 누락값만 채웁니다.
+mapfile -t required_variables < <(
+  grep -oE '\$\{[A-Z][A-Z0-9_]+:\?' "$COMPOSE_FILE" |
+    sed -E 's/^\$\{([^:]+):\?$/\1/' |
+    sort -u
+)
+for variable_name in "${required_variables[@]}"; do
+  if ! grep -qE "^${variable_name}=" "$ENV_FILE"; then
+    printf '%s=%s\n' "$variable_name" "$(openssl rand -hex 32)" >> "$ENV_FILE"
+    printf '기존 환경 파일에 새 필수값을 추가했습니다: %s\n' "$variable_name"
+  fi
+done
+chmod 600 "$ENV_FILE"
+
 log "3/5" "Docker·Compose·디스크·포트 상태를 점검합니다."
 python3 "$SETUP_ROOT/tools/practice_preflight.py" \
   --root "$SETUP_ROOT" --env-file "$ENV_FILE" --file "$COMPOSE_FILE"
@@ -89,6 +103,8 @@ fi
 
 printf '\n설치가 완료되었습니다.\n'
 printf 'Control Center: http://127.0.0.1:28097\n'
+admin_token="$(sed -n 's/^GUIDED_ADMIN_TOKEN=//p' "$ENV_FILE")"
+printf '관리자 답안:   http://127.0.0.1:28097/?mode=admin&admin_token=%s\n' "$admin_token"
 printf 'NeMo Chat UI:  http://127.0.0.1:28192\n'
 printf 'P20 Grafana:    http://127.0.0.1:23002/d/guided-p20\n'
 printf 'Grafana 비밀번호 확인: grep -E '\''^(GUIDED_GRAFANA_PASSWORD|GUIDED_P20_GRAFANA_PASSWORD)='\'' %s\n' "$ENV_FILE"
