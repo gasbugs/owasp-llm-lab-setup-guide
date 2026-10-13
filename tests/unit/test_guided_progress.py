@@ -65,6 +65,10 @@ class ProgressTests(unittest.TestCase):
         self.complete(course_verdict='HIT')
         self.assertEqual(len(self.store.history()), 1)
 
+    def test_policy_promotion_sandbox_digest_is_saved(self):
+        self.complete('P16', source_digest=None, result={'sandbox_digest': 'b' * 64})
+        self.assertEqual(self.store.history()[0]['digest'], 'b' * 64)
+
     def test_failed_new_attempt_retains_history_but_requires_recheck(self):
         self.complete()
         self.store.begin('P01')

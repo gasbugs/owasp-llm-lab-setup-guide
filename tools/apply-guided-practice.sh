@@ -23,4 +23,7 @@ mapfile -t services < <(printf '%s\n' "${services[@]}" | sort -u)
 
 docker compose --env-file "$ENV_FILE" --file "$COMPOSE_FILE" --file "$override_file" build "${services[@]}"
 docker compose --env-file "$ENV_FILE" --file "$COMPOSE_FILE" --file "$override_file" up -d --no-deps --force-recreate "${services[@]}"
+if [[ "$MISSION_ID" == "P06-01" ]]; then
+  docker compose --env-file "$ENV_FILE" --file "$COMPOSE_FILE" restart guided-prometheus
+fi
 printf '%s 작업 파일을 적용했습니다. setup의 Starter 파일은 변경하지 않았습니다.\n' "$MISSION_ID"

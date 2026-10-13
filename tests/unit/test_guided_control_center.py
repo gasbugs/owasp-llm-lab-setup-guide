@@ -1352,7 +1352,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         page=self.client.get('/').text
         self.assertNotIn('EXPORT_TO_ALLOY',page)
         self.assertIn('미션 채점',page)
-        self.assertIn('guided-h17-telemetry',page)
+        self.assertIn('./tools/apply-guided-practice.sh P06-01',page)
         self.assertIn('aria-describedby="h17-help"',page)
 
     def test_p19_uses_dedicated_runtime_and_server_owned_verification(self):
@@ -1391,7 +1391,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         page=self.client.get('/').text
         self.assertIn('미션 채점',page);self.assertIn('aria-describedby="h20-help"',page)
         self.assertNotIn('guided_h20_risk_active',page);self.assertNotIn('dashboard-query.txt',page)
-        self.assertIn('h20-alert-dashboard/rules.yaml',page)
+        self.assertIn('./tools/apply-guided-practice.sh P06-04',page)
 
     def test_p20_missing_connection_does_not_call_shared_observability(self):
         with patch.object(self.server,'H20_TOKEN',''),patch.object(self.server.httpx,'AsyncClient',FakeAsyncClient):
@@ -1445,11 +1445,11 @@ class GuidedControlCenterTests(unittest.TestCase):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         self.assertNotIn("effective_max_tokens = min(request.max_output_tokens, 128)", html)
         self.assertNotIn('result = boto3.client("bedrock-runtime"', html)
-        self.assertIn("h01-bedrock-gateway/learner.py", html)
+        self.assertIn("~/owasp-llm-practice/P03-01_learner.py", html)
         self.assertIn("handle_request(body, client)", html)
         self.assertNotIn("강사와 함께", html)
         self.assertNotIn("비용 안내", html)
-        self.assertIn("--env-file llm-security-control-plane/.state/guided-course.env", html)
+        self.assertIn("./tools/apply-guided-practice.sh P03-01", html)
         self.assertIn('data-theme-choice="light"', html)
         self.assertIn('data-theme-choice="dark"', html)
         self.assertIn('id="chat-form"', html)
@@ -1604,19 +1604,19 @@ class GuidedControlCenterTests(unittest.TestCase):
     def test_p18_problem_contains_contract_but_not_completed_queries(self):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         problem = html.split('<div id="h18-work"', 1)[1].split('<div id="h19-work"', 1)[0]
-        for required in ('미션 채점', 'guided-h18-queries', 'queries.yaml',
-                         'request_id', 'Counter', '--no-deps', 'aria-describedby="h18-help"'):
+        for required in ('미션 채점', 'queries.yaml', 'request_id', 'Counter',
+                         './tools/apply-guided-practice.sh P06-02', 'aria-describedby="h18-help"'):
             self.assertIn(required, problem)
         for solution in ('logql:', 'promql:', 'sum(', 'max by ('):
             self.assertNotIn(solution, problem)
-        self.assertNotIn('build guided-observability', problem)
+        self.assertNotIn('docker compose build', problem)
 
     def test_p19_problem_has_function_contract_not_answer_constant(self):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         problem = html.split('<div id="h19-work"', 1)[1].split('<div id="h20-work"', 1)[0]
         self.assertNotIn('JOIN_KEY', problem)
         for required in ('미션 채점', 'analyze_incident', 'downstream_calls', 'ValueError',
-                         'build guided-h19-investigation', '--no-deps', '실제 저장소 호출',
+                         './tools/apply-guided-practice.sh P06-03', '실제 저장소 호출',
                          'aria-describedby="h19-help"', 'role="note"'):
             self.assertIn(required, problem)
 

@@ -158,14 +158,12 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
         real_client = httpx.Client
         with patch.object(self.server.httpx, 'Client', side_effect=lambda **kw:
                           real_client(transport=httpx.MockTransport(respond), **kw)):
-            for number in (*range(1, 13), *range(17, 21)):
+            for number in (*range(1, 17), *range(17, 23)):
                 result = self.server.progress_build(f'P{number:02d}', None)
                 self.assertEqual(result, {'problem': f'P{number:02d}', 'source_digest': 'a' * 64})
-            for number in (13, 14, 15, 16, 21, 22):
-                self.assertIsNone(self.server.progress_build(f'P{number}', None)['source_digest'])
-        self.assertEqual(len(calls), 16)
+        self.assertEqual(len(calls), 22)
         self.assertTrue(all(request.method == 'GET' for request in calls))
-        self.assertEqual(calls[-1].url.path, '/v1/buildinfo')
+        self.assertIn('/v1/buildinfo', [request.url.path for request in calls])
         self.assertEqual(self.client.get('/v1/progress/P01/build').status_code, 401)
 
     def test_progress_identity_error_does_not_return_old_identity_or_source(self):
@@ -176,6 +174,15 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             with patch.object(self.server.httpx, 'Client', side_effect=lambda **kw:
                               real_client(transport=httpx.MockTransport(lambda req: response), **kw)):
                 self.assertIsNone(self.server.progress_build('P01', None)['source_digest'])
+
+    def test_progress_identity_accepts_nested_p12_build(self):
+        import httpx
+        real_client = httpx.Client
+        response = httpx.Response(200, json={'build': {'source_digest': 'a' * 64,
+                                                       'files': {'pipeline.py': 'b' * 64}}})
+        with patch.object(self.server.httpx, 'Client', side_effect=lambda **kw:
+                          real_client(transport=httpx.MockTransport(lambda req: response), **kw)):
+            self.assertEqual(self.server.progress_build('P12', None)['source_digest'], 'b' * 64)
 
     def setUp(self):
         with self.server.connect() as database:

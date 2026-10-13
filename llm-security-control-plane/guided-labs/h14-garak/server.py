@@ -15,6 +15,11 @@ def auth(value, expected):
 @app.get("/readyz")
 def readyz(): return {"status": "ready", "tool": "garak", "version": "0.15.1"}
 
+@app.get("/v1/build-info")
+def build_info(authorization: str | None = Header(None)):
+    auth(authorization, VERIFY)
+    return {"source_digest": hashlib.sha256(Path('/work/garak-config.yaml').read_bytes()).hexdigest()}
+
 @app.post("/v1/run")
 def run(body: dict, authorization: str | None = Header(None)):
     auth(authorization, CONTROL); suite = body["suite_id"]

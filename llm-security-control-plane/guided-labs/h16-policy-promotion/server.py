@@ -44,6 +44,10 @@ def run(body:dict,authorization:str|None=Header(None)):
 def receipt(suite:str,authorization:str|None=Header(None)):
     auth(authorization,VERIFY);return json.loads(Path(f'/state/{suite}.json').read_text())
 
+@app.get('/v1/build-info')
+def build_info(authorization:str|None=Header(None)):
+    auth(authorization,VERIFY);return {'source_digest':digest(SOURCE.read_bytes())}
+
 
 from pydantic import BaseModel, ConfigDict, Field
 class PreviewRequest(BaseModel):

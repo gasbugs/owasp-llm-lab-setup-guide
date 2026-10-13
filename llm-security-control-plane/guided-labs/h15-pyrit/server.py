@@ -19,6 +19,10 @@ def auth(v,e):
     if not hmac.compare_digest(v or '',f'Bearer {e}'): raise HTTPException(401,'invalid credential')
 @app.get('/readyz')
 def ready(): return {'status':'ready','tool':'pyrit','version':'1.0.1'}
+@app.get('/v1/build-info')
+def build_info(authorization:str|None=Header(None)):
+    auth(authorization,VERIFY)
+    return {'source_digest':hashlib.sha256(Path('/work/attack.py').read_bytes()).hexdigest()}
 @app.post('/v1/run')
 async def run(body:dict,authorization:str|None=Header(None)):
     auth(authorization,CONTROL); suite=body['suite_id']; contract=module.attack_contract()

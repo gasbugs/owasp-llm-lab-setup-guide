@@ -181,6 +181,10 @@ app = FastAPI(title="H21 Agent Gateway Host", docs_url=None, redoc_url=None)
 def readyz() -> dict:
     return {"status": "ready", "protocol_version": PROTOCOL}
 
+@app.get("/v1/build-info")
+def build_info(_authorized: None = Depends(require_verifier)) -> dict:
+    return {"source_digest": hashlib.sha256(Path("/app/policy.py").read_bytes()).hexdigest()}
+
 
 @app.post("/v1/run-suite")
 async def run_suite(_authorized: None = Depends(require_control)) -> dict:

@@ -139,7 +139,7 @@ H08_SCAFFOLD_DIGEST = "4d6e417d5822895ee43fffd92c019618101df8bcd5cd0da1b8cd35bad
 H09_SCAFFOLD_DIGEST = "0059b03306a1aea17097c4a82e304dc7d87d7b35f7f9e1745d41673e9ed541c3"
 H10_SCAFFOLD_DIGEST = "938c82047c9fb004900b362a3368605b9ea5627f667b3749cc8cdfe2f4c8b926"
 H11_SCAFFOLD_DIGEST = "760f73d58b6a58217dcd4d9cde35734a59f56003333b882719b306485ff3a569"
-H13_SCAFFOLD_DIGEST = "cd953ec730a7b953713ba2488e0b4669ac59e7f5ab1836e0f174b7b84bf375ce"
+H13_SCAFFOLD_DIGEST = "6c091ab6a82d5e2c3e30457b5628e9595a259eea8094fefcaea4aab8c0809717"
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
 H21_HOST_URL = os.getenv("GUIDED_H21_HOST_URL", "http://guided-h21-host:8000")
 H21_PROVIDER_URL = os.getenv(
@@ -561,9 +561,13 @@ def progress_build(problem: str, _authorized: None = Depends(require_control)) -
         url = "http://guided-model-call:8000"
         token = hmac.new(LAB_TOKEN.encode(), b"model-call:P23", "sha256").hexdigest()
         path = "/v1/build-info"
-    elif number <= 12:
+    elif number <= 16:
         url = LAB_URL if number == 1 else globals()[f"LAB{number:02d}_URL"]
         token = LAB_TOKEN if number == 1 else globals()[f"LAB{number:02d}_TOKEN"]
+        path = '/v1/build-info'
+    elif number in {21, 22}:
+        url = H21_HOST_URL if number == 21 else H22_HOST_URL
+        token = H21_TOKEN if number == 21 else H22_TOKEN
         path = '/v1/build-info'
     elif 17 <= number <= 20:
         url, token = globals()[f'H{number}_URL'], globals()[f'H{number}_TOKEN']
@@ -579,7 +583,9 @@ def progress_build(problem: str, _authorized: None = Depends(require_control)) -
                     content.extend(chunk)
                     if len(content) > 262144:
                         raise ValueError('oversized build identity')
-        digest = json.loads(content).get('source_digest')
+        payload = json.loads(content)
+        build = payload.get('build') or {}
+        digest = ((build.get('files') or {}).get('pipeline.py') or payload.get('source_digest')) if number == 12 else payload.get('source_digest') or build.get('source_digest')
         if not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest):
             raise ValueError('missing build identity')
         return {'problem': problem, 'source_digest': digest}
@@ -4757,6 +4763,7 @@ def verify_p02(request: P02VerifyRequest, _authorized: None = Depends(require_co
     if not P02_LOCK.acquire(blocking=False):
         raise HTTPException(409, "P02 verification already running")
     result, completed = {}, False
+    expected_cases = []
     def update_progress(cases, current):
         P02_PROGRESS[suite] = {"suite_id": suite, "phase": "verifying", "total": 22,
                                "cases": [dict(case) for case in cases], "current_case": current}
@@ -4768,11 +4775,20 @@ def verify_p02(request: P02VerifyRequest, _authorized: None = Depends(require_co
         if not root.exists():
             root = Path(__file__).resolve().parents[1] / "guided-labs/h02-document-ingestion"
         verification = Verification(root, LAB02_URL, GATEWAY_URL, LAB02_TOKEN, GATEWAY_TOKEN, native_sdk=True)
+        expected_cases = [case["case_id"] for case in verification.cases]
         with httpx.Client(follow_redirects=False, trust_env=False) as client:
             result = verification.collect(suite, client, on_progress=update_progress)
         completed = result.get("case_contract_verified") is True
     except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError, IndexError, OSError):
-        result = {"case_contract_verified": False, "cases": []}
+        observed = [dict(case) for case in P02_PROGRESS[suite].get("cases", [])]
+        failed_count = len(observed)
+        if not observed and expected_cases:
+            observed = [{"case_id": expected_cases[0], "status": "ERR", "case_verified": False,
+                         "reason": "Starter 구현에서 첫 검증 사례를 완료하지 못했습니다."}]
+            failed_count = 1
+        observed.extend({"case_id": case_id, "status": "미실행", "reason": "앞 케이스 실패로 중단"}
+                        for case_id in expected_cases[failed_count:])
+        result = {"case_contract_verified": False, "cases": observed}
     finally:
         progress = P02_PROGRESS[suite]
         current = progress.get("current_case")
@@ -4787,7 +4803,7 @@ def verify_p02(request: P02VerifyRequest, _authorized: None = Depends(require_co
             "verified_by": "guided-evidence-verifier", "verified_at": datetime.now(timezone.utc).isoformat(),
             "stage_calls": [{"stage": case["case_id"], "attempted": True,
                              "outcome": "stored-and-embedded" if case["calls"] else "rejected-before-provider"}
-                            for case in result["cases"]],
+                            for case in result["cases"] if "calls" in case],
             "result": {**result, "task_completed": completed, "security_verdict": verdict,
                        "embedding_dimension": 1024 if completed else None,
                        "source_digest": result.get("build", {}).get("source_digest")},
@@ -4811,17 +4827,26 @@ def verify_p03(request: P03VerifyRequest, _authorized: None = Depends(require_co
     suite = str(request.suite_id)
     if not P03_LOCK.acquire(blocking=False):
         raise HTTPException(409, "P03 verification already running")
+    expected_cases = []
     try:
         try:
             root = Path(__file__).with_name("p03-runner")
             if not root.exists():
                 root = Path(__file__).resolve().parents[1] / "guided-labs/h03-ingestion-search"
             verification = SuiteVerification(root, LAB03_URL, GATEWAY_URL, LAB03_TOKEN, GATEWAY_TOKEN, native_sdk=True)
+            expected_cases = [case["case_id"] for case in verification.cases]
             validate_roles(verification, CONTROL_TOKEN)
             result = grade_run(verification, suite)
         except (ValueError, KeyError, TypeError, AttributeError, IndexError, OSError):
+            cases = []
+            if expected_cases:
+                cases.append({"case_id": expected_cases[0], "status": "ERR", "case_verified": False,
+                              "outcome": "starter-incomplete",
+                              "reason": "Starter 구현에서 첫 검증 사례를 완료하지 못했습니다."})
+                cases.extend({"case_id": case_id, "status": "미실행", "outcome": "not-run",
+                              "reason": "앞 케이스 실패로 중단"} for case_id in expected_cases[1:])
             result = {"practice_id": "P03", "activity_id": "H03", "contract_version": "p03-search-v1",
-                      "suite_id": suite, "case_contract_verified": False, "cases": [],
+                      "suite_id": suite, "case_contract_verified": False, "cases": cases,
                       "task_completed": False, "security_verdict": "ERR"}
     finally:
         P03_LOCK.release()

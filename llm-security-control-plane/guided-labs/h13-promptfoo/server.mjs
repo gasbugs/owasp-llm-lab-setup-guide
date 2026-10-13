@@ -92,6 +92,11 @@ const server = createServer(async (request, response) => {
       response.end(JSON.stringify({ status: "ready", tool: "promptfoo", version: "0.121.20" }));
       return;
     }
+    if (request.method === "GET" && request.url === "/v1/build-info") {
+      if (!bearer(request, verifierToken)) throw Object.assign(new Error("unauthorized"), {status:401});
+      response.writeHead(200, {"Content-Type":"application/json"});
+      response.end(JSON.stringify({source_digest:digest(await readFile("/work/promptfooconfig.yaml"))})); return;
+    }
     if (request.method === "POST" && request.url === "/v1/run-case") {
       if (!bearer(request, controlToken)) throw Object.assign(new Error("unauthorized"), {status:401});
       const value = await runCase(await body(request));

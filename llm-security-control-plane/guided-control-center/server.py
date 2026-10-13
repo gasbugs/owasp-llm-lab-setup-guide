@@ -635,10 +635,20 @@ async def execute_suite(session_id: str, suite_kind: str) -> dict:
                     if lab_response.status_code == 502 and isinstance(code, str) and code in guidance:
                         reason, next_check = guidance[code]
                         failure.update(provider_error=code, reason=reason + " 연결 확인을 완료하지 못했습니다. 모델 실행 완료 여부는 확인되지 않았습니다.", next_check=next_check)
-                    raise HTTPException(
-                        status_code=502,
-                        detail=failure,
-                    )
+                    failed_case = {
+                        **progress["cases"][-1],
+                        "status": "ERR",
+                        "case_verified": False,
+                        "reason": failure["reason"],
+                    }
+                    remaining = [
+                        {"case_id": item["case_id"], "status": "미실행", "reason": "앞 케이스 실패로 중단"}
+                        for item in definitions[len(progress["cases"]):]
+                    ]
+                    failure["result"] = {"cases": [failed_case, *remaining]}
+                    progress["cases"] = failure["result"]["cases"]
+                    progress["verdict"] = "ERR"
+                    return failure
                 cases.append(
                     {
                         "case_id": definition["case_id"],

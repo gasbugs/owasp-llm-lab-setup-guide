@@ -42,7 +42,8 @@ class ProgressStore:
             return
         result = payload.get('result') or {}
         digest = (payload.get('source_digest') or result.get('source_digest')
-                  or (result.get('receipt') or {}).get('source_digest') or result.get('config_digest'))
+                  or (result.get('receipt') or {}).get('source_digest') or result.get('config_digest')
+                  or result.get('sandbox_digest'))
         if not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest):
             digest = None
         with self.lock, self.db:

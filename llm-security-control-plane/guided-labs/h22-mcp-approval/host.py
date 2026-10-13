@@ -290,6 +290,12 @@ def receipt(suite_id: str, _authorized: None = Depends(require_verifier)) -> dic
         raise HTTPException(status_code=404, detail="receipt not found")
     return json.loads(row["receipt_json"])
 
+@app.get("/v1/build-info")
+async def build_info(_authorized: None = Depends(require_verifier)) -> dict:
+    async with Client(MCP_URL, mode=PROTOCOL_VERSION) as client:
+        result = await client.call_tool("server_build_info", {})
+    return {"source_digest": (tool_payload(result) or {}).get("source_digest")}
+
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
