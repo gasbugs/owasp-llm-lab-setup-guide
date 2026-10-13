@@ -39,10 +39,7 @@ def main():
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin, wait_until='networkidle')
-            page.wait_for_function('document.querySelector("#home-next").dataset.problem')
-            page.locator('#home-next').click()
-            page.locator('#mission-menu-toggle').click()
-            page.locator('#practice-menu-P18').click()
+            page.locator('#home-missions .home-mission[data-problem="P18"]').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
             problem = page.locator('#h18-work').inner_text()
             assert 'P18' in problem and 'queries.yaml' in problem

@@ -43,10 +43,7 @@ async function main() {
     const errors = [];
     page.on('pageerror', err => errors.push(err.message));
     await page.goto(origin, { waitUntil: 'networkidle' });
-    await page.waitForFunction(() => document.querySelector('#home-next').dataset.problem);
-    await page.locator('#home-next').click();
-    await page.locator('#mission-menu-toggle').click();
-    await page.locator('#practice-menu-P18').click();
+    await page.locator('#home-missions .home-mission[data-problem="P18"]').click();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
     const problem = await page.locator('#h18-work').innerText();
     assert(problem.includes('P18') && problem.includes('queries.yaml'));
