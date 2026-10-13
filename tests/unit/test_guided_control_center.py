@@ -1551,8 +1551,10 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn('button.textContent = copied ? "복사됨" : "복사 실패"', javascript)
         self.assertIn("prepareCopyableBlocks(output)", javascript)
         stylesheet = (CONTROL / "guided-control-center/app.css").read_text(encoding="utf-8")
-        self.assertIn(".copyable-block { margin: 1.25rem 0; overflow: hidden; border: 2px solid var(--line-strong)", stylesheet)
+        self.assertIn(".copyable-block { min-width: 0; max-width: 100%; margin: 1.25rem 0; overflow: hidden; border: 2px solid var(--line-strong)", stylesheet)
         self.assertIn(".copy-block-toolbar { display: flex;", stylesheet)
+        self.assertIn(".lab-workspace > details.admin-answer { grid-column: 1 / -1; }", stylesheet)
+        self.assertIn("details.admin-answer {\n  width: 100%;\n  min-width: 0;\n  max-width: 100%;", stylesheet)
         self.assertNotIn("innerHTML", javascript[javascript.index("function appendAdminInline"):javascript.index("async function showAdminAnswer")])
         self.assertNotIn("P03은 P02·P11과 별도의 문서와 자원을 사용합니다.", self.home.text)
 
