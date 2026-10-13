@@ -1363,7 +1363,11 @@ function renderError(error) {
     next_check: "원시 오류를 먼저 확인합니다. 연결 오류라면 해당 문제의 컨테이너 상태를 확인합니다.",
     error: error.message, stage_calls: [] };
   if (/^P\d{2}$/.test(error.detail?.activity_id || "") && error.detail.task_completed === false) {
-    Object.assign(payload, error.detail, { course_verdict: "ERR", security_verdict: "ERR", task_completed: false, client_error: true });
+    Object.assign(payload, error.detail);
+    payload.course_verdict = "ERR";
+    payload.security_verdict = "ERR";
+    payload.task_completed = false;
+    if (!("client_error" in error.detail)) payload.client_error = true;
   }
   renderEnvelope(payload);
 }
