@@ -43,7 +43,7 @@ def main():
                 expect(page.locator('#task-completion')).to_have_text(label)
             else:
                 assert page.locator('#task-completion').is_hidden()
-            assert page.locator('#practice-progress-count').inner_text() == ('1 / 22' if complete else '0 / 22')
+            assert page.locator('#practice-progress-count').inner_text() == ('1 / 24' if complete else '0 / 24')
             assert ('is-complete' in page.locator('#practice-tab-0').get_attribute('class')) is complete
             if complete:
                 page.locator('#completion-toast').wait_for(state='visible')
@@ -95,7 +95,7 @@ def main():
             page.locator('[data-theme-choice="dark"]').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
             page.reload(wait_until='networkidle')
-            assert page.locator('#practice-progress-count').inner_text() == ('1 / 22' if complete else '0 / 22')
+            assert page.locator('#practice-progress-count').inner_text() == ('1 / 24' if complete else '0 / 24')
             assert page.locator('#completion-toast').is_hidden()
             assert page.locator('#task-completion').is_hidden()
             assert errors == []
