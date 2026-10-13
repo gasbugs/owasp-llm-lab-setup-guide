@@ -1567,8 +1567,8 @@ async function execute(path, body) {
     }
   };
   try {
-    if ((problem && problem !== "P23" && problem !== "P03")) {
-      renderCaseProgress({phase: "idle", cases: [], total: problem === "P04" ? 27 : problem === "P02" ? 22 : problem === "P01" ? 23 : null});
+    if ((problem && problem !== "P03")) {
+      renderCaseProgress({phase: "idle", cases: [], total: problem === "P04" ? 27 : problem === "P02" ? 22 : problem === "P01" ? 23 : problem === "P23" ? 3 : null});
       try {
         const snapshot = await fetch(`/api/test-progress/${problem}`);
         if (snapshot.ok) previousSuite = (await snapshot.json()).suite_id;

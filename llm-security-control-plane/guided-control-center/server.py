@@ -2964,6 +2964,7 @@ async def verify_model_call(request: Request, session: tuple[str,dict] = Depends
     if await request.body():
         raise HTTPException(422,"verification inputs are server-owned")
     execution=str(uuid.uuid4())
+    session[1]["p23_case_progress"]={"suite_id":execution,"phase":"running","total":3,"cases":[],"current_case":None}
     token=hmac.new(LAB_TOKEN.encode(), b"model-call:P23", "sha256").hexdigest()
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, trust_env=False, follow_redirects=False) as client:
@@ -2974,9 +2975,29 @@ async def verify_model_call(request: Request, session: tuple[str,dict] = Depends
         payload=verified.json()
         if payload.get("execution_id") != execution or payload.get("activity_id") != "P23" or payload.get("verified_by") != "guided-evidence-verifier":
             raise ValueError("verifier identity mismatch")
+        session[1]["p23_case_progress"]={"suite_id":execution,"phase":"finished","total":3,
+            "cases":payload.get("result",{}).get("cases",[]),"current_case":None,"verdict":payload.get("course_verdict","ERR")}
         return payload
     except (httpx.HTTPError,ValueError):
+        session[1]["p23_case_progress"].update(phase="finished",current_case=None,verdict="ERR")
         return {"activity_id":"P23","execution_id":execution,"task_completed":False,"security_verdict":"ERR","course_verdict":"ERR","next_check":"모델 연결 앱·검증기와 AWS 호출 권한을 확인하세요."}
+
+@app.get("/api/test-progress/P23")
+async def p23_case_progress(session: tuple[str,dict] = Depends(require_session)):
+    state=session[1].get("p23_case_progress")
+    if not state:
+        return {"suite_id":None,"phase":"idle","total":3,"cases":[],"current_case":None}
+    if state.get("phase") != "running":
+        return state
+    token=hmac.new(LAB_TOKEN.encode(),b"model-call:P23","sha256").hexdigest()
+    try:
+        async with httpx.AsyncClient(timeout=5,trust_env=False,follow_redirects=False) as client:
+            response=await client.get(f"http://guided-model-call:8000/v1/progress/{state['suite_id']}",headers={"Authorization":"Bearer "+token})
+        if response.status_code == 200 and response.json().get("suite_id") == state["suite_id"]:
+            return response.json()
+    except httpx.HTTPError:
+        pass
+    return state
 
 
 class ModelCallChatRequest(BaseModel):

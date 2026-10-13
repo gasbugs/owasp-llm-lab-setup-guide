@@ -43,6 +43,12 @@ def identity():
             "runner_digest": hashlib.sha256((ROOT/"server.py").read_bytes()).hexdigest()}
 
 SDK_LOCK = threading.Lock()
+PROGRESS = {}
+CASE_DEFINITIONS = [
+    ("normal", "계정 비밀번호를 바꾸는 이유를 한 문장으로 설명해 주세요.", False),
+    ("blank", "   ", False),
+    ("provider-error", "연결 오류 처리 확인", True),
+]
 
 class SDKRecorder:
     def __init__(self, failure=False, preview_tokens=None):
@@ -118,7 +124,10 @@ def run(body: Run, _=Depends(control), _sdk=Depends(sdk_session)):
         except sqlite3.IntegrityError:
             raise HTTPException(409, "execution already exists")
     cases=[]
-    for name, message, fail in [("normal", "계정 비밀번호를 바꾸는 이유를 한 문장으로 설명해 주세요.", False), ("blank", "   ", False), ("provider-error", "연결 오류 처리 확인", True)]:
+    progress={"suite_id":execution,"phase":"running","total":len(CASE_DEFINITIONS),"cases":[],"current_case":None}
+    PROGRESS[execution]=progress
+    for number, (name, message, fail) in enumerate(CASE_DEFINITIONS, 1):
+        progress["current_case"]={"number":number,"case_id":name,"status":"실행 중"}
         client=SDKRecorder(fail)
         returned=None
         error=None
@@ -127,13 +136,25 @@ def run(body: Run, _=Depends(control), _sdk=Depends(sdk_session)):
                 returned=learner.forward_question(message)
         except Exception as exc:
             error={"type":type(exc).__name__, "message":str(exc)}
-        cases.append({"case_id":name,"input":message,"failure_fixture":fail,
+        case={"case_id":name,"input":message,"failure_fixture":fail,
             "returned":returned,"error":error,"sdk_clients":client.clients,"calls":client.calls,"provider_attempts":client.attempts,
-            "provider_results":client.results,"fixture_errors":client.errors})
+            "provider_results":client.results,"fixture_errors":client.errors}
+        cases.append(case)
+        progress["cases"].append({"number":number,"case_id":name,"status":"실행 완료","provider_attempts":client.attempts,
+            "error_type":error.get("type") if error else None})
+        progress["current_case"]=None
+    progress["phase"]="verifying"
     payload={"activity_id":"P23","execution_id":execution,"closed":True,**identity(),"cases":cases}
     with sqlite3.connect("/tmp/model-call.sqlite3") as db:
         db.execute("UPDATE runs SET payload=? WHERE id=?", (json.dumps(payload,ensure_ascii=False),execution))
     return {"execution_id":execution}
+
+@app.get("/v1/progress/{execution_id}")
+def progress(execution_id: UUID, _=Depends(control)):
+    state=PROGRESS.get(str(execution_id))
+    if state is None:
+        raise HTTPException(404,"progress unavailable")
+    return deepcopy(state)
 
 @app.get("/v1/receipts/{execution_id}")
 def receipt(execution_id: UUID, _=Depends(verifier)):
