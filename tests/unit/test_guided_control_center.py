@@ -1519,9 +1519,11 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("function renderAdminMarkdown(container, source)", javascript)
         self.assertIn("renderAdminMarkdown(output, payload.answer)", javascript)
         self.assertIn('code.textContent = codeLines.join("\\n")', javascript)
-        self.assertIn('copyButton.textContent = "답안 전체 복사"', javascript)
-        self.assertIn("navigator.clipboard.writeText(adminAnswerMarkdown)", javascript)
-        self.assertIn('status.textContent = "복사했습니다."', javascript)
+        self.assertIn("function prepareCopyableBlocks(root = document)", javascript)
+        self.assertIn('root.querySelectorAll("pre:not([id])")', javascript)
+        self.assertIn("navigator.clipboard.writeText(text)", javascript)
+        self.assertIn('button.textContent = copied ? "복사됨" : "복사 실패"', javascript)
+        self.assertIn("prepareCopyableBlocks(output)", javascript)
         self.assertNotIn("innerHTML", javascript[javascript.index("function appendAdminInline"):javascript.index("async function showAdminAnswer")])
 
     def test_recheck_history_is_grouped_in_one_sidebar_line(self):
