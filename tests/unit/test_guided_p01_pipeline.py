@@ -93,10 +93,10 @@ class P01PipelineTests(unittest.TestCase):
         def deny(body, client):
             raise ValueError("not implemented")
         response = self.verify(deny)
-        self.assertEqual(response.status_code, 502)
-        self.assertEqual(response.json()["detail"]["course_verdict"], "ERR")
-        self.assertFalse(response.json()["detail"]["task_completed"])
-        self.assertEqual(response.json()["detail"]["security_verdict"], "ERR")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["course_verdict"], "ERR")
+        self.assertFalse(response.json()["task_completed"])
+        self.assertEqual(response.json()["security_verdict"], "ERR")
         self.assertFalse(self.control.ACTIVE_SESSIONS)
         self.assertTrue(self.verify(gateway_fixture.valid).json()["task_completed"])
 
@@ -112,8 +112,9 @@ class P01PipelineTests(unittest.TestCase):
 
     def test_starter_has_no_provider_receipt(self):
         response = self.client.post("/api/hands-on/H01/verify", headers=self.headers)
-        self.assertEqual(response.status_code, 502)
-        self.assertFalse(response.json()["detail"]["task_completed"])
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["task_completed"])
+        self.assertEqual(response.json()["security_verdict"], "ERR")
         with self.gateway.connect() as database:
             self.assertEqual(database.execute("SELECT COUNT(*) FROM receipts").fetchone()[0], 0)
 
@@ -144,8 +145,8 @@ class P01PipelineTests(unittest.TestCase):
                  patch.object(self.gateway.boto3, "client", side_effect=error), \
                  patch.object(self.gateway.learner, "handle_request", gateway_fixture.valid):
                 response = self.client.post("/api/provider-preflight", headers=self.headers)
-                self.assertEqual(response.status_code, 502)
-                result = response.json()["detail"]
+                self.assertEqual(response.status_code, 200)
+                result = response.json()
                 self.assertEqual(result.get("provider_error"), code)
                 self.assertFalse(result["task_completed"])
                 self.assertEqual(result["security_verdict"], "ERR")
