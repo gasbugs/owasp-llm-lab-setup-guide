@@ -51,6 +51,7 @@ def main():
                 page.screenshot(path=str(args.output.with_suffix('.completion.png')))
             else:
                 assert page.locator('#completion-toast').is_hidden()
+            expect(page.locator('#raw')).to_contain_text('{')
             rendered = json.loads(page.locator('#raw').inner_text())
             # Error rendering adds a next-check default but must preserve every
             # server-provided field; successful evidence is byte-value complete.

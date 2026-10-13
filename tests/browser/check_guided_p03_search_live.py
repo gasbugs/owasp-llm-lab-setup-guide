@@ -24,7 +24,7 @@ with sync_playwright() as p:
  expect(page.locator('#knowledge-console-links a')).to_have_count(0)
 
  expect(page.locator('#mission-experience-run')).to_be_hidden()
- expect(page.locator('#h03-work')).to_contain_text('~/owasp-llm-lab-setup-guide/llm-security-control-plane/guided-labs/h03-ingestion-search/learner.py')
+ expect(page.locator('#h03-work')).to_contain_text('~/owasp-llm-practice/P01-03_learner.py')
  page.evaluate('updateKnowledgeLinks({state:"present", search_ready:false, resources:[]})')
  expect(page.locator('#knowledge-search-submit')).to_be_disabled()
  page.evaluate('updateKnowledgeLinks({state:"present", search_ready:true, resources:[]})')

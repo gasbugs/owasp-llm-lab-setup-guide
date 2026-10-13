@@ -37,6 +37,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin, wait_until='networkidle')
             page.locator('#home-missions .home-mission[data-problem="P12"]').click()
+            page.locator('#h23-grade-tab').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
             with page.expect_response(lambda response: response.url.endswith('/api/practice/P12/verify'), timeout=990000) as pending:
                 page.locator('#h12-verify').click()
