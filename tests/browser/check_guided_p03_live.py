@@ -40,7 +40,7 @@ def main():
                 assert preparation_response.status == 200 and preparation["resource_ready"] is True
                 assert preparation["task_completed"] is False and "security_verdict" not in preparation
                 expect(page.locator('#task-completion')).to_have_text('P03 과제: 미완료')
-                assert json.loads(page.locator("#raw").inner_text()) == preparation
+                assert json.loads(page.locator("#raw").text_content()) == preparation
             with page.expect_response(lambda response: response.url.endswith("/api/practice/P03/verify"), timeout=240000) as pending:
                 page.locator("#h03-verify").click()
             response = pending.value
@@ -52,7 +52,7 @@ def main():
             assert result["security_verdict"] == ("PASS" if complete else "ERR")
             label = "P03 과제: " + ("완료" if complete else "미완료")
             expect(page.locator('#task-completion')).to_have_text(label)
-            assert json.loads(page.locator("#raw").inner_text()) == result
+            assert json.loads(page.locator("#raw").text_content()) == result
             provider_label = "AWS + 합성 경계 사례" if args.prepare_aws else "합성 사례"
             assert page.locator("#provider-id").inner_text() == (provider_label if complete else "—")
             assert page.locator("#requested-max").inner_text() == ("19" if complete else "—")

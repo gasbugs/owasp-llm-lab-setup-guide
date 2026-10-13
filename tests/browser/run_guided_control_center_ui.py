@@ -200,7 +200,7 @@ def main() -> int:
             page, timeout_ms, h22_hands_on.get("execution_id")
         )
         h09_verdict = page.locator("#verdict strong").inner_text()
-        h09_raw_text = page.locator("#raw").inner_text()
+        h09_raw_text = page.locator("#raw").text_content()
 
         # H08은 H07 상태 없이 전용 Prompt, NeMo service와 Gateway 원장을 사용한다.
         page.locator('.tab[data-tab-index="4"]').click()
@@ -209,7 +209,7 @@ def main() -> int:
             page, timeout_ms, h09_hands_on.get("execution_id")
         )
         h08_verdict = page.locator("#verdict strong").inner_text()
-        h08_raw_text = page.locator("#raw").inner_text()
+        h08_raw_text = page.locator("#raw").text_content()
 
         # H07은 H05·H06·H08 상태 없이 전용 NeMo config와 역할별 Gateway 원장을 사용한다.
         page.locator("#h07-verify").click()
@@ -217,7 +217,7 @@ def main() -> int:
             page, timeout_ms, h08_hands_on.get("execution_id")
         )
         h07_verdict = page.locator("#verdict strong").inner_text()
-        h07_raw_text = page.locator("#raw").inner_text()
+        h07_raw_text = page.locator("#raw").text_content()
 
         # H06은 H05가 중지돼도 전용 NeMo runtime과 합성 Provider만 사용한다.
         page.locator('.tab[data-tab-index="3"]').click()

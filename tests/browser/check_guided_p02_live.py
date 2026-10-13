@@ -39,7 +39,7 @@ def main():
             assert result["security_verdict"] == ("PASS" if complete else "ERR")
             label = "P02 과제: " + ("완료" if complete else "미완료")
             expect(page.locator('#task-completion')).to_have_text(label)
-            assert json.loads(page.locator("#raw").inner_text()) == result
+            assert json.loads(page.locator("#raw").text_content()) == result
             assert page.locator("#provider-id").inner_text() == result["execution_id"]
             assert page.locator("#requested-max").inner_text() == ("22" if complete else "—")
             assert page.locator("#forwarded-max").inner_text() == ("1024" if complete else "—")

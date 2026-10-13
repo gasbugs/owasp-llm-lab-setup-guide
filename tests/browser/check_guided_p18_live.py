@@ -60,7 +60,7 @@ def main():
             assert result['security_verdict'] == ('PASS' if complete else 'ERR')
             label = 'P18 과제: ' + ('완료' if complete else '미완료')
             expect(page.locator('#task-completion')).to_have_text(label)
-            assert json.loads(page.locator('#raw').inner_text()) == result
+            assert json.loads(page.locator('#raw').text_content()) == result
             assert result['result']['source_digest'] == args.source_digest
             if complete:
                 cases = result['result']['cases']

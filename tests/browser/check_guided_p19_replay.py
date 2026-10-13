@@ -77,7 +77,7 @@ def main():
                     expect(page.locator('#task-completion')).to_have_text(label)
                     # A repeated incomplete label is insufficient: wait for the new raw result.
                     expect(page.locator('#raw')).to_contain_text(str(expected.get('reason')))
-                    raw = json.loads(page.locator('#raw').inner_text())
+                    raw = json.loads(page.locator('#raw').text_content())
                     for key, value in expected.items():
                         assert raw[key] == value
                 for width in (1440, 390):

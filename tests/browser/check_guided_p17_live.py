@@ -53,7 +53,7 @@ def main():
             assert result['security_verdict'] == ('PASS' if complete else 'ERR')
             label = 'P17 과제: ' + ('완료' if complete else '미완료')
             expect(page.locator('#task-completion')).to_have_text(label)
-            rendered = json.loads(page.locator('#raw').inner_text())
+            rendered = json.loads(page.locator('#raw').text_content())
             if rendered != result:
                 args.output.with_suffix('.mismatch.json').write_text(json.dumps(
                     {'response': result, 'rendered': rendered}, ensure_ascii=False, indent=2))

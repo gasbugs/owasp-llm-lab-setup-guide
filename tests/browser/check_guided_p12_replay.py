@@ -74,7 +74,7 @@ def main():
                 for index, expected in enumerate(cases):
                     page.locator('#h12-verify').click()
                     expect(page.locator('#raw')).to_contain_text(str(expected['reason']))
-                    raw = json.loads(page.locator('#raw').inner_text())
+                    raw = json.loads(page.locator('#raw').text_content())
                     assert raw == expected
                     assert page.locator('#task-completion').inner_text() == 'P12 과제: ' + ('완료' if expected['task_completed'] else '미완료')
                     assert page.locator('#effective-label').inner_text() == '확인한 모델 호출'

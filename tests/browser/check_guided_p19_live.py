@@ -53,7 +53,7 @@ def main():
             assert ('실패한 요구사항' in result['next_check']) is not expected_complete
             label = 'P19 과제: ' + ('완료' if expected_complete else '미완료')
             expect(page.locator('#task-completion')).to_have_text(label)
-            assert json.loads(page.locator('#raw').inner_text()) == result
+            assert json.loads(page.locator('#raw').text_content()) == result
             executions = result['result']['analysis_executions']
             assert len(executions) == 10
             assert all(row['source_digest'] == args.source_digest for row in executions)

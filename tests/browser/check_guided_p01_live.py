@@ -52,7 +52,7 @@ def main():
             else:
                 assert page.locator('#completion-toast').is_hidden()
             expect(page.locator('#raw')).to_contain_text('{')
-            rendered = json.loads(page.locator('#raw').inner_text())
+            rendered = json.loads(page.locator('#raw').text_content())
             # Error rendering adds a next-check default but must preserve every
             # server-provided field; successful evidence is byte-value complete.
             assert all(rendered.get(key) == value for key, value in result.items())

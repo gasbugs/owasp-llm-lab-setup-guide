@@ -52,7 +52,7 @@ def main():
             assert result['result']['source_digest'] == args.source_digest
             label = 'P20 과제: ' + ('완료' if expected else '미완료')
             expect(page.locator('#task-completion')).to_have_text(label)
-            assert json.loads(page.locator('#raw').inner_text()) == result
+            assert json.loads(page.locator('#raw').text_content()) == result
             assert page.locator('#provider-label').inner_text() == '실행 상태'
             assert page.locator('#provider-id').inner_text() == ('완료' if expected else '오류')
             assert page.locator('#requested-max').inner_text() == ('7' if expected else '6')
