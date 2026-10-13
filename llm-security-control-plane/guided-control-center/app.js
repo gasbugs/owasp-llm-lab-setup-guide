@@ -28,6 +28,7 @@ let csrfToken = "";
 let adminMode = false;
 let adminAnswerPanel = null;
 let adminAnswerRequest = 0;
+let adminAnswerMarkdown = "";
 let activeTab = 0;
 let activeProblem = "P01";
 let sidebarPinned = false;
@@ -593,14 +594,44 @@ async function showAdminAnswer(problem) {
   host.append(adminAnswerPanel);
   adminAnswerPanel.open = false;
   const output = adminAnswerPanel.querySelector(".admin-answer-content");
+  const copyButton = adminAnswerPanel.querySelector(".admin-answer-copy");
+  const copyStatus = adminAnswerPanel.querySelector(".admin-answer-copy-status");
+  adminAnswerMarkdown = "";
+  copyButton.disabled = true;
+  copyStatus.textContent = "";
   output.textContent = "관리자 답안을 불러오는 중입니다…";
   try {
     const response = await fetch(`/api/admin/answers/${problem}`);
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "관리자 답안을 불러오지 못했습니다.");
-    if (requestNumber === adminAnswerRequest) renderAdminMarkdown(output, payload.answer);
+    if (requestNumber === adminAnswerRequest) {
+      adminAnswerMarkdown = payload.answer;
+      copyButton.disabled = false;
+      renderAdminMarkdown(output, payload.answer);
+    }
   } catch (error) {
     if (requestNumber === adminAnswerRequest) output.textContent = error.message;
+  }
+}
+
+async function copyAdminAnswer() {
+  if (!adminAnswerMarkdown || !adminAnswerPanel) return;
+  const status = adminAnswerPanel.querySelector(".admin-answer-copy-status");
+  let fallbackField = null;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(adminAnswerMarkdown);
+    } else {
+      const field = document.createElement("textarea"); fallbackField = field;
+      field.value = adminAnswerMarkdown; field.setAttribute("readonly", "");
+      field.className = "clipboard-fallback"; document.body.append(field); field.select();
+      if (!document.execCommand("copy")) throw new Error("copy failed");
+    }
+    status.textContent = "복사했습니다.";
+  } catch {
+    status.textContent = "복사하지 못했습니다. 브라우저 권한을 확인하세요.";
+  } finally {
+    fallbackField?.remove();
   }
 }
 
@@ -611,8 +642,16 @@ function prepareAdminAnswers() {
   const title = document.createElement("summary"); title.textContent = "관리자 답안";
   const note = document.createElement("p");
   note.textContent = "현재 문제의 제한된 조건과 Starter만 사용한 독립 풀이입니다.";
+  const toolbar = document.createElement("div"); toolbar.className = "admin-answer-toolbar";
+  const copyButton = document.createElement("button");
+  copyButton.type = "button"; copyButton.className = "secondary admin-answer-copy";
+  copyButton.textContent = "답안 전체 복사"; copyButton.disabled = true;
+  copyButton.addEventListener("click", copyAdminAnswer);
+  const copyStatus = document.createElement("span");
+  copyStatus.className = "admin-answer-copy-status"; copyStatus.setAttribute("aria-live", "polite");
+  toolbar.append(copyButton, copyStatus);
   const output = document.createElement("div"); output.className = "admin-answer-content";
-  adminAnswerPanel.append(title, note, output);
+  adminAnswerPanel.append(title, note, toolbar, output);
 }
 
 function prepareMissionPanes() {

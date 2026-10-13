@@ -1519,6 +1519,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("function renderAdminMarkdown(container, source)", javascript)
         self.assertIn("renderAdminMarkdown(output, payload.answer)", javascript)
         self.assertIn('code.textContent = codeLines.join("\\n")', javascript)
+        self.assertIn('copyButton.textContent = "답안 전체 복사"', javascript)
+        self.assertIn("navigator.clipboard.writeText(adminAnswerMarkdown)", javascript)
+        self.assertIn('status.textContent = "복사했습니다."', javascript)
         self.assertNotIn("innerHTML", javascript[javascript.index("function appendAdminInline"):javascript.index("async function showAdminAnswer")])
 
     def test_web_code_blocks_only_contain_apply_commands_and_resource_templates(self):
