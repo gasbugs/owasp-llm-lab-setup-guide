@@ -1376,6 +1376,7 @@ function createCaseCard(item, index) {
   }
   const fields = [
     ["검사 내용", item.test_description],
+    ["실행 로그", item.execution_log],
     ["실제 요청·입력", Object.hasOwn(item, "input") ? item.input : item.prompt ?? item.request ?? item.query ?? item.message],
     ["케이스에 정의된 요청", item.defined_request],
     ["실행 기록·공격 시도", item.test_observations],

@@ -260,6 +260,17 @@ test('case cards preserve reported state and HTTP evidence without inferring PAS
   assert.equal(ready.className, 'case-card case-neutral');
   assert.equal(ready.children[0].children[1].textContent, 'ready');
 });
+test('case cards show structured execution logs inside each case', () => {
+  const {ctx} = caseHarness();
+  const card = ctx.createCaseCard({case_id:'input-kr-rrn', status:'ERR', execution_log:{
+    stage:'input', detections:[], candidate_changed:false, delivery_recorded:true,
+  }}, 0);
+  const texts=[];
+  const visit=node=>{if(node.textContent)texts.push(node.textContent);for(const child of node.children||[])visit(child);};
+  visit(card);
+  assert.ok(texts.includes('실행 로그'));
+  assert.ok(texts.some(value=>value.includes('"candidate_changed": false')));
+});
 test('every P can show actual cases but an enclosing PASS cannot fabricate case success', () => {
   const {ctx, elements} = caseHarness();
   for (let number=1; number<=22; number++) {

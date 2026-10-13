@@ -3453,6 +3453,19 @@ def check_h09_evidence(request: H09VerifyRequest,case_only:bool=False)->dict:
     cap_by_case = {item["case_id"]: item for item in capabilities}
     delivery_by_case = {item["case_id"]: item for item in deliveries}
     receipt_by_case = {item["case_id"]: item for item in receipt_cases}
+    def attach_case_log(case_id: str) -> dict:
+        case = receipt_by_case[case_id]
+        delivery = delivery_by_case.get(case_id, {})
+        case["execution_log"] = {
+            "stage": case.get("stage"),
+            "configured_entities": case.get("entities"),
+            "detections": case.get("detections"),
+            "candidate_changed": case.get("candidate_digest") != case.get("input_digest"),
+            "released_candidate": case.get("released_digest") == case.get("candidate_digest"),
+            "delivery_recorded": delivery.get("delivered_digest") == case.get("released_digest"),
+            "delivered_bytes": delivery.get("delivered_bytes"),
+        }
+        return case
     execution_ids: set[str] = set()
     delivery_ids: set[str] = set()
     for case_id in case_order:
@@ -3540,9 +3553,12 @@ def check_h09_evidence(request: H09VerifyRequest,case_only:bool=False)->dict:
                     case.get("candidate_digest") == safe_digest,
                 )
             ):
-                return h09_err_envelope(
-                    request, f"{case_id}의 공식 Entity·span·score·비식별화 후보가 다릅니다."
-                )
+                error = h09_err_envelope(request, f"{case_id}의 공식 Entity·span·score·비식별화 후보가 다릅니다.")
+                observed = attach_case_log(case_id)
+                return {**error,"case_id":case_id,"result":{"cases":[{
+                    "case_id":case_id,"status":"ERR","case_verified":False,"reason":error["reason"],
+                    "execution_log":observed["execution_log"],
+                }]}}
         expected_raw_observed = case.get("released_digest") == raw_digest and entity is not None
         if delivery.get("raw_marker_observed") is not expected_raw_observed:
             return h09_err_envelope(request, f"{case_id}의 원문 marker 관측값이 전달 digest와 다릅니다.")
@@ -3583,6 +3599,9 @@ def check_h09_evidence(request: H09VerifyRequest,case_only:bool=False)->dict:
     ]
     if not reserve_provider_evidence_batch(reservations):
         return h09_err_envelope(request, "예전 H09 suite·capability·전달 증거가 다시 사용됐습니다.")
+
+    for case_id in case_order:
+        attach_case_log(case_id)
 
     return {
         "lab_id": "06-privacy-output",
