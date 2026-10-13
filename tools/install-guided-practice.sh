@@ -65,13 +65,27 @@ log "3/5" "Docker·Compose·디스크·포트 상태를 점검합니다."
 python3 "$SETUP_ROOT/tools/practice_preflight.py" \
   --root "$SETUP_ROOT" --env-file "$ENV_FILE" --file "$COMPOSE_FILE"
 
-log "4/5" "실습 이미지를 Build하고 공통 플랫폼을 시작합니다."
+log "4/5" "실습 이미지를 Build하고 최신 이미지로 공통 플랫폼을 다시 생성합니다."
 docker compose --env-file "$ENV_FILE" \
-  --file "$COMPOSE_FILE" up -d --build
+  --file "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 
 log "5/5" "설치 결과를 확인합니다."
 docker compose --env-file "$ENV_FILE" \
   --file "$COMPOSE_FILE" ps --all
+
+stale_services=()
+while IFS= read -r container_id; do
+  configured_image="$(docker inspect --format '{{.Config.Image}}' "$container_id")"
+  running_image="$(docker inspect --format '{{.Image}}' "$container_id")"
+  current_image="$(docker image inspect --format '{{.Id}}' "$configured_image")"
+  if [[ "$running_image" != "$current_image" ]]; then
+    stale_services+=("$(docker inspect --format '{{index .Config.Labels \"com.docker.compose.service\"}}' "$container_id")")
+  fi
+done < <(docker compose --env-file "$ENV_FILE" --file "$COMPOSE_FILE" ps -q)
+
+if (( ${#stale_services[@]} > 0 )); then
+  fail "최신 로컬 이미지를 사용하지 않는 서비스가 남았습니다: ${stale_services[*]}"
+fi
 
 printf '\n설치가 완료되었습니다.\n'
 printf 'Control Center: http://127.0.0.1:28097\n'

@@ -34,9 +34,15 @@ class GuidedInstallerTests(unittest.TestCase):
     def test_prerequisites_precede_compose_install(self):
         prerequisites = self.text.index('log "1/5"')
         preflight = self.text.index("practice_preflight.py")
-        install = self.text.index("up -d --build")
+        install = self.text.index("up -d --build --force-recreate --remove-orphans")
         self.assertLess(prerequisites, preflight)
         self.assertLess(preflight, install)
+
+    def test_install_recreates_stale_images_and_verifies_runtime_ids(self):
+        self.assertIn("up -d --build --force-recreate --remove-orphans", self.text)
+        self.assertIn("docker image inspect --format '{{.Id}}'", self.text)
+        self.assertIn('if [[ "$running_image" != "$current_image" ]]', self.text)
+        self.assertIn("최신 로컬 이미지를 사용하지 않는 서비스", self.text)
 
 
 if __name__ == "__main__":
