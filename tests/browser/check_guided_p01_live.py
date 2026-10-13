@@ -38,11 +38,8 @@ def main():
             assert result['activity_id'] == 'P01'
             assert result['task_completed'] is complete
             assert result['security_verdict'] == ('PASS' if complete else 'ERR')
-            label = 'P01 과제: 완료'
-            if complete:
-                expect(page.locator('#task-completion')).to_have_text(label)
-            else:
-                assert page.locator('#task-completion').is_hidden()
+            label = f'P01 과제: {"완료" if complete else "미완료"}'
+            expect(page.locator('#task-completion')).to_have_text(label)
             assert page.locator('#practice-progress-count').inner_text() == ('1 / 24' if complete else '0 / 24')
             assert ('is-complete' in page.locator('#practice-tab-0').get_attribute('class')) is complete
             if complete:
