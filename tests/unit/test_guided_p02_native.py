@@ -151,7 +151,12 @@ class NativeChildIntegrationTests(unittest.TestCase):
     def test_bounded_child_http_ledger_and_independent_source(self):
         import socket, threading, time
         import uvicorn
-        from workflow import Workflow
+        execution_spec=importlib.util.spec_from_file_location("p02_native_execution",LAB/"execution.py")
+        execution_module=importlib.util.module_from_spec(execution_spec);execution_spec.loader.exec_module(execution_module)
+        spec=importlib.util.spec_from_file_location("p02_native_workflow",LAB/"workflow.py")
+        workflow_module=importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules,{"execution":execution_module}):spec.loader.exec_module(workflow_module)
+        Workflow=workflow_module.Workflow
         from p02_provider import DocumentProvider
         from p02_contract import ContractSDK
         sys.path.insert(0,str(ROOT/"guided-evidence-verifier"))

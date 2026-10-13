@@ -28,7 +28,10 @@ class RecordedArtifactTests(unittest.TestCase):
         data = {"receipt": {"started_at": "publisher-start", "tool_version": "0.15.1",
                             "config_digest": "a" * 64, "report_digest": "b" * 64, "exit_code": 0},
                 "report": [{"entry_type": "start_run setup", "run.soft_probe_prompt_cap": 4,
-                            "run.generations": 1, "system.parallel_attempts": False}]}
+                            "run.generations": 1, "system.parallel_attempts": 1},
+                           {"entry_type": "attempt", "seq": 1, "status": 2,
+                            "outputs": [{"text": "bounded fixture output"}],
+                            "detector_results": {}}]}
         self.assertEqual(self.grade("h14", data), "PASS")
         for field, value in (("run.soft_probe_prompt_cap", 0), ("system.parallel_attempts", 2)):
             wrong = deepcopy(data)

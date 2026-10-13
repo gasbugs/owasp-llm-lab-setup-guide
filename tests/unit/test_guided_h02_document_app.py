@@ -15,14 +15,13 @@ class GuidedP02PackagingTests(unittest.TestCase):
         self.assertIn('"run_server:configured_app"', recipe)
         self.assertNotIn("h02-document-ingestion/server.py", recipe)
 
-    def test_runtime_has_no_aws_sdk_or_credentials(self):
+    def test_runtime_keeps_aws_credentials_out_of_compose(self):
         compose = yaml.safe_load(
             (ROOT / "examples/security-monitoring/compose.guided.yaml").read_text()
         )
+        self.assertIn("import boto3", (LAB / "native_runtime.py").read_text())
         for path in LAB.glob("*.py"):
-            source = path.read_text()
-            self.assertNotIn("import boto3", source, path)
-            self.assertNotIn("AWS_SHARED_CREDENTIALS_FILE", source, path)
+            self.assertNotIn("AWS_SHARED_CREDENTIALS_FILE", path.read_text(), path)
         service = compose["services"]["guided-h02-document-app"]
         self.assertNotIn("/tmp/.aws", str(service))
         self.assertNotIn("AWS_PROFILE", str(service))
