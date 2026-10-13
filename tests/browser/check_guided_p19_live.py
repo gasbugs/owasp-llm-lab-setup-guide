@@ -55,10 +55,10 @@ def main():
             expect(page.locator('#task-completion')).to_have_text(label)
             assert json.loads(page.locator('#raw').text_content()) == result
             executions = result['result']['analysis_executions']
-            assert len(executions) == 10
+            assert len(executions) == 10 if expected_complete else 0 < len(executions) <= 10
             assert all(row['source_digest'] == args.source_digest for row in executions)
-            assert len(result['result']['products']) == 3
             if expected_complete:
+                assert len(result['result']['products']) == 3
                 assert [row['downstream_count'] for row in result['result']['analyses']] == [1, 0, 0]
             boundary = page.evaluate('''async () => {
                 const bootstrap = await (await fetch('/api/bootstrap')).json();

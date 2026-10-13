@@ -42,8 +42,8 @@ def main():
             page.locator('#home-missions .home-mission[data-problem="P18"]').click()
             page.locator('#h23-grade-tab').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
-            problem = page.locator('#h18-work').inner_text()
-            assert 'P18' in problem and 'queries.yaml' in problem
+            problem = page.locator('#h18-work').text_content()
+            assert 'P18' in problem and 'P06-02_queries.yaml' in problem
             examples = '\n'.join(page.locator('#h18-work pre').all_text_contents())
             assert 'logql:' not in examples and 'sum by (' not in examples
             with page.expect_response(lambda response: response.url.endswith('/api/practice/P18/verify'),

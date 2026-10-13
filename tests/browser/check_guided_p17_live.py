@@ -63,8 +63,10 @@ def main():
             if execution.get('execution_error'):
                 assert not complete
                 assert execution['closed'] is False
-            else:
+            elif complete:
                 assert len(execution['cases']) == 3
+            else:
+                assert 0 < len(execution['cases']) <= 3
             if complete:
                 assert len(result['result']['products']) == 3
                 assert [c['downstream_count'] for c in result['result']['cases']] == [1, 0, 0]

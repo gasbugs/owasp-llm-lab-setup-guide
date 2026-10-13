@@ -2837,10 +2837,17 @@ async def run_alert_checks(url,token):
 
 
 async def run_observability_activity(activity: str) -> dict:
-    if activity=='H20' and not EXPLORATION.get():return await run_alert_checks(H20_URL,H20_TOKEN)
-    if activity=='H18' and not EXPLORATION.get():return await run_query_checks(H18_URL,H18_TOKEN)
-    if activity=='H19' and not EXPLORATION.get():return await run_incident_checks(H19_URL,H19_TOKEN)
-    if activity=='H17' and not EXPLORATION.get():return await run_telemetry_checks(H17_URL,H17_TOKEN)
+    if not EXPLORATION.get():
+        runner = {'H17': (run_telemetry_checks, H17_URL, H17_TOKEN),
+                  'H18': (run_query_checks, H18_URL, H18_TOKEN),
+                  'H19': (run_incident_checks, H19_URL, H19_TOKEN),
+                  'H20': (run_alert_checks, H20_URL, H20_TOKEN)}[activity]
+        result = await runner[0](runner[1], runner[2])
+        # Case/preflight verifiers use course_verdict internally.  The public
+        # grading envelope always exposes the same verdict as security_verdict.
+        result.setdefault('security_verdict', result.get('course_verdict', 'ERR'))
+        result.setdefault('next_check', '실패한 요구사항과 미실행 사례를 확인하세요.')
+        return result
     suite_id=str(uuid.uuid4()); started_at=datetime.now(timezone.utc).isoformat()
     url,token={'H17': (H17_URL,H17_TOKEN), 'H18': (H18_URL,H18_TOKEN), 'H19': (H19_URL,H19_TOKEN),
                'H20': (H20_URL,H20_TOKEN)}[activity]

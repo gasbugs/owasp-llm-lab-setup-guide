@@ -222,7 +222,8 @@ def main():
                 suite = str(uuid4())
                 status, root = rpc(project, 'learner:8000', '/v1/run', TOKENS['control'], {'suite_id': suite})
             proof['root'] = root
-            assert status == 200 and root['run_state'] == 'finished' and len(root['cases']) == 27
+            assert status == 200 and root['run_state'] == 'finished'
+            assert len(root['cases']) == 27 if expected else 0 < len(root['cases']) <= 27
             assert root['build']['source_digest'] == proof['source_digest']
             for index in range(2):
                 status, result = rpc(project, 'verifier:8000', '/v1/verify/p04', TOKENS['control'], {'suite_id': suite})

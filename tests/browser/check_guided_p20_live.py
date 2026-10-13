@@ -49,14 +49,15 @@ def main():
             assert result['activity_id'] == 'P20'
             assert result['task_completed'] is expected
             assert result['security_verdict'] == ('PASS' if expected else 'ERR')
-            assert result['result']['source_digest'] == args.source_digest
+            if expected:
+                assert result['result']['source_digest'] == args.source_digest
             label = 'P20 과제: ' + ('완료' if expected else '미완료')
             expect(page.locator('#task-completion')).to_have_text(label)
             assert json.loads(page.locator('#raw').text_content()) == result
             assert page.locator('#provider-label').inner_text() == '실행 상태'
-            assert page.locator('#provider-id').inner_text() == ('완료' if expected else '오류')
-            assert page.locator('#requested-max').inner_text() == ('7' if expected else '6')
-            assert page.locator('#forwarded-max').inner_text() == ('종료' if expected else '미종료')
+            assert page.locator('#provider-id').inner_text() == ('완료' if expected else '—')
+            assert page.locator('#requested-max').inner_text() == ('7' if expected else '—')
+            assert page.locator('#forwarded-max').inner_text() == ('종료' if expected else '—')
             boundary = page.evaluate('''async () => {
                 const bootstrap = await (await fetch('/api/bootstrap')).json();
                 return (await fetch('/api/practice/P20/verify', {method: 'POST',

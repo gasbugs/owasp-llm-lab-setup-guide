@@ -56,8 +56,12 @@ def main():
             assert json.loads(page.locator('#raw').text_content()) == result
             assert page.locator('#provider-label').inner_text() == '검사 묶음'
             assert page.locator('#provider-id').inner_text() == result['execution_id']
-            assert page.locator('#requested-max').inner_text() == ('8' if expected else '0')
-            assert page.locator('#forwarded-max').inner_text() == ('16' if expected else '—')
+            displayed_cases = result['result'].get('cases')
+            displayed_calls = result['result'].get('provider_call_count')
+            assert page.locator('#requested-max').inner_text() == (str(len(displayed_cases)) if displayed_cases is not None else '—')
+            assert page.locator('#forwarded-max').inner_text() == (str(displayed_calls) if displayed_calls is not None else '—')
+            if expected:
+                assert len(displayed_cases) == 8 and displayed_calls == 16
             boundary = page.evaluate('''async () => {
                 const bootstrap = await (await fetch('/api/bootstrap')).json();
                 return (await fetch('/api/practice/P12/verify', {method: 'POST',
