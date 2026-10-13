@@ -59,6 +59,32 @@ class RunnerTests(unittest.TestCase):
         return (client or self.client).post("/v1/run", headers=self.control,
                                            json={"suite_id": suite or str(uuid4()), **extra})
 
+    def test_direct_chat_runs_one_custom_input_without_grading(self):
+        response = self.client.post("/v1/chat", headers=self.control, json={"message":"자유 문장"})
+        self.assertEqual(response.status_code,200)
+        self.assertFalse(response.json()["graded"])
+        self.workflow.prepare_direct.assert_called_once()
+        self.workflow.run_case.assert_called_once()
+        self.workflow.prepare_suite.assert_not_called()
+        self.assertEqual(self.workflow.prepare_direct.call_args.kwargs["text"],"자유 문장")
+        self.assertEqual(self.client.post("/v1/chat",json={"message":"질문"}).status_code,401)
+        self.assertEqual(self.client.post("/v1/chat",headers=self.control,json={"message":" "}).status_code,422)
+        self.assertEqual(self.client.post("/v1/chat",headers=self.control,json={"message":"질문","guardrailIdentifier":"spoof"}).status_code,422)
+
+    def test_step_execution_is_ordered_and_stopped_suite_does_not_call_later_cases(self):
+        suite=str(uuid4())
+        result=self.client.post("/v1/start",headers=self.control,json={"suite_id":suite})
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(len(result.json()["cases"]),27)
+        self.workflow.run_case.assert_not_called()
+        self.assertEqual(self.client.post("/v1/step",headers=self.control,json={"suite_id":suite,"index":1}).status_code,409)
+        self.assertEqual(self.client.post("/v1/step",headers=self.control,json={"suite_id":suite,"index":0}).status_code,200)
+        self.assertEqual(self.client.post("/v1/finish",headers=self.control,json={"suite_id":suite,"stopped":True}).json()["run_state"],"error")
+        self.assertEqual(self.client.post("/v1/step",headers=self.control,json={"suite_id":suite,"index":1}).status_code,409)
+        self.workflow.run_case.assert_called_once()
+        root=self.client.get("/v1/receipts/"+suite,headers=self.verifier).json()
+        self.assertTrue(all(row["execution"] is None for row in root["cases"][1:]))
+
     def test_health_has_no_provider_or_source_execution(self):
         (self.root / "learner.py").write_text("invalid learner syntax !")
         self.assertEqual(self.client.get("/readyz").json()["provider_check"], "not-run")
@@ -213,7 +239,7 @@ class RunnerTCPTests(unittest.TestCase):
         self.assertEqual(len(self.fixture.backend_calls), 9)
 
     def test_starter_records_all_attempts_but_does_not_receive_a_verdict(self):
-        self.fixture.source.write_text((LAB / "learner.py").read_text())
+        self.fixture.source.write_text("async def invoke_guarded(body, guardrail, services):\n    raise NotImplementedError()\n")
         root = self.execute_suite()
         for row in root["cases"]:
             self.assertEqual(row["execution"]["execution"]["execution_status"], "not_implemented")

@@ -44,7 +44,7 @@ class Signals:
         self.log_provider.shutdown()
 
 
-def run_suite(source, baseline, signals):
+def run_suite(source, baseline, signals, selected_case=None):
     registry = CollectorRegistry()
     counter = Counter('guided_p17_decisions_total', 'P17 business decisions',
                       ['decision'], registry=registry)
@@ -56,8 +56,9 @@ def run_suite(source, baseline, signals):
         spec = importlib.util.spec_from_file_location('p17_learner', source)
         learner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(learner)
-        for principal, action in (('reader', 'notice_lookup'), ('reader', 'notice_publish'),
-                                  ('anonymous', 'notice_lookup')):
+        fixed_cases=[('reader','notice_lookup'),('reader','notice_publish'),('anonymous','notice_lookup')]
+        chosen=fixed_cases if selected_case is None else [fixed_cases[selected_case]]
+        for principal, action in chosen:
             request_id = str(uuid.uuid4())
             operation = BusinessOperation(request_id, principal, action)
             case = {'request_id': request_id, 'principal': principal, 'action': action,
@@ -92,7 +93,7 @@ def main():
     body = json.load(sys.stdin)
     signals = Signals()
     try:
-        result = run_suite(Path(body['source']), body['baseline'], signals)
+        result = run_suite(Path(body['source']), body['baseline'], signals, body.get('selected_case'))
         print(json.dumps(result, ensure_ascii=False, allow_nan=False))
     finally:
         signals.close()

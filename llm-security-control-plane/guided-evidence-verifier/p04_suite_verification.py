@@ -6,7 +6,8 @@ from uuid import UUID
 
 import httpx
 
-from p04_results import EvidenceError, require, sha, timestamp, verify_policy_audit
+from p04_results import EvidenceError, require, sha, timestamp, verify_policy_audit, verify_execution_binding
+from p04_product import verify_product_response
 from p04_suite_results import SuiteContract
 
 
@@ -25,6 +26,56 @@ class SuiteVerification:
         require(all(isinstance(token, str) and token.isascii() and len(token) >= 32
                     for token in (app_token, gateway_token)))
         self.app_token, self.gateway_token, self.transport = app_token, gateway_token, transport
+
+    def collect_case(self, suite_id, index):
+        try:
+            require(str(UUID(suite_id)) == suite_id and type(index) is int and 0 <= index < len(self.cases))
+            with httpx.Client(timeout=15,follow_redirects=False,trust_env=False,transport=self.transport) as client:
+                def get(origin,path,token):
+                    with client.stream("GET",origin+path,headers={"Authorization":"Bearer "+token}) as response:
+                        require(response.status_code == 200)
+                        raw=bytearray()
+                        for chunk in response.iter_bytes():
+                            raw.extend(chunk);require(len(raw)<=2097152)
+                    return json.loads(raw)
+                root=get(self.app_origin,"/v1/receipts/"+suite_id,self.app_token)
+                build=get(self.app_origin,"/v1/build-info",self.app_token)
+                registration=get(self.gateway_origin,"/v1/p04/suites/"+suite_id,self.gateway_token)
+                require(root["suite_id"]==registration["suite_id"]==suite_id and root["practice_id"]==registration["practice_id"]=="P04")
+                require(root["run_state"]=="running" and registration["state"]=="prepared")
+                require(sha(build)==sha(root["build"]) and build["runner_files"]==self.contract.files
+                        and build["runner_digest"]==self.contract.runner_digest
+                        and build["contract_digest"]==registration["contract_digest"]==self.contract.contract_digest)
+                rows=root["cases"]
+                require(len(rows)==len(self.cases)==len(registration["cases"]))
+                require([row["case_id"] for row in rows]==[case["case_id"] for case in self.cases])
+                require(registration["cases"]==[{key:row[key] for key in ("case_id","execution_id")} for row in rows])
+                require(all(row["execution"] is not None for row in rows[:index+1])
+                        and all(row["execution"] is None for row in rows[index+1:]))
+                row=rows[index];case=self.cases[index]
+                path="/v1/p04/executions/"+row["execution_id"]
+                record=get(self.gateway_origin,path,self.gateway_token)
+                require(timestamp(root["started_at"])<=timestamp(registration["started_at"])<=timestamp(registration["prepared_at"])<=timestamp(record["started_at"]))
+                if index:
+                    require(timestamp(rows[index-1]["execution"]["closure"]["closed_at"])<=timestamp(record["started_at"]))
+                checked=verify_execution_binding(case,row["execution"],record,suite_id=suite_id,
+                    execution_id=row["execution_id"],source_digest=build["source_digest"],runner_digest=self.contract.runner_digest,
+                    resources=registration["resources"],now=time.time())
+                if case["backend"]=="provider":
+                    verify_product_response(case,checked["response"],registration["resources"]["guardrail"])
+                require(sha(get(self.gateway_origin,path,self.gateway_token))==sha(record)
+                        and sha(get(self.app_origin,"/v1/build-info",self.app_token))==sha(build)
+                        and sha(get(self.app_origin,"/v1/receipts/"+suite_id,self.app_token))==sha(root))
+            return {"suite_id":suite_id,"index":index,"case_id":case["case_id"],"status":"PASS",
+                    "case_verified":True,"reason":"실행 코드·호출 기록·정책 결과 대조 완료",
+                    "input":case["body"],"expected":case["expected"],"actual":row["execution"]["execution"]["execution_status"]}
+        except (KeyError,TypeError,ValueError,AttributeError,OverflowError,RecursionError,httpx.HTTPError):
+            error=EvidenceError("케이스 실행 결과 또는 호출·정책 기록이 기대 동작과 다릅니다.")
+            case=self.cases[index] if type(index) is int and 0<=index<len(self.cases) else {}
+            execution=locals().get("row",{}).get("execution") or {}
+            error.details={"input":case.get("body"),"expected":case.get("expected"),
+                           "actual":(execution.get("execution") or {}).get("execution_status","실행 기록 확인 실패")}
+            raise error from None
 
     def collect(self, suite_id):
         try:

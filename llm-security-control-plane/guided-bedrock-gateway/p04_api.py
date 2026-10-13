@@ -49,6 +49,13 @@ class SuiteRequest(BaseModel):
     cases: list[CaseMapping] = Field(min_length=1, max_length=32)
 
 
+class DirectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: str = Field(pattern=UUID_PATTERN)
+    execution_id: str = Field(pattern=UUID_PATTERN)
+    text: str = Field(min_length=1, max_length=1000)
+
+
 def create_app(ledger, *, control_token, verifier_token, invocation_for,
                resolve_execution=None, suite_store=None, provision_token=None, preparation=None,
                resource_audit=None):
@@ -117,6 +124,12 @@ def create_app(ledger, *, control_token, verifier_token, invocation_for,
             raise
         except Exception:
             raise HTTPException(503, "P04 preparation evidence is unavailable") from None
+
+    @app.post("/direct", dependencies=[Depends(require_control)])
+    def prepare_direct(request: DirectRequest):
+        if suite_store is None:
+            raise HTTPException(503, "P04 direct execution unavailable")
+        return suite_store.prepare_direct(request.suite_id, request.execution_id, request.text)
 
     @app.post("/suites", dependencies=[Depends(require_control)])
     def prepare(request: SuiteRequest):

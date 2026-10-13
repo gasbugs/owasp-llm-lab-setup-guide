@@ -95,7 +95,7 @@ def handle_action(action, principal, tracer, logger, counter, store):
             "policy_rule": "notice-read-only", "downstream_called": result is not None}
 
 
-def run_suite(body, query_path, tracer, logger, counter, trace_provider, log_provider, state):
+def run_suite(body, query_path, tracer, logger, counter, trace_provider, log_provider, state, prepare_only=False):
     suite_id = str(uuid.UUID(body["suite_id"]))
     if suite_id != body["suite_id"] or not isinstance(body["started_at"], str):
         raise ValueError("invalid suite metadata")
@@ -125,8 +125,9 @@ def run_suite(body, query_path, tracer, logger, counter, trace_provider, log_pro
         queries = yaml.safe_load(query_path.read_text())
         receipt["queries"] = queries
         wait_for_scrape(cases[-1]['finished_ns'])
-        receipt["query_executions"] = collected_queries(queries, cases, start_ns)
-        receipt["query_execution"] = receipt["query_executions"][1]
+        receipt["query_start_ns"]=start_ns
+        receipt["query_executions"]=[] if prepare_only else collected_queries(queries,cases,start_ns)
+        if not prepare_only:receipt["query_execution"]=receipt["query_executions"][1]
     except (ValueError, yaml.YAMLError, httpx.HTTPError, TimeoutError):
         receipt["query_error"] = "learner query or product request failed"
     return receipt

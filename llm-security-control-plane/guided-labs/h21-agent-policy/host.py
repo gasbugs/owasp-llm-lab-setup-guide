@@ -204,4 +204,113 @@ async def run_suite(_authorized: None = Depends(require_control)) -> dict:
 def receipt(suite_id: str, _authorized: None = Depends(require_verifier)) -> dict:
     if suite_id not in RECEIPTS:
         raise HTTPException(status_code=404, detail="receipt not found")
-    return RECEIPTS[suite_id]
+    return {**RECEIPTS[suite_id],"current_source":hashlib.sha256(Path("/app/policy.py").read_bytes()).hexdigest()}
+
+
+from pydantic import BaseModel, ConfigDict, Field
+class PreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    case_id: str = Field(min_length=1, max_length=100)
+
+@app.post("/v1/preview")
+async def preview(body:PreviewRequest, _authorized: None = Depends(require_control)):
+    definition = next((case for case in CASES if case["case_id"] == body.case_id), None)
+    if definition is None:
+        raise HTTPException(422,"unknown server-owned scenario")
+    suite_id=str(uuid.uuid4())
+    result=await run_case(suite_id,definition)
+    return {"graded":False,"suite_id":suite_id,"input":definition,"result":result}
+
+# Runtime-owned progress: execution completion is not a grading verdict.
+import contextvars as _progress_contextvars
+import functools as _progress_functools
+import inspect as _progress_inspect
+from fastapi import Request as _ProgressRequest
+_NATIVE_CONTEXT = _progress_contextvars.ContextVar("native_case_context", default=None)
+_NATIVE_PROGRESS = {}
+
+def _native_case(function):
+    @_progress_functools.wraps(function)
+    async def observed(*args, **kwargs):
+        state = _NATIVE_CONTEXT.get()
+        bound = _progress_inspect.signature(function).bind(*args, **kwargs).arguments
+        grant = bound.get("grant") or bound.get("request")
+        definition = bound.get("definition") or {}
+        case_id = bound.get("case_id") or getattr(grant, "case_id", None) or definition.get("case_id")
+        if state and state.get("selected") and case_id != state["selected"]:
+            return {"case_id":case_id,"direct_skipped":True}
+        if state:
+            state["current_case"]={"case_id":case_id or "현재 기능", "status":"실행 중", "started_at":datetime.now(timezone.utc).isoformat()}
+        try:
+            result = await function(*args, **kwargs)
+        except Exception:
+            if state:
+                state["cases"].append({"case_id":case_id,"status":"ERR","reason":"실행 중 오류가 발생했습니다."})
+                state["current_case"]=None
+            raise
+        if state:
+            state["cases"].append({"case_id":case_id,"status":"실행 완료", "reason":"독립 검증 대기"})
+            state["current_case"]=None
+        return result
+    return observed
+
+def _install_native_progress(application, control_token):
+    @application.middleware("http")
+    async def native_progress_boundary(request: _ProgressRequest, call_next):
+        if request.method != "POST" or request.url.path not in {"/v1/run", "/v1/run-suite"}:
+            return await call_next(request)
+        if not hmac.compare_digest(request.headers.get("authorization", ""), "Bearer " + control_token):
+            return await call_next(request)
+        try:
+            body=await request.json()
+        except ValueError:
+            return await call_next(request)
+        key=body.get("suite_id") or body.get("execution_id") or request.headers.get("x-progress-id")
+        if not isinstance(key,str):
+            return await call_next(request)
+        selected=request.headers.get("x-preview-case")
+        total=len(body.get("cases",body.get("execution_ids",[]))) or len(CASES)
+        state={"suite_id":key,"phase":"running","cases":[],"current_case":None,"total":1 if selected else total,"selected":selected}
+        if len(_NATIVE_PROGRESS)>=32:
+            removable=next((k for k,v in _NATIVE_PROGRESS.items() if v["phase"]=="finished"),None)
+            if removable:_NATIVE_PROGRESS.pop(removable)
+        _NATIVE_PROGRESS[key]=state
+        context=_NATIVE_CONTEXT.set(state)
+        try:
+            return await call_next(request)
+        finally:
+            state["phase"]="finished";state["current_case"]=None
+            _NATIVE_CONTEXT.reset(context)
+    @application.get("/v1/progress/{suite_id}")
+    async def native_progress_snapshot(suite_id:str, authorization:str|None=Header(default=None)):
+        if not hmac.compare_digest(authorization or "", "Bearer " + control_token):
+            raise HTTPException(401,"invalid progress credential")
+        state=_NATIVE_PROGRESS.get(suite_id)
+        if state is None:raise HTTPException(404,"execution not started")
+        return {k:v for k,v in state.items() if k!="selected"}
+
+run_case = _native_case(run_case)
+_install_native_progress(app, CONTROL_TOKEN)
+
+class CaseRunRequest(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    suite_id:str
+    started_at:str
+    case_id:str
+
+SEQUENCE_LOCK=asyncio.Lock()
+@app.post('/v1/run-case')
+async def run_sequence_case(body:CaseRunRequest,_authorized:None=Depends(require_control)):
+    if str(uuid.UUID(body.suite_id))!=body.suite_id:raise HTTPException(422,'invalid suite')
+    async with SEQUENCE_LOCK:
+        source=hashlib.sha256(Path('/app/policy.py').read_bytes()).hexdigest()
+        receipt=RECEIPTS.get(body.suite_id,{'suite_id':body.suite_id,'started_at':body.started_at,
+            'protocol_version':PROTOCOL,'source_digest':source,'cases':[],'external_action_called':False})
+        index=len(receipt['cases'])
+        if (index>=len(CASES) or CASES[index]['case_id']!=body.case_id
+                or receipt['started_at']!=body.started_at or receipt['source_digest']!=source
+                or receipt.get('running')):raise HTTPException(409,'case order or source changed')
+        receipt['running']=True;RECEIPTS[body.suite_id]=receipt
+        result=await run_case(body.suite_id,CASES[index])
+        receipt['cases'].append(result);receipt.update(running=False,observed_at=datetime.now(timezone.utc).isoformat())
+        return {'suite_id':body.suite_id,'case_id':body.case_id}

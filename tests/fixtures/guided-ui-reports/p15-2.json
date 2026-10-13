@@ -1,0 +1,33 @@
+{
+  "lab_id": "09-red-team",
+  "activity_id": "P15",
+  "execution_id": "9bbf84ad-8ac1-4d04-aec7-ae82535e195f",
+  "execution_kind": "h15-native-suite",
+  "started_at": "2026-10-11T01:42:33.074968+00:00",
+  "status": "completed",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T01:42:33.119153+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "result": {
+    "cases": [
+      {
+        "case_id": "execution-limits",
+        "status": "ERR",
+        "reason": "도구 실행 전 현재 코드의 실행 제한을 확인하세요."
+      },
+      {
+        "case_id": "native-tool-report",
+        "status": "미실행",
+        "reason": "실행 제한 검사 실패로 중단"
+      }
+    ]
+  },
+  "reason": "도구 실행 전 현재 코드의 실행 제한을 확인하세요.",
+  "next_check": "H15 learner source와 native artifact를 확인합니다.",
+  "case_verified": false,
+  "task_completed": false,
+  "internal_activity_id": "H15",
+  "security_verdict": "ERR"
+}

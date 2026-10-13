@@ -50,6 +50,14 @@ class P19VerificationTests(unittest.TestCase):
         return verification.verify(self.receipt, self.ledger, self.build, {'bundle': self.bundle},
                                    suite_id=self.suite, started_at=self.started, runner_digests=self.runner)
 
+    def test_partial_analysis_checks_prefix_without_completing_task(self):
+        self.receipt['analysis_executions']=self.receipt['analysis_executions'][:1]
+        result=verification.verify(self.receipt,self.ledger,self.build,{'bundle':self.bundle},
+            suite_id=self.suite,started_at=self.started,runner_digests=self.runner,through_case='0-collected')
+        self.assertTrue(result['case_verified']);self.assertFalse(result['task_completed'])
+        self.assertEqual(len(result['checks']),1)
+        with self.assertRaises(verification.RESULTS.EvidenceMismatch):self.verify()
+
     def test_all_ten_requirements_complete_only_after_baseline_checks(self):
         result = self.verify()
         self.assertTrue(result['task_completed'])

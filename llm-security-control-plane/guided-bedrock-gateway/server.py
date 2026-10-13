@@ -8,6 +8,7 @@ import json
 import os
 import sqlite3
 import threading
+from resource_progress import tracked, step as resource_step, read as read_resource_progress
 import time
 import uuid
 import random
@@ -17,6 +18,7 @@ from typing import Literal
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from fastapi.responses import JSONResponse
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -331,6 +333,7 @@ def wait_for_status(fetch, ready: str, *, attempts: int = 60) -> dict:
 
 
 def provision_h02_aws(execution_id: str) -> dict:
+    resource_step(1)
     sts = boto3.client("sts", region_name=AWS_REGION)
     account_id = sts.get_caller_identity()["Account"]
     template = h02_template(account_id)
@@ -340,13 +343,16 @@ def provision_h02_aws(execution_id: str) -> dict:
     iam = boto3.client("iam", region_name=AWS_REGION)
     agent = boto3.client("bedrock-agent", region_name=AWS_REGION)
 
+    resource_step(2)
     reused = preflight(template, s3=s3, vectors=s3vectors, iam=iam, agent=agent,
                        policy_name=f"{H02_PREFIX}-knowledge-base-runtime", allow_partial=True)
     if reused is not None:
+        resource_step(10)
         reused.update(execution_id=execution_id, observed_at=datetime.now(timezone.utc).isoformat())
         save_h02_state(reused)
         return reused
 
+    resource_step(3)
     try:
         s3.head_bucket(Bucket=template["source_bucket"], ExpectedBucketOwner=account_id)
     except ClientError as exc:
@@ -354,6 +360,7 @@ def provision_h02_aws(execution_id: str) -> dict:
             raise
         created = s3.create_bucket(Bucket=template["source_bucket"])
         request_ids.append(created["ResponseMetadata"]["RequestId"])
+        resource_step(4)
         s3.put_public_access_block(
             Bucket=template["source_bucket"], ExpectedBucketOwner=account_id,
             PublicAccessBlockConfiguration=PUBLIC_BLOCK,
@@ -365,6 +372,7 @@ def provision_h02_aws(execution_id: str) -> dict:
     else:
         check_bucket(s3, template)
 
+    resource_step(5)
     try:
         vector = s3vectors.get_vector_bucket(
             vectorBucketName=template["vector_bucket"]
@@ -382,6 +390,7 @@ def provision_h02_aws(execution_id: str) -> dict:
     if vector["vectorBucketArn"] != template["vector_bucket_arn"]:
         raise HTTPException(status_code=409, detail="foreign vector bucket")
 
+    resource_step(6)
     try:
         index = s3vectors.get_index(
             vectorBucketName=template["vector_bucket"], indexName=H02_INDEX_NAME
@@ -410,6 +419,7 @@ def provision_h02_aws(execution_id: str) -> dict:
     ):
         raise HTTPException(status_code=409, detail="foreign vector index configuration")
 
+    resource_step(7)
     try:
         role = iam.get_role(RoleName=template["role_name"])["Role"]
     except iam.exceptions.NoSuchEntityException:
@@ -437,6 +447,7 @@ def provision_h02_aws(execution_id: str) -> dict:
     if role["Arn"] != template["role_arn"]:
         raise HTTPException(status_code=409, detail="foreign IAM role")
 
+    resource_step(8)
     summaries = pages(agent.list_knowledge_bases, "knowledgeBaseSummaries", maxResults=100)
     matches = [
         item
@@ -510,6 +521,7 @@ def provision_h02_aws(execution_id: str) -> dict:
     ):
         raise HTTPException(status_code=409, detail="foreign Knowledge Base configuration")
 
+    resource_step(9)
     summaries = pages(agent.list_data_sources, "dataSourceSummaries",
                       knowledgeBaseId=knowledge_base_id, maxResults=100)
     matches = [
@@ -583,6 +595,7 @@ def provision_h02_aws(execution_id: str) -> dict:
         "dimensions": 1024,
         "aws_request_ids": request_ids,
     }
+    resource_step(10)
     audited = preflight(template, s3=s3, vectors=s3vectors, iam=iam, agent=agent,
                         policy_name=f"{H02_PREFIX}-knowledge-base-runtime")
     if audited is None:
@@ -592,6 +605,7 @@ def provision_h02_aws(execution_id: str) -> dict:
     return state
 
 
+@tracked("P02")
 def provision_h02(execution_id: str) -> dict:
     if not H02_PROVISION_LOCK.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="H02 provisioning is already running")
@@ -941,6 +955,11 @@ def h11_ledger(
     return {"suite_id": suite_id, "calls": [dict(row) for row in rows]}
 
 
+with connect() as database:
+    if "stop_reason" not in {row["name"] for row in database.execute("PRAGMA table_info(h10_calls)")}:
+        database.execute("ALTER TABLE h10_calls ADD COLUMN stop_reason TEXT")
+
+
 @app.post("/v1/h10/chat/completions")
 def h10_chat(
     request: ChatRequest,
@@ -1009,8 +1028,8 @@ def h10_chat(
         with connect() as database:
             database.execute(
                 "INSERT INTO h10_calls "
-                "(suite_id,execution_id,case_id,role,provider_request_id,request_digest,response_digest,output_text,observed_at,provider_mode) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "(suite_id,execution_id,case_id,role,provider_request_id,request_digest,response_digest,output_text,observed_at,provider_mode,stop_reason) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     x_guided_suite_id,
                     x_guided_execution_id,
@@ -1022,6 +1041,7 @@ def h10_chat(
                     provider["text"],
                     observed_at,
                     provider["provider_mode"],
+                    provider["stop_reason"],
                 ),
             )
     except sqlite3.IntegrityError as exc:
@@ -1030,7 +1050,7 @@ def h10_chat(
         "id": provider["request_id"],
         "object": "chat.completion",
         "model": MODEL_ID,
-        "choices": [{"index": 0, "message": {"role": "assistant", "content": provider["text"]}, "finish_reason": "stop"}],
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": provider["text"]}, "finish_reason": "length" if provider["stop_reason"] == "max_tokens" else "stop"}],
         "usage": {
             "prompt_tokens": provider["usage"]["inputTokens"],
             "completion_tokens": provider["usage"]["outputTokens"],
@@ -1075,3 +1095,97 @@ def chat(request: ChatRequest, _authorized: None = Depends(require_nemo)) -> dic
             "total_tokens": provider["usage"]["totalTokens"],
         },
     }
+
+
+class ResourceDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation_id: str
+
+
+@app.post("/v1/resource-lifecycle/{problem}/delete")
+def delete_mission_resources(problem: str, request: ResourceDeleteRequest,
+                             authorization: str | None = Header(default=None)) -> dict:
+    tokens = {"P02": H02_PROVISION_TOKEN, "P03": os.getenv("GUIDED_LAB03_PROVISION_TOKEN"),
+              "P04": os.getenv("GUIDED_LAB04_PROVISION_TOKEN")}
+    if problem not in tokens or not tokens[problem]:
+        raise HTTPException(404, "unsupported mission deletion")
+    bearer(tokens[problem], authorization)
+    if not H02_PROVISION_LOCK.acquire(blocking=False):
+        raise HTTPException(409, "AWS resource operation already running")
+    try:
+        from resource_cleanup import delete_resources
+        return delete_resources(problem, request.operation_id, DATABASE_PATH,
+            p02_template=h02_template, p02_state=load_h02_state, provider_mode=PROVIDER_MODE)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(502, "AWS deletion stopped; inspect remaining mission resources") from exc
+    finally:
+        H02_PROVISION_LOCK.release()
+
+
+RESOURCE_MUTEXES = {problem: threading.Lock() for problem in ("P02", "P03", "P04")}
+
+
+@app.middleware("http")
+async def resource_lifecycle_boundary(request, call_next):
+    # Serialize mutations, including registration, against destructive work.
+    parts = request.url.path.strip("/").split("/")
+    problem = None
+    if request.method == "POST":
+        if len(parts) >= 3 and parts[0] == "v1" and parts[1] in {"p02", "p03", "p04", "h02"}:
+            problem = "P02" if parts[1] == "h02" else parts[1].upper()
+        elif len(parts) == 4 and parts[:2] == ["v1", "resource-lifecycle"]:
+            problem = parts[2]
+    lock = RESOURCE_MUTEXES.get(problem)
+    if lock is not None and not lock.acquire(blocking=False):
+        return JSONResponse(status_code=409, content={"detail": "mission AWS resource operation already running"})
+    try:
+        return await call_next(request)
+    finally:
+        if lock is not None:
+            lock.release()
+
+
+@app.get("/v1/resource-progress/{problem}/{operation_id}")
+def resource_progress_status(problem: str, operation_id: str, authorization: str | None = Header(default=None)):
+    tokens = {"P02": H02_PROVISION_TOKEN, "P03": os.getenv("GUIDED_LAB03_PROVISION_TOKEN"),
+              "P04": os.getenv("GUIDED_LAB04_PROVISION_TOKEN")}
+    if problem not in tokens or not tokens[problem]:
+        raise HTTPException(404, "unsupported mission progress")
+    bearer(tokens[problem], authorization)
+    return read_resource_progress(problem, operation_id)
+
+
+@app.get("/v1/resource-status/{problem}")
+def resource_status(problem: str, authorization: str | None = Header(default=None)):
+    tokens = {"P02": H02_PROVISION_TOKEN, "P03": os.getenv("GUIDED_LAB03_PROVISION_TOKEN"),
+              "P04": os.getenv("GUIDED_LAB04_PROVISION_TOKEN")}
+    if problem not in tokens:
+        raise HTTPException(404, "unsupported mission")
+    bearer(tokens[problem], authorization)
+    lock = RESOURCE_MUTEXES[problem]
+    if not lock.acquire(blocking=False):
+        raise HTTPException(409, "AWS 자원 작업이 진행 중입니다. 완료 후 확인하세요.")
+    try:
+        from resource_status import inventory
+        result = inventory(problem, provider_mode=PROVIDER_MODE, p02_template=h02_template)
+        if problem == "P03":
+            from p03_preparation import PreparationStore
+            try:
+                PreparationStore(DATABASE_PATH).resources()
+                result["search_ready"] = result["state"] == "present"
+            except Exception:
+                result["search_ready"] = False
+            result["search_detail"] = ("검색 준비 완료" if result["search_ready"] else
+                "검색 준비 미완료 — AWS 자원 준비를 완료하세요. 상태 확인은 자원 조회만 수행합니다.")
+        if problem == "P04":
+            from p04_preparation import PreparationStore
+            try:
+                PreparationStore(DATABASE_PATH).resources()
+                result["model_ready"] = result["state"] == "present"
+            except Exception:
+                result["model_ready"] = False
+        return result
+    finally:
+        lock.release()

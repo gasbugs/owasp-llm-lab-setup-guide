@@ -17,7 +17,7 @@ import httpx
 
 from p03_results import EvidenceError, json_digest, require, stamp, verify_case
 
-FILES = ("cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py", "requirements.txt", "Containerfile")
+FILES = ("aws_auth.py", "native_runtime.py", "cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py", "requirements.txt", "Containerfile")
 CONTRACT_URI = "s3://p03-contract/h03/knowledge/current-policy.md"
 
 
@@ -45,7 +45,8 @@ def fixture_status(case, job):
 
 
 class SuiteVerification:
-    def __init__(self, runner_root, app_origin, gateway_origin, app_token, gateway_token, *, transport=None):
+    def __init__(self, runner_root, app_origin, gateway_origin, app_token, gateway_token, *, transport=None, native_sdk=False):
+        self.native_sdk = native_sdk
         root = Path(runner_root)
         spec = importlib.util.spec_from_file_location("p03_verifier_owned_cases", root / "cases.py")
         module = importlib.util.module_from_spec(spec)
@@ -147,12 +148,26 @@ class SuiteVerification:
                     ledger = gateway("/executions/" + row["execution_id"])
                     require(previous_end <= stamp(ledger["started_at"]) <= stamp(ledger["closed_at"]) <= finished)
                     previous_end = ledger["closed_at"]
+                    if self.native_sdk:
+                        worker = row['execution']['execution']
+                        require(worker.get('native_sdk') is True)
+                        require({c['service'] for c in worker['sdk_clients']} == {'bedrock-agent', 'bedrock-agent-runtime'})
+                        require(all(c['native_sdk'] is True and c['region'] == 'us-east-1' for c in worker['sdk_clients']))
+                        for index, call in enumerate(worker['calls']):
+                            require(call.get('native_sdk') is True and call.get('sdk_operation') == ('GetIngestionJob', 'Retrieve')[index])
+                        if worker.get('result', {}).get('status') == 'ready':
+                            response = worker['native_result']['result']
+                            require(json_digest(response) == json_digest(worker['sdk_responses']['retrieve']))
+                            require(json_digest(response['retrievalResults']) == json_digest(ledger['calls'][1]['response']['results']))
+                            if mode == 'aws':
+                                require(response['ResponseMetadata']['RequestId'] == ledger['calls'][1]['provider_request_id'])
+                                require(response['ResponseMetadata']['HTTPStatusCode'] == 200)
                     checked = verify_case(expected, row["execution"], ledger,
                         source_digest=build["source_digest"], runner_digest=self.runner_digest, now=time.time(), provider_mode=mode)
                     for seen, current in ((native_ids, checked["provider_request_ids"]), (observation_ids, checked["observation_ids"])):
                         require(not seen.intersection(current))
                         seen.update(current)
-                    results.append({"case_id": case["case_id"], "provider_mode": mode, **checked})
+                    results.append({"case_id": case["case_id"], "provider_mode": mode, "input": {"scenario": case, "calls": row["execution"].get("execution", {}).get("calls", [])}, **checked})
                     evidence.append(ledger)
                 after = inspect()
                 require(json_digest(app("/v1/build-info")) == json_digest(build)

@@ -1,0 +1,45 @@
+{
+  "lab_id": "07-rag-boundary",
+  "activity_id": "P11",
+  "execution_id": "82bab38e-3e2c-447b-8933-a8c351d43267",
+  "execution_kind": "h11-rag-provenance-suite",
+  "started_at": "2026-10-11T00:19:37.267259+00:00",
+  "status": "ERR",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T00:19:41.862993+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "reason": "H11 정상 요청이 승인된 본인 tenant source를 검색하지 못했습니다.",
+  "next_check": "인증 principal, candidate filter와 Titan embedding ledger를 확인합니다.",
+  "case_id": "normal-approved",
+  "case_verified": false,
+  "task_completed": false,
+  "result": {
+    "cases": [
+      {
+        "case_id": "normal-approved",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "H11 정상 요청이 승인된 본인 tenant source를 검색하지 못했습니다."
+      },
+      {
+        "case_id": "client-self-approval",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "client-tenant-spoof",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "client-role-spoof",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ]
+  },
+  "internal_activity_id": "H11",
+  "security_verdict": "ERR"
+}

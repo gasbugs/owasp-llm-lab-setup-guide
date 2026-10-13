@@ -24,7 +24,7 @@ def identity(receipt, suite_id, started_at):
             'stale execution')
 
 
-def check_execution(receipt, ledger, build, runner_digests):
+def check_execution(receipt, ledger, build, runner_digests, selected_case=None):
     require(build.get('runner_digests') == runner_digests, 'provided runner changed')
     digest = receipt.get('source_digest')
     require(isinstance(digest, str) and re.fullmatch('[0-9a-f]{64}', digest), 'invalid source digest')
@@ -35,9 +35,13 @@ def check_execution(receipt, ledger, build, runner_digests):
     require(ledger.get('suite_id') == receipt['suite_id'] and ledger.get('started_at') == receipt['started_at'],
             'ledger identity mismatch')
     cases = execution['cases']
-    require(len(cases) == 3 and len({c['request_id'] for c in cases}) == 3, 'three unique requests required')
-    require([(c['principal'], c['action']) for c in cases] == [
-        ('reader', 'notice_lookup'), ('reader', 'notice_publish'), ('anonymous', 'notice_lookup')], 'wrong business suite')
+    expected=[('reader','notice_lookup'),('reader','notice_publish'),('anonymous','notice_lookup')]
+    if selected_case is not None:
+        require(receipt.get('selected_case')==selected_case,'selected case mismatch')
+        expected=[expected[selected_case]]
+    else:require('selected_case' not in receipt,'partial receipt cannot complete full suite')
+    require(len(cases)==len(expected) and len({c['request_id'] for c in cases})==len(expected),'unique current requests required')
+    require([(c['principal'],c['action']) for c in cases]==expected,'wrong business suite')
     require(ledger['cases'] == [c['ledger'] for c in cases], 'receipt and independent ledger differ')
     start, end = receipt['query_start_ns'], receipt['query_end_ns']
     require(type(start) is int and type(end) is int and 0 < end-start <= 60_000_000_000,
@@ -53,8 +57,8 @@ def check_execution(receipt, ledger, build, runner_digests):
 
 
 def collect_and_verify(receipt, ledger, build, runner_digests, *, client,
-                       loki_url, tempo_url, prometheus_url, result, timeout=15):
-    cases = check_execution(receipt, ledger, build, runner_digests)
+                       loki_url, tempo_url, prometheus_url, result, timeout=15, selected_case=None):
+    cases = check_execution(receipt, ledger, build, runner_digests,selected_case)
     def get(url, **kwargs):
         response = client.get(url, **kwargs)
         response.raise_for_status()
@@ -69,7 +73,8 @@ def collect_and_verify(receipt, ledger, build, runner_digests, *, client,
     first, last = RESULTS.counter_values(before), RESULTS.counter_values(after)
     require(first == receipt['counter_before'] and last == receipt['execution']['counter_values'],
             'product Counter differs from actual SDK values')
-    require({d: last[d]-first[d] for d in first} == {'allow': 1, 'block': 2}, 'Counter delta differs')
+    expected_delta={'allow':1,'block':2} if selected_case is None else {'allow':int(selected_case==0),'block':int(selected_case!=0)}
+    require({d:last[d]-first[d] for d in first}==expected_delta,'Counter delta differs')
     # Product export may lag execution. Only re-read observations; never replay actions.
     deadline = time.monotonic() + timeout
     for case in cases:
@@ -84,7 +89,7 @@ def collect_and_verify(receipt, ledger, build, runner_digests, *, client,
                     'tempo': get(tempo_url + '/api/traces/' + trace_id)}
                 result['products'] = [p for p in result['products'] if p['request_id'] != case['request_id']] + [raw]
                 analysis = RESULTS.verify_case(case, raw)
-                result['cases'].append(analysis)
+                result['cases'].append({**analysis, 'input': {'principal': case['principal'], 'action': case['action']}})
                 break
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code != 404:

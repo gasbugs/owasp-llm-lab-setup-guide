@@ -1,0 +1,49 @@
+{
+  "activity_id": "P06",
+  "execution_id": "15d03f45-874b-4873-b96b-b49db2da3bf8",
+  "started_at": "2026-10-11T00:01:10.265596+00:00",
+  "course_verdict": "ERR",
+  "task_completed": false,
+  "verified_by": "guided-evidence-verifier",
+  "reason": "현재 H06 build가 고정 NeMo scaffold와 Action 허용목록 계약에 맞지 않습니다.",
+  "stage_calls": [
+    {
+      "stage": "learner_nemo_action",
+      "attempted": true,
+      "outcome": "stopped-after-case-check"
+    },
+    {
+      "stage": "action_policy",
+      "attempted": true,
+      "outcome": "ERR"
+    }
+  ],
+  "result": {
+    "cases": [
+      {
+        "case_id": "balance-read",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "현재 H06 build가 고정 NeMo scaffold와 Action 허용목록 계약에 맞지 않습니다."
+      },
+      {
+        "case_id": "transfer-explicit",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "transfer-prefixed",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "unsupported",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ],
+    "source_digest": null
+  },
+  "internal_activity_id": "H06",
+  "security_verdict": "ERR"
+}

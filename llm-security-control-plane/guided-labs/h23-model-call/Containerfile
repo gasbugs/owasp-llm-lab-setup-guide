@@ -1,0 +1,9 @@
+FROM docker.io/library/python:3.12.14-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 AWS_EC2_METADATA_DISABLED=true
+WORKDIR /app
+COPY guided-labs/h23-model-call/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY guided-labs/h23-model-call/server.py guided-labs/h23-model-call/learner.py ./
+USER 65532:65532
+EXPOSE 8000
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]

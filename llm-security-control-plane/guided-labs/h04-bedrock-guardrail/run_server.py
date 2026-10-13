@@ -18,7 +18,7 @@ from uuid import UUID, uuid4
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from cases import CONTRACT_VERSION, cases as default_cases
 
@@ -28,6 +28,23 @@ RUNNER_FILES = ("cases.py", "execution.py", "service_client.py", "workflow.py", 
 class Run(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: UUID
+
+
+class Chat(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str = Field(min_length=1, max_length=1000)
+
+
+class Step(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: UUID
+    index: int = Field(ge=0, le=26)
+
+
+class Finish(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite_id: UUID
+    stopped: bool = False
 
 
 def create_app(*, workflow, tokens, database, source_root=None, now=time.time):
@@ -108,6 +125,96 @@ def create_app(*, workflow, tokens, database, source_root=None, now=time.time):
         if row is None:
             raise HTTPException(404, "P04 execution not found")
         return json.loads(row["receipt"])
+
+    @app.post("/v1/chat")
+    def chat(request: Chat, authorization: str | None = Header(default=None)):
+        require("control", authorization)
+        if not request.message.strip():
+            raise HTTPException(422, "질문을 입력하세요.")
+        if not lock.acquire(blocking=False):
+            raise HTTPException(409, "다른 질문 또는 채점이 진행 중입니다.")
+        try:
+            baseline, suite, execution_id = build(), str(uuid4()), str(uuid4())
+            workflow.prepare_direct(suite_id=suite, execution_id=execution_id, text=request.message)
+            execution = workflow.run_case(root / "learner.py", suite_id=suite, execution_id=execution_id,
+                runner_digest=baseline["runner_digest"], timeout=75)
+            return {"practice_id":"P04", "graded":False, "message":request.message, "execution":execution}
+        except Exception as error:
+            if getattr(error, "status", None) == 409:
+                raise HTTPException(409, "모델 호출 미실행 — AWS Guardrail 준비를 완료하세요.") from None
+            raise HTTPException(502, "모델 호출 준비에 실패했습니다. Guardrail 상태를 확인하세요.") from None
+        finally:
+            lock.release()
+
+    def stored(suite):
+        with connect() as db:
+            row = db.execute("SELECT receipt FROM p04_runs WHERE suite_id=?", (suite,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "P04 suite not found")
+        return json.loads(row[0])
+
+    @app.post("/v1/start")
+    def start(request: Run, authorization: str | None = Header(default=None)):
+        require("control", authorization)
+        if not lock.acquire(blocking=False):
+            raise HTTPException(409, "P04 execution already running")
+        try:
+            suite, baseline, started = str(request.suite_id), build(), stamp()
+            rows = [{"case_id":case["case_id"], "execution_id":str(uuid4()), "execution":None} for case in cases]
+            result = {"practice_id":"P04", "activity_id":"H04", "contract_version":CONTRACT_VERSION,
+                      "suite_id":suite, "started_at":started, "finished_at":None, "run_state":"running",
+                      "build":baseline, "cases":rows}
+            with connect() as db:
+                for prior in db.execute("SELECT receipt FROM p04_runs"):
+                    previous = json.loads(prior[0])
+                    if previous["run_state"] == "running" and 0 <= started - previous["started_at"] < 180:
+                        raise HTTPException(409,"P04 execution already running")
+                db.execute("INSERT INTO p04_runs VALUES(?,?)", (suite,json.dumps(result)))
+            try:
+                workflow.prepare_suite(suite_id=suite,
+                    executions=[{key:row[key] for key in ("case_id","execution_id")} for row in rows],timeout=30)
+            except Exception:
+                result.update(run_state="error", finished_at=stamp(), final_build=build());save(result)
+                raise HTTPException(503,"P04 suite preparation failed") from None
+            return {"suite_id":suite, "started_at":started, "cases":[{"case_id":row["case_id"]} for row in rows]}
+        finally:
+            lock.release()
+
+    @app.post("/v1/step")
+    def step(request: Step, authorization: str | None = Header(default=None)):
+        require("control",authorization)
+        if not lock.acquire(blocking=False):
+            raise HTTPException(409,"P04 execution already running")
+        try:
+            suite = str(request.suite_id); result=stored(suite)
+            pending=next((index for index,row in enumerate(result["cases"]) if row["execution"] is None),None)
+            remaining=180-(stamp()-result["started_at"])
+            if result["run_state"] != "running" or request.index != pending or remaining <= 0 or build() != result["build"]:
+                raise HTTPException(409,"P04 next case or build mismatch")
+            row=result["cases"][request.index]
+            row["execution"]=workflow.run_case(root/"learner.py",suite_id=suite,
+                execution_id=row["execution_id"],runner_digest=result["build"]["runner_digest"],timeout=min(75,remaining))
+            save(result)
+            return {"suite_id":suite,"index":request.index,"case_id":row["case_id"]}
+        finally:
+            lock.release()
+
+    @app.post("/v1/finish")
+    def finish(request: Finish, authorization: str | None = Header(default=None)):
+        require("control",authorization)
+        if not lock.acquire(blocking=False):
+            raise HTTPException(409,"P04 execution already running")
+        try:
+            suite=str(request.suite_id); result=stored(suite)
+            if result["run_state"] != "running":
+                raise HTTPException(409,"P04 suite already closed")
+            complete=all(row["execution"] is not None for row in result["cases"])
+            result.update(run_state="finished" if complete and not request.stopped else "error",
+                          finished_at=stamp(),final_build=build())
+            save(result)
+            return {"suite_id":suite,"run_state":result["run_state"]}
+        finally:
+            lock.release()
 
     @app.post("/v1/run")
     def run(request: Run, authorization: str | None = Header(default=None)):

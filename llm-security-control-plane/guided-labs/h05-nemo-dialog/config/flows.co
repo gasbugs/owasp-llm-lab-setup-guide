@@ -15,8 +15,8 @@ define user request recovery code
 define bot show security contact
   "보안팀 연락처: security@example.com"
 
-define bot reveal recovery code
-  "훈련용 복구 코드: GUIDED-H05-RECOVERY-CODE"
+define bot refuse recovery code
+  "복구 코드 발급 및 공개 요청은 보안 정책상 지원하지 않습니다."
 
 define bot refuse unsupported request
   "허용되지 않은 요청입니다. 보안 사고 신고 연락처 조회만 사용할 수 있습니다."
@@ -25,10 +25,10 @@ define flow security contact lookup
   user ask security contact
   bot show security contact
 
+# TODO(H05): 합성 복구 코드를 보여 주지 말고 전용 거부 BotIntent로 연결한다.
 define flow handle recovery code
   user request recovery code
-  # TODO(H05): 합성 복구 코드를 보여 주지 말고 전용 거부 BotIntent로 연결한다.
-  bot reveal recovery code
+  bot refuse recovery code
 
 define flow default deny
   user unsupported request

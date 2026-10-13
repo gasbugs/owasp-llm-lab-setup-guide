@@ -285,6 +285,37 @@ async def run(request: RunRequest, _authorized: None = Depends(require_control))
         raise HTTPException(status_code=502, detail=str(error)) from error
 
 
+class RunCaseRequest(RunRequest):
+    case_id: CaseId
+
+
+@app.post("/v1/run-case")
+async def run_case(request: RunCaseRequest, _authorized: None = Depends(require_control)) -> dict:
+    if tuple(grant.case_id for grant in request.cases) != CASE_ORDER or len({grant.execution_id for grant in request.cases}) != len(CASE_ORDER):
+        raise HTTPException(422, "run does not match fixed H09 cases")
+    if run_lock.locked():
+        raise HTTPException(409, "H09 execution already running")
+    async with run_lock:
+        with connect() as database:
+            row = database.execute("SELECT receipt_json FROM receipts WHERE suite_id=?", (request.suite_id,)).fetchone()
+        previous = json.loads(row[0]) if row else None
+        completed = previous["cases"] if previous else []
+        grant_digest = digest_bytes(json.dumps([grant.model_dump() for grant in request.cases],sort_keys=True).encode())
+        if len(completed) >= len(CASE_ORDER) or request.case_id != CASE_ORDER[len(completed)] or [case["case_id"] for case in completed] != list(CASE_ORDER[:len(completed)]):
+            raise HTTPException(409, "only the next server-owned H09 case may run")
+        if previous and (previous["started_at"] != request.started_at or previous["source_digest"] != source_digest() or previous.get("grant_digest") != grant_digest):
+            raise HTTPException(409, "H09 suite source or grants changed")
+        grant = request.cases[len(completed)]
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0,connect=3.0)) as client:
+            result = await deliver_case(client,grant,request.suite_id)
+        receipt = {"suite_id":request.suite_id,"started_at":request.started_at,"observed_at":datetime.now(timezone.utc).isoformat(),
+            "source_digest":source_digest(),"scaffold_digest":scaffold_digest(),
+            "framework":"microsoft-presidio","framework_version":FRAMEWORK_VERSION,"grant_digest":grant_digest,"cases":completed+[result]}
+        with connect() as database:
+            database.execute("INSERT OR REPLACE INTO receipts VALUES(?,?)", (request.suite_id,json.dumps(receipt,ensure_ascii=False)))
+        return {"suite_id":request.suite_id,"source_digest":receipt["source_digest"]}
+
+
 @app.get("/v1/build-info")
 def build_info(_authorized: None = Depends(require_verifier)) -> dict:
     return {
@@ -320,3 +351,86 @@ def receipt(suite_id: str, _authorized: None = Depends(require_verifier)) -> dic
     if row is None:
         raise HTTPException(status_code=404, detail="receipt not found")
     return json.loads(row["receipt_json"])
+
+
+class PreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str = Field(min_length=1, max_length=2000)
+    stage: Literal["input", "output"] = "input"
+
+
+@app.post("/v1/preview")
+def preview(body: PreviewRequest, _authorized: None = Depends(require_control)):
+    result = policy.apply_privacy_policy(stage=body.stage, text=body.message)
+    return {"graded": False, "input": body.message, "reply": result["released_text"], "details": result}
+
+# Runtime-owned progress: execution completion is not a grading verdict.
+import contextvars as _progress_contextvars
+import functools as _progress_functools
+import inspect as _progress_inspect
+from fastapi import Request as _ProgressRequest
+_NATIVE_CONTEXT = _progress_contextvars.ContextVar("native_case_context", default=None)
+_NATIVE_PROGRESS = {}
+
+def _native_case(function):
+    @_progress_functools.wraps(function)
+    async def observed(*args, **kwargs):
+        state = _NATIVE_CONTEXT.get()
+        bound = _progress_inspect.signature(function).bind(*args, **kwargs).arguments
+        grant = bound.get("grant") or bound.get("request")
+        definition = bound.get("definition") or {}
+        case_id = bound.get("case_id") or getattr(grant, "case_id", None) or definition.get("case_id")
+        if state and state.get("selected") and case_id != state["selected"]:
+            return {"case_id":case_id,"direct_skipped":True}
+        if state:
+            state["current_case"]={"case_id":case_id or "현재 기능", "status":"실행 중", "started_at":datetime.now(timezone.utc).isoformat()}
+        try:
+            result = await function(*args, **kwargs)
+        except Exception:
+            if state:
+                state["cases"].append({"case_id":case_id,"status":"ERR","reason":"실행 중 오류가 발생했습니다."})
+                state["current_case"]=None
+            raise
+        if state:
+            state["cases"].append({"case_id":case_id,"status":"실행 완료", "reason":"독립 검증 대기"})
+            state["current_case"]=None
+        return result
+    return observed
+
+def _install_native_progress(application, control_token):
+    @application.middleware("http")
+    async def native_progress_boundary(request: _ProgressRequest, call_next):
+        if request.method != "POST" or request.url.path not in {"/v1/run", "/v1/run-suite"}:
+            return await call_next(request)
+        if not hmac.compare_digest(request.headers.get("authorization", ""), "Bearer " + control_token):
+            return await call_next(request)
+        try:
+            body=await request.json()
+        except ValueError:
+            return await call_next(request)
+        key=body.get("suite_id") or body.get("execution_id") or request.headers.get("x-progress-id")
+        if not isinstance(key,str):
+            return await call_next(request)
+        selected=request.headers.get("x-preview-case")
+        total=len(body.get("cases",body.get("execution_ids",[]))) or len(CASES)
+        state={"suite_id":key,"phase":"running","cases":[],"current_case":None,"total":1 if selected else total,"selected":selected}
+        if len(_NATIVE_PROGRESS)>=32:
+            removable=next((k for k,v in _NATIVE_PROGRESS.items() if v["phase"]=="finished"),None)
+            if removable:_NATIVE_PROGRESS.pop(removable)
+        _NATIVE_PROGRESS[key]=state
+        context=_NATIVE_CONTEXT.set(state)
+        try:
+            return await call_next(request)
+        finally:
+            state["phase"]="finished";state["current_case"]=None
+            _NATIVE_CONTEXT.reset(context)
+    @application.get("/v1/progress/{suite_id}")
+    async def native_progress_snapshot(suite_id:str, authorization:str|None=Header(default=None)):
+        if not hmac.compare_digest(authorization or "", "Bearer " + control_token):
+            raise HTTPException(401,"invalid progress credential")
+        state=_NATIVE_PROGRESS.get(suite_id)
+        if state is None:raise HTTPException(404,"execution not started")
+        return {k:v for k,v in state.items() if k!="selected"}
+
+deliver_case = _native_case(deliver_case)
+_install_native_progress(app, CONTROL_TOKEN)

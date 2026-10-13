@@ -1,0 +1,27 @@
+{
+  "lab_id": "02-embedding-kb",
+  "activity_id": "P03",
+  "execution_id": "f364f873-c9e8-4817-be70-aa9469b89f80",
+  "execution_kind": "p03-search-suite",
+  "contract_version": "p03-search-v1",
+  "status": "completed",
+  "task_completed": false,
+  "security_verdict": "ERR",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T05:18:08.691222+00:00",
+  "stage_calls": [],
+  "result": {
+    "case_contract_verified": false,
+    "cases": [],
+    "practice_id": "P03",
+    "activity_id": "H03",
+    "contract_version": "p03-search-v1",
+    "suite_id": "f364f873-c9e8-4817-be70-aa9469b89f80",
+    "task_completed": false,
+    "security_verdict": "ERR",
+    "source_digest": null
+  },
+  "reason": "현재 실행의 필수 기록을 확인하지 못해 과제는 미완료입니다.",
+  "next_check": "사례별 실행 코드와 Gateway의 작업 상태·검색 기록을 확인하세요."
+}

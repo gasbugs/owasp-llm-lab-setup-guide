@@ -1,0 +1,404 @@
+{
+  "lab_id": "01-nova",
+  "activity_id": "P01",
+  "internal_activity_id": "H01",
+  "contract_version": 3,
+  "task_completed": true,
+  "security_verdict": "PASS",
+  "execution_id": "4a822bed-4bb2-4a51-9e95-10f1a24de33e",
+  "execution_kind": "learner-gateway-suite",
+  "started_at": "2026-10-11T05:17:17.917926+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T05:17:32.490993+00:00",
+  "stage_calls": [
+    {
+      "stage": "learner_gateway",
+      "attempted": true,
+      "outcome": "completed",
+      "evidence_id": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8"
+    },
+    {
+      "stage": "bedrock_main",
+      "attempted": true,
+      "outcome": "completed",
+      "evidence_id": "490a0cb0-6832-45d4-8b4d-7d8f8662e4d0"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "amazon-bedrock",
+      "kind": "normal-64",
+      "id": "9f6fcac1-a126-4b6d-b280-2a935b306ce7",
+      "observed_at": "2026-10-11T05:17:19.743393+00:00"
+    },
+    {
+      "source": "amazon-bedrock",
+      "kind": "risk-512",
+      "id": "490a0cb0-6832-45d4-8b4d-7d8f8662e4d0",
+      "observed_at": "2026-10-11T05:17:21.871531+00:00"
+    },
+    {
+      "source": "amazon-bedrock",
+      "kind": "normal-1",
+      "id": "86725f1d-a89e-454e-8ba0-eea81a994092",
+      "observed_at": "2026-10-11T05:17:22.965546+00:00"
+    },
+    {
+      "source": "amazon-bedrock",
+      "kind": "normal-37",
+      "id": "81b9d0cd-13a1-4bdf-91b7-6692e7935213",
+      "observed_at": "2026-10-11T05:17:24.293006+00:00"
+    },
+    {
+      "source": "amazon-bedrock",
+      "kind": "normal-128",
+      "id": "63ede934-141f-4673-9cbc-9b92f861c2da",
+      "observed_at": "2026-10-11T05:17:25.814768+00:00"
+    },
+    {
+      "source": "amazon-bedrock",
+      "kind": "limit-129",
+      "id": "e5c8f228-c83a-4b64-8fb8-ae895c04e245",
+      "observed_at": "2026-10-11T05:17:27.370162+00:00"
+    },
+    {
+      "source": "amazon-bedrock",
+      "kind": "message-4000",
+      "id": "3f0306b3-7178-4baa-99ce-c59d27e9ee94",
+      "observed_at": "2026-10-11T05:17:28.940688+00:00"
+    },
+    {
+      "source": "amazon-bedrock",
+      "kind": "budget-first-token",
+      "id": "cdb0add9-bb6b-4981-adaa-848ac3e72b23",
+      "observed_at": "2026-10-11T05:17:30.095561+00:00"
+    }
+  ],
+  "result": {
+    "case_id": "risk-512",
+    "execution_id": "a36925c6-1c84-4cc1-9319-1aa48beb9dae",
+    "http_status": 200,
+    "requested_max_output_tokens": 512,
+    "effective_max_output_tokens": 128,
+    "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+    "provider_request_id": "490a0cb0-6832-45d4-8b4d-7d8f8662e4d0",
+    "model_id": "us.amazon.nova-lite-v1:0",
+    "region": "us-east-1",
+    "forwarded_parameters": {
+      "temperature": 0.0,
+      "maxTokens": 128
+    },
+    "usage": {
+      "inputTokens": 40,
+      "outputTokens": 128,
+      "totalTokens": 168
+    },
+    "stop_reason": "max_tokens",
+    "output_text": "**GUIDED-H01-RISK: 상담 절차 안내서**\n\n---\n\n### 1. 상담 절차 개요\n\n본 문서는 리스크 상담 절차를 상세히 안내하는 가이드입니다. 본 절차는 고객이 리스크 관련 문제를 해결하고 안전한 환경에서 활동",
+    "provider_mode": "aws",
+    "upstream_called": true,
+    "cases": [
+      {
+        "case_id": "normal-64",
+        "execution_id": "4f721f40-5ad0-4a1c-989c-d033f585ae67",
+        "http_status": 200,
+        "requested_max_output_tokens": 64,
+        "effective_max_output_tokens": 64,
+        "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+        "provider_request_id": "9f6fcac1-a126-4b6d-b280-2a935b306ce7",
+        "model_id": "us.amazon.nova-lite-v1:0",
+        "region": "us-east-1",
+        "forwarded_parameters": {
+          "temperature": 0.0,
+          "maxTokens": 64
+        },
+        "usage": {
+          "inputTokens": 40,
+          "outputTokens": 64,
+          "totalTokens": 104
+        },
+        "stop_reason": "max_tokens",
+        "output_text": "TLS 인증서 교체 절차는 먼저 새 인증서를 발급받고, 해당 인증서를 서버에 업로드한 후 ",
+        "provider_mode": "aws",
+        "upstream_called": true
+      },
+      {
+        "case_id": "risk-512",
+        "execution_id": "a36925c6-1c84-4cc1-9319-1aa48beb9dae",
+        "http_status": 200,
+        "requested_max_output_tokens": 512,
+        "effective_max_output_tokens": 128,
+        "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+        "provider_request_id": "490a0cb0-6832-45d4-8b4d-7d8f8662e4d0",
+        "model_id": "us.amazon.nova-lite-v1:0",
+        "region": "us-east-1",
+        "forwarded_parameters": {
+          "temperature": 0.0,
+          "maxTokens": 128
+        },
+        "usage": {
+          "inputTokens": 40,
+          "outputTokens": 128,
+          "totalTokens": 168
+        },
+        "stop_reason": "max_tokens",
+        "output_text": "**GUIDED-H01-RISK: 상담 절차 안내서**\n\n---\n\n### 1. 상담 절차 개요\n\n본 문서는 리스크 상담 절차를 상세히 안내하는 가이드입니다. 본 절차는 고객이 리스크 관련 문제를 해결하고 안전한 환경에서 활동",
+        "provider_mode": "aws",
+        "upstream_called": true
+      },
+      {
+        "case_id": "normal-1",
+        "execution_id": "723cc436-3a8b-4ef8-894d-7e9fad4f7134",
+        "http_status": 200,
+        "requested_max_output_tokens": 1,
+        "effective_max_output_tokens": 1,
+        "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+        "provider_request_id": "86725f1d-a89e-454e-8ba0-eea81a994092",
+        "model_id": "us.amazon.nova-lite-v1:0",
+        "region": "us-east-1",
+        "forwarded_parameters": {
+          "temperature": 0.0,
+          "maxTokens": 1
+        },
+        "usage": {
+          "inputTokens": 5,
+          "outputTokens": 1,
+          "totalTokens": 6
+        },
+        "stop_reason": "max_tokens",
+        "output_text": "",
+        "provider_mode": "aws",
+        "upstream_called": true
+      },
+      {
+        "case_id": "normal-37",
+        "execution_id": "d6ef29f8-8a83-435d-908e-054747c2dc8c",
+        "http_status": 200,
+        "requested_max_output_tokens": 37,
+        "effective_max_output_tokens": 37,
+        "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+        "provider_request_id": "81b9d0cd-13a1-4bdf-91b7-6692e7935213",
+        "model_id": "us.amazon.nova-lite-v1:0",
+        "region": "us-east-1",
+        "forwarded_parameters": {
+          "temperature": 0.0,
+          "maxTokens": 37
+        },
+        "usage": {
+          "inputTokens": 16,
+          "outputTokens": 37,
+          "totalTokens": 53
+        },
+        "stop_reason": "max_tokens",
+        "output_text": "물론입니다! 어떤 주제나 확인하고 싶으신가요? 간단하",
+        "provider_mode": "aws",
+        "upstream_called": true
+      },
+      {
+        "case_id": "normal-128",
+        "execution_id": "fc8e465b-2d48-4deb-a17a-524815ee0836",
+        "http_status": 200,
+        "requested_max_output_tokens": 128,
+        "effective_max_output_tokens": 128,
+        "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+        "provider_request_id": "63ede934-141f-4673-9cbc-9b92f861c2da",
+        "model_id": "us.amazon.nova-lite-v1:0",
+        "region": "us-east-1",
+        "forwarded_parameters": {
+          "temperature": 0.0,
+          "maxTokens": 128
+        },
+        "usage": {
+          "inputTokens": 9,
+          "outputTokens": 128,
+          "totalTokens": 137
+        },
+        "stop_reason": "max_tokens",
+        "output_text": "안녕하세요! 어떤 문의사항이 있으신가요? 도움이 필요하신 경우 언제든지 물어보세요. 예를 들어, 특정 주제에 대한 정보, 기술적인 도움, 일상 생활에서의 조언 등 다양한 주제에 대해 도��",
+        "provider_mode": "aws",
+        "upstream_called": true
+      },
+      {
+        "case_id": "limit-129",
+        "execution_id": "3cdd736d-30df-4ee9-9925-9513869e7cde",
+        "http_status": 200,
+        "requested_max_output_tokens": 129,
+        "effective_max_output_tokens": 128,
+        "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+        "provider_request_id": "e5c8f228-c83a-4b64-8fb8-ae895c04e245",
+        "model_id": "us.amazon.nova-lite-v1:0",
+        "region": "us-east-1",
+        "forwarded_parameters": {
+          "temperature": 0.0,
+          "maxTokens": 128
+        },
+        "usage": {
+          "inputTokens": 16,
+          "outputTokens": 128,
+          "totalTokens": 144
+        },
+        "stop_reason": "max_tokens",
+        "output_text": "물론입니다. 정상 문의를 요약하면 다음과 같습니다:\n\n1. **정의**: 정상 문의란 일반적인 상황에서 발생하는 질문, 의견, 불만사항 등을 조직이나 기관에 제기하는 것을 말합니다. 이는 일상적인 업무 운영과 관�",
+        "provider_mode": "aws",
+        "upstream_called": true
+      },
+      {
+        "case_id": "message-4000",
+        "execution_id": "d0f0a5ec-1075-44bc-a31f-acfa66539c4e",
+        "http_status": 200,
+        "requested_max_output_tokens": 1,
+        "effective_max_output_tokens": 1,
+        "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+        "provider_request_id": "3f0306b3-7178-4baa-99ce-c59d27e9ee94",
+        "model_id": "us.amazon.nova-lite-v1:0",
+        "region": "us-east-1",
+        "forwarded_parameters": {
+          "temperature": 0.0,
+          "maxTokens": 1
+        },
+        "usage": {
+          "inputTokens": 4001,
+          "outputTokens": 1,
+          "totalTokens": 4002
+        },
+        "stop_reason": "max_tokens",
+        "output_text": "",
+        "provider_mode": "aws",
+        "upstream_called": true
+      },
+      {
+        "case_id": "invalid-empty-message",
+        "execution_id": "67b12c02-a68a-4a63-95c5-8f939d86b302",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-blank-message",
+        "execution_id": "b1057247-da65-4b96-9160-22f2b96d6f22",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-long-message",
+        "execution_id": "161150ee-ff84-423f-a1f1-2debb03bc807",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-message-type",
+        "execution_id": "810509ce-fed7-40f1-aa09-0c39da42b4c7",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "missing-message",
+        "execution_id": "a1948f4d-0b18-476d-8a26-7afeddbfafa3",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "missing-limit",
+        "execution_id": "d4a362bc-b935-4e76-bcb7-0053a541c0e4",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-zero-limit",
+        "execution_id": "70f8ab77-2347-43b0-8d4b-fc79daf9da03",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-negative-limit",
+        "execution_id": "1e2c5c9d-e9e1-426e-b2ba-8d8c6b35313b",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-large-limit",
+        "execution_id": "6a6b14d8-768a-43b5-96f7-55c646de0bb9",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-bool-limit",
+        "execution_id": "11dfb452-9a7e-4388-b69f-70ada778aa67",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-string-limit",
+        "execution_id": "6c644ed5-62ec-4293-a6ce-98b7d256ebd5",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-fractional-limit",
+        "execution_id": "6fd5a72d-e202-45d4-9e04-d2daf108c635",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "invalid-integral-float-limit",
+        "execution_id": "63b7309a-025f-44be-a9a4-bd536d948208",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "reject-model-override",
+        "execution_id": "bc14a3d8-50f4-44ef-a7c1-27026bcd8f08",
+        "http_status": 422,
+        "upstream_called": false,
+        "client_id": "team-a-4a822bed"
+      },
+      {
+        "case_id": "budget-first-token",
+        "execution_id": "3975771c-2bd9-43f2-8b2c-91a7def20b8f",
+        "http_status": 200,
+        "requested_max_output_tokens": 1,
+        "effective_max_output_tokens": 1,
+        "source_digest": "3fad046dd0328db6407e94f18532e9b510ff73129ff95a303acbb2b21e362ab8",
+        "provider_request_id": "cdb0add9-bb6b-4981-adaa-848ac3e72b23",
+        "model_id": "us.amazon.nova-lite-v1:0",
+        "region": "us-east-1",
+        "forwarded_parameters": {
+          "temperature": 0.0,
+          "maxTokens": 1
+        },
+        "usage": {
+          "inputTokens": 17,
+          "outputTokens": 1,
+          "totalTokens": 18
+        },
+        "stop_reason": "max_tokens",
+        "output_text": "",
+        "provider_mode": "aws",
+        "upstream_called": true
+      },
+      {
+        "case_id": "budget-exhausted",
+        "execution_id": "8d3311a6-62b9-4790-8bad-eb99abe9d928",
+        "http_status": 429,
+        "upstream_called": false,
+        "client_id": "budget-one-token-4a822bed"
+      }
+    ]
+  },
+  "reason": "정상 요청은 유지하고 큰 요청은 제한했으며 잘못된 body와 모델 변경도 Provider 전에 거부했습니다.",
+  "next_check": "각 사례의 HTTP 상태, upstream_called와 Provider maxTokens를 순서대로 비교합니다."
+}

@@ -16,6 +16,16 @@ class ProgressStore:
                 problem TEXT PRIMARY KEY, attempt TEXT NOT NULL, needs_check INTEGER NOT NULL,
                 execution TEXT, digest TEXT, completed_at TEXT)''')
 
+    def tutorial_completed(self, owner):
+        with self.lock, self.db:
+            self.db.execute('CREATE TABLE IF NOT EXISTS tutorial_completion (owner TEXT PRIMARY KEY)')
+            return self.db.execute('SELECT 1 FROM tutorial_completion WHERE owner=?', (owner,)).fetchone() is not None
+
+    def complete_tutorial(self, owner):
+        with self.lock, self.db:
+            self.db.execute('CREATE TABLE IF NOT EXISTS tutorial_completion (owner TEXT PRIMARY KEY)')
+            self.db.execute('INSERT OR IGNORE INTO tutorial_completion VALUES (?)', (owner,))
+
     def begin(self, problem):
         attempt = uuid.uuid4().hex
         with self.lock, self.db:

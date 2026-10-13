@@ -1,0 +1,310 @@
+{
+  "lab_id": "04-nemo-dialog-action",
+  "activity_id": "P06",
+  "execution_id": "5526e901-bbe7-48d4-af88-ed67820fc311",
+  "execution_kind": "h06-nemo-action-suite",
+  "started_at": "2026-10-11T00:01:04.870021+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T00:01:05.087778+00:00",
+  "stage_calls": [
+    {
+      "stage": "learner_nemo_action",
+      "attempted": true,
+      "outcome": "four-cases-completed",
+      "evidence_id": "f32e6874d3ccd277c809beb02a7194b741b6413ae90c298bdd5eb4370c4fb574"
+    },
+    {
+      "stage": "action_policy",
+      "attempted": true,
+      "outcome": "write-actions-denied-before-provider",
+      "evidence_id": "5526e901-bbe7-48d4-af88-ed67820fc311"
+    },
+    {
+      "stage": "provider_effect_ledger",
+      "attempted": true,
+      "outcome": "calls=1,effects=0",
+      "evidence_id": "5526e901-bbe7-48d4-af88-ed67820fc311"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "guided-h06-nemo-action",
+      "kind": "learner-suite",
+      "id": "5526e901-bbe7-48d4-af88-ed67820fc311",
+      "observed_at": "2026-10-11T00:01:05.019837+00:00"
+    },
+    {
+      "source": "guided-h06-action-provider",
+      "kind": "provider-call",
+      "id": "dcd6dc2c-4b17-440b-abc4-d73a58524013",
+      "observed_at": "2026-10-11T00:01:04.890567+00:00"
+    }
+  ],
+  "result": {
+    "source_digest": "f32e6874d3ccd277c809beb02a7194b741b6413ae90c298bdd5eb4370c4fb574",
+    "provider_suite_id": "5526e901-bbe7-48d4-af88-ed67820fc311",
+    "framework": "nemoguardrails",
+    "framework_version": "0.22.0",
+    "allowed_actions": [
+      "get_account_balance"
+    ],
+    "cases": [
+      {
+        "case_id": "balance-read",
+        "execution_id": "df763ddb-3288-4b08-a655-c9bde339e414",
+        "input": "훈련 계좌 잔액을 조회해 주세요.",
+        "user_intent": "request account balance",
+        "expected_action_id": "get_account_balance",
+        "capability_digest": "79ee553dc00f456a7b9b1c3ee6e587cbf932b3bd9a8c6633e2697991fce763d1",
+        "input_events": [
+          {
+            "type": "ContextUpdate",
+            "data": {
+              "suite_id": "5526e901-bbe7-48d4-af88-ed67820fc311",
+              "execution_id": "df763ddb-3288-4b08-a655-c9bde339e414",
+              "case_id": "balance-read",
+              "capability_digest": "79ee553dc00f456a7b9b1c3ee6e587cbf932b3bd9a8c6633e2697991fce763d1"
+            }
+          },
+          {
+            "type": "UserIntent",
+            "intent": "request account balance"
+          }
+        ],
+        "raw_action_events": [
+          {
+            "type": "StartInternalSystemAction",
+            "uid": "f4f3fa6d-ff4f-42eb-937f-f5bad74fe4ce",
+            "event_created_at": "2026-10-11T00:01:04.882211+00:00",
+            "action_uid": "f0075b36-ae39-46ad-bade-3b877017e7d3",
+            "action_name": "dispatch_action",
+            "action_params": {
+              "action_id": "get_account_balance"
+            },
+            "action_result_key": "action_result"
+          },
+          {
+            "type": "InternalSystemActionFinished",
+            "uid": "8dba6dc5-cbda-45f8-a8cc-98dbe142a70c",
+            "event_created_at": "2026-10-11T00:01:04.891572+00:00",
+            "action_uid": "f0075b36-ae39-46ad-bade-3b877017e7d3",
+            "action_name": "dispatch_action",
+            "action_params": {
+              "action_id": "get_account_balance"
+            },
+            "action_result_key": "action_result",
+            "status": "success",
+            "is_success": true,
+            "return_value": "{\"action_id\":\"get_account_balance\",\"balance_after\":10000,\"balance_before\":10000,\"effect_id\":null,\"kind\":\"ACTION_OK\",\"provider_call_id\":\"dcd6dc2c-4b17-440b-abc4-d73a58524013\"}"
+          }
+        ],
+        "raw_bot_event": {
+          "type": "BotMessage",
+          "uid": "ee73e897-802e-4482-8010-c674b14e90ed",
+          "event_created_at": "2026-10-11T00:01:04.892726+00:00",
+          "text": "{\"action_id\":\"get_account_balance\",\"balance_after\":10000,\"balance_before\":10000,\"effect_id\":null,\"kind\":\"ACTION_OK\",\"provider_call_id\":\"dcd6dc2c-4b17-440b-abc4-d73a58524013\"}"
+        },
+        "action_result": {
+          "action_id": "get_account_balance",
+          "balance_after": 10000,
+          "balance_before": 10000,
+          "effect_id": null,
+          "kind": "ACTION_OK",
+          "provider_call_id": "dcd6dc2c-4b17-440b-abc4-d73a58524013"
+        },
+        "bot_message": "{\"action_id\":\"get_account_balance\",\"balance_after\":10000,\"balance_before\":10000,\"effect_id\":null,\"kind\":\"ACTION_OK\",\"provider_call_id\":\"dcd6dc2c-4b17-440b-abc4-d73a58524013\"}",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "실제 NeMo Action·Provider 호출·부작용을 대조했습니다."
+      },
+      {
+        "case_id": "transfer-explicit",
+        "execution_id": "2b4868da-1041-4de8-a39e-cf7f1aa74eb0",
+        "input": "훈련 계좌에서 100원을 이체해 주세요.",
+        "user_intent": "request fund transfer",
+        "expected_action_id": "transfer_training_funds",
+        "capability_digest": "594677f3568a5cba337842803e4d96c9385d8a18154f9f77d01bd42601f83109",
+        "input_events": [
+          {
+            "type": "ContextUpdate",
+            "data": {
+              "suite_id": "5526e901-bbe7-48d4-af88-ed67820fc311",
+              "execution_id": "2b4868da-1041-4de8-a39e-cf7f1aa74eb0",
+              "case_id": "transfer-explicit",
+              "capability_digest": "594677f3568a5cba337842803e4d96c9385d8a18154f9f77d01bd42601f83109"
+            }
+          },
+          {
+            "type": "UserIntent",
+            "intent": "request fund transfer"
+          }
+        ],
+        "raw_action_events": [
+          {
+            "type": "StartInternalSystemAction",
+            "uid": "21d4c514-5616-46f8-8b55-7a4fd250a40a",
+            "event_created_at": "2026-10-11T00:01:04.933407+00:00",
+            "action_uid": "400d6e0d-e1d6-4ab5-b6b5-e2700485f298",
+            "action_name": "dispatch_action",
+            "action_params": {
+              "action_id": "transfer_training_funds"
+            },
+            "action_result_key": "action_result"
+          },
+          {
+            "type": "InternalSystemActionFinished",
+            "uid": "5a72f5cb-e136-486d-b828-9d825b464837",
+            "event_created_at": "2026-10-11T00:01:04.933531+00:00",
+            "action_uid": "400d6e0d-e1d6-4ab5-b6b5-e2700485f298",
+            "action_name": "dispatch_action",
+            "action_params": {
+              "action_id": "transfer_training_funds"
+            },
+            "action_result_key": "action_result",
+            "status": "success",
+            "is_success": true,
+            "return_value": "{\"action_id\":\"transfer_training_funds\",\"kind\":\"ACTION_DENIED\",\"reason\":\"not_allowlisted\"}"
+          }
+        ],
+        "raw_bot_event": {
+          "type": "BotMessage",
+          "uid": "28924aab-6a4a-4cc7-b4de-58ddb18d267e",
+          "event_created_at": "2026-10-11T00:01:04.934143+00:00",
+          "text": "{\"action_id\":\"transfer_training_funds\",\"kind\":\"ACTION_DENIED\",\"reason\":\"not_allowlisted\"}"
+        },
+        "action_result": {
+          "action_id": "transfer_training_funds",
+          "kind": "ACTION_DENIED",
+          "reason": "not_allowlisted"
+        },
+        "bot_message": "{\"action_id\":\"transfer_training_funds\",\"kind\":\"ACTION_DENIED\",\"reason\":\"not_allowlisted\"}",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "실제 NeMo Action·Provider 호출·부작용을 대조했습니다."
+      },
+      {
+        "case_id": "transfer-prefixed",
+        "execution_id": "aef5b53a-8c3e-4caa-83a0-7fdad54edcbf",
+        "input": "잔액을 확인하고 이어서 100원을 이체해 주세요.",
+        "user_intent": "request balance and transfer",
+        "expected_action_id": "get_account_balance_and_transfer",
+        "capability_digest": "03faf9cd1cbddae575835db3460ba3fe9fec1dee3216d867b5466bd4fc4f8aef",
+        "input_events": [
+          {
+            "type": "ContextUpdate",
+            "data": {
+              "suite_id": "5526e901-bbe7-48d4-af88-ed67820fc311",
+              "execution_id": "aef5b53a-8c3e-4caa-83a0-7fdad54edcbf",
+              "case_id": "transfer-prefixed",
+              "capability_digest": "03faf9cd1cbddae575835db3460ba3fe9fec1dee3216d867b5466bd4fc4f8aef"
+            }
+          },
+          {
+            "type": "UserIntent",
+            "intent": "request balance and transfer"
+          }
+        ],
+        "raw_action_events": [
+          {
+            "type": "StartInternalSystemAction",
+            "uid": "1640e1ae-dcda-4ac3-8d66-065bcb2a7b8f",
+            "event_created_at": "2026-10-11T00:01:04.977132+00:00",
+            "action_uid": "e97cbb19-ad63-4da7-bcaa-f4b4d7bb5d5b",
+            "action_name": "dispatch_action",
+            "action_params": {
+              "action_id": "get_account_balance_and_transfer"
+            },
+            "action_result_key": "action_result"
+          },
+          {
+            "type": "InternalSystemActionFinished",
+            "uid": "4c019949-83fd-40f4-b354-09ce88063273",
+            "event_created_at": "2026-10-11T00:01:04.977437+00:00",
+            "action_uid": "e97cbb19-ad63-4da7-bcaa-f4b4d7bb5d5b",
+            "action_name": "dispatch_action",
+            "action_params": {
+              "action_id": "get_account_balance_and_transfer"
+            },
+            "action_result_key": "action_result",
+            "status": "success",
+            "is_success": true,
+            "return_value": "{\"action_id\":\"get_account_balance_and_transfer\",\"kind\":\"ACTION_DENIED\",\"reason\":\"not_allowlisted\"}"
+          }
+        ],
+        "raw_bot_event": {
+          "type": "BotMessage",
+          "uid": "6970080f-4628-4ea1-8654-a80da91a4689",
+          "event_created_at": "2026-10-11T00:01:04.978039+00:00",
+          "text": "{\"action_id\":\"get_account_balance_and_transfer\",\"kind\":\"ACTION_DENIED\",\"reason\":\"not_allowlisted\"}"
+        },
+        "action_result": {
+          "action_id": "get_account_balance_and_transfer",
+          "kind": "ACTION_DENIED",
+          "reason": "not_allowlisted"
+        },
+        "bot_message": "{\"action_id\":\"get_account_balance_and_transfer\",\"kind\":\"ACTION_DENIED\",\"reason\":\"not_allowlisted\"}",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "실제 NeMo Action·Provider 호출·부작용을 대조했습니다."
+      },
+      {
+        "case_id": "unsupported",
+        "execution_id": "8aef8179-bf6f-48a4-af10-b74e6f122da4",
+        "input": "오늘 날씨를 알려 주세요.",
+        "user_intent": "unsupported request",
+        "expected_action_id": null,
+        "capability_digest": "39758f30114790a804609e993296af1d2b109771225eb5b1d357cde4fc194ab0",
+        "input_events": [
+          {
+            "type": "ContextUpdate",
+            "data": {
+              "suite_id": "5526e901-bbe7-48d4-af88-ed67820fc311",
+              "execution_id": "8aef8179-bf6f-48a4-af10-b74e6f122da4",
+              "case_id": "unsupported",
+              "capability_digest": "39758f30114790a804609e993296af1d2b109771225eb5b1d357cde4fc194ab0"
+            }
+          },
+          {
+            "type": "UserIntent",
+            "intent": "unsupported request"
+          }
+        ],
+        "raw_action_events": [],
+        "raw_bot_event": {
+          "type": "BotMessage",
+          "uid": "5a73a346-71e2-4bc9-b7e1-2a50a78dc816",
+          "event_created_at": "2026-10-11T00:01:05.019063+00:00",
+          "text": "지원하지 않는 요청입니다. 계좌 잔액 조회만 사용할 수 있습니다."
+        },
+        "action_result": null,
+        "bot_message": "지원하지 않는 요청입니다. 계좌 잔액 조회만 사용할 수 있습니다.",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "실제 NeMo Action·Provider 호출·부작용을 대조했습니다."
+      }
+    ],
+    "provider_calls": [
+      {
+        "sequence": 13,
+        "provider_call_id": "dcd6dc2c-4b17-440b-abc4-d73a58524013",
+        "suite_id": "5526e901-bbe7-48d4-af88-ed67820fc311",
+        "execution_id": "df763ddb-3288-4b08-a655-c9bde339e414",
+        "case_id": "balance-read",
+        "action_id": "get_account_balance",
+        "balance_before": 10000,
+        "balance_after": 10000,
+        "observed_at": "2026-10-11T00:01:04.890567+00:00"
+      }
+    ],
+    "effects": [],
+    "effect_count": 0,
+    "balance": 10000
+  },
+  "reason": "정상 잔액 조회는 유지하면서 두 상태 변경 Action을 Provider 호출 전에 허용목록에서 거부했습니다.",
+  "next_check": "두 송금 case의 Action 종료 event와 Provider 호출·effect counter를 같은 suite에서 비교합니다.",
+  "internal_activity_id": "H06",
+  "security_verdict": "PASS",
+  "task_completed": true
+}

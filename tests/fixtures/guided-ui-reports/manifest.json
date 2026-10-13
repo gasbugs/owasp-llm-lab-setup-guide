@@ -1,0 +1,287 @@
+{
+  "scope": "Sanitized historical responses for UI display only. Not fresh execution/verifier evidence. P02-P04 stored receipts returned ERR with no verified cases.",
+  "records": [
+    {
+      "mission": "P00",
+      "file": "p00-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P00",
+      "file": "p00-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P01",
+      "file": "p01-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 23
+    },
+    {
+      "mission": "P02",
+      "file": "p02-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 0
+    },
+    {
+      "mission": "P03",
+      "file": "p03-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 0
+    },
+    {
+      "mission": "P04",
+      "file": "p04-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 0
+    },
+    {
+      "mission": "P05",
+      "file": "p05-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P05",
+      "file": "p05-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P06",
+      "file": "p06-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P06",
+      "file": "p06-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P07",
+      "file": "p07-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P07",
+      "file": "p07-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P08",
+      "file": "p08-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P08",
+      "file": "p08-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P09",
+      "file": "p09-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P09",
+      "file": "p09-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P10",
+      "file": "p10-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P10",
+      "file": "p10-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P11",
+      "file": "p11-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P11",
+      "file": "p11-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 4
+    },
+    {
+      "mission": "P12",
+      "file": "p12-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 8
+    },
+    {
+      "mission": "P12",
+      "file": "p12-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 8
+    },
+    {
+      "mission": "P13",
+      "file": "p13-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P13",
+      "file": "p13-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P14",
+      "file": "p14-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P14",
+      "file": "p14-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P15",
+      "file": "p15-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P15",
+      "file": "p15-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P16",
+      "file": "p16-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 5
+    },
+    {
+      "mission": "P16",
+      "file": "p16-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 5
+    },
+    {
+      "mission": "P17",
+      "file": "p17-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 3
+    },
+    {
+      "mission": "P17",
+      "file": "p17-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 3
+    },
+    {
+      "mission": "P18",
+      "file": "p18-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P18",
+      "file": "p18-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P19",
+      "file": "p19-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 10
+    },
+    {
+      "mission": "P19",
+      "file": "p19-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 10
+    },
+    {
+      "mission": "P20",
+      "file": "p20-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P20",
+      "file": "p20-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 2
+    },
+    {
+      "mission": "P21",
+      "file": "p21-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 9
+    },
+    {
+      "mission": "P21",
+      "file": "p21-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 9
+    },
+    {
+      "mission": "P22",
+      "file": "p22-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 7
+    },
+    {
+      "mission": "P22",
+      "file": "p22-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 7
+    },
+    {
+      "mission": "P23",
+      "file": "p23-1.json",
+      "kind": "recorded-native-response",
+      "case_count": 3
+    },
+    {
+      "mission": "P23",
+      "file": "p23-2.json",
+      "kind": "recorded-native-response",
+      "case_count": 3
+    },
+    {
+      "mission": "P02",
+      "file": "p02-contract-display.json",
+      "kind": "display-contract-fixture",
+      "case_count": 22
+    },
+    {
+      "mission": "P03",
+      "file": "p03-contract-display.json",
+      "kind": "display-contract-fixture",
+      "case_count": 19
+    },
+    {
+      "mission": "P04",
+      "file": "p04-contract-display.json",
+      "kind": "display-contract-fixture",
+      "case_count": 27
+    }
+  ]
+}

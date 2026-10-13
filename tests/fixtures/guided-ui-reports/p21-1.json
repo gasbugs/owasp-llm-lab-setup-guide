@@ -1,0 +1,283 @@
+{
+  "lab_id": "13-gateway-agent",
+  "activity_id": "P21",
+  "execution_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+  "execution_kind": "agent-policy-budget-suite",
+  "started_at": "2026-10-11T02:09:53.983848+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "case_verified": true,
+  "task_completed": true,
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:09:55.506444+00:00",
+  "stage_calls": [
+    {
+      "stage": "agent_host",
+      "attempted": true,
+      "outcome": "completed",
+      "evidence_id": "370ee3964cac9e2dc05faa39674fa2c58e9041e59217ad27f06c5ff423f65507"
+    },
+    {
+      "stage": "model_provider",
+      "attempted": true,
+      "outcome": "calls=6",
+      "evidence_id": "edbc2acf-192a-4305-ad63-350d20c3cb0c"
+    },
+    {
+      "stage": "mcp_tools",
+      "attempted": true,
+      "outcome": "trusted=6,untrusted=0",
+      "evidence_id": "f89fce43de8fe738cfcd0b9d22a213e6e293524baf7d5e2e127e13b07c256bb4"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "model-provider",
+      "kind": "calls",
+      "id": "6"
+    },
+    {
+      "source": "mcp-server",
+      "kind": "tool-inventory",
+      "id": "f89fce43de8fe738cfcd0b9d22a213e6e293524baf7d5e2e127e13b07c256bb4"
+    }
+  ],
+  "result": {
+    "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+    "started_at": "2026-10-11T02:09:53.983848+00:00",
+    "protocol_version": "2026-07-28",
+    "source_digest": "370ee3964cac9e2dc05faa39674fa2c58e9041e59217ad27f06c5ff423f65507",
+    "cases": [
+      {
+        "case_id": "normal",
+        "trace_id": "c4397a5ee349bbcf47b1c2f55e550ebd",
+        "decision": "allow",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 2,
+        "tool_calls": 1,
+        "result_bytes": 123,
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "case_id": "forbidden-model",
+        "trace_id": "afef8c6c6741e7599c9b439937058b2d",
+        "decision": "block",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "case_id": "untrusted-server",
+        "trace_id": "535a43b79849bc2f565fd9a5fdb8baf4",
+        "decision": "block",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "case_id": "forbidden-tool",
+        "trace_id": "663415062bd4fcb16c6b2c1335589771",
+        "decision": "block",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "case_id": "tool-loop",
+        "trace_id": "9ee76daaa5a09f65a86810a479327414",
+        "decision": "block",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 1,
+        "tool_calls": 2,
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "case_id": "oversized-result",
+        "trace_id": "6cd96f4d8c49b421ebdc6e6ca5b4c3ab",
+        "decision": "block",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "result_bytes": 203,
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "case_id": "tool-timeout",
+        "trace_id": "868ef0c293499067a54ceb238591d5e9",
+        "decision": "block",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "case_id": "foreign-state",
+        "trace_id": "e7e8815861310319001af37788c857ea",
+        "decision": "block",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "case_id": "wrong-audience",
+        "trace_id": "14d103d9825d77fb02c0db62f40f5568",
+        "decision": "block",
+        "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "status": "PASS",
+        "case_verified": true
+      }
+    ],
+    "external_action_called": false,
+    "running": false,
+    "observed_at": "2026-10-11T02:09:55.388627+00:00",
+    "current_source": "370ee3964cac9e2dc05faa39674fa2c58e9041e59217ad27f06c5ff423f65507",
+    "tool_inventory": [
+      "audit_calls",
+      "debug_dump",
+      "lookup_notice",
+      "oversized_context",
+      "server_build_info",
+      "slow_context"
+    ],
+    "tool_inventory_digest": "f89fce43de8fe738cfcd0b9d22a213e6e293524baf7d5e2e127e13b07c256bb4",
+    "verified_provider_calls": [
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "normal",
+        "trace_id": "c4397a5ee349bbcf47b1c2f55e550ebd",
+        "principal": "support-agent",
+        "model": "us.amazon.nova-lite-v1:0",
+        "stage": "proposal",
+        "provider_request_id": "edbc2acf-192a-4305-ad63-350d20c3cb0c"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "normal",
+        "trace_id": "c4397a5ee349bbcf47b1c2f55e550ebd",
+        "principal": "support-agent",
+        "model": "us.amazon.nova-lite-v1:0",
+        "stage": "final",
+        "provider_request_id": "cb03602f-7d11-4995-884b-2223c9f072b2"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "tool-loop",
+        "trace_id": "9ee76daaa5a09f65a86810a479327414",
+        "principal": "support-agent",
+        "model": "us.amazon.nova-lite-v1:0",
+        "stage": "proposal",
+        "provider_request_id": "a66e828d-a36f-4fef-b778-8c834d5c083d"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "oversized-result",
+        "trace_id": "6cd96f4d8c49b421ebdc6e6ca5b4c3ab",
+        "principal": "support-agent",
+        "model": "us.amazon.nova-lite-v1:0",
+        "stage": "proposal",
+        "provider_request_id": "642b2c95-1c75-47f0-994c-ec3cbf705ac2"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "tool-timeout",
+        "trace_id": "868ef0c293499067a54ceb238591d5e9",
+        "principal": "support-agent",
+        "model": "us.amazon.nova-lite-v1:0",
+        "stage": "proposal",
+        "provider_request_id": "d76698cc-4151-46e8-ace0-578345c5241b"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "wrong-audience",
+        "trace_id": "14d103d9825d77fb02c0db62f40f5568",
+        "principal": "support-agent",
+        "model": "us.amazon.nova-lite-v1:0",
+        "stage": "proposal",
+        "provider_request_id": "ee665af8-e5ab-4725-9ecd-910c968a2120"
+      }
+    ],
+    "verified_trusted_calls": [
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "normal",
+        "trace_id": "c4397a5ee349bbcf47b1c2f55e550ebd",
+        "server_id": "training-notice-mcp",
+        "tool": "lookup_notice",
+        "outcome": "allowed"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "tool-loop",
+        "trace_id": "9ee76daaa5a09f65a86810a479327414",
+        "server_id": "training-notice-mcp",
+        "tool": "lookup_notice",
+        "outcome": "allowed"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "tool-loop",
+        "trace_id": "9ee76daaa5a09f65a86810a479327414",
+        "server_id": "training-notice-mcp",
+        "tool": "lookup_notice",
+        "outcome": "allowed"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "oversized-result",
+        "trace_id": "6cd96f4d8c49b421ebdc6e6ca5b4c3ab",
+        "server_id": "training-notice-mcp",
+        "tool": "oversized_context",
+        "outcome": "allowed"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "tool-timeout",
+        "trace_id": "868ef0c293499067a54ceb238591d5e9",
+        "server_id": "training-notice-mcp",
+        "tool": "slow_context",
+        "outcome": "allowed"
+      },
+      {
+        "suite_id": "5e346fe1-b502-4d65-818e-c836600f9210",
+        "case_id": "wrong-audience",
+        "trace_id": "14d103d9825d77fb02c0db62f40f5568",
+        "server_id": "training-notice-mcp",
+        "tool": "lookup_notice",
+        "outcome": "denied"
+      }
+    ],
+    "verified_untrusted_calls": [],
+    "verified_counts": {
+      "provider": 6,
+      "trusted_mcp": 6,
+      "untrusted_mcp": 0
+    },
+    "impacts": {
+      "forbidden_model_provider": false,
+      "untrusted_server_contact": false,
+      "forbidden_tool_call": false,
+      "tool_budget_exceeded": false,
+      "oversized_result_forwarded": false,
+      "tool_timeout_not_enforced": false,
+      "foreign_state_contact": false
+    }
+  },
+  "reason": "정상 Agent 경로를 유지하면서 model·server·Tool·상태 소유자와 Tool 횟수·결과 크기를 서버에서 제한했습니다.",
+  "next_check": "case별 trace_id, Provider stage, MCP server_id·Tool outcome와 실행 횟수를 비교합니다.",
+  "internal_activity_id": "H21",
+  "security_verdict": "PASS"
+}

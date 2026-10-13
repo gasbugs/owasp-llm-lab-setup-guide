@@ -1,5 +1,6 @@
 """Create only absent P04 resources; never update, delete, or silently repair policies."""
 from contextlib import ExitStack
+from resource_progress import step
 import hashlib
 import re
 import threading
@@ -64,6 +65,7 @@ class Provisioner:
                     stack.callback(value.close)
                     return value
 
+                step(1)
                 identity = call(client('sts').get_caller_identity)
                 account = identity['Account']
                 require(isinstance(account, str) and re.fullmatch(r'[0-9]{12}', account))
@@ -73,10 +75,12 @@ class Provisioner:
                     specification = self.store.begin(operation_id, account)
                     begun = True
                 bedrock = client('bedrock')
+                step(2)
                 existing = inspect_existing(specification, client=bedrock, clock=self.clock)
                 check_time()
                 require(not set(request_ids).intersection(existing['aws_request_ids']))
                 request_ids.extend(existing['aws_request_ids'])
+                step(3)
                 created = existing['state'] == 'absent'
                 if not created:
                     snapshot = existing['resources']
@@ -92,6 +96,7 @@ class Provisioner:
                     require(isinstance(guardrail_id, str) and re.fullmatch(r'[a-z0-9]{1,64}', guardrail_id))
                     arn = f'arn:aws:bedrock:{self.region}:{account}:guardrail/{guardrail_id}'
                     require(response['guardrailArn'] == arn and response['version'] == 'DRAFT')
+                    step(4)
                     for attempt in range(40):
                         detail = call(bedrock.get_guardrail, guardrailIdentifier=guardrail_id, guardrailVersion='DRAFT')
                         if detail.get('status') == 'READY':
@@ -101,6 +106,7 @@ class Provisioner:
                     tags = call(bedrock.list_tags_for_resource, resourceARN=arn)
                     snapshot = validate_owned(specification, detail, tags['tags'], expected_id=guardrail_id)
                 check_time()
+                step(5)
                 return self.store.publish(operation_id, snapshot,
                     {'aws_request_ids': request_ids, 'created': created})
         except Exception as error:

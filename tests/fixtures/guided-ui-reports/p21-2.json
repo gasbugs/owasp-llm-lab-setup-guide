@@ -1,0 +1,133 @@
+{
+  "lab_id": "13-gateway-agent",
+  "activity_id": "P21",
+  "execution_id": "af452149-4d4a-4257-986c-b03d15ca1ef8",
+  "execution_kind": "agent-policy-budget-suite",
+  "started_at": "2026-10-11T02:10:03.257862+00:00",
+  "status": "completed",
+  "course_verdict": "ERR",
+  "case_verified": false,
+  "task_completed": false,
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:10:03.369272+00:00",
+  "stage_calls": [
+    {
+      "stage": "agent_host",
+      "attempted": true,
+      "outcome": "completed",
+      "evidence_id": "c6e9c50615ac3484ae79ff440f5e341ad54237dabfab334579c90aa16ecd471f"
+    },
+    {
+      "stage": "model_provider",
+      "attempted": true,
+      "outcome": "calls=0",
+      "evidence_id": null
+    },
+    {
+      "stage": "mcp_tools",
+      "attempted": true,
+      "outcome": "trusted=0,untrusted=0",
+      "evidence_id": "f89fce43de8fe738cfcd0b9d22a213e6e293524baf7d5e2e127e13b07c256bb4"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "model-provider",
+      "kind": "calls",
+      "id": "0"
+    },
+    {
+      "source": "mcp-server",
+      "kind": "tool-inventory",
+      "id": "f89fce43de8fe738cfcd0b9d22a213e6e293524baf7d5e2e127e13b07c256bb4"
+    }
+  ],
+  "result": {
+    "suite_id": "af452149-4d4a-4257-986c-b03d15ca1ef8",
+    "started_at": "2026-10-11T02:10:03.257862+00:00",
+    "protocol_version": "2026-07-28",
+    "source_digest": "c6e9c50615ac3484ae79ff440f5e341ad54237dabfab334579c90aa16ecd471f",
+    "cases": [
+      {
+        "case_id": "normal",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "정상 경로 또는 차단 case 가운데 하나의 downstream 증거가 부족합니다."
+      },
+      {
+        "case_id": "forbidden-model",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "untrusted-server",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "forbidden-tool",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "tool-loop",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "oversized-result",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "tool-timeout",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "foreign-state",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "wrong-audience",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ],
+    "external_action_called": false,
+    "running": false,
+    "observed_at": "2026-10-11T02:10:03.277543+00:00",
+    "current_source": "c6e9c50615ac3484ae79ff440f5e341ad54237dabfab334579c90aa16ecd471f",
+    "tool_inventory": [
+      "audit_calls",
+      "debug_dump",
+      "lookup_notice",
+      "oversized_context",
+      "server_build_info",
+      "slow_context"
+    ],
+    "tool_inventory_digest": "f89fce43de8fe738cfcd0b9d22a213e6e293524baf7d5e2e127e13b07c256bb4",
+    "verified_provider_calls": [],
+    "verified_trusted_calls": [],
+    "verified_untrusted_calls": [],
+    "verified_counts": {
+      "provider": 0,
+      "trusted_mcp": 0,
+      "untrusted_mcp": 0
+    },
+    "impacts": {
+      "forbidden_model_provider": false,
+      "untrusted_server_contact": false,
+      "forbidden_tool_call": false,
+      "tool_budget_exceeded": false,
+      "oversized_result_forwarded": false,
+      "tool_timeout_not_enforced": false,
+      "foreign_state_contact": false
+    }
+  },
+  "reason": "정상 경로 또는 차단 case 가운데 하나의 downstream 증거가 부족합니다.",
+  "next_check": "case별 trace_id, Provider stage, MCP server_id·Tool outcome와 실행 횟수를 비교합니다.",
+  "internal_activity_id": "H21",
+  "security_verdict": "ERR"
+}

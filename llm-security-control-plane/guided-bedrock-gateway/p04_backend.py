@@ -14,12 +14,15 @@ class ProviderError(RuntimeError):
 class BedrockBackend:
     provider_mode = "aws"
 
-    def __init__(self, body, guardrail, *, region="us-east-1", client_factory=None):
+    def __init__(self, body, guardrail, *, region="us-east-1", client_factory=None, preview_tokens=None):
         if region != "us-east-1":
             raise ValueError("P04 uses the configured course region")
         self.body, self.guardrail = json.loads(canonical(body)), json.loads(canonical(guardrail))
         # Invalid-input cases must stop in the learner; they cannot create a provider.
         expected_arguments(self.body, self.guardrail)
+        self.preview_tokens = preview_tokens
+        if preview_tokens not in (None, 2048):
+            raise ValueError("invalid preview output budget")
         self.region = region
         self.client_factory = client_factory or boto3.client
 
@@ -32,6 +35,8 @@ class BedrockBackend:
             )
             try:
                 method = {"apply_guardrail": client.apply_guardrail, "converse": client.converse}[operation]
+                if operation == "converse" and self.preview_tokens is not None:
+                    arguments["inferenceConfig"]["maxTokens"] = self.preview_tokens
                 response = method(**arguments)
             finally:
                 client.close()

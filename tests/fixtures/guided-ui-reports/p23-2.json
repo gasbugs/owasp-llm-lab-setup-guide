@@ -1,0 +1,53 @@
+{
+  "activity_id": "P23",
+  "execution_id": "53a805a2-561f-4a3b-8289-efda815cdded",
+  "source_digest": "f696bd46531f7dedc0ba83afe207f9c2847e9c506397e0cab03be3234483b29e",
+  "verified_by": "guided-evidence-verifier",
+  "course_verdict": "ERR",
+  "security_verdict": "ERR",
+  "task_completed": false,
+  "result": {
+    "model_id": "us.amazon.nova-lite-v1:0",
+    "provider_request_id": null,
+    "usage": null,
+    "requested_max_output_tokens": 64,
+    "forwarded_parameters": {
+      "maxTokens": 64
+    },
+    "cases": [
+      {
+        "case_id": "normal",
+        "case_verified": false,
+        "status": "ERR",
+        "response": null,
+        "error": {
+          "type": "NotImplementedError",
+          "message": "Implement forward_question"
+        },
+        "provider_attempts": 0
+      },
+      {
+        "case_id": "blank",
+        "case_verified": false,
+        "status": "ERR",
+        "response": null,
+        "error": {
+          "type": "NotImplementedError",
+          "message": "Implement forward_question"
+        },
+        "provider_attempts": 0
+      },
+      {
+        "case_id": "provider-error",
+        "case_verified": false,
+        "status": "ERR",
+        "response": null,
+        "error": {
+          "type": "NotImplementedError",
+          "message": "Implement forward_question"
+        },
+        "provider_attempts": 0
+      }
+    ]
+  }
+}

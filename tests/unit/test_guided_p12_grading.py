@@ -24,7 +24,9 @@ class GradingTests(unittest.TestCase):
     @asynccontextmanager
     async def snapshot(self, *args, **kwargs):
         self.assertEqual(kwargs["case_ids"], [spec["input"]["case_id"] for spec in self.specs])
-        yield {"binding": {"source_digest": "a" * 64}, "receipt": {"cases": [spec["input"] for spec in self.specs]}}
+        ids = [spec["input"]["case_id"] for spec in self.specs]
+        count = len(ids) if kwargs.get("through_case") is None else ids.index(kwargs["through_case"])+1
+        yield {"binding": {"source_digest": "a" * 64}, "receipt": {"cases": [spec["input"] for spec in self.specs[:count]]}}
         self.exited = True
         if self.mode == "root-changed":
             raise grading.EvidenceError("private-credential-fixture")
@@ -43,10 +45,20 @@ class GradingTests(unittest.TestCase):
                 "ledgers": {"privacy": {"calls": [{"stage": "input_privacy", "evidence": {"entity_counts": entities}}]},
                             "gateway": {"grants": [{"state": "completed", "evidence": {"provider_request_id": identifier}}]}}}
 
-    def grade(self):
+    def grade(self, **kwargs):
         with patch.object(grading, "verified_run_snapshot", self.snapshot), patch.object(grading, "verify_case_from_services", self.case):
             return asyncio.run(grading.grade_run("http://runner", "fixture", {}, {}, suite_id="fixture",
-                specifications=self.specs, documents=[], scaffold_files={}))
+                specifications=self.specs, documents=[], scaffold_files={}, **kwargs))
+
+    def test_verified_prefix_is_not_whole_completion(self):
+        result = self.grade(through_case="case-1")
+        self.assertEqual(result["security_verdict"], "PASS")
+        self.assertTrue(result["case_verified"])
+        self.assertFalse(result["task_completed"])
+        self.assertEqual(len(self.calls),2)
+        self.assertTrue(self.exited)
+        self.mode,self.calls="privacy-mismatch",[]
+        self.assertEqual(self.grade(through_case="case-1")["security_verdict"],"ERR")
 
     def test_completion_requires_every_case_and_successful_final_requery(self):
         result = self.grade()

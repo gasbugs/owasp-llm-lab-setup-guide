@@ -1,0 +1,82 @@
+{
+  "activity_id": "P23",
+  "execution_id": "9826a1e4-3a29-4a0e-a8b9-a7fe8968f746",
+  "source_digest": "8145a173641fbac9894768083a7e312fa15c474df411da81ae03805258fdd359",
+  "verified_by": "guided-evidence-verifier",
+  "course_verdict": "PASS",
+  "security_verdict": "PASS",
+  "task_completed": true,
+  "result": {
+    "model_id": "us.amazon.nova-lite-v1:0",
+    "provider_request_id": "7245733a-2b6d-42c5-9507-9f7ea4d14da5",
+    "usage": {
+      "inputTokens": 35,
+      "outputTokens": 55,
+      "totalTokens": 90
+    },
+    "cases": [
+      {
+        "case_id": "normal",
+        "case_verified": true,
+        "status": "PASS",
+        "response": {
+          "ResponseMetadata": {
+            "RequestId": "7245733a-2b6d-42c5-9507-9f7ea4d14da5",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {
+              "date": "Fri, 09 Oct 2026 23:52:59 GMT",
+              "content-type": "application/json",
+              "content-length": "323",
+              "connection": "keep-alive",
+              "x-amzn-requestid": "7245733a-2b6d-42c5-9507-9f7ea4d14da5"
+            },
+            "RetryAttempts": 0
+          },
+          "output": {
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "text": "계정 보안을 강화하고 악의적인 접근을 방지하기 위해 비밀번호를 정기적으로 변경합니다."
+                }
+              ]
+            }
+          },
+          "stopReason": "end_turn",
+          "usage": {
+            "inputTokens": 35,
+            "outputTokens": 55,
+            "totalTokens": 90
+          },
+          "metrics": {
+            "latencyMs": 509
+          }
+        },
+        "error": null,
+        "provider_attempts": 1
+      },
+      {
+        "case_id": "blank",
+        "case_verified": true,
+        "status": "PASS",
+        "response": null,
+        "error": {
+          "type": "ValueError",
+          "message": "message required"
+        },
+        "provider_attempts": 0
+      },
+      {
+        "case_id": "provider-error",
+        "case_verified": true,
+        "status": "PASS",
+        "response": null,
+        "error": {
+          "type": "RuntimeError",
+          "message": "model unavailable"
+        },
+        "provider_attempts": 0
+      }
+    ]
+  }
+}

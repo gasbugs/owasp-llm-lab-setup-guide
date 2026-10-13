@@ -18,7 +18,7 @@ class LifecycleError(RuntimeError):
 
 
 class Workflow:
-    def __init__(self, origin, control_token, *, transport=None, worker=execute):
+    def __init__(self, origin, control_token, *, transport=None, worker=execute, native_sdk=False):
         parsed = urlsplit(origin)
         if (parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password
                 or parsed.query or parsed.fragment or parsed.path not in {"", "/"}):
@@ -27,6 +27,7 @@ class Workflow:
             raise ValueError("invalid lifecycle credential")
         self.origin, self.control_token = origin.rstrip("/"), control_token
         self.transport, self.worker = transport, worker
+        self.native_sdk = native_sdk
 
     def _post(self, path, body):
         try:
@@ -80,10 +81,19 @@ class Workflow:
             result["started_at"] = stamp
             configuration = {"suite_id": suite_id, "execution_id": execution_id,
                              "origin": self.origin, "capability": capability}
+            if self.native_sdk:
+                configuration["native_sdk"] = True
             execution = self.worker(source_path, body, configuration, timeout=timeout)
             result["execution"] = execution
             if execution.get("source_digest") != source_digest:
                 raise ValueError("source changed during execution")
+            if self.native_sdk and execution.get("provider_mode") != "contract":
+                for call in execution.get("calls") or []:
+                    if call.get("native_sdk") is not True:
+                        raise ValueError("native SDK trace required")
+                    self._post("/native-record", {"suite_id": suite_id, "execution_id": execution_id,
+                        "capability": capability, "operation": call["operation"],
+                        "request_digest": call["request_digest"], "response": call.get("response")})
             result["lifecycle_status"] = "finished"
         except Exception:
             result["lifecycle_status"] = "error"

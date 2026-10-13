@@ -19,7 +19,7 @@ INPUTS = helper('p19_inputs.py', 'guided-labs/h19-incident-investigation/analysi
 require = RESULTS.require
 
 
-def verify(receipt, ledger, build, observed, *, suite_id, started_at, runner_digests):
+def verify(receipt, ledger, build, observed, *, suite_id, started_at, runner_digests, through_case=None):
     require(receipt.get('activity_id') == 'P19' and receipt.get('internal_activity_id') == 'H19'
             and receipt.get('contract_version') == 2, 'P19 contract mismatch')
     for record in (receipt, ledger):
@@ -57,7 +57,11 @@ def verify(receipt, ledger, build, observed, *, suite_id, started_at, runner_dig
     require([row['downstream_count'] for row in analyses] == [1, 0, 0], 'denied request reached downstream')
     expected = INPUTS.build_inputs(bundle, [case['request_id'] for case in cases])
     executions = receipt.get('analysis_executions', [])
-    require(len(executions) == len(expected), 'analysis suite incomplete')
+    if through_case is not None:
+        names=[case['case_id'] for case in expected]
+        require(through_case in names,'unknown analysis case')
+        expected=expected[:names.index(through_case)+1]
+    require(len(executions)==len(expected),'analysis suite incomplete')
     checked = []
     for actual, case in zip(executions, expected):
         require(all(actual.get(key) == case[key] for key in ('case_id', 'request_id', 'input_digest'))
@@ -65,7 +69,7 @@ def verify(receipt, ledger, build, observed, *, suite_id, started_at, runner_dig
         require(actual.get('source_digest') == source, 'analysis used another learner source')
         result = RESULTS.check_analysis(case['bundle'], case['request_id'], actual,
                                         expected_invalid=case['expected_invalid'])
-        checked.append({'case_id': case['case_id'], **result})
+        checked.append({'case_id': case['case_id'], 'input': {'request_id': case['request_id'], 'bundle': case['bundle']}, **result})
     return {'activity_id': 'P19', 'internal_activity_id': 'H19', 'contract_version': 2,
-            'task_completed': True, 'security_verdict': 'PASS', 'analyses': analyses,
+            'task_completed': through_case is None, 'case_verified':True, 'security_verdict': 'PASS', 'analyses': analyses,
             'checks': checked, 'source_digest': source}

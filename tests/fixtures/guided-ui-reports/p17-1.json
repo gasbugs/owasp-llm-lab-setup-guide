@@ -1,0 +1,1521 @@
+{
+  "lab_id": "10-policy-promotion",
+  "activity_id": "P17",
+  "execution_id": "bce6e4b1-c148-4905-aca1-c58f39d3b6ea",
+  "execution_kind": "h17-native-suite",
+  "started_at": "2026-10-11T02:27:05.686232+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:27:17.348933+00:00",
+  "stage_calls": [
+    {
+      "stage": "telemetry_export",
+      "attempted": true,
+      "outcome": "allow",
+      "evidence_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f"
+    },
+    {
+      "stage": "telemetry_export",
+      "attempted": true,
+      "outcome": "block",
+      "evidence_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b"
+    },
+    {
+      "stage": "telemetry_export",
+      "attempted": true,
+      "outcome": "block",
+      "evidence_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "tempo",
+      "kind": "trace",
+      "id": "8a2647ac833d6918515ed68462e70648"
+    },
+    {
+      "source": "tempo",
+      "kind": "trace",
+      "id": "901dea2b6a02976b76c2421c5a70b11b"
+    },
+    {
+      "source": "tempo",
+      "kind": "trace",
+      "id": "720f2ec1673943a3b60b75c9b17b132e"
+    }
+  ],
+  "result": {
+    "source_digest": "a094e37998484538d298bd0d43a5887a3a3ac5199203be3c9106b31e50f1bc48",
+    "cases": [
+      {
+        "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+        "trace_id": "8a2647ac833d6918515ed68462e70648",
+        "decision": "allow",
+        "stop_stage": null,
+        "downstream_count": 1,
+        "stages": [
+          "authenticate",
+          "authorize",
+          "notice_lookup"
+        ],
+        "case_id": "normal-lookup",
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+        "trace_id": "901dea2b6a02976b76c2421c5a70b11b",
+        "decision": "block",
+        "stop_stage": "authorize",
+        "downstream_count": 0,
+        "stages": [
+          "authenticate",
+          "authorize"
+        ],
+        "case_id": "unauthorized-publish",
+        "status": "PASS",
+        "case_verified": true
+      },
+      {
+        "request_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8",
+        "trace_id": "720f2ec1673943a3b60b75c9b17b132e",
+        "decision": "block",
+        "stop_stage": "authenticate",
+        "downstream_count": 0,
+        "stages": [
+          "authenticate"
+        ],
+        "case_id": "anonymous-lookup",
+        "status": "PASS",
+        "case_verified": true
+      }
+    ],
+    "children": [
+      {
+        "suite_id": "03513146-28b1-4288-935f-7578326dc9b7",
+        "started_at": "2026-10-11T02:27:05.692441+00:00"
+      },
+      {
+        "suite_id": "18cadc93-891a-42f0-844c-3015609485cc",
+        "started_at": "2026-10-11T02:27:09.296124+00:00"
+      },
+      {
+        "suite_id": "9433aae8-9448-40c4-878f-9de88f8a552c",
+        "started_at": "2026-10-11T02:27:13.293595+00:00"
+      }
+    ],
+    "counter_delta": {
+      "allow": 1.0,
+      "block": 2.0
+    },
+    "observations": [
+      {
+        "execution": {
+          "source_digest": "a094e37998484538d298bd0d43a5887a3a3ac5199203be3c9106b31e50f1bc48",
+          "cases": [
+            {
+              "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+              "principal": "reader",
+              "action": "notice_lookup",
+              "started_ns": 1791685627723878812,
+              "returned": {
+                "decision": "allow",
+                "stop_stage": null,
+                "downstream_count": 1,
+                "result": {
+                  "notice_id": "p17-training-notice",
+                  "text": "P17 교육용 공지입니다."
+                }
+              },
+              "execution_status": "returned",
+              "finished_ns": 1791685627724903482,
+              "ledger": {
+                "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+                "invocations": 1,
+                "stages": [
+                  {
+                    "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+                    "stage": "authenticate",
+                    "sequence": 1,
+                    "trace_id": "8a2647ac833d6918515ed68462e70648",
+                    "span_id": "d256c9c5a5acf3c4"
+                  },
+                  {
+                    "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+                    "stage": "authorize",
+                    "sequence": 2,
+                    "trace_id": "8a2647ac833d6918515ed68462e70648",
+                    "span_id": "62cc1f514f6ab5b1"
+                  },
+                  {
+                    "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+                    "stage": "notice_lookup",
+                    "sequence": 3,
+                    "trace_id": "8a2647ac833d6918515ed68462e70648",
+                    "span_id": "771defe254b79c1d"
+                  }
+                ],
+                "downstream_calls": [
+                  {
+                    "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+                    "stage": "notice_lookup",
+                    "sequence": 3,
+                    "trace_id": "8a2647ac833d6918515ed68462e70648",
+                    "span_id": "771defe254b79c1d",
+                    "result": {
+                      "notice_id": "p17-training-notice",
+                      "text": "P17 교육용 공지입니다."
+                    }
+                  }
+                ],
+                "closures": [
+                  {
+                    "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+                    "closed": true,
+                    "decision": "allow",
+                    "stop_stage": null,
+                    "downstream_count": 1,
+                    "result": {
+                      "notice_id": "p17-training-notice",
+                      "text": "P17 교육용 공지입니다."
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "closed": true,
+          "export_flushed": true,
+          "metrics": "# HELP guided_p17_decisions_total P17 business decisions\n# TYPE guided_p17_decisions_total counter\nguided_p17_decisions_total{decision=\"allow\"} 2.0\nguided_p17_decisions_total{decision=\"block\"} 2.0\n# HELP guided_p17_decisions_created P17 business decisions\n# TYPE guided_p17_decisions_created gauge\nguided_p17_decisions_created{decision=\"allow\"} 1.7916856277226253e+09\nguided_p17_decisions_created{decision=\"block\"} 1.7916856277226486e+09\n",
+          "counter_values": {
+            "allow": 2.0,
+            "block": 2.0
+          }
+        },
+        "execution_error": null,
+        "prometheus_before": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685627.262,
+                  "1"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685627.262,
+                  "2"
+                ]
+              }
+            ]
+          }
+        },
+        "prometheus_after": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685629.163,
+                  "2"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685629.163,
+                  "2"
+                ]
+              }
+            ]
+          }
+        },
+        "source_digest": "a094e37998484538d298bd0d43a5887a3a3ac5199203be3c9106b31e50f1bc48",
+        "cases": [
+          {
+            "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+            "trace_id": "8a2647ac833d6918515ed68462e70648",
+            "decision": "allow",
+            "stop_stage": null,
+            "downstream_count": 1,
+            "stages": [
+              "authenticate",
+              "authorize",
+              "notice_lookup"
+            ]
+          }
+        ],
+        "products": [
+          {
+            "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+            "loki": {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "stream": {
+                      "code_file_path": "/app/instrumentation.py",
+                      "code_function_name": "observe_request",
+                      "code_line_number": "24",
+                      "decision": "allow",
+                      "detected_level": "INFO",
+                      "flags": "1",
+                      "observed_timestamp": "1791685627724733715",
+                      "request_id": "bbfe0f06-971e-443e-a404-2da6da7bf84f",
+                      "scope_name": "p17-decisions",
+                      "service_name": "guided-h17-telemetry",
+                      "severity_number": "9",
+                      "severity_text": "INFO",
+                      "span_id": "9800668f47713953",
+                      "telemetry_sdk_language": "python",
+                      "telemetry_sdk_name": "opentelemetry",
+                      "telemetry_sdk_version": "1.37.0",
+                      "trace_id": "8a2647ac833d6918515ed68462e70648"
+                    },
+                    "values": [
+                      [
+                        "1791685627724510208",
+                        "{\"request_id\": \"bbfe0f06-971e-443e-a404-2da6da7bf84f\", \"trace_id\": \"8a2647ac833d6918515ed68462e70648\", \"decision\": \"allow\", \"stop_stage\": null}"
+                      ]
+                    ]
+                  }
+                ],
+                "stats": {
+                  "summary": {
+                    "bytesProcessedPerSecond": 33986,
+                    "linesProcessedPerSecond": 125,
+                    "totalBytesProcessed": 271,
+                    "totalLinesProcessed": 1,
+                    "execTime": 0.007974,
+                    "queueTime": 0.000602,
+                    "subqueries": 0,
+                    "totalEntriesReturned": 1,
+                    "splits": 0,
+                    "shards": 1,
+                    "totalPostFilterLines": 1,
+                    "totalStructuredMetadataBytesProcessed": 128
+                  },
+                  "querier": {
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": false,
+                      "chunk": {
+                        "headChunkBytes": 0,
+                        "headChunkLines": 0,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 0,
+                        "headChunkStructuredMetadataBytes": 0,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 0,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "ingester": {
+                    "totalReached": 1,
+                    "totalChunksMatched": 1,
+                    "totalBatches": 2,
+                    "totalLinesSent": 1,
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": true,
+                      "chunk": {
+                        "headChunkBytes": 271,
+                        "headChunkLines": 1,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 1,
+                        "headChunkStructuredMetadataBytes": 128,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 171418,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "cache": {
+                    "chunk": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "index": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "result": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "statsResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "volumeResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "seriesResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "labelResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "instantMetricResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    }
+                  },
+                  "index": {
+                    "totalChunks": 0,
+                    "postFilterChunks": 0,
+                    "shardsDuration": 0,
+                    "usedBloomFilters": false
+                  }
+                }
+              }
+            },
+            "tempo": {
+              "batches": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                          "stringValue": "python"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                          "stringValue": "opentelemetry"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                          "stringValue": "1.37.0"
+                        }
+                      },
+                      {
+                        "key": "service.name",
+                        "value": {
+                          "stringValue": "guided-h17-telemetry"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeSpans": [
+                    {
+                      "scope": {
+                        "name": "p17"
+                      },
+                      "spans": [
+                        {
+                          "traceId": "iiZHrIM9aRhRXtaEYucGSA==",
+                          "spanId": "0lbJxaWs88Q=",
+                          "parentSpanId": "mABmj0dxOVM=",
+                          "name": "authenticate",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685627724177782",
+                          "endTimeUnixNano": "1791685627724201975",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "bbfe0f06-971e-443e-a404-2da6da7bf84f"
+                              }
+                            },
+                            {
+                              "key": "sequence",
+                              "value": {
+                                "intValue": "1"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "iiZHrIM9aRhRXtaEYucGSA==",
+                          "spanId": "YswfUU9qtbE=",
+                          "parentSpanId": "mABmj0dxOVM=",
+                          "name": "authorize",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685627724270259",
+                          "endTimeUnixNano": "1791685627724288295",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "bbfe0f06-971e-443e-a404-2da6da7bf84f"
+                              }
+                            },
+                            {
+                              "key": "sequence",
+                              "value": {
+                                "intValue": "2"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "iiZHrIM9aRhRXtaEYucGSA==",
+                          "spanId": "dx3v4lS3nB0=",
+                          "parentSpanId": "mABmj0dxOVM=",
+                          "name": "notice_lookup",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685627724334635",
+                          "endTimeUnixNano": "1791685627724370060",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "bbfe0f06-971e-443e-a404-2da6da7bf84f"
+                              }
+                            },
+                            {
+                              "key": "sequence",
+                              "value": {
+                                "intValue": "3"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "iiZHrIM9aRhRXtaEYucGSA==",
+                          "spanId": "mABmj0dxOVM=",
+                          "name": "security.request",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685627724059458",
+                          "endTimeUnixNano": "1791685627724887248",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "bbfe0f06-971e-443e-a404-2da6da7bf84f"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "allow"
+                              }
+                            },
+                            {
+                              "key": "stop_stage",
+                              "value": {
+                                "stringValue": ""
+                              }
+                            },
+                            {
+                              "key": "stage_count",
+                              "value": {
+                                "intValue": "3"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "counter_delta": {
+          "allow": 1.0,
+          "block": 0.0
+        }
+      },
+      {
+        "execution": {
+          "source_digest": "a094e37998484538d298bd0d43a5887a3a3ac5199203be3c9106b31e50f1bc48",
+          "cases": [
+            {
+              "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+              "principal": "reader",
+              "action": "notice_publish",
+              "started_ns": 1791685631563087813,
+              "returned": {
+                "decision": "block",
+                "stop_stage": "authorize",
+                "downstream_count": 0,
+                "result": null
+              },
+              "execution_status": "returned",
+              "finished_ns": 1791685631564083726,
+              "ledger": {
+                "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+                "invocations": 1,
+                "stages": [
+                  {
+                    "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+                    "stage": "authenticate",
+                    "sequence": 1,
+                    "trace_id": "901dea2b6a02976b76c2421c5a70b11b",
+                    "span_id": "0cd1aee73f6e429d"
+                  },
+                  {
+                    "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+                    "stage": "authorize",
+                    "sequence": 2,
+                    "trace_id": "901dea2b6a02976b76c2421c5a70b11b",
+                    "span_id": "a18104c5c4c00fba"
+                  }
+                ],
+                "downstream_calls": [],
+                "closures": [
+                  {
+                    "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+                    "closed": true,
+                    "decision": "block",
+                    "stop_stage": "authorize",
+                    "downstream_count": 0,
+                    "result": null
+                  }
+                ]
+              }
+            }
+          ],
+          "closed": true,
+          "export_flushed": true,
+          "metrics": "# HELP guided_p17_decisions_total P17 business decisions\n# TYPE guided_p17_decisions_total counter\nguided_p17_decisions_total{decision=\"allow\"} 2.0\nguided_p17_decisions_total{decision=\"block\"} 3.0\n# HELP guided_p17_decisions_created P17 business decisions\n# TYPE guided_p17_decisions_created gauge\nguided_p17_decisions_created{decision=\"allow\"} 1.7916856315621443e+09\nguided_p17_decisions_created{decision=\"block\"} 1.7916856315622408e+09\n",
+          "counter_values": {
+            "allow": 2.0,
+            "block": 3.0
+          }
+        },
+        "execution_error": null,
+        "prometheus_before": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685631.099,
+                  "2"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685631.099,
+                  "2"
+                ]
+              }
+            ]
+          }
+        },
+        "prometheus_after": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685633.218,
+                  "2"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685633.218,
+                  "3"
+                ]
+              }
+            ]
+          }
+        },
+        "source_digest": "a094e37998484538d298bd0d43a5887a3a3ac5199203be3c9106b31e50f1bc48",
+        "cases": [
+          {
+            "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+            "trace_id": "901dea2b6a02976b76c2421c5a70b11b",
+            "decision": "block",
+            "stop_stage": "authorize",
+            "downstream_count": 0,
+            "stages": [
+              "authenticate",
+              "authorize"
+            ]
+          }
+        ],
+        "products": [
+          {
+            "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+            "loki": {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "stream": {
+                      "code_file_path": "/app/instrumentation.py",
+                      "code_function_name": "observe_request",
+                      "code_line_number": "24",
+                      "decision": "block",
+                      "detected_level": "INFO",
+                      "flags": "1",
+                      "observed_timestamp": "1791685631563965422",
+                      "request_id": "2ef78296-bc26-4a0b-a1f5-5d766965a37b",
+                      "scope_name": "p17-decisions",
+                      "service_name": "guided-h17-telemetry",
+                      "severity_number": "9",
+                      "severity_text": "INFO",
+                      "span_id": "8660af949e340b33",
+                      "stop_stage": "authorize",
+                      "telemetry_sdk_language": "python",
+                      "telemetry_sdk_name": "opentelemetry",
+                      "telemetry_sdk_version": "1.37.0",
+                      "trace_id": "901dea2b6a02976b76c2421c5a70b11b"
+                    },
+                    "values": [
+                      [
+                        "1791685631563876608",
+                        "{\"request_id\": \"2ef78296-bc26-4a0b-a1f5-5d766965a37b\", \"trace_id\": \"901dea2b6a02976b76c2421c5a70b11b\", \"decision\": \"block\", \"stop_stage\": \"authorize\"}"
+                      ]
+                    ]
+                  }
+                ],
+                "stats": {
+                  "summary": {
+                    "bytesProcessedPerSecond": 47479,
+                    "linesProcessedPerSecond": 170,
+                    "totalBytesProcessed": 278,
+                    "totalLinesProcessed": 1,
+                    "execTime": 0.005855,
+                    "queueTime": 0.000479,
+                    "subqueries": 0,
+                    "totalEntriesReturned": 1,
+                    "splits": 0,
+                    "shards": 1,
+                    "totalPostFilterLines": 1,
+                    "totalStructuredMetadataBytesProcessed": 128
+                  },
+                  "querier": {
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": false,
+                      "chunk": {
+                        "headChunkBytes": 0,
+                        "headChunkLines": 0,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 0,
+                        "headChunkStructuredMetadataBytes": 0,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 0,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "ingester": {
+                    "totalReached": 1,
+                    "totalChunksMatched": 1,
+                    "totalBatches": 2,
+                    "totalLinesSent": 1,
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": true,
+                      "chunk": {
+                        "headChunkBytes": 278,
+                        "headChunkLines": 1,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 1,
+                        "headChunkStructuredMetadataBytes": 128,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 139216,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "cache": {
+                    "chunk": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "index": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "result": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "statsResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "volumeResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "seriesResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "labelResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "instantMetricResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    }
+                  },
+                  "index": {
+                    "totalChunks": 0,
+                    "postFilterChunks": 0,
+                    "shardsDuration": 0,
+                    "usedBloomFilters": false
+                  }
+                }
+              }
+            },
+            "tempo": {
+              "batches": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                          "stringValue": "python"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                          "stringValue": "opentelemetry"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                          "stringValue": "1.37.0"
+                        }
+                      },
+                      {
+                        "key": "service.name",
+                        "value": {
+                          "stringValue": "guided-h17-telemetry"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeSpans": [
+                    {
+                      "scope": {
+                        "name": "p17"
+                      },
+                      "spans": [
+                        {
+                          "traceId": "kB3qK2oCl2t2wkIcWnCxGw==",
+                          "spanId": "DNGu5z9uQp0=",
+                          "parentSpanId": "hmCvlJ40CzM=",
+                          "name": "authenticate",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685631563623872",
+                          "endTimeUnixNano": "1791685631563652697",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "2ef78296-bc26-4a0b-a1f5-5d766965a37b"
+                              }
+                            },
+                            {
+                              "key": "sequence",
+                              "value": {
+                                "intValue": "1"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "kB3qK2oCl2t2wkIcWnCxGw==",
+                          "spanId": "oYEExcTAD7o=",
+                          "parentSpanId": "hmCvlJ40CzM=",
+                          "name": "authorize",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685631563728195",
+                          "endTimeUnixNano": "1791685631563747225",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "2ef78296-bc26-4a0b-a1f5-5d766965a37b"
+                              }
+                            },
+                            {
+                              "key": "sequence",
+                              "value": {
+                                "intValue": "2"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "kB3qK2oCl2t2wkIcWnCxGw==",
+                          "spanId": "hmCvlJ40CzM=",
+                          "name": "security.request",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685631563437130",
+                          "endTimeUnixNano": "1791685631564070755",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "2ef78296-bc26-4a0b-a1f5-5d766965a37b"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "block"
+                              }
+                            },
+                            {
+                              "key": "stop_stage",
+                              "value": {
+                                "stringValue": "authorize"
+                              }
+                            },
+                            {
+                              "key": "stage_count",
+                              "value": {
+                                "intValue": "2"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "counter_delta": {
+          "allow": 0.0,
+          "block": 1.0
+        }
+      },
+      {
+        "execution": {
+          "source_digest": "a094e37998484538d298bd0d43a5887a3a3ac5199203be3c9106b31e50f1bc48",
+          "cases": [
+            {
+              "request_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8",
+              "principal": "anonymous",
+              "action": "notice_lookup",
+              "started_ns": 1791685635680058737,
+              "returned": {
+                "decision": "block",
+                "stop_stage": "authenticate",
+                "downstream_count": 0,
+                "result": null
+              },
+              "execution_status": "returned",
+              "finished_ns": 1791685635680690605,
+              "ledger": {
+                "request_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8",
+                "invocations": 1,
+                "stages": [
+                  {
+                    "request_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8",
+                    "stage": "authenticate",
+                    "sequence": 1,
+                    "trace_id": "720f2ec1673943a3b60b75c9b17b132e",
+                    "span_id": "7f31d33afcef48a5"
+                  }
+                ],
+                "downstream_calls": [],
+                "closures": [
+                  {
+                    "request_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8",
+                    "closed": true,
+                    "decision": "block",
+                    "stop_stage": "authenticate",
+                    "downstream_count": 0,
+                    "result": null
+                  }
+                ]
+              }
+            }
+          ],
+          "closed": true,
+          "export_flushed": true,
+          "metrics": "# HELP guided_p17_decisions_total P17 business decisions\n# TYPE guided_p17_decisions_total counter\nguided_p17_decisions_total{decision=\"allow\"} 2.0\nguided_p17_decisions_total{decision=\"block\"} 4.0\n# HELP guided_p17_decisions_created P17 business decisions\n# TYPE guided_p17_decisions_created gauge\nguided_p17_decisions_created{decision=\"allow\"} 1.7916856356792939e+09\nguided_p17_decisions_created{decision=\"block\"} 1.791685635679313e+09\n",
+          "counter_values": {
+            "allow": 2.0,
+            "block": 4.0
+          }
+        },
+        "execution_error": null,
+        "prometheus_before": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685635.081,
+                  "2"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685635.081,
+                  "3"
+                ]
+              }
+            ]
+          }
+        },
+        "prometheus_after": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685637.102,
+                  "2"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p17_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h17-telemetry:8000",
+                  "job": "guided-h17-telemetry"
+                },
+                "value": [
+                  1791685637.102,
+                  "4"
+                ]
+              }
+            ]
+          }
+        },
+        "source_digest": "a094e37998484538d298bd0d43a5887a3a3ac5199203be3c9106b31e50f1bc48",
+        "cases": [
+          {
+            "request_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8",
+            "trace_id": "720f2ec1673943a3b60b75c9b17b132e",
+            "decision": "block",
+            "stop_stage": "authenticate",
+            "downstream_count": 0,
+            "stages": [
+              "authenticate"
+            ]
+          }
+        ],
+        "products": [
+          {
+            "request_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8",
+            "loki": {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "stream": {
+                      "code_file_path": "/app/instrumentation.py",
+                      "code_function_name": "observe_request",
+                      "code_line_number": "24",
+                      "decision": "block",
+                      "detected_level": "INFO",
+                      "flags": "1",
+                      "observed_timestamp": "1791685635680576149",
+                      "request_id": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8",
+                      "scope_name": "p17-decisions",
+                      "service_name": "guided-h17-telemetry",
+                      "severity_number": "9",
+                      "severity_text": "INFO",
+                      "span_id": "c348e47692c8ab1e",
+                      "stop_stage": "authenticate",
+                      "telemetry_sdk_language": "python",
+                      "telemetry_sdk_name": "opentelemetry",
+                      "telemetry_sdk_version": "1.37.0",
+                      "trace_id": "720f2ec1673943a3b60b75c9b17b132e"
+                    },
+                    "values": [
+                      [
+                        "1791685635680428800",
+                        "{\"request_id\": \"1e377980-fd41-42ef-b34b-c38dfdd8c4b8\", \"trace_id\": \"720f2ec1673943a3b60b75c9b17b132e\", \"decision\": \"block\", \"stop_stage\": \"authenticate\"}"
+                      ]
+                    ]
+                  }
+                ],
+                "stats": {
+                  "summary": {
+                    "bytesProcessedPerSecond": 56145,
+                    "linesProcessedPerSecond": 199,
+                    "totalBytesProcessed": 281,
+                    "totalLinesProcessed": 1,
+                    "execTime": 0.005005,
+                    "queueTime": 0.00066,
+                    "subqueries": 0,
+                    "totalEntriesReturned": 1,
+                    "splits": 0,
+                    "shards": 1,
+                    "totalPostFilterLines": 1,
+                    "totalStructuredMetadataBytesProcessed": 128
+                  },
+                  "querier": {
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": false,
+                      "chunk": {
+                        "headChunkBytes": 0,
+                        "headChunkLines": 0,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 0,
+                        "headChunkStructuredMetadataBytes": 0,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 0,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "ingester": {
+                    "totalReached": 1,
+                    "totalChunksMatched": 1,
+                    "totalBatches": 2,
+                    "totalLinesSent": 1,
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": true,
+                      "chunk": {
+                        "headChunkBytes": 281,
+                        "headChunkLines": 1,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 1,
+                        "headChunkStructuredMetadataBytes": 128,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 144146,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "cache": {
+                    "chunk": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "index": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "result": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "statsResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "volumeResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "seriesResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "labelResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "instantMetricResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    }
+                  },
+                  "index": {
+                    "totalChunks": 0,
+                    "postFilterChunks": 0,
+                    "shardsDuration": 0,
+                    "usedBloomFilters": false
+                  }
+                }
+              }
+            },
+            "tempo": {
+              "batches": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                          "stringValue": "python"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                          "stringValue": "opentelemetry"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                          "stringValue": "1.37.0"
+                        }
+                      },
+                      {
+                        "key": "service.name",
+                        "value": {
+                          "stringValue": "guided-h17-telemetry"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeSpans": [
+                    {
+                      "scope": {
+                        "name": "p17"
+                      },
+                      "spans": [
+                        {
+                          "traceId": "cg8uwWc5Q6O2C3XJsXsTLg==",
+                          "spanId": "fzHTOvzvSKU=",
+                          "parentSpanId": "w0jkdpLIqx4=",
+                          "flags": 256,
+                          "name": "authenticate",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685635680294158",
+                          "endTimeUnixNano": "1791685635680316782",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8"
+                              }
+                            },
+                            {
+                              "key": "sequence",
+                              "value": {
+                                "intValue": "1"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "cg8uwWc5Q6O2C3XJsXsTLg==",
+                          "spanId": "w0jkdpLIqx4=",
+                          "flags": 256,
+                          "name": "security.request",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791685635680193898",
+                          "endTimeUnixNano": "1791685635680674866",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "1e377980-fd41-42ef-b34b-c38dfdd8c4b8"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "block"
+                              }
+                            },
+                            {
+                              "key": "stop_stage",
+                              "value": {
+                                "stringValue": "authenticate"
+                              }
+                            },
+                            {
+                              "key": "stage_count",
+                              "value": {
+                                "intValue": "1"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "counter_delta": {
+          "allow": 0.0,
+          "block": 1.0
+        }
+      }
+    ]
+  },
+  "reason": "세 요청의 실제 Log·Trace·Counter를 각각 다시 확인했습니다.",
+  "next_check": "H17 learner source와 native artifact를 확인합니다.",
+  "task_completed": true,
+  "case_verified": true
+}

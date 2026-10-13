@@ -1,0 +1,414 @@
+{
+  "lab_id": "11-raw-observability",
+  "activity_id": "P18",
+  "execution_id": "871d5253-4269-43be-82ac-baef42d73f39",
+  "execution_kind": "h18-native-suite",
+  "started_at": "2026-10-11T02:06:51.473205+00:00",
+  "status": "completed",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:06:53.987804+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "result": {
+    "source_digest": "66e13275a654527ad5974560dab700876380b6f7393047bb6b18c8027679f397",
+    "runner_digests": {
+      "server.py": "6b1d473de4605b29102f065ec718c3075a7bc2bf9c0a09dd138b4565576bfa04",
+      "query_execution.py": "8b4c01eb1d0ffb0601707bc787fec92e1efc90395a22f5499dd2eb7c4c4efee8",
+      "request_workflow.py": "a1880b237b9aa6e591e8f183978d5ab8b7ab4d586c1397c063c42bf2ceda41b8"
+    },
+    "queries": {
+      "logql": "{service_name=\"guided-h18-queries\"} | request_id = \"{request_id}\"",
+      "promql": "sum by (decision) (guided_security_decisions_total{hands_on=\"H18\"}) * 0 + 1",
+      "trace_lookup": "exact_trace_id"
+    },
+    "cases": [
+      {
+        "case_id": "normal-query",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "정상·거부 Counter가 이번 실행에서 각각 1씩 늘어나지 않았습니다."
+      },
+      {
+        "case_id": "denied-query",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ],
+    "query_attempts": [
+      {
+        "request_id": "e839aaf3-1be1-447c-9b3e-c7ad0bcc7c26",
+        "trace_id": "bb4eeed9ce9dc113cc2b9793b6082463",
+        "products": {
+          "loki": {
+            "parameters": {
+              "query": "{service_name=\"guided-h18-queries\"} | request_id = \"e839aaf3-1be1-447c-9b3e-c7ad0bcc7c26\"",
+              "start": 1791684411821530072,
+              "end": 1791684413951390302,
+              "limit": 200
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "stream": {
+                      "code_file_path": "/app/request_workflow.py",
+                      "code_function_name": "handle_action",
+                      "code_line_number": "88",
+                      "decision": "allow",
+                      "detected_level": "INFO",
+                      "fixture": "notice-authorization",
+                      "flags": "1",
+                      "hands_on": "H18",
+                      "observed_timestamp": "1791684411822024763",
+                      "policy_rule": "notice-read-only",
+                      "request_id": "e839aaf3-1be1-447c-9b3e-c7ad0bcc7c26",
+                      "scope_name": "guided-security",
+                      "service_name": "guided-h18-queries",
+                      "severity_number": "9",
+                      "severity_text": "INFO",
+                      "span_id": "d79f1781eeab5604",
+                      "telemetry_sdk_language": "python",
+                      "telemetry_sdk_name": "opentelemetry",
+                      "telemetry_sdk_version": "1.37.0",
+                      "trace_id": "bb4eeed9ce9dc113cc2b9793b6082463"
+                    },
+                    "values": [
+                      [
+                        "1791684411821929472",
+                        "security_decision"
+                      ]
+                    ]
+                  }
+                ],
+                "stats": {
+                  "summary": {
+                    "bytesProcessedPerSecond": 63215,
+                    "linesProcessedPerSecond": 357,
+                    "totalBytesProcessed": 354,
+                    "totalLinesProcessed": 2,
+                    "execTime": 0.0056,
+                    "queueTime": 0.000142,
+                    "subqueries": 0,
+                    "totalEntriesReturned": 1,
+                    "splits": 0,
+                    "shards": 1,
+                    "totalPostFilterLines": 1,
+                    "totalStructuredMetadataBytesProcessed": 320
+                  },
+                  "querier": {
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": false,
+                      "chunk": {
+                        "headChunkBytes": 0,
+                        "headChunkLines": 0,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 0,
+                        "headChunkStructuredMetadataBytes": 0,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 0,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "ingester": {
+                    "totalReached": 1,
+                    "totalChunksMatched": 1,
+                    "totalBatches": 2,
+                    "totalLinesSent": 1,
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": true,
+                      "chunk": {
+                        "headChunkBytes": 354,
+                        "headChunkLines": 2,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 1,
+                        "headChunkStructuredMetadataBytes": 320,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 125772,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "cache": {
+                    "chunk": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "index": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "result": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "statsResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "volumeResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "seriesResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "labelResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "instantMetricResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    }
+                  },
+                  "index": {
+                    "totalChunks": 0,
+                    "postFilterChunks": 0,
+                    "shardsDuration": 0,
+                    "usedBloomFilters": false
+                  }
+                }
+              }
+            }
+          },
+          "tempo": {
+            "parameters": {},
+            "http_status": 200,
+            "response": {
+              "batches": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                          "stringValue": "python"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                          "stringValue": "opentelemetry"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                          "stringValue": "1.37.0"
+                        }
+                      },
+                      {
+                        "key": "service.name",
+                        "value": {
+                          "stringValue": "guided-h18-queries"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeSpans": [
+                    {
+                      "scope": {
+                        "name": "guided-course"
+                      },
+                      "spans": [
+                        {
+                          "traceId": "u07u2c6dwRPMK5eTtggkYw==",
+                          "spanId": "fpreof6X6Bc=",
+                          "parentSpanId": "158Xge6rVgQ=",
+                          "flags": 256,
+                          "name": "authorize",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684411821769218",
+                          "endTimeUnixNano": "1791684411821791292",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e839aaf3-1be1-447c-9b3e-c7ad0bcc7c26"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "allow"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "u07u2c6dwRPMK5eTtggkYw==",
+                          "spanId": "8uUkqw6HYX8=",
+                          "parentSpanId": "158Xge6rVgQ=",
+                          "flags": 256,
+                          "name": "notice_lookup",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684411821848406",
+                          "endTimeUnixNano": "1791684411821860912",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e839aaf3-1be1-447c-9b3e-c7ad0bcc7c26"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "u07u2c6dwRPMK5eTtggkYw==",
+                          "spanId": "158Xge6rVgQ=",
+                          "flags": 256,
+                          "name": "security.request",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684411821695420",
+                          "endTimeUnixNano": "1791684411822120822",
+                          "attributes": [
+                            {
+                              "key": "hands_on",
+                              "value": {
+                                "stringValue": "H18"
+                              }
+                            },
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e839aaf3-1be1-447c-9b3e-c7ad0bcc7c26"
+                              }
+                            },
+                            {
+                              "key": "fixture",
+                              "value": {
+                                "stringValue": "notice-authorization"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "allow"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "prometheus": {
+            "parameters": {
+              "query": "sum by (decision) (guided_security_decisions_total{hands_on=\"H18\"}) * 0 + 1",
+              "time": 1791684413.9513903
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "vector",
+                "result": [
+                  {
+                    "metric": {
+                      "decision": "allow"
+                    },
+                    "value": [
+                      1791684413.951,
+                      "1"
+                    ]
+                  },
+                  {
+                    "metric": {
+                      "decision": "block"
+                    },
+                    "value": [
+                      1791684413.951,
+                      "1"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    ],
+    "failed_requirement": "Counter must increase once for each decision"
+  },
+  "reason": "정상·거부 Counter가 이번 실행에서 각각 1씩 늘어나지 않았습니다.",
+  "next_check": "현재 실행의 정상·거부 요청에 대한 조회문과 원시 저장소 응답을 확인합니다.",
+  "internal_activity_id": "H18",
+  "contract_version": 2,
+  "task_completed": false,
+  "case_verified": false,
+  "security_verdict": "ERR"
+}

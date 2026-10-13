@@ -1,0 +1,1357 @@
+{
+  "lab_id": "12-incident-alert",
+  "activity_id": "P20",
+  "execution_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+  "execution_kind": "h20-native-suite",
+  "started_at": "2026-10-11T02:26:54.882392+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:27:24.273402+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "result": {
+    "product_contract_verified": true,
+    "receipt": {
+      "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+      "started_at": "2026-10-11T02:26:54.882392+00:00",
+      "phase": "recovery",
+      "activity_id": "P20",
+      "internal_activity_id": "H20",
+      "execution_status": "complete",
+      "execution_error": null,
+      "checkpoints": {
+        "after_requests": 1791685630012,
+        "baseline": 1791685615190,
+        "normal": 1791685623457
+      },
+      "build": {
+        "artifact_digests": {
+          "dashboard.json": "1021c02a77ca6ceedf59e50155f5f01b3cb2b7f0ffc5774fc4b8187de2260353",
+          "rules.yaml": "3068bfe5a2e7b623f745413a8b2301b5a7d09cbee8049f572faf91c7a67907b8"
+        },
+        "runner_digests": {
+          "execution.py": "3da0e20625aa7f5bb8af84ae00ad9a5c12c6243eb1fb6e0df96e768944930b4a",
+          "server.py": "4e146364501446f91ac3663e7bb0ba9cfb4fa7931260bee483a84fdf77d99602",
+          "workflow.py": "6f3b709f477bf9d7260fe401d1787fe524b9b1c6714f2ecbf547b289815e224b"
+        },
+        "source_digest": "5bb86485ac6c78a32cdc33bffa54a8500f371f4514982d69489c3b4f6c022861"
+      },
+      "product_snapshots": {
+        "after": {
+          "observed_ns": 1791685644084734997,
+          "body": {
+            "dashboard": {
+              "dashboard": {
+                "_comment": "CUSTOM FILE; Grafana dashboard model https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/view-dashboard-json-model/; AGPL-3.0; P20만 선택하고 decision별 누적 건수를 표시한다.",
+                "id": 1,
+                "panels": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "p20"
+                    },
+                    "gridPos": {
+                      "h": 8,
+                      "w": 24,
+                      "x": 0,
+                      "y": 0
+                    },
+                    "id": 1,
+                    "targets": [
+                      {
+                        "expr": "sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})",
+                        "legendFormat": "{{decision}}",
+                        "refId": "A"
+                      }
+                    ],
+                    "title": "P20 허용·거부",
+                    "type": "timeseries"
+                  }
+                ],
+                "schemaVersion": 41,
+                "title": "P20 요청 처리 건수",
+                "uid": "guided-p20",
+                "version": 2
+              },
+              "meta": {
+                "annotationsPermissions": {
+                  "dashboard": {
+                    "canAdd": false,
+                    "canDelete": false,
+                    "canEdit": false
+                  },
+                  "organization": {
+                    "canAdd": false,
+                    "canDelete": false,
+                    "canEdit": false
+                  }
+                },
+                "apiVersion": "v0alpha1",
+                "canAdmin": false,
+                "canDelete": false,
+                "canEdit": false,
+                "canSave": false,
+                "canStar": true,
+                "created": "2026-10-09T02:12:28Z",
+                "createdBy": "Anonymous",
+                "expires": "0001-01-01T00:00:00Z",
+                "folderId": 0,
+                "folderTitle": "General",
+                "folderUid": "",
+                "folderUrl": "",
+                "hasAcl": false,
+                "isFolder": false,
+                "provisioned": true,
+                "provisionedExternalId": "dashboard.json",
+                "slug": "p20-ec9a94-ecb2ad-ecb298-eba6ac-eab1b4-ec8898",
+                "type": "db",
+                "updated": "2026-10-11T02:26:53Z",
+                "updatedBy": "Anonymous",
+                "url": "/d/guided-p20/p20-ec9a94-ecb2ad-ecb298-eba6ac-eab1b4-ec8898",
+                "version": 2
+              }
+            },
+            "rules": {
+              "data": {
+                "groups": [
+                  {
+                    "evaluationTime": 0.001664762,
+                    "file": "/etc/prometheus/p20-rules.yml",
+                    "interval": 1,
+                    "lastEvaluation": "2026-10-11T02:27:23.803877473Z",
+                    "limit": 0,
+                    "name": "p20",
+                    "rules": [
+                      {
+                        "alerts": [],
+                        "annotations": {},
+                        "duration": 4,
+                        "evaluationTime": 0.001427752,
+                        "health": "ok",
+                        "keepFiringFor": 0,
+                        "labels": {
+                          "practice": "P20",
+                          "severity": "warning"
+                        },
+                        "lastEvaluation": "2026-10-11T02:27:23.804104667Z",
+                        "name": "GuidedP20BlockedRequests",
+                        "query": "sum(increase(guided_p20_decisions_total{decision=\"block\",practice=\"P20\"}[20s])) > 0",
+                        "state": "inactive",
+                        "type": "alerting"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "status": "success"
+            }
+          }
+        },
+        "before": {
+          "observed_ns": 1791685615189559880,
+          "body": {
+            "dashboard": {
+              "dashboard": {
+                "_comment": "CUSTOM FILE; Grafana dashboard model https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/view-dashboard-json-model/; AGPL-3.0; P20만 선택하고 decision별 누적 건수를 표시한다.",
+                "id": 1,
+                "panels": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "p20"
+                    },
+                    "gridPos": {
+                      "h": 8,
+                      "w": 24,
+                      "x": 0,
+                      "y": 0
+                    },
+                    "id": 1,
+                    "targets": [
+                      {
+                        "expr": "sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})",
+                        "legendFormat": "{{decision}}",
+                        "refId": "A"
+                      }
+                    ],
+                    "title": "P20 허용·거부",
+                    "type": "timeseries"
+                  }
+                ],
+                "schemaVersion": 41,
+                "title": "P20 요청 처리 건수",
+                "uid": "guided-p20",
+                "version": 2
+              },
+              "meta": {
+                "annotationsPermissions": {
+                  "dashboard": {
+                    "canAdd": false,
+                    "canDelete": false,
+                    "canEdit": false
+                  },
+                  "organization": {
+                    "canAdd": false,
+                    "canDelete": false,
+                    "canEdit": false
+                  }
+                },
+                "apiVersion": "v0alpha1",
+                "canAdmin": false,
+                "canDelete": false,
+                "canEdit": false,
+                "canSave": false,
+                "canStar": true,
+                "created": "2026-10-09T02:12:28Z",
+                "createdBy": "Anonymous",
+                "expires": "0001-01-01T00:00:00Z",
+                "folderId": 0,
+                "folderTitle": "General",
+                "folderUid": "",
+                "folderUrl": "",
+                "hasAcl": false,
+                "isFolder": false,
+                "provisioned": true,
+                "provisionedExternalId": "dashboard.json",
+                "slug": "p20-ec9a94-ecb2ad-ecb298-eba6ac-eab1b4-ec8898",
+                "type": "db",
+                "updated": "2026-10-11T02:26:53Z",
+                "updatedBy": "Anonymous",
+                "url": "/d/guided-p20/p20-ec9a94-ecb2ad-ecb298-eba6ac-eab1b4-ec8898",
+                "version": 2
+              }
+            },
+            "rules": {
+              "data": {
+                "groups": [
+                  {
+                    "evaluationTime": 0.000531986,
+                    "file": "/etc/prometheus/p20-rules.yml",
+                    "interval": 1,
+                    "lastEvaluation": "2026-10-11T02:26:54.80369963Z",
+                    "limit": 0,
+                    "name": "p20",
+                    "rules": [
+                      {
+                        "alerts": [],
+                        "annotations": {},
+                        "duration": 4,
+                        "evaluationTime": 0.000494125,
+                        "health": "ok",
+                        "keepFiringFor": 0,
+                        "labels": {
+                          "practice": "P20",
+                          "severity": "warning"
+                        },
+                        "lastEvaluation": "2026-10-11T02:26:54.803732683Z",
+                        "name": "GuidedP20BlockedRequests",
+                        "query": "sum(increase(guided_p20_decisions_total{decision=\"block\",practice=\"P20\"}[20s])) > 0",
+                        "state": "inactive",
+                        "type": "alerting"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "status": "success"
+            }
+          }
+        }
+      },
+      "contract_version": 2,
+      "cases": [
+        {
+          "request_id": "465881e5-7190-42ea-9fa9-63a487125edc",
+          "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+          "phase": "normal",
+          "ordinal": 0,
+          "practice": "P20",
+          "operation": "notice_lookup",
+          "decision": "allow",
+          "finished_ns": 1791685615208656809,
+          "downstream_count": 1
+        },
+        {
+          "request_id": "c00b98ca-587d-40d3-9fff-326108162d72",
+          "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+          "phase": "normal",
+          "ordinal": 1,
+          "practice": "background",
+          "operation": "notice_publish",
+          "decision": "block",
+          "finished_ns": 1791685615209084225,
+          "downstream_count": 0
+        },
+        {
+          "request_id": "cbac810d-c58e-4d1e-b527-e1a8b845b702",
+          "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+          "phase": "normal",
+          "ordinal": 2,
+          "practice": "background",
+          "operation": "notice_publish",
+          "decision": "block",
+          "finished_ns": 1791685615209147085,
+          "downstream_count": 0
+        },
+        {
+          "request_id": "35fbd936-8fb7-4f60-9e2f-d46cb12ff7a9",
+          "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+          "phase": "normal",
+          "ordinal": 3,
+          "practice": "background",
+          "operation": "notice_publish",
+          "decision": "block",
+          "finished_ns": 1791685615209158415,
+          "downstream_count": 0
+        },
+        {
+          "request_id": "9a0e73b1-52f7-4b9c-abc6-8f8626a39a1a",
+          "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+          "phase": "risk",
+          "ordinal": 0,
+          "practice": "P20",
+          "operation": "notice_publish",
+          "decision": "block",
+          "finished_ns": 1791685623466717897,
+          "downstream_count": 0
+        },
+        {
+          "request_id": "350a8b49-1bca-4c53-b4e9-b710f35ea7ed",
+          "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+          "phase": "risk",
+          "ordinal": 1,
+          "practice": "P20",
+          "operation": "notice_publish",
+          "decision": "block",
+          "finished_ns": 1791685623466988672,
+          "downstream_count": 0
+        },
+        {
+          "request_id": "9e8bdd64-9638-4341-8d91-00905d6e31ae",
+          "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+          "phase": "recovery",
+          "ordinal": 0,
+          "practice": "P20",
+          "operation": "notice_lookup",
+          "decision": "allow",
+          "finished_ns": 1791685629227914752,
+          "downstream_count": 1
+        }
+      ],
+      "requests_closed": true,
+      "observation_closed_ns": 1791685644084964191,
+      "closed": true
+    },
+    "build": {
+      "source_digest": "5bb86485ac6c78a32cdc33bffa54a8500f371f4514982d69489c3b4f6c022861",
+      "artifact_digests": {
+        "rules.yaml": "3068bfe5a2e7b623f745413a8b2301b5a7d09cbee8049f572faf91c7a67907b8",
+        "dashboard.json": "1021c02a77ca6ceedf59e50155f5f01b3cb2b7f0ffc5774fc4b8187de2260353"
+      },
+      "runner_digests": {
+        "server.py": "4e146364501446f91ac3663e7bb0ba9cfb4fa7931260bee483a84fdf77d99602",
+        "workflow.py": "6f3b709f477bf9d7260fe401d1787fe524b9b1c6714f2ecbf547b289815e224b",
+        "execution.py": "3da0e20625aa7f5bb8af84ae00ad9a5c12c6243eb1fb6e0df96e768944930b4a"
+      }
+    },
+    "source_digest": "5bb86485ac6c78a32cdc33bffa54a8500f371f4514982d69489c3b4f6c022861",
+    "rules": {
+      "status": "success",
+      "data": {
+        "groups": [
+          {
+            "name": "p20",
+            "file": "/etc/prometheus/p20-rules.yml",
+            "rules": [
+              {
+                "state": "inactive",
+                "name": "GuidedP20BlockedRequests",
+                "query": "sum(increase(guided_p20_decisions_total{decision=\"block\",practice=\"P20\"}[20s])) > 0",
+                "duration": 4,
+                "keepFiringFor": 0,
+                "labels": {
+                  "practice": "P20",
+                  "severity": "warning"
+                },
+                "annotations": {},
+                "alerts": [],
+                "health": "ok",
+                "evaluationTime": 0.001427752,
+                "lastEvaluation": "2026-10-11T02:27:23.804104667Z",
+                "type": "alerting"
+              }
+            ],
+            "interval": 1,
+            "limit": 0,
+            "evaluationTime": 0.001664762,
+            "lastEvaluation": "2026-10-11T02:27:23.803877473Z"
+          }
+        ]
+      }
+    },
+    "dashboard": {
+      "meta": {
+        "type": "db",
+        "canSave": false,
+        "canEdit": false,
+        "canAdmin": false,
+        "canStar": true,
+        "canDelete": false,
+        "slug": "p20-ec9a94-ecb2ad-ecb298-eba6ac-eab1b4-ec8898",
+        "url": "/d/guided-p20/p20-ec9a94-ecb2ad-ecb298-eba6ac-eab1b4-ec8898",
+        "expires": "0001-01-01T00:00:00Z",
+        "created": "2026-10-09T02:12:28Z",
+        "updated": "2026-10-11T02:26:53Z",
+        "updatedBy": "Anonymous",
+        "createdBy": "Anonymous",
+        "version": 2,
+        "hasAcl": false,
+        "isFolder": false,
+        "apiVersion": "v0alpha1",
+        "folderId": 0,
+        "folderUid": "",
+        "folderTitle": "General",
+        "folderUrl": "",
+        "provisioned": true,
+        "provisionedExternalId": "dashboard.json",
+        "annotationsPermissions": {
+          "dashboard": {
+            "canAdd": false,
+            "canEdit": false,
+            "canDelete": false
+          },
+          "organization": {
+            "canAdd": false,
+            "canEdit": false,
+            "canDelete": false
+          }
+        }
+      },
+      "dashboard": {
+        "_comment": "CUSTOM FILE; Grafana dashboard model https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/view-dashboard-json-model/; AGPL-3.0; P20만 선택하고 decision별 누적 건수를 표시한다.",
+        "id": 1,
+        "panels": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "p20"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 0
+            },
+            "id": 1,
+            "targets": [
+              {
+                "expr": "sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})",
+                "legendFormat": "{{decision}}",
+                "refId": "A"
+              }
+            ],
+            "title": "P20 허용·거부",
+            "type": "timeseries"
+          }
+        ],
+        "schemaVersion": 41,
+        "title": "P20 요청 처리 건수",
+        "uid": "guided-p20",
+        "version": 2
+      }
+    },
+    "configuration_continuity": {
+      "before_ns": 1791685615189559880,
+      "after_ns": 1791685644084734997,
+      "unchanged": true
+    },
+    "native_config": {
+      "artifact_digests": {
+        "rules.yaml": "3068bfe5a2e7b623f745413a8b2301b5a7d09cbee8049f572faf91c7a67907b8",
+        "dashboard.json": "1021c02a77ca6ceedf59e50155f5f01b3cb2b7f0ffc5774fc4b8187de2260353"
+      },
+      "formatted_rule": "sum(increase(guided_p20_decisions_total{decision=\"block\",practice=\"P20\"}[20s])) > 0",
+      "dashboard_uid": "guided-p20",
+      "native_config_matches": true
+    },
+    "snapshots": {
+      "baseline": {
+        "counter": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "P20"
+                },
+                "value": [
+                  1791685615.19,
+                  "1"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "P20"
+                },
+                "value": [
+                  1791685615.19,
+                  "2"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "background"
+                },
+                "value": [
+                  1791685615.19,
+                  "0"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "background"
+                },
+                "value": [
+                  1791685615.19,
+                  "3"
+                ]
+              }
+            ]
+          }
+        },
+        "panel_request": {
+          "from": "1791685615190",
+          "to": "1791685615190",
+          "queries": [
+            {
+              "refId": "A",
+              "expr": "sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "p20"
+              },
+              "instant": true,
+              "range": false,
+              "format": "time_series",
+              "intervalMs": 1000,
+              "maxDataPoints": 1
+            }
+          ]
+        },
+        "panel": {
+          "results": {
+            "A": {
+              "status": 200,
+              "frames": [
+                {
+                  "schema": {
+                    "refId": "A",
+                    "meta": {
+                      "type": "numeric-multi",
+                      "typeVersion": [
+                        0,
+                        1
+                      ],
+                      "custom": {
+                        "resultType": "vector"
+                      },
+                      "executedQueryString": "Expr: sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})\nStep: 1s"
+                    },
+                    "fields": [
+                      {
+                        "name": "Time",
+                        "type": "time",
+                        "typeInfo": {
+                          "frame": "time.Time"
+                        },
+                        "config": {
+                          "interval": 1000
+                        }
+                      },
+                      {
+                        "name": "Value",
+                        "type": "number",
+                        "typeInfo": {
+                          "frame": "float64"
+                        },
+                        "labels": {
+                          "decision": "allow"
+                        },
+                        "config": {
+                          "displayNameFromDS": "{decision=\"allow\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "data": {
+                    "values": [
+                      [
+                        1791685615190
+                      ],
+                      [
+                        1
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "schema": {
+                    "refId": "A",
+                    "meta": {
+                      "type": "numeric-multi",
+                      "typeVersion": [
+                        0,
+                        1
+                      ],
+                      "custom": {
+                        "resultType": "vector"
+                      }
+                    },
+                    "fields": [
+                      {
+                        "name": "Time",
+                        "type": "time",
+                        "typeInfo": {
+                          "frame": "time.Time"
+                        },
+                        "config": {
+                          "interval": 1000
+                        }
+                      },
+                      {
+                        "name": "Value",
+                        "type": "number",
+                        "typeInfo": {
+                          "frame": "float64"
+                        },
+                        "labels": {
+                          "decision": "block"
+                        },
+                        "config": {
+                          "displayNameFromDS": "{decision=\"block\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "data": {
+                    "values": [
+                      [
+                        1791685615190
+                      ],
+                      [
+                        2
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "normal": {
+        "counter": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "P20"
+                },
+                "value": [
+                  1791685623.457,
+                  "2"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "P20"
+                },
+                "value": [
+                  1791685623.457,
+                  "2"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "background"
+                },
+                "value": [
+                  1791685623.457,
+                  "0"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "background"
+                },
+                "value": [
+                  1791685623.457,
+                  "6"
+                ]
+              }
+            ]
+          }
+        },
+        "panel_request": {
+          "from": "1791685623457",
+          "to": "1791685623457",
+          "queries": [
+            {
+              "refId": "A",
+              "expr": "sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "p20"
+              },
+              "instant": true,
+              "range": false,
+              "format": "time_series",
+              "intervalMs": 1000,
+              "maxDataPoints": 1
+            }
+          ]
+        },
+        "panel": {
+          "results": {
+            "A": {
+              "status": 200,
+              "frames": [
+                {
+                  "schema": {
+                    "refId": "A",
+                    "meta": {
+                      "type": "numeric-multi",
+                      "typeVersion": [
+                        0,
+                        1
+                      ],
+                      "custom": {
+                        "resultType": "vector"
+                      },
+                      "executedQueryString": "Expr: sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})\nStep: 1s"
+                    },
+                    "fields": [
+                      {
+                        "name": "Time",
+                        "type": "time",
+                        "typeInfo": {
+                          "frame": "time.Time"
+                        },
+                        "config": {
+                          "interval": 1000
+                        }
+                      },
+                      {
+                        "name": "Value",
+                        "type": "number",
+                        "typeInfo": {
+                          "frame": "float64"
+                        },
+                        "labels": {
+                          "decision": "allow"
+                        },
+                        "config": {
+                          "displayNameFromDS": "{decision=\"allow\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "data": {
+                    "values": [
+                      [
+                        1791685623457
+                      ],
+                      [
+                        2
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "schema": {
+                    "refId": "A",
+                    "meta": {
+                      "type": "numeric-multi",
+                      "typeVersion": [
+                        0,
+                        1
+                      ],
+                      "custom": {
+                        "resultType": "vector"
+                      }
+                    },
+                    "fields": [
+                      {
+                        "name": "Time",
+                        "type": "time",
+                        "typeInfo": {
+                          "frame": "time.Time"
+                        },
+                        "config": {
+                          "interval": 1000
+                        }
+                      },
+                      {
+                        "name": "Value",
+                        "type": "number",
+                        "typeInfo": {
+                          "frame": "float64"
+                        },
+                        "labels": {
+                          "decision": "block"
+                        },
+                        "config": {
+                          "displayNameFromDS": "{decision=\"block\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "data": {
+                    "values": [
+                      [
+                        1791685623457
+                      ],
+                      [
+                        2
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "after_requests": {
+        "counter": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "P20"
+                },
+                "value": [
+                  1791685630.012,
+                  "3"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "P20"
+                },
+                "value": [
+                  1791685630.012,
+                  "4"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "allow",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "background"
+                },
+                "value": [
+                  1791685630.012,
+                  "0"
+                ]
+              },
+              {
+                "metric": {
+                  "__name__": "guided_p20_decisions_total",
+                  "decision": "block",
+                  "instance": "guided-h20-alerts:8000",
+                  "job": "p20",
+                  "practice": "background"
+                },
+                "value": [
+                  1791685630.012,
+                  "6"
+                ]
+              }
+            ]
+          }
+        },
+        "panel_request": {
+          "from": "1791685630012",
+          "to": "1791685630012",
+          "queries": [
+            {
+              "refId": "A",
+              "expr": "sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "p20"
+              },
+              "instant": true,
+              "range": false,
+              "format": "time_series",
+              "intervalMs": 1000,
+              "maxDataPoints": 1
+            }
+          ]
+        },
+        "panel": {
+          "results": {
+            "A": {
+              "status": 200,
+              "frames": [
+                {
+                  "schema": {
+                    "refId": "A",
+                    "meta": {
+                      "type": "numeric-multi",
+                      "typeVersion": [
+                        0,
+                        1
+                      ],
+                      "custom": {
+                        "resultType": "vector"
+                      },
+                      "executedQueryString": "Expr: sum by (decision) (guided_p20_decisions_total{practice=\"P20\"})\nStep: 1s"
+                    },
+                    "fields": [
+                      {
+                        "name": "Time",
+                        "type": "time",
+                        "typeInfo": {
+                          "frame": "time.Time"
+                        },
+                        "config": {
+                          "interval": 1000
+                        }
+                      },
+                      {
+                        "name": "Value",
+                        "type": "number",
+                        "typeInfo": {
+                          "frame": "float64"
+                        },
+                        "labels": {
+                          "decision": "allow"
+                        },
+                        "config": {
+                          "displayNameFromDS": "{decision=\"allow\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "data": {
+                    "values": [
+                      [
+                        1791685630012
+                      ],
+                      [
+                        3
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "schema": {
+                    "refId": "A",
+                    "meta": {
+                      "type": "numeric-multi",
+                      "typeVersion": [
+                        0,
+                        1
+                      ],
+                      "custom": {
+                        "resultType": "vector"
+                      }
+                    },
+                    "fields": [
+                      {
+                        "name": "Time",
+                        "type": "time",
+                        "typeInfo": {
+                          "frame": "time.Time"
+                        },
+                        "config": {
+                          "interval": 1000
+                        }
+                      },
+                      {
+                        "name": "Value",
+                        "type": "number",
+                        "typeInfo": {
+                          "frame": "float64"
+                        },
+                        "labels": {
+                          "decision": "block"
+                        },
+                        "config": {
+                          "displayNameFromDS": "{decision=\"block\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "data": {
+                    "values": [
+                      [
+                        1791685630012
+                      ],
+                      [
+                        4
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "alert_history": {
+      "status": "success",
+      "data": {
+        "resultType": "matrix",
+        "result": [
+          {
+            "metric": {
+              "__name__": "ALERTS",
+              "alertname": "GuidedP20BlockedRequests",
+              "alertstate": "firing",
+              "practice": "P20",
+              "severity": "warning"
+            },
+            "values": [
+              [
+                1791685629.19,
+                "1"
+              ],
+              [
+                1791685630.19,
+                "1"
+              ],
+              [
+                1791685631.19,
+                "1"
+              ],
+              [
+                1791685632.19,
+                "1"
+              ],
+              [
+                1791685633.19,
+                "1"
+              ],
+              [
+                1791685634.19,
+                "1"
+              ],
+              [
+                1791685635.19,
+                "1"
+              ],
+              [
+                1791685636.19,
+                "1"
+              ],
+              [
+                1791685637.19,
+                "1"
+              ],
+              [
+                1791685638.19,
+                "1"
+              ],
+              [
+                1791685639.19,
+                "1"
+              ],
+              [
+                1791685640.19,
+                "1"
+              ],
+              [
+                1791685641.19,
+                "1"
+              ],
+              [
+                1791685642.19,
+                "1"
+              ],
+              [
+                1791685643.19,
+                "1"
+              ]
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "ALERTS",
+              "alertname": "GuidedP20BlockedRequests",
+              "alertstate": "pending",
+              "practice": "P20",
+              "severity": "warning"
+            },
+            "values": [
+              [
+                1791685625.19,
+                "1"
+              ],
+              [
+                1791685626.19,
+                "1"
+              ],
+              [
+                1791685627.19,
+                "1"
+              ],
+              [
+                1791685628.19,
+                "1"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    "resolved_alerts": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": []
+      }
+    },
+    "notifications": [
+      {
+        "received_ns": 1791685629027934847,
+        "body": {
+          "receiver": "p20",
+          "status": "firing",
+          "alerts": [
+            {
+              "status": "firing",
+              "labels": {
+                "alertname": "GuidedP20BlockedRequests",
+                "practice": "P20",
+                "severity": "warning"
+              },
+              "annotations": {},
+              "startsAt": "2026-10-11T02:27:08.802Z",
+              "endsAt": "0001-01-01T00:00:00Z",
+              "generatorURL": "http://514e24ed533a:9090/graph?g0.expr=sum%28increase%28guided_p20_decisions_total%7Bdecision%3D%22block%22%2Cpractice%3D%22P20%22%7D%5B20s%5D%29%29+%3E+0&g0.tab=1",
+              "fingerprint": "221a09bbf14e260a"
+            }
+          ],
+          "groupLabels": {
+            "alertname": "GuidedP20BlockedRequests",
+            "practice": "P20"
+          },
+          "commonLabels": {
+            "alertname": "GuidedP20BlockedRequests",
+            "practice": "P20",
+            "severity": "warning"
+          },
+          "commonAnnotations": {},
+          "externalURL": "http://27491a668836:9093",
+          "version": "4",
+          "groupKey": "{}:{alertname=\"GuidedP20BlockedRequests\", practice=\"P20\"}",
+          "truncatedAlerts": 0
+        }
+      },
+      {
+        "received_ns": 1791685644003442480,
+        "body": {
+          "receiver": "p20",
+          "status": "resolved",
+          "alerts": [
+            {
+              "status": "resolved",
+              "labels": {
+                "alertname": "GuidedP20BlockedRequests",
+                "practice": "P20",
+                "severity": "warning"
+              },
+              "annotations": {},
+              "startsAt": "2026-10-11T02:27:08.802Z",
+              "endsAt": "2026-10-11T02:27:23.802Z",
+              "generatorURL": "http://514e24ed533a:9090/graph?g0.expr=sum%28increase%28guided_p20_decisions_total%7Bdecision%3D%22block%22%2Cpractice%3D%22P20%22%7D%5B20s%5D%29%29+%3E+0&g0.tab=1",
+              "fingerprint": "221a09bbf14e260a"
+            }
+          ],
+          "groupLabels": {
+            "alertname": "GuidedP20BlockedRequests",
+            "practice": "P20"
+          },
+          "commonLabels": {
+            "alertname": "GuidedP20BlockedRequests",
+            "practice": "P20",
+            "severity": "warning"
+          },
+          "commonAnnotations": {},
+          "externalURL": "http://27491a668836:9093",
+          "version": "4",
+          "groupKey": "{}:{alertname=\"GuidedP20BlockedRequests\", practice=\"P20\"}",
+          "truncatedAlerts": 0
+        }
+      }
+    ],
+    "alert_identity": {
+      "fingerprint": "221a09bbf14e260a",
+      "startsAt": "2026-10-11T02:27:08.802Z"
+    },
+    "scope": "Artifact/native configuration identity and re-fetched products; course endpoint still required",
+    "native_requests": [
+      {
+        "request_id": "465881e5-7190-42ea-9fa9-63a487125edc",
+        "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+        "phase": "normal",
+        "ordinal": 0,
+        "practice": "P20",
+        "operation": "notice_lookup",
+        "decision": "allow",
+        "finished_ns": 1791685615208656809,
+        "downstream_count": 1
+      },
+      {
+        "request_id": "c00b98ca-587d-40d3-9fff-326108162d72",
+        "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+        "phase": "normal",
+        "ordinal": 1,
+        "practice": "background",
+        "operation": "notice_publish",
+        "decision": "block",
+        "finished_ns": 1791685615209084225,
+        "downstream_count": 0
+      },
+      {
+        "request_id": "cbac810d-c58e-4d1e-b527-e1a8b845b702",
+        "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+        "phase": "normal",
+        "ordinal": 2,
+        "practice": "background",
+        "operation": "notice_publish",
+        "decision": "block",
+        "finished_ns": 1791685615209147085,
+        "downstream_count": 0
+      },
+      {
+        "request_id": "35fbd936-8fb7-4f60-9e2f-d46cb12ff7a9",
+        "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+        "phase": "normal",
+        "ordinal": 3,
+        "practice": "background",
+        "operation": "notice_publish",
+        "decision": "block",
+        "finished_ns": 1791685615209158415,
+        "downstream_count": 0
+      },
+      {
+        "request_id": "9a0e73b1-52f7-4b9c-abc6-8f8626a39a1a",
+        "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+        "phase": "risk",
+        "ordinal": 0,
+        "practice": "P20",
+        "operation": "notice_publish",
+        "decision": "block",
+        "finished_ns": 1791685623466717897,
+        "downstream_count": 0
+      },
+      {
+        "request_id": "350a8b49-1bca-4c53-b4e9-b710f35ea7ed",
+        "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+        "phase": "risk",
+        "ordinal": 1,
+        "practice": "P20",
+        "operation": "notice_publish",
+        "decision": "block",
+        "finished_ns": 1791685623466988672,
+        "downstream_count": 0
+      },
+      {
+        "request_id": "9e8bdd64-9638-4341-8d91-00905d6e31ae",
+        "suite_id": "97a856bd-0dfb-4b5d-aef3-f452a9538b14",
+        "phase": "recovery",
+        "ordinal": 0,
+        "practice": "P20",
+        "operation": "notice_lookup",
+        "decision": "allow",
+        "finished_ns": 1791685629227914752,
+        "downstream_count": 1
+      }
+    ],
+    "cases": [
+      {
+        "case_id": "configuration-binding",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "설정 파일과 실제 Prometheus·Grafana 적용 상태가 일치합니다.",
+        "configuration": {
+          "source_digest": "5bb86485ac6c78a32cdc33bffa54a8500f371f4514982d69489c3b4f6c022861",
+          "configuration": {
+            "artifact_digests": {
+              "rules.yaml": "3068bfe5a2e7b623f745413a8b2301b5a7d09cbee8049f572faf91c7a67907b8",
+              "dashboard.json": "1021c02a77ca6ceedf59e50155f5f01b3cb2b7f0ffc5774fc4b8187de2260353"
+            },
+            "formatted_rule": "sum(increase(guided_p20_decisions_total{decision=\"block\",practice=\"P20\"}[20s])) > 0",
+            "dashboard_uid": "guided-p20",
+            "native_config_matches": true
+          }
+        }
+      },
+      {
+        "case_id": "alert-lifecycle",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "정상 조회와 권한 거부를 유지하면서 경보 발생·해제와 패널 수치가 실제 요청 기록에 맞았습니다. 업무 저장소는 합성 fixture입니다."
+      }
+    ]
+  },
+  "reason": "정상 조회와 권한 거부를 유지하면서 경보 발생·해제와 패널 수치가 실제 요청 기록에 맞았습니다. 업무 저장소는 합성 fixture입니다.",
+  "next_check": "정상·거부 요청 수와 경보 발생·해제 시각을 제품 원문에서 확인합니다.",
+  "internal_activity_id": "H20",
+  "contract_version": 2,
+  "task_completed": true,
+  "security_verdict": "PASS"
+}

@@ -385,3 +385,41 @@ def ledger(suite_id: str, _authorized: None = Depends(require_verifier)) -> dict
             for item in deliveries
         ],
     }
+
+
+with connect() as database:
+    database.execute("CREATE TABLE IF NOT EXISTS case_closures (suite_id TEXT NOT NULL,case_id TEXT NOT NULL,closed_at TEXT NOT NULL,PRIMARY KEY(suite_id,case_id))")
+
+
+@app.post("/v1/suites/{suite_id}/cases/{case_id}/close")
+def close_case(suite_id:str,case_id:str,_authorized:None=Depends(require_control))->dict:
+    if case_id not in CASE_ORDER:raise HTTPException(422,"unknown server-owned case")
+    with connect() as database:
+        database.execute("BEGIN IMMEDIATE")
+        suite=database.execute("SELECT closed_at FROM suites WHERE suite_id=?",(suite_id,)).fetchone()
+        if suite is None:raise HTTPException(404,"suite not found")
+        previous=database.execute("SELECT closed_at FROM case_closures WHERE suite_id=? AND case_id=?",(suite_id,case_id)).fetchone()
+        if previous:
+            database.execute("COMMIT")
+            return {"suite_id":suite_id,"case_id":case_id,"case_closed_at":previous["closed_at"]}
+        if suite["closed_at"] is not None:raise HTTPException(409,"suite already closed")
+        if any(not database.execute("SELECT 1 FROM case_closures WHERE suite_id=? AND case_id=?",(suite_id,earlier)).fetchone() for earlier in CASE_ORDER[:CASE_ORDER.index(case_id)]):
+            raise HTTPException(409,"earlier cases must close first")
+        closed_at=now().isoformat()
+        database.execute("UPDATE capabilities SET status='closed_unused' WHERE suite_id=? AND case_id=? AND status='issued'",(suite_id,case_id))
+        database.execute("INSERT INTO case_closures VALUES(?,?,?)",(suite_id,case_id,closed_at))
+        database.execute("COMMIT")
+    return {"suite_id":suite_id,"case_id":case_id,"case_closed_at":closed_at}
+
+
+@app.get("/v1/suites/{suite_id}/cases/{case_id}/ledger")
+def case_ledger(suite_id:str,case_id:str,_authorized:None=Depends(require_verifier))->dict:
+    if case_id not in CASE_ORDER:raise HTTPException(422,"unknown server-owned case")
+    with connect() as database:
+        closure=database.execute("SELECT closed_at FROM case_closures WHERE suite_id=? AND case_id=?",(suite_id,case_id)).fetchone()
+    if closure is None:raise HTTPException(409,"case not closed")
+    value=ledger(suite_id);prefix=CASE_ORDER[:CASE_ORDER.index(case_id)+1]
+    return {**value,"case_id":case_id,"case_scope":list(prefix),"case_closed_at":closure["closed_at"],
+        "future_deliveries":[item for item in value["deliveries"] if item["case_id"] not in prefix],
+        "deliveries":[item for item in value["deliveries"] if item["case_id"] in prefix],
+        "capabilities":[item for item in value["capabilities"] if item["case_id"] in prefix]}

@@ -19,6 +19,15 @@ spec.loader.exec_module(verification)
 
 
 class P17VerificationTests(unittest.TestCase):
+    def test_single_case_cannot_complete_full_suite_or_change_fixed_case(self):
+        selected=copy.deepcopy(self.receipt);selected['selected_case']=0
+        selected['execution']['cases']=selected['execution']['cases'][:1]
+        ledger=copy.deepcopy(self.ledger);ledger['cases']=ledger['cases'][:1]
+        build={'source_digest':selected['source_digest'],'runner_digests':self.digests}
+        self.assertEqual(len(verification.check_execution(selected,ledger,build,self.digests,0)),1)
+        with self.assertRaises(verification.RESULTS.EvidenceMismatch):verification.check_execution(selected,ledger,build,self.digests)
+        with self.assertRaises(verification.RESULTS.EvidenceMismatch):verification.check_execution(selected,ledger,build,self.digests,1)
+
     def setUp(self):
         self.started = datetime.now(timezone.utc).isoformat()
         start = time.time_ns()

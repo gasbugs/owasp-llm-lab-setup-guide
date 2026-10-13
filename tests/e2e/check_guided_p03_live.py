@@ -121,7 +121,7 @@ def main():
             temporary = Path(cleanup.enter_context(tempfile.TemporaryDirectory(prefix="p03-build-")))
             target = temporary / "guided-labs/h03-ingestion-search"
             target.mkdir(parents=True)
-            for name in ("cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py",
+            for name in ("aws_auth.py", "native_runtime.py", "cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py",
                          "Containerfile", "requirements.txt"):
                 shutil.copyfile(LAB / name, target / name)
             (target / "learner.py").write_bytes(source)
@@ -161,7 +161,7 @@ def main():
                 "GUIDED_H03_GATEWAY_TOKEN": "publisher-p03-runtime", "GUIDED_CONTROL_LAB03_TOKEN": "publisher-test-control",
                 "GUIDED_VERIFIER_LAB03_TOKEN": "publisher-test-verifier",
                 "GUIDED_H03_DATABASE": "/state/p03-receipts.sqlite3"}
-            learner_extra = ["--network-alias", "learner", "--mount", "type=volume,source=" + volume + ",target=/state"]
+            learner_extra = (["--network", egress] if mode == "aws" else []) + ["--network-alias", "learner", "--mount", "type=volume,source=" + volume + ",target=/state"]
             live.launch("learner", learner, learner_env, learner_extra)
             live.start_verifier(verifier, {"GUIDED_LAB03_URL": "http://learner:8000",
                 "GUIDED_VERIFIER_LAB03_TOKEN": "publisher-test-verifier", "GUIDED_BEDROCK_GATEWAY_URL": "http://gateway:8080",

@@ -571,6 +571,49 @@ def complete_call(
     }
 
 
+with connect() as database:
+    database.execute("CREATE TABLE IF NOT EXISTS h07_case_closures (suite_id TEXT NOT NULL, case_id TEXT NOT NULL, closed_at TEXT NOT NULL, PRIMARY KEY(suite_id,case_id))")
+
+
+def close_case(suite_id: str, case_id: str) -> dict[str, Any]:
+    if case_id not in CASE_IDS:
+        raise HTTPException(422, "unknown server-owned H07 case")
+    with connect() as database:
+        database.execute("BEGIN IMMEDIATE")
+        suite = database.execute("SELECT closed_at FROM h07_suites WHERE suite_id=?", (suite_id,)).fetchone()
+        if suite is None:
+            raise HTTPException(404, "H07 suite not found")
+        previous = database.execute("SELECT closed_at FROM h07_case_closures WHERE suite_id=? AND case_id=?", (suite_id,case_id)).fetchone()
+        if previous:
+            return {"suite_id":suite_id,"case_id":case_id,"case_closed_at":previous["closed_at"]}
+        if suite["closed_at"] is not None:
+            raise HTTPException(409, "H07 suite already closed")
+        prefix = CASE_IDS[:CASE_IDS.index(case_id)]
+        if any(not database.execute("SELECT 1 FROM h07_case_closures WHERE suite_id=? AND case_id=?", (suite_id,earlier)).fetchone() for earlier in prefix):
+            raise HTTPException(409, "earlier H07 cases must close first")
+        if database.execute("SELECT 1 FROM h07_capabilities WHERE suite_id=? AND case_id=? AND status='reserved'", (suite_id,case_id)).fetchone():
+            raise HTTPException(409, "H07 case has in-flight calls")
+        closed_at = now()
+        database.execute("UPDATE h07_capabilities SET status='closed_unused' WHERE suite_id=? AND case_id=? AND status='issued'", (suite_id,case_id))
+        database.execute("INSERT INTO h07_case_closures VALUES(?,?,?)", (suite_id,case_id,closed_at))
+        return {"suite_id":suite_id,"case_id":case_id,"case_closed_at":closed_at}
+
+
+def case_ledger(suite_id: str, case_id: str) -> dict[str, Any]:
+    if case_id not in CASE_IDS:
+        raise HTTPException(422, "unknown server-owned H07 case")
+    with connect() as database:
+        closure = database.execute("SELECT closed_at FROM h07_case_closures WHERE suite_id=? AND case_id=?", (suite_id,case_id)).fetchone()
+    if closure is None:
+        raise HTTPException(409, "H07 case is not closed")
+    value = ledger(suite_id)
+    prefix = CASE_IDS[:CASE_IDS.index(case_id)+1]
+    return {**value,"case_id":case_id,"case_closed_at":closure["closed_at"],"case_scope":list(prefix),
+        "future_calls":[call for call in value["calls"] if call["case_id"] not in prefix],
+        "calls":[call for call in value["calls"] if call["case_id"] in prefix],
+        "capabilities":[cap for cap in value["capabilities"] if cap["case_id"] in prefix]}
+
+
 def close_suite(suite_id: str) -> dict[str, Any]:
     closed_at = now()
     database = connect()
@@ -695,3 +738,13 @@ def ledger_route(
     suite_id: str, _authorized: None = Depends(require_verifier)
 ) -> dict[str, Any]:
     return ledger(suite_id)
+
+
+@router.post("/v1/h07/suites/{suite_id}/cases/{case_id}/close")
+def close_case_route(suite_id: str, case_id: str, _authorized: None = Depends(require_control)) -> dict:
+    return close_case(suite_id, case_id)
+
+
+@router.get("/v1/h07/suites/{suite_id}/cases/{case_id}/ledger")
+def case_ledger_route(suite_id: str, case_id: str, _authorized: None = Depends(require_verifier)) -> dict:
+    return case_ledger(suite_id, case_id)

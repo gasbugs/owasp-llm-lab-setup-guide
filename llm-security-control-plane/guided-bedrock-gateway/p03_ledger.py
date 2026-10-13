@@ -169,3 +169,19 @@ class SearchLedger:
             call["response"] = json.loads(raw) if raw is not None else None
         return {**row, "practice_id": "P03", "activity_id": "H03", "contract_version": CONTRACT,
                 "closed": row["closed_at"] is not None, "calls": calls}
+
+    def authorize_native(self, token, suite_id, execution_id):
+        identifier(suite_id); identifier(execution_id)
+        if not isinstance(token, str) or not token.isascii(): raise LedgerError(401)
+        with self.connect() as db:
+            row = self._execution(db, execution_id)
+            if not hmac.compare_digest(row['capability_hash'], hashlib.sha256(token.encode()).hexdigest()): raise LedgerError(401)
+            if row['suite_id'] != suite_id: raise LedgerError(403)
+            if row['closed_at'] is not None or not 0 <= self.stamp()-row['started_at'] < 180: raise LedgerError(409)
+
+    def claim_native_grant(self, execution_id):
+        try:
+            with self.connect() as db:
+                db.execute('CREATE TABLE IF NOT EXISTS p03_native_grants (execution_id TEXT PRIMARY KEY)')
+                db.execute('INSERT INTO p03_native_grants VALUES(?)', (execution_id,))
+        except sqlite3.IntegrityError: raise LedgerError(409) from None

@@ -28,6 +28,18 @@ class Invocation(BaseModel):
     payload: dict
 
 
+class NativeGrant(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    suite_id: str
+    execution_id: str
+
+
+class NativeRecord(NativeGrant):
+    capability: str
+    operation: Literal["job_status", "retrieve"]
+    response: dict | None
+
+
 class Empty(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -51,7 +63,7 @@ class ResourcePreparation(BaseModel):
 
 def create_app(ledger, provider_factory, *, control_token, verifier_token, job_resolver,
                suite_preparer=None, suite_reader=None, suite_resources=None,
-               provision_token=None, resource_preparer=None, preparation_reader=None):
+               provision_token=None, resource_preparer=None, preparation_reader=None, native_credentials=None, native_recorder=None):
     if (any(not isinstance(token, str) or not token or not token.isascii() for token in (control_token, verifier_token))
             or control_token == verifier_token):
         raise ValueError("distinct server credentials required")
@@ -124,6 +136,18 @@ def create_app(ledger, provider_factory, *, control_token, verifier_token, job_r
     @app.post("/executions/{execution_id}/close", dependencies=[Depends(control)])
     def close(execution_id: str, _body: Empty):
         return ledger.close(execution_id)
+
+    @app.post("/native-credentials")
+    def credentials(body: NativeGrant, authorization: str | None = Header(default=None)):
+        ledger.authorize_native(token(authorization), body.suite_id, body.execution_id)
+        if native_credentials is None: raise HTTPException(503, "P03 SDK authentication unavailable")
+        ledger.claim_native_grant(body.execution_id)
+        return JSONResponse(native_credentials(body.suite_id, body.execution_id), headers={"Cache-Control": "no-store"})
+
+    @app.post("/native-record", dependencies=[Depends(control)])
+    def record(body: NativeRecord):
+        if native_recorder is None: raise HTTPException(503, "P03 SDK evidence unavailable")
+        return {"response": native_recorder(**body.model_dump())}
 
     @app.post("/invoke")
     def invoke(body: Invocation, authorization: str | None = Header(default=None)):

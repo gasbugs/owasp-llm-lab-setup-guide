@@ -34,7 +34,10 @@ def execute(source_path, current_job_id, configuration, *, timeout=75):
     if len(source) > SOURCE_LIMIT:
         return {**base, "execution_status": "source_limit"}
     try:
-        if set(configuration) != {"suite_id", "execution_id", "origin", "capability"}:
+        if (set(configuration) - {"query", "native_sdk"} != {"suite_id", "execution_id", "origin", "capability"}
+                or ("query" in configuration and (configuration.get("native_sdk") is not True
+                    or not isinstance(configuration["query"], str) or not configuration["query"].strip()
+                    or len(configuration["query"]) > 1000))):
             raise ValueError("only invocation configuration enters worker")
         execution_id = str(UUID(configuration["execution_id"]))
         if execution_id != configuration["execution_id"]:
@@ -93,7 +96,12 @@ def child():
     try:
         envelope = json.load(sys.stdin)
         configuration = envelope["input"]["configuration"]
-        services = ServiceClient(**configuration)
+        native_sdk = configuration.pop("native_sdk", False)
+        if native_sdk:
+            from native_runtime import NativeSDK
+            services = NativeSDK(**configuration)
+        else:
+            services = ServiceClient(**configuration)
         namespace = {"__name__": "p03_learner"}
         with open(os.devnull, "w") as sink, contextlib.redirect_stdout(sink):
             exec(compile(envelope["source"], "learner.py", "exec"), namespace)
@@ -101,7 +109,11 @@ def child():
             if function is None:
                 raise NotImplementedError()
             try:
-                value = asyncio.run(function(envelope["input"]["current_job_id"], services))
+                with services.observe() if native_sdk else contextlib.nullcontext():
+                    value = asyncio.run(function(envelope["input"]["current_job_id"], services))
+                    native_value = value
+                    if native_sdk:
+                        value = services.normalize(value)
             except ValueError:
                 raise LearnerRejected() from None
         if (not isinstance(value, dict) or set(value) != {"status", "result"}
@@ -118,6 +130,14 @@ def child():
         result = {"execution_status": "rejected"}
     except BaseException:
         result = {"execution_status": "runtime_error"}
+    if services and getattr(services, "connection", None):
+        result["native_sdk"] = True
+        result["sdk_clients"] = services.clients
+        result["sdk_responses"] = services.native
+        result["provider_mode"] = services.connection["provider_mode"]
+        if result["execution_status"] == "returned":
+            from native_runtime import serial
+            result["native_result"] = serial(native_value)
     result["calls"] = services.calls if services else None
     try:
         raw = encode(result)
@@ -125,6 +145,9 @@ def child():
         raw = encode({"execution_status": "invalid_return", "calls": result["calls"]})
     if len(raw) > OUTPUT_LIMIT:
         raw = encode({"execution_status": "output_limit", "calls": None})
+    if services and getattr(services, "connection", None):
+        for secret in services.connection["credentials"].values():
+            raw = raw.replace(secret.encode(), b"[REDACTED]")
     sys.stdout.buffer.write(raw)
 
 

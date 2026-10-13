@@ -77,12 +77,9 @@ def assert_starter_hit(payload: dict) -> None:
     assert result["framework_version"] == "2.2.362"
     assert result["entities"] == ["EMAIL_ADDRESS"]
     assert result["official_kr_rrn"] is False
-    assert result["delivery_count"] == 4
-    assert result["raw_risk_cases"] == [
-        "input-email",
-        "input-kr-rrn",
-        "output-email",
-    ]
+    assert result["delivery_count"] == 2
+    assert result["raw_risk_cases"] == ["input-email"]
+    assert [case["status"] for case in result["cases"]] == ["PASS", "HIT", "미실행", "미실행"]
     serialized = json.dumps(payload, ensure_ascii=False)
     assert "learner@example.com" not in serialized
     assert "900101-1234568" not in serialized
@@ -119,7 +116,7 @@ def main() -> int:
 
     starter = verify(origin)
     assert_starter_hit(starter)
-    print("h09_starter=HIT deliveries=4 raw_risk_cases=3")
+    print("h09_starter=HIT deliveries=2 raw_risk_cases=1")
 
     try:
         shutil.copyfile(SOLUTION_PATH, POLICY_PATH)
@@ -133,7 +130,7 @@ def main() -> int:
 
     restored = verify(origin)
     assert_starter_hit(restored)
-    print("h09_starter_restore=HIT deliveries=4 raw_risk_cases=3")
+    print("h09_starter_restore=HIT deliveries=2 raw_risk_cases=1")
     return 0
 
 

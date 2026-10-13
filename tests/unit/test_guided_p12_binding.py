@@ -39,6 +39,15 @@ class BindingTests(unittest.TestCase):
             "case_ids": self.ids, "contract_digest": "b" * 64, "scaffold_files": self.scaffold,
             "now": 106, **kwargs})
 
+    def test_prefix_keeps_whole_contract_and_refuses_future_case(self):
+        self.receipt["cases"] = self.receipt["cases"][:1]
+        self.receipt["run_state"] = "paused"
+        self.assertEqual(self.verify(through_case="normal")["case_ids"], ["normal"])
+        for kwargs in ({}, {"through_case":"unknown"}, {"through_case":"denied"}):
+            with self.assertRaises(EvidenceError): self.verify(**kwargs)
+        self.info["case_ids"] = ["normal"]
+        with self.assertRaises(EvidenceError): self.verify(through_case="normal")
+
     def test_bound_run_is_not_a_completion_verdict(self):
         result = self.verify()
         self.assertTrue(result["run_bound"])

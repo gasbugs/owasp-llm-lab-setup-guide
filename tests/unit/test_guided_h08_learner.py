@@ -173,6 +173,22 @@ class H08LearnerTest(unittest.TestCase):
         self.assertEqual(receipt.status_code, 200, receipt.text)
         return receipt.json()
 
+    def test_cases_execute_individually_with_fixed_order_and_unchanged_grants(self):
+        body={"suite_id":str(uuid.uuid4()),"started_at":"2026-09-23T00:00:00+00:00","cases":[{"case_id":case_id,"execution_id":str(uuid.uuid4()),"self_check_input_capability":CAPABILITIES[f"{case_id}:self_check_input"],"main_capability":CAPABILITIES[f"{case_id}:main"]} for case_id in CASE_IDS]}
+        headers={"Authorization":f"Bearer {CONTROL_TOKEN}"}
+        self.assertEqual(self.client.post("/v1/run-case",json={**body,"case_id":CASE_IDS[1]},headers=headers).status_code,409)
+        first=self.client.post("/v1/run-case",json={**body,"case_id":CASE_IDS[0]},headers=headers)
+        self.assertEqual(first.status_code,200,first.text)
+        self.assertEqual([(call["case_id"],call["role"]) for call in FakeGatewayHandler.calls],[(CASE_IDS[0],"self_check_input"),(CASE_IDS[0],"main")])
+        self.assertEqual(self.client.post("/v1/run-case",json={**body,"case_id":CASE_IDS[0]},headers=headers).status_code,409)
+        changed={**body,"cases":[dict(grant) for grant in body["cases"]]};changed["cases"][1]["execution_id"]=str(uuid.uuid4())
+        self.assertEqual(self.client.post("/v1/run-case",json={**changed,"case_id":CASE_IDS[1]},headers=headers).status_code,409)
+        for case_id in CASE_IDS[1:]:
+            result=self.client.post("/v1/run-case",json={**body,"case_id":case_id},headers=headers)
+            self.assertEqual(result.status_code,200,result.text)
+        receipt=self.client.get(f"/v1/receipts/{body['suite_id']}",headers={"Authorization":f"Bearer {VERIFIER_TOKEN}"}).json()
+        self.assertEqual([case["case_id"] for case in receipt["cases"]],list(CASE_IDS))
+
     def test_starter_runs_weak_self_check_then_main_for_all_cases(self):
         receipt = self.run_suite()
         self.assertEqual(

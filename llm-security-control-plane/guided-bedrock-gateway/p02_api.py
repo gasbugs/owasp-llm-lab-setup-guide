@@ -25,11 +25,24 @@ class Invocation(BaseModel):
     payload: dict
 
 
+class NativeGrant(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    suite_id: str
+    execution_id: str
+
+
+class NativeRecord(NativeGrant):
+    capability: str
+    operation: Literal["store_source", "embed"]
+    request_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    response: dict | None
+
+
 class Empty(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def create_app(ledger, provider_factory, *, control_token, verifier_token, resource_reader=None):
+def create_app(ledger, provider_factory, *, control_token, verifier_token, resource_reader=None, native_credentials=None):
     if (any(not isinstance(token, str) or not token or not token.isascii() for token in (control_token, verifier_token))
             or control_token == verifier_token):
         raise ValueError("distinct server credentials required")
@@ -68,6 +81,21 @@ def create_app(ledger, provider_factory, *, control_token, verifier_token, resou
         response = provider_factory().invoke(credential, **body.model_dump())
         return {"suite_id": body.suite_id, "execution_id": body.execution_id,
                 "operation": body.operation, "response": response}
+
+    @app.post("/native-credentials")
+    def credentials(body: NativeGrant, authorization: str | None = Header(default=None)):
+        ledger.authorize_native(token(authorization), body.suite_id, body.execution_id)
+        if native_credentials is None:
+            raise HTTPException(503, "P02 SDK authentication unavailable")
+        ledger.claim_native_grant(body.execution_id)
+        return JSONResponse(native_credentials(body.execution_id), headers={"Cache-Control": "no-store"})
+
+    @app.post("/native-record", dependencies=[Depends(control)])
+    def native_record(body: NativeRecord):
+        ledger.reserve(body.capability, body.suite_id, body.execution_id,
+                       body.operation, body.request_digest)
+        ledger.finish(body.execution_id, body.operation, body.response)
+        return {"recorded": True}
 
     @app.get("/executions/{execution_id}", dependencies=[Depends(verifier)])
     def read(execution_id: str):

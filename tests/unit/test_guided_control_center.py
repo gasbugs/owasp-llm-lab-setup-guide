@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import unittest
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -85,6 +86,11 @@ class FakeAsyncClient:
 
     async def get(self, url, *, headers):
         self.calls.append({"url": url, "json": None, "headers": headers})
+        if "/v1/resource-progress/" in url:
+            parts = url.split("/")
+            return FakeResponse({"practice_id": parts[-2], "operation_id": parts[-1],
+                                 "current": 3, "total": 11, "state": "running",
+                                 "title": "S3 원문 저장소 준비", "description": "문서 원문 저장소를 준비합니다."})
         if "/v1/status/" in url:
             return FakeResponse({"ingestion_job_id": "H03JOB", "status": "COMPLETE"})
         return FakeResponse({"detail": "not found"}, status_code=404)
@@ -120,10 +126,22 @@ class FakeAsyncClient:
                     ],
                 }
             )
+        if "/v1/h08/suites/" in url and "/cases/" in url and url.endswith("/close"):
+            parts=url.split("/")
+            return FakeResponse({"suite_id":parts[-4],"case_id":parts[-2],"case_closed_at":"2026-09-23T10:00:01+00:00"})
+        if url.endswith("/v1/verify/h08-case"):
+            return FakeResponse({"case_id":json["case_id"],"status":"PASS","course_verdict":"PASS","case_verified":True,"task_completed":False})
         if "/v1/h08/suites/" in url and url.endswith("/close"):
             return FakeResponse(
                 {"suite_id": url.rsplit("/", 2)[-2], "closed_at": "2026-09-24T10:00:01+00:00"}
             )
+        if "guided-h09-delivery-sink" in url and "/cases/" in url and url.endswith("/close"):
+            parts=url.split("/")
+            return FakeResponse({"suite_id":parts[-4],"case_id":parts[-2],"case_closed_at":"2026-09-23T10:00:01+00:00"})
+        if url.endswith("/v1/verify/h10-case"):
+            return FakeResponse({"case_id":json["case_id"],"status":"PASS","course_verdict":"PASS","case_verified":True,"task_completed":False})
+        if url.endswith("/v1/verify/h09-case"):
+            return FakeResponse({"case_id":json["case_id"],"status":"PASS","course_verdict":"PASS","case_verified":True,"task_completed":False})
         if "guided-h09-delivery-sink" in url and url.endswith("/close"):
             return FakeResponse(
                 {"suite_id": url.rsplit("/", 2)[-2], "closed_at": "2026-09-24T10:00:01+00:00"}
@@ -149,6 +167,11 @@ class FakeAsyncClient:
                     ],
                 }
             )
+        if "/v1/h07/suites/" in url and "/cases/" in url and url.endswith("/close"):
+            parts=url.split("/")
+            return FakeResponse({"suite_id":parts[-4],"case_id":parts[-2],"case_closed_at":"2026-09-23T10:00:01+00:00"})
+        if url.endswith("/v1/verify/h07-case"):
+            return FakeResponse({"case_id":json["case_id"],"status":"PASS","course_verdict":"PASS","case_verified":True,"task_completed":False})
         if "/v1/h07/suites/" in url and url.endswith("/close"):
             status = self.h07_close_statuses.pop(0) if self.h07_close_statuses else 200
             return FakeResponse(
@@ -177,6 +200,8 @@ class FakeAsyncClient:
                 }
             )
         if url.endswith("/v1/chat"):
+            if not re.fullmatch(r"[a-z0-9-]{1,64}", json.get("client_id", "")):
+                return FakeResponse({"detail": "missing or invalid client_id"}, status_code=422)
             message, tokens = json.get("message"), json.get("max_output_tokens")
             if not isinstance(message, str) or not message.strip() or len(message) > 4000 or type(tokens) is not int or not 1 <= tokens <= 512 or "model" in json:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
@@ -198,6 +223,9 @@ class FakeAsyncClient:
                     "response_text": "실제 모델 응답",
                 }
             )
+        if "/v1/resource-lifecycle/" in url:
+            problem = url.split("/")[-2]
+            return FakeResponse({"practice_id": problem, "operation_id": json["operation_id"], "state": "deleted"})
         if url.endswith("/v1/h02/provision"):
             return FakeResponse({"status": "READY", "knowledge_base_id": "TESTKB1234"})
         if url.endswith("/v1/p03/resources/prepare"):
@@ -213,9 +241,11 @@ class FakeAsyncClient:
             if not json["body"]:
                 return FakeResponse({"detail": "invalid request"}, status_code=422)
             return FakeResponse({"execution_id": json["execution_id"]})
-        if url.endswith("/v1/run"):
+        if url.endswith(("/v1/run","/v1/run-case")):
             if "guided-h02-document-app" in url or "guided-h03-sync-app" in url:
                 return FakeResponse({"suite_id": json["suite_id"]})
+            if "execution_ids" in json:
+                return FakeResponse({"suite_id":json["suite_id"]})
             if "cases" in json:
                 if json["cases"] and "content_safety_capability" in json["cases"][0]:
                     if self.h07_run_request_error:
@@ -224,6 +254,10 @@ class FakeAsyncClient:
                         return FakeResponse({"detail": "H07 learner failed"}, status_code=self.h07_run_status)
                 return FakeResponse({"suite_id": json["suite_id"], "source_digest": "a" * 64})
             return FakeResponse({"execution_id": json["execution_id"]})
+        if url.endswith("/v1/verify/h06-case"):
+            return FakeResponse({"case_id":json["case_id"],"status":"PASS","case_verified":True,"task_completed":False})
+        if url.endswith("/v1/verify/lab-05-case"):
+            return FakeResponse({"case_id":json["cases"][0]["case_id"],"status":"PASS","case_verified":True,"task_completed":False})
         activity_id = "P03" if "/verify/p03" in url else "P02" if "/verify/p02" in url else "H22" if "lab-22" in url else "H21" if "lab-21" in url else "H09" if "/h09" in url else "H08" if "/h08" in url else "H07" if "/h07" in url else "H06" if "/h06" in url else "H05" if "lab-05" in url else "H04" if "lab-04" in url else "H03" if "lab-03" in url else "H02" if "lab-02" in url else "H01"
         return FakeResponse(
             {
@@ -279,6 +313,17 @@ class FakeAsyncClient:
         )
 
 
+class SequentialFailureClient(FakeAsyncClient):
+    async def post(self,url,*,json=None,headers):
+        self.calls.append({'url':url,'json':json,'headers':headers})
+        if '/v1/verify/' not in url:return FakeResponse({'suite_id':json['suite_id']})
+        part=url.rsplit('/',1)[-1];number=part.split('-')[0][1:]
+        activity=('H' if number in ('21','22') else 'P')+number
+        return FakeResponse({'activity_id':activity,'execution_id':json['suite_id'],'started_at':json['started_at'],
+            'verified_by':'guided-evidence-verifier','course_verdict':'ERR','case_verified':False,
+            'task_completed':False,'reason':'fixture incomplete','result':{}})
+
+
 class GuidedControlCenterTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -297,6 +342,81 @@ class GuidedControlCenterTests(unittest.TestCase):
         FakeAsyncClient.h07_run_request_error = False
         FakeAsyncClient.h07_close_statuses = []
 
+    def test_native_initialization_diagnosis_reaches_grading_case(self):
+        original=FakeAsyncClient.post
+        async def post(client,url,**kwargs):
+            if url.endswith("/v1/run-case") and "guided-h07" in url:
+                return FakeResponse({"detail":{"diagnosis":{"cause":"등록되지 않은 input Rail: check input safety", "field":"rails.input.flows", "model_calls":"0회 — 초기화 중단", "evidence":"실제 설정 검증 오류"}}},500)
+            return await original(client,url,**kwargs)
+        with patch.object(FakeAsyncClient,"post",post),patch.object(self.server.httpx,"AsyncClient",FakeAsyncClient):
+            response=self.client.post("/api/practice/P07/verify",headers=self.headers)
+        def hints(value):
+            if isinstance(value,dict):
+                if "diagnosis" in value:yield value["diagnosis"]
+                for key,child in value.items():
+                    if key!="diagnosis":yield from hints(child)
+            elif isinstance(value,list):
+                for child in value:yield from hints(child)
+        observed=list(hints(response.json()))
+        self.assertTrue(observed,response.text)
+        for hint in observed:
+            self.assertIn("check input safety",hint["cause"])
+            self.assertTrue(hint["model_calls"].startswith("0회"))
+            self.assertTrue(hint["log_command"].endswith("guided-h07-content-safety"))
+
+    def test_all_problem_surfaces_have_guidance_and_apply_commands(self):
+        page = self.home.text
+        for number in range(2, 23):
+            start = page.index(f'id="h{number:02d}-work"')
+            following = re.search(r'id="h\d{2}-work"', page[start + 20:])
+            end = start + 20 + following.start() if following else page.index('<section class="inspection"', start)
+            section = page[start:end]
+            with self.subTest(problem=number):
+                self.assertIn('class="mission-brief"', section)
+                self.assertIn('미션 해결 조건', section)
+                self.assertIn('코드 적용하기', section)
+                self.assertIn('docker compose', section)
+                self.assertIn('--force-recreate', section)
+                self.assertIn('미션 채점', section)
+
+    def test_reload_preserves_verified_p00_session_and_token(self):
+        token = self.bootstrap["p00_submission_token"]
+        result = self.client.post("/api/practice/P00/check", headers={"Authorization": "Bearer " + token},
+            json={"message": "계정 보안을 위한 조언을 한 문장으로 알려 주세요.", "max_tokens": 64}).json()
+        self.assertTrue(result["completed"])
+        self.assertEqual(len(result["cases"]), 4)
+        self.assertTrue(all(case["case_verified"] for case in result["cases"]))
+        cookie = self.client.cookies.get("guided_session")
+        self.client.get("/")
+        self.assertEqual(self.client.cookies.get("guided_session"), cookie)
+        self.assertEqual(self.client.get("/api/bootstrap").json()["p00_submission_token"], token)
+        self.assertEqual(self.client.get("/api/practice/P00/result").json(), result)
+
+    def test_p00_independent_request_checks(self):
+        headers = {"Authorization": "Bearer " + self.bootstrap["p00_submission_token"]}
+        valid = {"message": "계정 보안을 위한 조언을 한 문장으로 알려 주세요.", "max_tokens": 64}
+        self.assertNotIn("received", self.client.get("/api/practice/P00/result").json())
+        for document, expected in [("{}", False), ("{", False), (json.dumps(valid), True),
+                                   (json.dumps(dict(valid, max_tokens="64")), False),
+                                   (json.dumps(dict(valid, completed=True)), False)]:
+            response = self.client.post("/api/practice/P00/check", headers=headers, content=document)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["completed"], expected)
+            self.assertEqual(self.client.get("/api/practice/P00/result").json(), response.json())
+        malformed = self.client.post("/api/practice/P00/check", headers=headers, content="{").json()
+        self.assertFalse(malformed["cases"][0]["case_verified"])
+        self.assertTrue(all(case["status"] == "미실행" for case in malformed["cases"][1:]))
+        wrong_type = self.client.post("/api/practice/P00/check", headers=headers, json=dict(valid, max_tokens="64")).json()
+        self.assertEqual([case["case_verified"] for case in wrong_type["cases"]], [True, True, True, False])
+        self.assertEqual(self.client.post("/api/practice/P00/check", content="{}").status_code, 401)
+        self.assertEqual(self.client.post("/api/practice/P00/check", headers=headers, content=" " * 4097).status_code, 413)
+        other = TestClient(self.server.app)
+        other.get("/")
+        self.assertNotIn("received", other.get("/api/practice/P00/result").json())
+        self.assertEqual(TestClient(self.server.app).get("/api/practice/P00/result").status_code, 401)
+        self.assertNotIn("tutorial-request", self.home.text)
+        self.assertIn("tutorial-submit-command", self.home.text)
+
     def test_session_csp_and_browser_token_boundary(self):
         cookie = self.home.headers["set-cookie"].lower()
         self.assertIn("httponly", cookie)
@@ -308,14 +428,14 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("application_token", self.home.text.lower())
         self.assertNotIn("gateway_token", self.home.text.lower())
         self.assertEqual(self.bootstrap["course"]["tabs"], 13)
-        self.assertEqual(self.bootstrap["course"]["hands_on"], 22)
-        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], [f"H{number:02d}" for number in range(1, 23)])
+        self.assertEqual(self.bootstrap["course"]["hands_on"], 23)
+        self.assertEqual(self.bootstrap["course"]["implemented_hands_on"], [f"H{number:02d}" for number in range(1, 24)])
         self.assertEqual(self.bootstrap['workspace'], 'practice')
         p02 = next(item for item in self.bootstrap["learner_apps"] if item["hands_on_id"] == "H02")
         self.assertEqual(p02["source_path"], "llm-security-control-plane/guided-labs/h02-document-ingestion/learner.py")
-        self.assertEqual(self.bootstrap['course']['practices'], 22)
-        self.assertEqual(self.bootstrap['course']['practice_ids'], [f'P{n:02d}' for n in range(1, 23)])
-        self.assertEqual(self.bootstrap['course']['execution_ids'], {f'P{n:02d}': f'H{n:02d}' for n in range(1, 23)})
+        self.assertEqual(self.bootstrap['course']['practices'], 23)
+        self.assertEqual(self.bootstrap['course']['practice_ids'], [f'P{n:02d}' for n in range(1, 24)])
+        self.assertEqual(self.bootstrap['course']['execution_ids'], {f'P{n:02d}': f'H{n:02d}' for n in range(1, 24)})
         for item in self.bootstrap['learner_apps']:
             self.assertEqual(item['practice_id'], 'P' + item['hands_on_id'][1:])
             self.assertEqual(item['internal_activity_id'], item['hands_on_id'])
@@ -349,6 +469,91 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(h09["service"], "guided-h09-presidio-redaction")
         self.assertTrue(h09["source_path"].endswith("h09-presidio-redaction/policy.py"))
 
+    def test_p03_direct_search_forwards_only_query_without_grading(self):
+        class SearchClient(FakeAsyncClient):
+            async def post(self, url, *, json=None, headers):
+                self.calls.append({"url": url, "json": json, "headers": headers})
+                return FakeResponse({"practice_id": "P03", "graded": False, "query": json["query"], "execution": {}})
+        with patch.object(self.server.httpx, "AsyncClient", SearchClient):
+            response = self.client.post("/api/knowledge/search", headers=self.headers, json={"query": "계정 접근 절차"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["graded"])
+        self.assertEqual(len(FakeAsyncClient.calls), 1)
+        self.assertTrue(FakeAsyncClient.calls[0]["url"].endswith("/v1/search"))
+        self.assertEqual(FakeAsyncClient.calls[0]["json"], {"query": "계정 접근 절차"})
+        self.assertEqual(self.client.post("/api/knowledge/search", headers=self.headers,
+            json={"query": "검색", "knowledge_base_id": "spoof"}).status_code, 422)
+        self.assertEqual(self.client.post("/api/knowledge/search", headers=self.headers, json={"query": " "}).status_code, 422)
+        self.assertEqual(self.client.post("/api/knowledge/search", json={"query": "검색"}).status_code, 403)
+
+    def test_session_refresh_preserves_identity_and_tokens_with_persistent_cookie(self):
+        cookie = self.client.cookies.get("guided_session")
+        _, state = self.server.session_from_cookie(cookie)
+        before = dict(state)
+        response = self.client.post("/api/session/refresh", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.cookies.get("guided_session"), cookie)
+        self.assertEqual(state, before)
+        self.assertIn("Max-Age=604800", response.headers["set-cookie"])
+        self.assertIn("HttpOnly", response.headers["set-cookie"])
+        self.assertEqual(self.client.post("/api/session/refresh").status_code, 403)
+        other = TestClient(self.server.app)
+        self.assertEqual(other.post("/api/session/refresh", headers=self.headers).status_code, 401)
+        other.close()
+
+    def test_server_session_loss_reconnects_same_signed_browser_identity(self):
+        cookie = self.client.cookies.get("guided_session")
+        sid, state = self.server.session_from_cookie(cookie)
+        csrf = state["csrf"]
+        self.server.SESSIONS.pop(sid)
+        self.assertEqual(self.client.post("/api/session/refresh", headers=self.headers).status_code, 401)
+        self.assertEqual(self.client.get("/").status_code, 200)
+        self.assertEqual(self.client.cookies.get("guided_session"), cookie)
+        recovered = self.client.get("/api/bootstrap").json()
+        self.assertNotEqual(recovered["csrf_token"], csrf)
+        self.assertEqual(self.client.post("/api/session/refresh", headers={
+            "Origin": "http://testserver", "X-CSRF-Token": recovered["csrf_token"]}).status_code, 200)
+
+    def test_p01_case_progress_is_session_owned_and_reports_actual_http(self):
+        self.assertEqual(self.client.get("/api/test-progress/P01").json()["phase"], "idle")
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            self.client.post("/api/practice/P01/verify", headers=self.headers)
+        progress = self.client.get("/api/test-progress/P01").json()
+        self.assertEqual(progress["phase"], "finished")
+        self.assertEqual(len(progress["cases"]), 23)
+        for case in progress["cases"]:
+            self.assertEqual(case["status"], "PASS")
+            self.assertEqual(case["observed_status"], case["expected_status"])
+        other = TestClient(self.server.app)
+        self.assertEqual(other.get("/api/test-progress/P01").status_code, 401)
+        other.get("/")
+        self.assertEqual(other.get("/api/test-progress/P01").json()["phase"], "idle")
+
+    def test_p02_progress_is_session_owned_and_preserves_verified_failure(self):
+        self.assertEqual(self.client.get("/api/test-progress/P02").json()["phase"], "idle")
+        suite = "progress-fixture"
+        cookie = self.client.cookies.get("guided_session")
+        _, state = self.server.session_from_cookie(cookie)
+        state["p02_case_progress"] = {"suite_id": suite, "phase": "running", "cases": [], "total": 22}
+        class ProgressClient(FakeAsyncClient):
+            async def get(self, url, *, headers):
+                if "/v1/progress/p02/" in url:
+                    return FakeResponse({"suite_id": suite, "phase": "finished", "total": 22,
+                        "cases": [{"case_id": "first", "case_verified": True}, {"case_id": "second", "status": "ERR"}], "current_case": None})
+                return FakeResponse({"suite_id": suite, "phase": "verifying", "total": 22,
+                    "cases": [], "current_case": None})
+        with patch.object(self.server.httpx, "AsyncClient", ProgressClient):
+            progress = self.client.get("/api/test-progress/P02").json()
+            self.assertEqual(progress["cases"][0]["case_verified"], True)
+            self.assertEqual(progress["cases"][1]["status"], "ERR")
+            state["p02_case_progress"].update(phase="finished", verdict="ERR")
+            self.assertEqual(self.client.get("/api/test-progress/P02").json()["cases"], progress["cases"])
+        other = TestClient(self.server.app)
+        self.assertEqual(other.get("/api/test-progress/P02").status_code, 401)
+        other.get("/")
+        self.assertIsNone(other.get("/api/test-progress/P02").json()["suite_id"])
+        other.close()
+
     def test_common_pages_and_readiness_do_not_contact_learner_services(self):
         with patch.object(self.server.httpx, "AsyncClient", side_effect=AssertionError("unexpected downstream connection")):
             for path in ("/", "/livez", "/readyz", "/api/bootstrap", "/app.css", "/app.js"):
@@ -367,12 +572,13 @@ class GuidedControlCenterTests(unittest.TestCase):
         routes = {route.path: route for route in self.server.app.routes}
         legacy = {path: route for path, route in routes.items()
                   if path.startswith("/api/hands-on/H")}
-        expected = {f"/api/practice/P{number:02d}/verify" for number in range(1, 23)}
+        expected = {f"/api/practice/P{number:02d}/verify" for number in range(1, 24)}
         expected.update(f"/api/practice/P{number:02d}/provision" for number in (2, 3, 4))
-        expected.add("/api/practice/P01/chat")
+        expected.update(f"/api/practice/P{number:02d}/delete-resources" for number in (2, 3, 4))
+        expected.update({"/api/practice/P01/chat", "/api/practice/P23/chat"})
         actual = {path for path in routes if path.startswith("/api/practice/")}
-        self.assertEqual(actual, expected)
-        self.assertEqual(len(legacy), len(expected))
+        self.assertEqual(actual, expected | {"/api/practice/P00/check", "/api/practice/P00/result", "/api/practice/P04/chat"})
+        self.assertEqual(len(legacy), len(expected) - 5)
         for path, route in legacy.items():
             alias = path.replace("/api/hands-on/H", "/api/practice/P", 1)
             with self.subTest(alias=alias):
@@ -386,7 +592,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         anonymous = TestClient(self.server.app)
         with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
             for route in self.server.app.routes:
-                if not route.path.startswith("/api/practice/"):
+                if not route.path.startswith("/api/practice/") or route.path.startswith("/api/practice/P00/"):
                     continue
                 with self.subTest(path=route.path):
                     self.assertEqual(anonymous.post(route.path, headers=self.headers).status_code, 401)
@@ -401,7 +607,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(FakeAsyncClient.calls, [])
 
     def test_unknown_practice_ids_do_not_fall_back_to_another_activity(self):
-        for activity in ("P00", "P23", "P1", "H01", "p01"):
+        for activity in ("P00", "P24", "P1", "H01", "p01"):
             with self.subTest(activity=activity):
                 response = self.client.post(f"/api/practice/{activity}/verify", headers=self.headers)
                 self.assertEqual(response.status_code, 404)
@@ -473,6 +679,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(request["message"], "현재 정책을 거쳐 실제로 답해 주세요.")
         self.assertEqual(request["max_output_tokens"], 512)
         self.assertEqual(request["scenario"], "chat")
+        self.assertRegex(request["client_id"], r"^chat-[a-f0-9]{32}$")
 
     def test_exploratory_chat_rejects_client_policy_fields(self):
         response = self.client.post(
@@ -562,7 +769,35 @@ class GuidedControlCenterTests(unittest.TestCase):
                 "/api/hands-on/H02/provision", headers=self.headers
             )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["activity_id"], "H02")
+        self.assertEqual(response.json()["activity_id"], "P02")
+        self.assertTrue(response.json()["resource_ready"])
+        self.assertFalse(response.json()["task_completed"])
+        self.assertNotIn("course_verdict", response.json())
+
+    def test_resource_progress_is_current_session_and_mission_owned(self):
+        self.assertEqual(TestClient(self.server.app).get("/api/resource-progress/P02").status_code, 401)
+        self.assertEqual(self.client.get("/api/resource-progress/P02").json()["state"], "idle")
+        _, data = self.server.session_from_cookie(self.client.cookies.get("guided_session"))
+        data["resource_operation"] = {"problem": "P02", "operation_id": "own-operation"}
+        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+            row = self.client.get("/api/resource-progress/P02").json()
+            other = self.client.get("/api/resource-progress/P03").json()
+        self.assertEqual(row["current"], 3)
+        self.assertEqual(row["total"], 11)
+        self.assertEqual(row["operation_id"], "own-operation")
+        self.assertEqual(other, {"state": "idle"})
+
+    def test_resource_deletion_is_authenticated_server_owned_and_not_grading(self):
+        for problem in ("P02", "P03", "P04"):
+            route = f"/api/practice/{problem}/delete-resources"
+            self.assertEqual(self.client.post(route).status_code, 403)
+            self.assertEqual(self.client.post(route, json={"bucket": "foreign"}, headers=self.headers).status_code, 422)
+            with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
+                response = self.client.post(route, headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.json()["resource_deleted"])
+            self.assertFalse(response.json()["task_completed"])
+            self.assertNotIn("course_verdict", response.json())
 
     def test_h03_suite_uses_current_server_owned_job(self):
         rejected = self.client.post(
@@ -644,7 +879,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertFalse(self.server.ACTIVE_SESSIONS)
 
     def test_practice_envelope_reuses_all_internal_ids_and_verdicts(self):
-        for number in range(1, 23):
+        for number in range(1, 24):
             for verdict in ("PASS", "HIT", "ERR"):
                 original = {"activity_id": f"H{number:02d}", "course_verdict": verdict,
                             "result": {"receipt": "existing-evidence"}}
@@ -696,7 +931,7 @@ class GuidedControlCenterTests(unittest.TestCase):
             item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/evaluate")
         )
         verifier_call = next(
-            item for item in FakeAsyncClient.calls if "lab-05" in item["url"]
+            item for item in FakeAsyncClient.calls if item["url"].endswith("/v1/verify/lab-05")
         )
         self.assertEqual(
             evaluation_call["json"]["suite_id"], verifier_call["json"]["suite_id"]
@@ -709,6 +944,64 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("course_verdict", verifier_call["json"])
         self.assertNotIn("prompt", verifier_call["json"])
         self.assertNotIn("unit-control-lab05", response.text)
+
+    def test_h05_stops_before_next_case_and_topical_when_independent_check_fails(self):
+        original=FakeAsyncClient.post
+        async def post(client,url,**kwargs):
+            if url.endswith("/v1/verify/lab-05-case"):
+                FakeAsyncClient.calls.append({"url":url,**kwargs})
+                return FakeResponse({"case_id":kwargs["json"]["cases"][0]["case_id"],"case_verified":False,"status":"ERR","reason":"raw evidence mismatch"})
+            return await original(client,url,**kwargs)
+        FakeAsyncClient.calls.clear()
+        with patch.object(self.server.httpx,"AsyncClient",FakeAsyncClient),patch.object(FakeAsyncClient,"post",post):
+            response=self.client.post("/api/practice/P05/verify",headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertFalse(response.json()["task_completed"])
+        executions=[call for call in FakeAsyncClient.calls if call["url"].endswith("/v1/run")]
+        self.assertEqual([call["json"]["case_id"] for call in executions],["contact-exact"])
+        self.assertFalse(any(call["url"].endswith("/v1/evaluate") for call in FakeAsyncClient.calls))
+        cases=response.json()["result"]["cases"]
+        self.assertEqual([case["status"] for case in cases],["ERR","미실행","미실행","미실행"])
+
+    def test_h11_case_verdict_stops_future_search_and_final_grade(self):
+        original=FakeAsyncClient.post
+        for result_status in ("HIT", "ERR"):
+            async def post(client,url,**kwargs):
+                if url.endswith("/v1/run-case"):
+                    FakeAsyncClient.calls.append({"url":url,**kwargs})
+                    return FakeResponse({"suite_id":kwargs["json"]["suite_id"]})
+                if url.endswith("/v1/verify/h11-case"):
+                    FakeAsyncClient.calls.append({"url":url,**kwargs})
+                    cid=kwargs["json"]["case_id"]
+                    status="PASS" if cid=="normal-approved" else result_status
+                    return FakeResponse({"case_id":cid,"status":status,"course_verdict":status,"case_verified":status=="PASS"})
+                return await original(client,url,**kwargs)
+            FakeAsyncClient.calls.clear()
+            with patch.object(self.server.httpx,"AsyncClient",FakeAsyncClient),patch.object(FakeAsyncClient,"post",post):
+                response=self.client.post("/api/practice/P11/verify",headers=self.headers)
+            self.assertEqual(response.status_code,200,response.text)
+            self.assertFalse(response.json()["task_completed"])
+            self.assertEqual([r["status"] for r in response.json()["result"]["cases"]],["PASS",result_status,"미실행","미실행"])
+            self.assertEqual([c["json"]["case_id"] for c in FakeAsyncClient.calls if c["url"].endswith("/v1/run-case")],["normal-approved","client-self-approval"])
+            self.assertFalse(any(c["url"].endswith("/v1/verify/h11") for c in FakeAsyncClient.calls))
+
+    def test_h06_transport_error_marks_first_case_err_and_later_cases_unexecuted(self):
+        original=FakeAsyncClient.post
+        async def post(client,url,**kwargs):
+            if url.endswith("/v1/run-case"):
+                FakeAsyncClient.calls.append({"url":url,**kwargs})
+                raise httpx.ConnectError("worker unavailable",request=httpx.Request("POST",url))
+            return await original(client,url,**kwargs)
+        FakeAsyncClient.calls.clear()
+        with patch.object(self.server.httpx,"AsyncClient",FakeAsyncClient),patch.object(FakeAsyncClient,"post",post):
+            response=self.client.post("/api/practice/P06/verify",headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertFalse(response.json()["task_completed"])
+        self.assertEqual(response.json()["verified_by"],"guided-control-center")
+        self.assertFalse(any(stage["stage"]=="action_policy" for stage in response.json()["stage_calls"]))
+        self.assertEqual([row["status"] for row in response.json()["result"]["cases"]],["ERR","미실행","미실행","미실행"])
+        self.assertEqual(len([call for call in FakeAsyncClient.calls if call["url"].endswith("/v1/run-case")]),1)
+        self.assertFalse(any("/v1/verify/h06" in call["url"] for call in FakeAsyncClient.calls))
 
     def test_h06_suite_actions_and_verdict_are_server_owned(self):
         rejected = self.client.post(
@@ -742,7 +1035,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         learner_call = next(
             item
             for item in FakeAsyncClient.calls
-            if item["url"].endswith("/v1/run") and "cases" in item["json"]
+            if item["url"].endswith("/v1/run-case") and "cases" in item["json"]
         )
         self.assertEqual(len(learner_call["json"]["cases"]), 4)
         self.assertTrue(
@@ -772,7 +1065,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(response.json()["activity_id"], "H07")
         urls = [item["url"] for item in FakeAsyncClient.calls]
         prepare_index = next(index for index, url in enumerate(urls) if url.endswith("/v1/h07/suites"))
-        learner_index = next(index for index, url in enumerate(urls) if url.endswith("/v1/run"))
+        learner_index = next(index for index, url in enumerate(urls) if url.endswith("/v1/run-case"))
         close_index = next(index for index, url in enumerate(urls) if url.endswith("/close"))
         verify_index = next(index for index, url in enumerate(urls) if url.endswith("/v1/verify/h07"))
         self.assertLess(prepare_index, learner_index)
@@ -788,6 +1081,22 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(set(verifier), {"suite_id", "started_at"})
         self.assertNotIn("course_verdict", verifier)
         self.assertNotIn("unit-h07-gateway-control", response.text)
+
+    def test_h08_failed_case_never_runs_next_and_closes_unused_suite_grants(self):
+        original=FakeAsyncClient.post
+        async def post(client,url,**kwargs):
+            if url.endswith("/v1/verify/h08-case"):
+                FakeAsyncClient.calls.append({"url":url,**kwargs})
+                return FakeResponse({"case_id":kwargs["json"]["case_id"],"status":"ERR","course_verdict":"ERR","case_verified":False,"reason":"classifier schema invalid"})
+            return await original(client,url,**kwargs)
+        with patch.object(self.server.httpx,"AsyncClient",FakeAsyncClient),patch.object(FakeAsyncClient,"post",post):
+            response=self.client.post("/api/practice/P08/verify",headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual([row["status"] for row in response.json()["result"]["cases"]],["ERR","미실행","미실행","미실행"])
+        self.assertFalse(response.json()["task_completed"])
+        self.assertEqual(len([call for call in FakeAsyncClient.calls if call["url"].endswith("/v1/run-case")]),1)
+        self.assertTrue(any(call["url"].endswith("/close") and "/cases/" not in call["url"] for call in FakeAsyncClient.calls))
+        self.assertFalse(any(call["url"].endswith("/v1/verify/h08") for call in FakeAsyncClient.calls))
 
     def test_h08_empty_request_closes_suite_before_read_only_verification(self):
         rejected = self.client.post(
@@ -810,7 +1119,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         learner_index = next(
             index
             for index, item in enumerate(FakeAsyncClient.calls)
-            if item["url"].endswith("/v1/run")
+            if item["url"].endswith("/v1/run-case")
             and item["json"]["cases"]
             and "self_check_input_capability" in item["json"]["cases"][0]
         )
@@ -852,6 +1161,37 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("course_verdict", verifier)
         self.assertNotIn("unit-h08-gateway-control", response.text)
 
+    def test_h09_failed_case_never_runs_next_and_closes_unused_suite_grants(self):
+        original=FakeAsyncClient.post
+        async def post(client,url,**kwargs):
+            if url.endswith("/v1/verify/h09-case"):
+                FakeAsyncClient.calls.append({"url":url,**kwargs})
+                return FakeResponse({"case_id":kwargs["json"]["case_id"],"status":"ERR","course_verdict":"ERR","case_verified":False,"reason":"classifier schema invalid"})
+            return await original(client,url,**kwargs)
+        with patch.object(self.server.httpx,"AsyncClient",FakeAsyncClient),patch.object(FakeAsyncClient,"post",post):
+            response=self.client.post("/api/practice/P09/verify",headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual([row["status"] for row in response.json()["result"]["cases"]],["ERR","미실행","미실행","미실행"])
+        self.assertFalse(response.json()["task_completed"])
+        self.assertEqual(len([call for call in FakeAsyncClient.calls if call["url"].endswith("/v1/run-case")]),1)
+        self.assertTrue(any(call["url"].endswith("/close") and "/cases/" not in call["url"] for call in FakeAsyncClient.calls))
+        self.assertFalse(any(call["url"].endswith("/v1/verify/h09") for call in FakeAsyncClient.calls))
+
+    def test_h10_failed_case_never_runs_next(self):
+        original=FakeAsyncClient.post
+        async def post(client,url,**kwargs):
+            if url.endswith("/v1/verify/h10-case"):
+                FakeAsyncClient.calls.append({"url":url,**kwargs})
+                return FakeResponse({"case_id":kwargs["json"]["case_id"],"status":"ERR","course_verdict":"ERR","case_verified":False,"reason":"classifier schema invalid"})
+            return await original(client,url,**kwargs)
+        with patch.object(self.server.httpx,"AsyncClient",FakeAsyncClient),patch.object(FakeAsyncClient,"post",post):
+            response=self.client.post("/api/practice/P10/verify",headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual([row["status"] for row in response.json()["result"]["cases"]],["ERR","미실행","미실행","미실행"])
+        self.assertFalse(response.json()["task_completed"])
+        self.assertEqual(len([call for call in FakeAsyncClient.calls if call["url"].endswith("/v1/run-case")]),1)
+        self.assertFalse(any(call["url"].endswith("/v1/verify/h10") for call in FakeAsyncClient.calls))
+
     def test_h09_uses_server_owned_cases_and_closes_sink_before_verification(self):
         rejected = self.client.post(
             "/api/hands-on/H09/verify",
@@ -877,7 +1217,7 @@ class GuidedControlCenterTests(unittest.TestCase):
             index
             for index, item in enumerate(calls)
             if "guided-h09-presidio-redaction" in item["url"]
-            and item["url"].endswith("/v1/run")
+            and item["url"].endswith("/v1/run-case")
         )
         close_index = next(
             index
@@ -902,6 +1242,22 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertNotIn("course_verdict", calls[verify_index]["json"])
         self.assertNotIn("unit-h09-sink-control", response.text)
 
+    def test_h07_failed_case_never_runs_next_and_closes_unused_suite_grants(self):
+        original=FakeAsyncClient.post
+        async def post(client,url,**kwargs):
+            if url.endswith("/v1/verify/h07-case"):
+                FakeAsyncClient.calls.append({"url":url,**kwargs})
+                return FakeResponse({"case_id":kwargs["json"]["case_id"],"status":"ERR","course_verdict":"ERR","case_verified":False,"reason":"classifier schema invalid"})
+            return await original(client,url,**kwargs)
+        with patch.object(self.server.httpx,"AsyncClient",FakeAsyncClient),patch.object(FakeAsyncClient,"post",post):
+            response=self.client.post("/api/practice/P07/verify",headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual([row["status"] for row in response.json()["result"]["cases"]],["ERR","미실행"])
+        self.assertFalse(response.json()["task_completed"])
+        self.assertEqual(len([call for call in FakeAsyncClient.calls if call["url"].endswith("/v1/run-case")]),1)
+        self.assertTrue(any(call["url"].endswith("/close") and "/cases/" not in call["url"] for call in FakeAsyncClient.calls))
+        self.assertFalse(any(call["url"].endswith("/v1/verify/h07") for call in FakeAsyncClient.calls))
+
     def test_h07_learner_failure_and_request_error_close_issued_capabilities(self):
         for request_error in (False, True):
             with self.subTest(request_error=request_error):
@@ -910,11 +1266,12 @@ class GuidedControlCenterTests(unittest.TestCase):
                 FakeAsyncClient.h07_run_request_error = request_error
                 with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
                     response = self.client.post("/api/hands-on/H07/verify", headers=self.headers)
-                self.assertEqual(response.status_code, 502)
-                self.assertTrue(response.json()["detail"]["downstream_called"])
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["course_verdict"], "ERR")
+                self.assertEqual([row["status"] for row in response.json()["result"]["cases"]], ["ERR", "미실행"])
                 urls = [item["url"] for item in FakeAsyncClient.calls]
                 self.assertTrue(any(url.endswith("/v1/h07/suites") for url in urls))
-                self.assertTrue(any(url.endswith("/v1/run") for url in urls))
+                self.assertTrue(any(url.endswith("/v1/run-case") for url in urls))
                 self.assertTrue(any(url.endswith("/close") for url in urls))
 
     def test_h07_close_retries_409_and_reports_called_downstream_on_failure(self):
@@ -925,132 +1282,103 @@ class GuidedControlCenterTests(unittest.TestCase):
             response = self.client.post("/api/hands-on/H07/verify", headers=self.headers)
         self.assertEqual(response.status_code, 502)
         self.assertTrue(response.json()["detail"]["downstream_called"])
-        close_calls = [item for item in FakeAsyncClient.calls if item["url"].endswith("/close")]
+        close_calls = [item for item in FakeAsyncClient.calls if item["url"].endswith("/close") and "/cases/" not in item["url"]]
         self.assertEqual(len(close_calls), 6)
         self.assertFalse(any(item["url"].endswith("/v1/verify/h07") for item in FakeAsyncClient.calls))
 
     def test_h22_suite_is_server_owned_and_uses_verifier(self):
-        rejected = self.client.post(
-            "/api/hands-on/H22/verify",
-            json={"course_verdict": "PASS", "approval": True},
-            headers=self.headers,
-        )
-        self.assertEqual(rejected.status_code, 422)
-        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
-            response = self.client.post(
-                "/api/hands-on/H22/verify", headers=self.headers
-            )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["activity_id"], "H22")
-        run_call, verifier_call = FakeAsyncClient.calls
-        self.assertIsNone(run_call["json"])
-        self.assertEqual(
-            verifier_call["json"]["suite_id"],
-            "88888888-8888-8888-8888-888888888888",
-        )
-        self.assertNotIn("course_verdict", verifier_call["json"])
+        self.assertEqual(self.client.post('/api/hands-on/H22/verify',json={'course_verdict':'PASS'},headers=self.headers).status_code,422)
+        with patch.object(self.server.httpx,'AsyncClient',SequentialFailureClient):
+            response=self.client.post('/api/hands-on/H22/verify',headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        result=response.json();self.assertEqual(result['activity_id'],'H22')
+        self.assertEqual(result['course_verdict'],'ERR');self.assertFalse(result['task_completed'])
+        run,verify=FakeAsyncClient.calls
+        self.assertTrue(run['url'].endswith('/v1/run-case'))
+        self.assertTrue(verify['url'].endswith('/v1/verify/h22-case'))
+        self.assertEqual(run['json'],verify['json'])
+        self.assertEqual(set(run['json']),{'suite_id','started_at','case_id'})
+        self.assertEqual(run['json']['case_id'],'normal')
+        self.assertEqual([c['status'] for c in result['result']['cases']],['ERR']+['미실행']*6)
 
     def test_h21_suite_is_server_owned_and_uses_verifier(self):
-        rejected = self.client.post(
-            "/api/hands-on/H21/verify",
-            json={"model": "attacker-selected-model", "course_verdict": "PASS"},
-            headers=self.headers,
-        )
-        self.assertEqual(rejected.status_code, 422)
-        with patch.object(self.server.httpx, "AsyncClient", FakeAsyncClient):
-            response = self.client.post(
-                "/api/hands-on/H21/verify", headers=self.headers
-            )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["activity_id"], "H21")
-        run_call, verifier_call = FakeAsyncClient.calls
-        self.assertIsNone(run_call["json"])
-        self.assertNotIn("course_verdict", verifier_call["json"])
+        self.assertEqual(self.client.post('/api/hands-on/H21/verify',json={'course_verdict':'PASS'},headers=self.headers).status_code,422)
+        with patch.object(self.server.httpx,'AsyncClient',SequentialFailureClient):
+            response=self.client.post('/api/hands-on/H21/verify',headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        result=response.json();self.assertEqual(result['activity_id'],'H21')
+        self.assertEqual(result['course_verdict'],'ERR');self.assertFalse(result['task_completed'])
+        run,verify=FakeAsyncClient.calls
+        self.assertTrue(run['url'].endswith('/v1/run-case'))
+        self.assertTrue(verify['url'].endswith('/v1/verify/h21-case'))
+        self.assertEqual(run['json'],verify['json'])
+        self.assertEqual(set(run['json']),{'suite_id','started_at','case_id'})
+        self.assertEqual(run['json']['case_id'],'normal')
+        self.assertEqual([c['status'] for c in result['result']['cases']],['ERR']+['미실행']*8)
 
     def test_p17_uses_dedicated_runtime_and_has_no_toggle_answer(self):
-        class P17Client(FakeAsyncClient):
-            async def post(self, url, *, json=None, headers):
-                self.calls.append({'url': url, 'json': json, 'headers': headers})
-                return FakeResponse({'activity_id': 'P17', 'task_completed': False, 'security_verdict': 'ERR'})
-        with patch.object(self.server.httpx, 'AsyncClient', P17Client):
-            rejected = self.client.post('/api/hands-on/H17/verify', headers=self.headers,
-                                        json={'task_completed': True})
-            self.assertEqual(rejected.status_code, 422)
-            self.assertEqual(FakeAsyncClient.calls, [])
-            response = self.client.post('/api/hands-on/H17/verify', headers=self.headers)
-        self.assertEqual(response.status_code, 200)
-        run, verify = FakeAsyncClient.calls
-        self.assertEqual(run['url'], self.server.H17_URL + '/v1/run/H17')
-        self.assertEqual(run['headers'], {'Authorization': 'Bearer unit-control-h17'})
-        self.assertEqual(verify['url'], self.server.VERIFIER_URL + '/v1/verify/h17')
-        self.assertEqual(run['json'], verify['json'])
-        page = self.client.get('/').text
-        self.assertNotIn('EXPORT_TO_ALLOY', page)
-        self.assertIn('P17 현재 구현 검증', page)
-        self.assertIn('guided-h17-telemetry', page)
-        self.assertIn('aria-describedby="h17-help"', page)
+        self.assertEqual(self.client.post('/api/hands-on/H17/verify',headers=self.headers,json={'task_completed':True}).status_code,422)
+        with patch.object(self.server.httpx,'AsyncClient',SequentialFailureClient):
+            response=self.client.post('/api/hands-on/H17/verify',headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        run,verify=FakeAsyncClient.calls
+        self.assertEqual(run['url'],self.server.H17_URL+'/v1/run-case/H17')
+        self.assertEqual(run['headers'],{'Authorization':'Bearer unit-control-h17'})
+        self.assertEqual(verify['url'],self.server.VERIFIER_URL+'/v1/verify/h17-case')
+        self.assertEqual(run['json'],verify['json'])
+        self.assertEqual([c['status'] for c in response.json()['result']['cases']],['ERR','미실행','미실행'])
+        page=self.client.get('/').text
+        self.assertNotIn('EXPORT_TO_ALLOY',page)
+        self.assertIn('미션 채점',page)
+        self.assertIn('guided-h17-telemetry',page)
+        self.assertIn('aria-describedby="h17-help"',page)
 
     def test_p19_uses_dedicated_runtime_and_server_owned_verification(self):
-        result = {"activity_id": "P19", "task_completed": False,
-                  "security_verdict": "ERR", "result": {"failed_requirement": "unfinished"}}
-
-        class P19Client(FakeAsyncClient):
-            async def post(self, url, *, json=None, headers):
-                self.calls.append({"url": url, "json": json, "headers": headers})
-                return FakeResponse(result if url.endswith("/v1/verify/h19") else {"closed": True})
-
-        with patch.object(self.server.httpx, "AsyncClient", P19Client):
-            rejected = self.client.post("/api/hands-on/H19/verify", headers=self.headers,
-                                        json={"task_completed": True, "suite_id": "browser-selected"})
-            self.assertEqual(rejected.status_code, 422)
-            self.assertEqual(FakeAsyncClient.calls, [])
-            response = self.client.post("/api/hands-on/H19/verify", headers=self.headers)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), result)
-        run, verify = FakeAsyncClient.calls
-        self.assertEqual(run["url"], self.server.H19_URL + "/v1/run/H19")
-        self.assertEqual(run["headers"], {"Authorization": "Bearer unit-control-h19"})
-        self.assertNotEqual(self.server.H19_URL, self.server.OBSERVABILITY_URL)
-        self.assertEqual(verify["url"], self.server.VERIFIER_URL + "/v1/verify/h19")
-        self.assertEqual(verify["headers"], {"Authorization": "Bearer unit-control-verifier"})
-        self.assertEqual(run["json"], verify["json"])
-        self.assertEqual(set(run["json"]), {"suite_id", "started_at"})
+        self.assertEqual(self.client.post('/api/hands-on/H19/verify',headers=self.headers,json={'suite_id':'browser-selected'}).status_code,422)
+        with patch.object(self.server.httpx,'AsyncClient',SequentialFailureClient):
+            response=self.client.post('/api/hands-on/H19/verify',headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        prepare,run,verify=FakeAsyncClient.calls
+        self.assertEqual(prepare['url'],self.server.H19_URL+'/v1/prepare/H19')
+        self.assertEqual(run['url'],self.server.H19_URL+'/v1/run-case/H19')
+        self.assertEqual(verify['url'],self.server.VERIFIER_URL+'/v1/verify/h19-case')
+        self.assertEqual(run['headers'],{'Authorization':'Bearer unit-control-h19'})
+        self.assertNotEqual(self.server.H19_URL,self.server.OBSERVABILITY_URL)
+        self.assertEqual(run['json'],verify['json'])
+        self.assertEqual(set(prepare['json']),{'suite_id','started_at'})
+        self.assertEqual(run['json']['case_id'],'0-collected')
+        self.assertFalse(response.json()['task_completed'])
+        self.assertEqual([c['status'] for c in response.json()['result']['cases']],['ERR']+['미실행']*9)
 
     def test_unknown_host_is_rejected(self):
         response = self.client.get("/", headers={"Host": "attacker.example"})
         self.assertEqual(response.status_code, 421)
 
     def test_p20_dedicated_runtime_and_problem_without_solution(self):
-        result = {'activity_id': 'P20', 'task_completed': False, 'security_verdict': 'ERR'}
-        class P20Client(FakeAsyncClient):
-            async def post(self, url, *, json=None, headers):
-                self.calls.append({'url': url, 'json': json, 'headers': headers})
-                return FakeResponse(result if url.endswith('/v1/verify/h20') else {'closed': False})
-        with patch.object(self.server, 'H20_TOKEN', 'p20-control'), patch.object(self.server.httpx, 'AsyncClient', P20Client):
-            self.assertEqual(self.client.post('/api/hands-on/H20/verify', headers=self.headers,
-                json={'task_completed': True}).status_code, 422)
-            self.assertEqual(FakeAsyncClient.calls, [])
-            response = self.client.post('/api/hands-on/H20/verify', headers=self.headers)
-        self.assertEqual(response.json(), result)
-        run, verify = FakeAsyncClient.calls
-        self.assertEqual(run['url'], self.server.H20_URL + '/v1/run/H20')
-        self.assertEqual(run['headers'], {'Authorization': 'Bearer p20-control'})
-        self.assertEqual(run['json'], verify['json'])
-        self.assertEqual(verify['url'], self.server.VERIFIER_URL + '/v1/verify/h20')
-        page = self.client.get('/').text
-        self.assertIn('P20 현재 구현 검증', page)
-        self.assertIn('aria-describedby="h20-help"', page)
-        self.assertNotIn('guided_h20_risk_active', page)
-        self.assertNotIn('dashboard-query.txt', page)
-        self.assertIn('h20-alert-dashboard/rules.yaml', page)
+        with patch.object(self.server,'H20_TOKEN','p20-control'),patch.object(self.server.httpx,'AsyncClient',SequentialFailureClient):
+            self.assertEqual(self.client.post('/api/hands-on/H20/verify',headers=self.headers,json={'task_completed':True}).status_code,422)
+            self.assertEqual(FakeAsyncClient.calls,[])
+            response=self.client.post('/api/hands-on/H20/verify',headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['course_verdict'],'ERR')
+        self.assertFalse(response.json()['task_completed'])
+        self.assertEqual(len(FakeAsyncClient.calls),1)
+        self.assertEqual(FakeAsyncClient.calls[0]['url'],self.server.VERIFIER_URL+'/v1/verify/h20-preflight')
+        self.assertEqual(set(FakeAsyncClient.calls[0]['json']),{'suite_id','started_at'})
+        self.assertEqual([c['status'] for c in response.json()['result']['cases']],['ERR','미실행'])
+        page=self.client.get('/').text
+        self.assertIn('미션 채점',page);self.assertIn('aria-describedby="h20-help"',page)
+        self.assertNotIn('guided_h20_risk_active',page);self.assertNotIn('dashboard-query.txt',page)
+        self.assertIn('h20-alert-dashboard/rules.yaml',page)
 
     def test_p20_missing_connection_does_not_call_shared_observability(self):
-        with patch.object(self.server, 'H20_TOKEN', ''), patch.object(self.server.httpx, 'AsyncClient', FakeAsyncClient):
-            response = self.client.post('/api/hands-on/H20/verify', headers=self.headers)
-        self.assertEqual(response.status_code, 502)
-        self.assertFalse(response.json()['detail']['task_completed'])
-        self.assertEqual(FakeAsyncClient.calls, [])
-        self.assertEqual(self.client.get('/readyz').status_code, 200)
+        with patch.object(self.server,'H20_TOKEN',''),patch.object(self.server.httpx,'AsyncClient',FakeAsyncClient):
+            response=self.client.post('/api/hands-on/H20/verify',headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertFalse(response.json()['task_completed'])
+        self.assertEqual(response.json()['course_verdict'],'ERR')
+        self.assertEqual(FakeAsyncClient.calls,[])
+        self.assertEqual(self.client.get('/readyz').status_code,200)
 
     def test_p19_transport_errors_are_incomplete_without_claiming_no_calls(self):
         for failure_at in ('learner_execution', 'evidence_verification'):
@@ -1069,25 +1397,25 @@ class GuidedControlCenterTests(unittest.TestCase):
                             if failure_type == 'status':
                                 return FakeResponse({}, 503)
                             return httpx.Response(200, text='not-json')
-                        return FakeResponse({})
+                        return FakeResponse({'suite_id':json['suite_id']})
 
                 with self.subTest(stage=failure_at, failure=failure_type), patch.object(
                         self.server.httpx, 'AsyncClient', BrokenClient):
                     response = self.client.post('/api/hands-on/H19/verify', headers=self.headers)
-                    self.assertEqual(response.status_code, 502)
-                    detail = response.json()['detail']
+                    self.assertEqual(response.status_code, 200)
+                    detail = response.json()
                     self.assertEqual(detail['activity_id'], 'P19')
                     self.assertFalse(detail['task_completed'])
-                    self.assertEqual(detail['security_verdict'], 'ERR')
-                    self.assertEqual(detail['stopped_stage'], failure_at)
+                    self.assertEqual(detail['course_verdict'], 'ERR')
+                    self.assertEqual([c['status'] for c in detail['result']['cases']],['ERR']+['미실행']*9)
                     self.assertNotIn('downstream_called', detail)
-                    self.assertEqual(len(FakeAsyncClient.calls), 1 if failure_at == 'learner_execution' else 2)
+                    self.assertEqual(len(FakeAsyncClient.calls), 1 if failure_at == 'learner_execution' else 3)
                     self.assertEqual(self.client.get('/readyz').status_code, 200)
 
     def test_session_store_evicts_idle_sessions_at_the_limit(self):
         with patch.object(self.server, "MAX_SESSIONS", 2):
-            self.client.get("/")
-            self.client.get("/")
+            TestClient(self.server.app).get("/")
+            TestClient(self.server.app).get("/")
         self.assertEqual(len(self.server.SESSIONS), 2)
         self.assertFalse(self.server.ACTIVE_SESSIONS)
 
@@ -1124,7 +1452,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         for button_id, tooltip_id in action_help.items():
             self.assertIn(f'id="{button_id}"', html)
             self.assertIn(f'aria-describedby="{tooltip_id}"', html)
-            self.assertIn(f'id="{tooltip_id}" class="action-tooltip" role="tooltip"', html)
+            self.assertIn(f'id="{tooltip_id}" class="action-tooltip" role="note"', html)
         self.assertIn("AWS 자격 증명과 모델 연결", html)
         self.assertIn("S3 Vector Index", html)
         self.assertIn("복구 코드 요청을 거부하는 Bot 응답", html)
@@ -1133,7 +1461,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("판정 응답은 차단 시", html)
         self.assertIn("다른 공격 문장까지 모두 막는다는 뜻은 아닙니다", html)
         self.assertIn("실제로 받은 digest", html)
-        self.assertIn("Token 제한 코드가 맞다는 뜻은 아닙니다", html)
+        self.assertIn("출력 상한과 예산 처리 코드는", html)
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("textContent", javascript)
         self.assertNotIn("innerHTML", javascript)
@@ -1150,11 +1478,8 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn(':root[data-theme="dark"]', stylesheet)
         self.assertIn("@media (prefers-color-scheme: dark)", stylesheet)
         self.assertIn("prefers-reduced-motion", stylesheet)
-        self.assertIn(".action-control:not(.tip-dismissed):focus-within .action-tooltip", stylesheet)
-        self.assertIn(
-            ".actions:not(.single) > .action-control:last-child .action-tooltip",
-            stylesheet,
-        )
+        self.assertIn(".action-help-summary", stylesheet)
+        self.assertIn(".action-tooltip, .action-tip { display: block; position: static;", stylesheet)
 
     def test_only_named_public_assets_are_served_not_source_or_course_files(self):
         paths = ("/server.py", "/p01.json", "/Containerfile", "/requirements.txt",
@@ -1174,7 +1499,9 @@ class GuidedControlCenterTests(unittest.TestCase):
             if text.startswith("{"):
                 templates.append(json.loads(text))
                 continue
-            self.assertTrue(text.startswith("docker compose "), text[:120])
+            if text in ("mkdir -p ~/work/control-center-tutorial\nvi ~/work/control-center-tutorial/request.json", "cat ~/work/control-center-tutorial/request.json", "제출 명령을 준비하고 있습니다."):
+                continue
+            self.assertTrue(text.startswith("docker compose ") or text.startswith("cd ~/owasp-llm-lab-setup-guide") or text.startswith("vi ~/owasp-llm-lab-setup-guide/llm-security-control-plane/guided-labs/"), text[:120])
             self.assertNotIn("cat >", text)
             self.assertNotIn("python -c", text)
         self.assertEqual(len(templates), 2)
@@ -1202,7 +1529,7 @@ class GuidedControlCenterTests(unittest.TestCase):
     def test_p18_problem_contains_contract_but_not_completed_queries(self):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         problem = html.split('<div id="h18-work"', 1)[1].split('<div id="h19-work"', 1)[0]
-        for required in ('P18 현재 구현 검증', 'guided-h18-queries', 'queries.yaml',
+        for required in ('미션 채점', 'guided-h18-queries', 'queries.yaml',
                          'request_id', 'Counter', '--no-deps', 'aria-describedby="h18-help"'):
             self.assertIn(required, problem)
         for solution in ('logql:', 'promql:', 'sum(', 'max by ('):
@@ -1213,9 +1540,9 @@ class GuidedControlCenterTests(unittest.TestCase):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         problem = html.split('<div id="h19-work"', 1)[1].split('<div id="h20-work"', 1)[0]
         self.assertNotIn('JOIN_KEY', problem)
-        for required in ('P19 현재 구현 검증', 'analyze_incident', 'downstream_calls', 'ValueError',
+        for required in ('미션 채점', 'analyze_incident', 'downstream_calls', 'ValueError',
                          'build guided-h19-investigation', '--no-deps', '교육용 공지 저장소',
-                         'aria-describedby="h19-help"', 'role="tooltip"'):
+                         'aria-describedby="h19-help"', 'role="note"'):
             self.assertIn(required, problem)
 
     def test_rendering_only_updates_existing_dom_ids(self):
@@ -1320,7 +1647,11 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn('@app.post("/v1/chat")', source)
         self.assertIn('boto3.client("bedrock-runtime", region_name=REGION)', source)
         self.assertIn("learner.handle_request(body, recorder)", source)
-        learner_source = (CONTROL / "guided-labs/h01-bedrock-gateway/learner.py").read_text()
+        # Check the published Starter without overwriting the learner's local solution.
+        learner_source = subprocess.check_output(
+            ["git", "show", "HEAD:llm-security-control-plane/guided-labs/h01-bedrock-gateway/learner.py"],
+            cwd=ROOT, text=True,
+        )
         self.assertIn("raise NotImplementedError", learner_source)
         self.assertNotIn("min(", learner_source)
 
@@ -1332,23 +1663,23 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("/tmp/.aws:ro", str(learner["volumes"]))
         self.assertNotIn("guided-h01-gateway", str(baseline))
 
-    def test_manifest_has_13_tabs_and_22_unique_activities(self):
+    def test_manifest_has_13_tabs_and_23_unique_activities(self):
         manifest = yaml.safe_load(
             (CONTROL / "guided-labs/manifest.yaml").read_text(encoding="utf-8")
         )
         hands_on = [str(item) for tab in manifest["tabs"] for item in tab["hands_on"]]
         self.assertEqual(len(manifest["tabs"]), 13)
-        self.assertEqual(len(hands_on), 22)
-        self.assertEqual(len(set(hands_on)), 22)
+        self.assertEqual(len(hands_on), 23)
+        self.assertEqual(len(set(hands_on)), 23)
         self.assertEqual(manifest["workspace"], "practice")
         self.assertEqual(manifest["execution_ids"],
-                         {f"P{i:02d}": f"H{i:02d}" for i in range(1, 23)})
+                         {f"P{i:02d}": f"H{i:02d}" for i in range(1, 24)})
         self.assertEqual(hands_on[0], "H01")
         self.assertTrue(all("practice" not in tab for tab in manifest["tabs"]))
         self.assertTrue(all("practice_status" not in tab for tab in manifest["tabs"]))
         self.assertEqual(manifest["tabs"][0]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][1]["hands_on_status"], "implemented")
-        self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H02", "H03"])
+        self.assertEqual(manifest["tabs"][1]["implemented_hands_on"], ["H23", "H02", "H03"])
         self.assertEqual(manifest["tabs"][2]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][2]["implemented_hands_on"], ["H04"])
         self.assertEqual(manifest["tabs"][3]["hands_on_status"], "implemented")
@@ -1376,6 +1707,84 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertTrue(all(tab["hands_on_status"] == "implemented" for tab in manifest["tabs"][6:12]))
         self.assertEqual(manifest["tabs"][12]["hands_on_status"], "implemented")
         self.assertEqual(manifest["tabs"][12]["implemented_hands_on"], ["H21", "H22"])
+
+    def test_experience_runs_native_function_without_verdict_or_completion(self):
+        from unittest.mock import AsyncMock
+        class NativeClient(FakeAsyncClient):
+            def stream(self,method,url,*,json,headers):
+                from contextlib import asynccontextmanager
+                @asynccontextmanager
+                async def receive():
+                    response=FakeResponse({**json,"run_state":"finished"})
+                    async def chunks():yield __import__('json').dumps(response.json()).encode()
+                    response.aiter_bytes=chunks
+                    self.calls.append({"url":url,"json":json,"headers":headers})
+                    yield response
+                return receive()
+            async def post(self, url, *, json=None, headers):
+                if url.endswith("/v1/preview"):
+                    self.calls.append({"url":url,"json":json,"headers":headers})
+                    return FakeResponse({"graded":False,"reply":"native reply"})
+                if url.endswith("/v1/run") or "/v1/run/H" in url:
+                    self.calls.append({"url": url, "json": json, "headers": headers})
+                    return FakeResponse(dict(json))
+                return await super().post(url, json=json, headers=headers)
+        before = self.client.get("/api/progress").json()
+        for problem,config in self.server.load_experience_catalog().items():
+            with self.subTest(problem=problem):
+                body={"case_id":config["options"][0]["id"]} if config["mode"]=="scenario" else {"message":"native prompt"} if config["mode"]=="message" else {"operation":"lookup","message":"notice"} if config["mode"]=="operation" else None
+                if config.get("editable"):body["message"]="직접 입력한 문장입니다."
+                FakeAsyncClient.calls.clear()
+                with patch.object(self.server, "H20_TOKEN", "unit-h20"), patch.object(self.server.httpx, "AsyncClient", NativeClient), patch.object(self.server, "exploration_result", AsyncMock(return_value={"graded": False, "result": {"native": True}})):
+                    response = self.client.post("/api/experience/" + problem,json=body,headers=self.headers) if body else self.client.post("/api/experience/" + problem,headers=self.headers)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertFalse(response.json()["graded"])
+                self.assertFalse(any("/v1/verify/" in call["url"] for call in FakeAsyncClient.calls))
+                self.assertFalse(self.server.EXPLORATION.get())
+                self.assertIsNone(self.server.PREVIEW_CASE.get())
+                self.assertIsNone(self.server.PREVIEW_MESSAGE.get())
+                self.assertEqual(self.client.get("/api/progress").json(), before)
+                if problem in {"P05","P09","P11","P16","P21","P22"}:
+                    self.assertEqual(len(FakeAsyncClient.calls),1)
+                    self.assertTrue(FakeAsyncClient.calls[0]["url"].endswith('/v1/preview'))
+                    expected={"case_id":body["case_id"],"query":body["message"]} if problem=="P11" else body
+                    self.assertEqual(FakeAsyncClient.calls[0]['json'],expected)
+                elif problem in {'P06','P07','P08','P10'}:
+                    execution=next(call for call in FakeAsyncClient.calls if call['url'].endswith('/v1/run'))
+                    self.assertEqual(execution['headers']['X-Preview-Case'],body['case_id'])
+                    if config.get('editable'):
+                        decoded=__import__('base64').urlsafe_b64decode(execution['headers']['X-Preview-Message']).decode()
+                        self.assertEqual(decoded,body['message'])
+
+    def test_experience_requires_csrf_and_dedicated_routes(self):
+        self.assertEqual(TestClient(self.server.app).post("/api/experience/P06").status_code,401)
+        self.assertEqual(self.client.post("/api/experience/P06").status_code,403)
+        self.assertEqual(self.client.post("/api/experience/P06",json={"security_verdict":"PASS"},headers=self.headers).status_code,422)
+        for problem in ("P03","P04"):
+            self.assertEqual(self.client.post("/api/experience/"+problem,headers=self.headers).status_code,404)
+
+    def test_document_upload_is_csrf_protected_and_rejects_client_identity(self):
+        body = {"title":"내 문서", "body":"사용자가 입력한 문서 내용입니다."}
+        self.assertEqual(TestClient(self.server.app).post("/api/documents/upload",json=body).status_code,401)
+        self.assertEqual(self.client.post("/api/documents/upload",json=body).status_code,403)
+        self.assertEqual(self.client.post("/api/documents/upload",json={**body,"document_id":"spoof"},headers=self.headers).status_code,422)
+        self.server.RESOURCE_ACTIONS.add("P02")
+        try:
+            self.assertEqual(self.client.post("/api/documents/upload",json=body,headers=self.headers).status_code,409)
+        finally:
+            self.server.RESOURCE_ACTIONS.discard("P02")
+
+    def test_pipeline_experience_stops_before_verifier_and_preserves_history(self):
+        from unittest.mock import AsyncMock
+        async def native(client, url, token, suite_id, timeout):
+            return {"suite_id": suite_id, "run_state": "finished", "cases": [{"reply": "native"}]}
+        before = self.client.get("/api/progress").json()
+        with patch.object(self.server, "p12_post_json", AsyncMock(side_effect=native)) as run, patch.object(self.server, "exploration_result", AsyncMock(return_value={"graded": False, "result": {"cases": []}})):
+            response = self.client.post("/api/experience/P12", json={"case_id":self.server.load_experience_catalog()["P12"]["options"][0]["id"]}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        run.assert_awaited_once()
+        self.assertNotIn("/verify/", run.await_args.args[1])
+        self.assertEqual(self.client.get("/api/progress").json(), before)
 
 
 if __name__ == "__main__":

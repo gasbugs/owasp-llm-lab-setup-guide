@@ -1,0 +1,297 @@
+{
+  "activity_id": "P04",
+  "execution_id": "display-only-P04",
+  "course_verdict": "PASS",
+  "security_verdict": "PASS",
+  "task_completed": true,
+  "verified_by": "display-fixture-only",
+  "reason": "UI 표시용 샘플",
+  "result": {
+    "cases": [
+      {
+        "case_id": "apply_guardrail-normal",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "apply_guardrail",
+          "text": "고객지원 운영 시간은 평일 오전 9시입니다."
+        },
+        "expected": "returned",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "apply_guardrail-email",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "apply_guardrail",
+          "text": "담당자 이메일은 learner@example.com 입니다."
+        },
+        "expected": "returned",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "converse-normal",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": "고객지원 운영 시간은 평일 오전 9시입니다."
+        },
+        "expected": "returned",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "converse-email",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": "담당자 이메일은 learner@example.com 입니다."
+        },
+        "expected": "returned",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "text-min",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "apply_guardrail",
+          "text": "x"
+        },
+        "expected": "returned",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "text-max",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "apply_guardrail",
+          "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "expected": "returned",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "preserve-whitespace",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "apply_guardrail",
+          "text": "  정상 문장  "
+        },
+        "expected": "returned",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "missing-operation",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "text": "normal"
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "missing-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse"
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "extra-policy",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": "normal",
+          "guardrailIdentifier": "other"
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "empty-body",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {},
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "list-body",
+        "case_verified": true,
+        "status": "PASS",
+        "input": [],
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "null-body",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "boolean-body",
+        "case_verified": true,
+        "status": "PASS",
+        "input": true,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "unknown-operation",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "unknown",
+          "text": "normal"
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "list-operation",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": [],
+          "text": "normal"
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "boolean-operation",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": true,
+          "text": "normal"
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "empty-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": ""
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "blank-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": " \n\t "
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "long-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "integer-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": 1
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "boolean-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": false
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "null-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": null
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "list-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": []
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "object-text",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": {}
+        },
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "apply_guardrail-error",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "apply_guardrail",
+          "text": "normal"
+        },
+        "expected": "service_error",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "converse-error",
+        "case_verified": true,
+        "status": "PASS",
+        "input": {
+          "operation": "converse",
+          "text": "normal"
+        },
+        "expected": "service_error",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      }
+    ]
+  }
+}

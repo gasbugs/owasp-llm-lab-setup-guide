@@ -18,7 +18,7 @@ class LifecycleError(RuntimeError):
 
 
 class Workflow:
-    def __init__(self, origin, control_token, *, transport=None, worker=execute):
+    def __init__(self, origin, control_token, *, transport=None, worker=execute, native_sdk=False):
         parsed = urlsplit(origin)
         if (parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password
                 or parsed.query or parsed.fragment or parsed.path not in {"", "/"}):
@@ -27,6 +27,7 @@ class Workflow:
             raise ValueError("invalid lifecycle credential")
         self.origin, self.control_token = origin.rstrip("/"), control_token
         self.transport, self.worker = transport, worker
+        self.native_sdk = native_sdk
 
     def _post(self, path, body, *, timeout=5):
         try:
@@ -68,7 +69,7 @@ class Workflow:
                         "mapping_digest": mapping_digest, "prepared": True}:
             raise LifecycleError()
 
-    def run_case(self, source_path, *, suite_id, execution_id, runner_digest, timeout=75):
+    def run_case(self, source_path, *, suite_id, execution_id, runner_digest, timeout=75, query=None):
         if str(UUID(suite_id)) != suite_id or str(UUID(execution_id)) != execution_id:
             raise ValueError("server-issued UUIDs required")
         with Path(source_path).open("rb") as stream:
@@ -99,7 +100,23 @@ class Workflow:
             result["started_at"] = stamp
             configuration = {"suite_id": suite_id, "execution_id": execution_id,
                              "origin": self.origin, "capability": capability}
+            if self.native_sdk:
+                configuration["native_sdk"] = True
+            if query is not None:
+                if not self.native_sdk or not isinstance(query, str) or not query.strip() or len(query) > 1000:
+                    raise ValueError("invalid direct query")
+                configuration["query"] = query
             execution = self.worker(source_path, grant["current_job_id"], configuration, timeout=timeout)
+            if execution.get("native_sdk") and execution.get("provider_mode") == "aws":
+                for call in execution.get("calls", []):
+                    recorded = self._post("/native-record", {"suite_id": suite_id, "execution_id": execution_id,
+                        "capability": capability, "operation": call["operation"], "response": call.get("response")})
+                    proof = recorded["response"]
+                    call.pop("response", None)
+                    if proof is not None:
+                        call["response_digest"] = hashlib.sha256(json.dumps(proof, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+                        if call["operation"] == "retrieve" and execution.get("result", {}).get("status") == "ready":
+                            execution["result"]["result"] = proof
             result["execution"] = execution
             if execution.get("source_digest") != source_digest:
                 raise ValueError("source changed during execution")

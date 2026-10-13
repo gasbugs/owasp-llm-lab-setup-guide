@@ -34,7 +34,8 @@ def execute(source_path, body, configuration, *, timeout=75):
     if len(source) > SOURCE_LIMIT:
         return {**base, "execution_status": "source_limit"}
     try:
-        if set(configuration) != {"suite_id", "execution_id", "origin", "capability"}:
+        if set(configuration) not in ({"suite_id", "execution_id", "origin", "capability"},
+                                      {"suite_id", "execution_id", "origin", "capability", "native_sdk"}):
             raise ValueError("only invocation configuration enters worker")
         document_id = str(UUID(configuration["execution_id"]))
         if document_id != configuration["execution_id"]:
@@ -86,10 +87,16 @@ def child():
     sys.path.insert(0, str(Path(__file__).parent))
     from service_client import ServiceClient, ServiceError
     services = None
+    native = False
     try:
         envelope = json.load(sys.stdin)
         configuration = envelope["input"]["configuration"]
-        services = ServiceClient(**configuration)
+        native = configuration.pop("native_sdk", False)
+        if native:
+            from native_runtime import NativeSDK
+            services = NativeSDK(configuration)
+        else:
+            services = ServiceClient(**configuration)
         namespace = {"__name__": "p02_learner"}
         with open(os.devnull, "w") as sink, contextlib.redirect_stdout(sink):
             exec(compile(envelope["source"], "learner.py", "exec"), namespace)
@@ -97,13 +104,16 @@ def child():
             if function is None:
                 raise NotImplementedError()
             try:
-                value = asyncio.run(function(envelope["input"]["body"], configuration["execution_id"], services))
+                with services.observe() if native else contextlib.nullcontext():
+                    value = asyncio.run(function(envelope["input"]["body"], configuration["execution_id"], services))
             except ValueError:
                 raise LearnerRejected() from None
         if not isinstance(value, dict) or set(value) != {"source", "embedding"} or any(not isinstance(v, dict) for v in value.values()):
             result = {"execution_status": "invalid_return"}
         else:
-            result = {"execution_status": "returned", "result": value}
+            result = {"execution_status": "returned", "result": services.normalize(value) if native else value}
+            if native:
+                result["native_result"] = value
     except NotImplementedError:
         result = {"execution_status": "not_implemented"}
     except ServiceError:
@@ -113,12 +123,19 @@ def child():
     except BaseException:
         result = {"execution_status": "runtime_error"}
     result["calls"] = services.calls if services else None
+    if services is not None and native:
+        result["native_sdk"] = True
+        result["sdk_clients"] = services.clients
+        result["provider_mode"] = services.connection["provider_mode"] if services.connection else None
     try:
         raw = encode(result)
     except (ValueError, TypeError):
         raw = encode({"execution_status": "invalid_return", "calls": result["calls"]})
     if len(raw) > OUTPUT_LIMIT:
         raw = encode({"execution_status": "output_limit", "calls": None})
+    if native and services is not None and services.connection is not None:
+        for secret in services.connection["credentials"].values():
+            raw = raw.replace(secret.encode(), b"[REDACTED]")
     sys.stdout.buffer.write(raw)
 
 

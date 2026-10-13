@@ -32,7 +32,7 @@ def load(name):
 cases = load("cases")
 flow.gateway.load("p03_backend")
 suites = flow.gateway.load("p03_suites")
-with patch.dict(sys.modules, {"cases": cases}):
+with patch.dict(sys.modules, {"cases": cases, "workflow": flow.workflow}):
     runner = load("run_server")
 
 
@@ -61,6 +61,30 @@ class RunnerTests(unittest.TestCase):
     def run_suite(self, client=None, suite=None, **extra):
         return (client or self.client).post("/v1/run", headers=self.control,
                                            json={"suite_id": suite or str(uuid4()), **extra})
+
+    def test_direct_search_executes_only_current_case_without_grading_receipt(self):
+        response = self.client.post("/v1/search", headers=self.control, json={"query": "계정 접근 절차"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["graded"])
+        self.assertEqual(response.json()["query"], "계정 접근 절차")
+        self.workflow.run_case.assert_called_once()
+        self.assertEqual(self.workflow.run_case.call_args.kwargs["query"], "계정 접근 절차")
+        mapping = self.workflow.prepare_suite.call_args.kwargs["executions"]
+        self.assertEqual(self.workflow.run_case.call_args.kwargs["execution_id"], mapping[0]["execution_id"])
+        suite = self.workflow.run_case.call_args.kwargs["suite_id"]
+        self.assertEqual(self.client.get("/v1/receipts/" + suite, headers=self.verifier).status_code, 404)
+        self.assertEqual(self.client.post("/v1/search", json={"query": "검색"}).status_code, 401)
+        self.assertEqual(self.client.post("/v1/search", headers=self.control, json={"query": " "}).status_code, 422)
+        self.assertEqual(self.client.post("/v1/search", headers=self.control, json={"query": "검색", "knowledge_base_id": "spoof"}).status_code, 422)
+
+    def test_search_missing_preparation_reports_not_executed_and_releases_lock(self):
+        self.workflow.prepare_suite.side_effect = flow.workflow.LifecycleError(409)
+        response = self.client.post("/v1/search", headers=self.control, json={"query":"검색"})
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("검색 미실행", response.json()["detail"])
+        self.workflow.run_case.assert_not_called()
+        self.workflow.prepare_suite.side_effect = None
+        self.assertEqual(self.client.post("/v1/search", headers=self.control, json={"query":"검색"}).status_code, 200)
 
     def test_health_has_no_provider_or_source_execution(self):
         self.assertEqual(self.client.get("/readyz").json()["provider_check"], "not-run")
@@ -199,6 +223,7 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(response.json(), self.store.read(root["suite_id"]))
 
     def test_actual_starter_records_all_attempts_but_has_no_verified_case(self):
+        (self.root / "learner.py").write_text("async def search_current(current_job_id, services):\n    raise NotImplementedError()\n")
         live = self.client_for(self.live_workflow())
         root = self.run_suite(live).json()
         self.assertEqual(root["run_state"], "finished")

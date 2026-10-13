@@ -119,9 +119,9 @@ def response_text(value) -> str:
     return str(response)
 
 
-async def execute_case(request: RunRequest) -> dict:
+async def execute_case(request: RunRequest, message: str | None = None) -> dict:
     generated = await rails.generate_async(
-        messages=[{"role": "user", "content": CASES[request.case_id]}],
+        messages=[{"role": "user", "content": message if message is not None else CASES[request.case_id]}],
         options={
             "rails": ["dialog"],
             "output_vars": True,
@@ -166,7 +166,7 @@ async def execute_case(request: RunRequest) -> dict:
         "started_at": request.started_at,
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "case_id": request.case_id,
-        "input": CASES[request.case_id],
+        "input": message if message is not None else CASES[request.case_id],
         "user_intent": intent,
         "flow": flow,
         "bot_intent": bot_intent,
@@ -183,7 +183,7 @@ async def execute_case(request: RunRequest) -> dict:
         "framework_version": FRAMEWORK_VERSION,
     }
     store("case", request.execution_id, receipt)
-    return {"execution_id": request.execution_id, "case_id": request.case_id}
+    return receipt if message is not None else {"execution_id": request.execution_id, "case_id": request.case_id}
 
 
 def run_evaluation(request: EvaluateRequest) -> dict:
@@ -286,3 +286,16 @@ def receipt(execution_id: str, _authorized: None = Depends(require_verifier)) ->
 @app.get("/v1/evaluations/{evaluation_id}")
 def evaluation(evaluation_id: str, _authorized: None = Depends(require_verifier)) -> dict:
     return receipt(evaluation_id, _authorized)
+
+
+class PreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str = Field(min_length=1, max_length=1000)
+
+
+@app.post("/v1/preview")
+async def preview(body: PreviewRequest, _authorized: None = Depends(require_control)):
+    from uuid import uuid4
+    request = RunRequest(execution_id=str(uuid4()), started_at=datetime.now(timezone.utc).isoformat(), case_id="contact-exact")
+    receipt = await execute_case(request, body.message)
+    return {"graded": False, "input": body.message, "reply": receipt["bot_message"], "details": receipt}

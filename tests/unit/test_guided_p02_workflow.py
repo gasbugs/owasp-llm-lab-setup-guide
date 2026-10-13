@@ -151,7 +151,7 @@ class WorkflowTests(unittest.TestCase):
         self.runtime.invoke_model.assert_not_called()
 
     def test_starter_is_finished_execution_but_not_verified_case(self):
-        self.source.write_text(ROOT.joinpath("guided-labs/h02-document-ingestion/learner.py").read_text())
+        self.source.write_text("async def prepare_document(*args): raise NotImplementedError()")
         result = self.run_case()
         ledger, source = self.evidence(source=False)
         self.assertEqual(result["lifecycle_status"], "finished")
@@ -250,7 +250,19 @@ class WorkflowTests(unittest.TestCase):
             verifier = verification_module.Verification(self.source.parent, "http://runner", self.origin,
                                                         "runner-verifier", "verifier-fixture")
             with httpx.Client(transport=httpx.MockTransport(transport)) as reader:
-                full = verifier.collect(root["suite_id"], reader)
+                snapshots = []
+                full = verifier.collect(root["suite_id"], reader,
+                    on_progress=lambda done, current: snapshots.append(([dict(row) for row in done], current)))
+                self.assertEqual(len(snapshots), 44)
+                for index in range(22):
+                    before, current = snapshots[index * 2]
+                    after, finished = snapshots[index * 2 + 1]
+                    self.assertEqual(len(before), index)
+                    self.assertEqual(current["case_id"], full["cases"][index]["case_id"])
+                    self.assertEqual(current["status"], "채점 중")
+                    self.assertEqual(len(after), index + 1)
+                    self.assertTrue(after[-1]["case_verified"])
+                    self.assertIsNone(finished)
                 self.assertTrue(full["case_contract_verified"])
                 self.assertEqual(len(full["cases"]), 22)
                 invalid_root_mutations = [lambda value: value.update(run_state="running"),

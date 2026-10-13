@@ -1,0 +1,33 @@
+{
+  "lab_id": "10-policy-promotion",
+  "activity_id": "P20",
+  "execution_id": "6d2a38d2-affe-4fc4-85dc-6e79db47ee2d",
+  "execution_kind": "h20-native-suite",
+  "started_at": "2026-10-11T02:27:39.651733+00:00",
+  "status": "completed",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:27:39.684034+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "result": {
+    "cases": [
+      {
+        "case_id": "configuration-binding",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "현재 설정 파일과 실제 적용 상태를 확인하지 못했습니다.",
+        "configuration": {}
+      },
+      {
+        "case_id": "alert-lifecycle",
+        "status": "미실행",
+        "reason": "설정 적용 검사 실패로 중단"
+      }
+    ]
+  },
+  "reason": "현재 설정 파일과 실제 적용 상태를 확인하지 못했습니다.",
+  "next_check": "H20 learner source와 native artifact를 확인합니다.",
+  "case_verified": false,
+  "task_completed": false
+}

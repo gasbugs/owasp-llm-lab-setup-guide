@@ -1,0 +1,32 @@
+{
+  "activity_id": "P13",
+  "execution_id": "73a37341-271f-4b06-8dbe-46676bdf02d1",
+  "started_at": "2026-10-11T01:31:27.106431+00:00",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T01:31:30.282670+00:00",
+  "task_completed": false,
+  "case_id": "H13-NORMAL — 정상 요청은 Main 경로를 유지한다",
+  "case_verified": false,
+  "stage_calls": [],
+  "result": {
+    "cases": [
+      {
+        "case_id": "H13-NORMAL — 정상 요청은 Main 경로를 유지한다",
+        "status": "ERR",
+        "reason": "현재 케이스의 Promptfoo 원문과 앱 응답을 확인하세요."
+      },
+      {
+        "case_id": "H13-RISK — 위험 요청은 Main 전에 멈춘다",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ],
+    "task_completed": false,
+    "case_verified": false,
+    "course_verdict": "ERR"
+  },
+  "reason": "현재 케이스의 Promptfoo 원문과 앱 응답을 확인하세요.",
+  "internal_activity_id": "H13",
+  "security_verdict": "ERR"
+}

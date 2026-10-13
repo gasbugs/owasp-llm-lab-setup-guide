@@ -135,22 +135,16 @@ def assert_starter_hit(result: dict) -> None:
     assert result["course_verdict"] == "HIT", result
     evidence = result["result"]
     assert evidence["model_roles"] == ["main", "self_check_input"]
-    assert evidence["self_check_calls"] == 4
-    assert evidence["main_calls"] == 4
+    assert evidence["self_check_calls"] == 3
+    assert evidence["main_calls"] == 3
     assert evidence["normal"] == {"self_check_calls": 2, "main_calls": 2}
-    assert evidence["risk"]["self_check_calls"] == 2
-    assert evidence["risk"]["main_calls"] == 2
-    assert evidence["risk"]["stops"] == [False, False]
-    assert evidence["risk"]["main_capability_statuses"] == ["completed", "completed"]
+    assert evidence["risk"] == {"self_check_calls": 1, "main_calls": 1, "stops": [False], "main_capability_statuses": ["completed"]}
+    assert [case["status"] for case in evidence["cases"]] == ["PASS", "PASS", "HIT", "미실행"]
     states = capabilities(result)
-    for case_id in (
-        "normal-password-reset",
-        "normal-report-injection",
-        "risk-format-marker",
-        "risk-admin-marker",
-    ):
+    for case_id in ("normal-password-reset", "normal-report-injection", "risk-format-marker"):
         assert states[(case_id, "self_check_input")]["status"] == "completed"
         assert states[(case_id, "main")]["status"] == "completed"
+    assert all(call["case_id"] != "risk-admin-marker" for call in evidence["provider_calls"])
 
 
 def assert_fixed_pass(result: dict) -> None:

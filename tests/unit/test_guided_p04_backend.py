@@ -1,3 +1,4 @@
+import json
 """Actual Boto3 request serialization using Stubber, never AWS network traffic."""
 from copy import deepcopy
 from pathlib import Path
@@ -52,6 +53,17 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(kwargs["config"].retries, {"total_max_attempts": 1})
         self.assertEqual(kwargs["config"].connect_timeout, 3)
         self.assertEqual(kwargs["config"].read_timeout, 20)
+
+    def test_preview_budget_changes_only_provider_transport(self):
+        args = expected_arguments(self.body, self.guardrail)
+        actual = json.loads(json.dumps(args))
+        actual["inferenceConfig"]["maxTokens"] = 2048
+        self.stubber.add_response("converse", self.response, actual)
+        self.stubber.activate()
+        backend=BedrockBackend(self.body,self.guardrail,client_factory=self.factory,preview_tokens=2048)
+        self.assertEqual(backend("converse",args), self.response)
+        self.assertEqual(args["inferenceConfig"]["maxTokens"],128)
+        self.stubber.assert_no_pending_responses()
 
     def test_apply_uses_output_scope_without_converse(self):
         self.body["operation"] = "apply_guardrail"

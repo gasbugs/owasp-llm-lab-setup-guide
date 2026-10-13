@@ -1,0 +1,1564 @@
+{
+  "lab_id": "11-raw-observability",
+  "activity_id": "P18",
+  "execution_id": "d6ed6e04-99fb-41fc-84b6-477a7939b0a9",
+  "execution_kind": "h18-native-suite",
+  "started_at": "2026-10-11T02:06:39.202270+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:06:42.440802+00:00",
+  "stage_calls": [
+    {
+      "stage": "product_query",
+      "attempted": true,
+      "outcome": "allow",
+      "evidence_id": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f"
+    },
+    {
+      "stage": "product_query",
+      "attempted": true,
+      "outcome": "block",
+      "evidence_id": "c13bcef3-8984-4fa8-8b11-5d3059847fda"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "tempo",
+      "kind": "trace",
+      "id": "b843b6998228dca918aaff39ed402aea"
+    },
+    {
+      "source": "tempo",
+      "kind": "trace",
+      "id": "b52e0689d94516998b8cdc71cd6f585f"
+    }
+  ],
+  "result": {
+    "source_digest": "13e213feab7d3eb2e95f7ffb3a57a39a948bdfaf9343efeee8ada59b1146a7aa",
+    "runner_digests": {
+      "server.py": "6b1d473de4605b29102f065ec718c3075a7bc2bf9c0a09dd138b4565576bfa04",
+      "query_execution.py": "8b4c01eb1d0ffb0601707bc787fec92e1efc90395a22f5499dd2eb7c4c4efee8",
+      "request_workflow.py": "a1880b237b9aa6e591e8f183978d5ab8b7ab4d586c1397c063c42bf2ceda41b8"
+    },
+    "queries": {
+      "logql": "{service_name=\"guided-h18-queries\"} | request_id = \"{request_id}\"",
+      "promql": "sum by (decision) (guided_security_decisions_total{hands_on=\"H18\"})",
+      "trace_lookup": "exact_trace_id"
+    },
+    "cases": [
+      {
+        "request_id": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f",
+        "trace_id": "b843b6998228dca918aaff39ed402aea",
+        "decision": "allow",
+        "logs": 1,
+        "spans": [
+          "authorize",
+          "notice_lookup",
+          "security.request"
+        ],
+        "counter_delta": {
+          "allow": 1.0,
+          "block": 1.0
+        },
+        "products": {
+          "loki": {
+            "parameters": {
+              "query": "{service_name=\"guided-h18-queries\"} | request_id = \"e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f\"",
+              "start": 1791684399745656152,
+              "end": 1791684401924828942,
+              "limit": 200
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "stream": {
+                      "code_file_path": "/app/request_workflow.py",
+                      "code_function_name": "handle_action",
+                      "code_line_number": "88",
+                      "decision": "allow",
+                      "detected_level": "INFO",
+                      "fixture": "notice-authorization",
+                      "flags": "1",
+                      "hands_on": "H18",
+                      "observed_timestamp": "1791684399746157117",
+                      "policy_rule": "notice-read-only",
+                      "request_id": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f",
+                      "scope_name": "guided-security",
+                      "service_name": "guided-h18-queries",
+                      "severity_number": "9",
+                      "severity_text": "INFO",
+                      "span_id": "f701efaf971ea5ae",
+                      "telemetry_sdk_language": "python",
+                      "telemetry_sdk_name": "opentelemetry",
+                      "telemetry_sdk_version": "1.37.0",
+                      "trace_id": "b843b6998228dca918aaff39ed402aea"
+                    },
+                    "values": [
+                      [
+                        "1791684399746064128",
+                        "security_decision"
+                      ]
+                    ]
+                  }
+                ],
+                "stats": {
+                  "summary": {
+                    "bytesProcessedPerSecond": 51069,
+                    "linesProcessedPerSecond": 288,
+                    "totalBytesProcessed": 354,
+                    "totalLinesProcessed": 2,
+                    "execTime": 0.006932,
+                    "queueTime": 0.000534,
+                    "subqueries": 0,
+                    "totalEntriesReturned": 1,
+                    "splits": 0,
+                    "shards": 1,
+                    "totalPostFilterLines": 1,
+                    "totalStructuredMetadataBytesProcessed": 320
+                  },
+                  "querier": {
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": false,
+                      "chunk": {
+                        "headChunkBytes": 0,
+                        "headChunkLines": 0,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 0,
+                        "headChunkStructuredMetadataBytes": 0,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 0,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "ingester": {
+                    "totalReached": 1,
+                    "totalChunksMatched": 1,
+                    "totalBatches": 2,
+                    "totalLinesSent": 1,
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": true,
+                      "chunk": {
+                        "headChunkBytes": 354,
+                        "headChunkLines": 2,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 1,
+                        "headChunkStructuredMetadataBytes": 320,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 221098,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "cache": {
+                    "chunk": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "index": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "result": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "statsResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "volumeResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "seriesResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "labelResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "instantMetricResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    }
+                  },
+                  "index": {
+                    "totalChunks": 0,
+                    "postFilterChunks": 0,
+                    "shardsDuration": 0,
+                    "usedBloomFilters": false
+                  }
+                }
+              }
+            }
+          },
+          "tempo": {
+            "parameters": {},
+            "http_status": 200,
+            "response": {
+              "batches": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                          "stringValue": "python"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                          "stringValue": "opentelemetry"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                          "stringValue": "1.37.0"
+                        }
+                      },
+                      {
+                        "key": "service.name",
+                        "value": {
+                          "stringValue": "guided-h18-queries"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeSpans": [
+                    {
+                      "scope": {
+                        "name": "guided-course"
+                      },
+                      "spans": [
+                        {
+                          "traceId": "uEO2mYIo3KkYqv857UAq6g==",
+                          "spanId": "V5JJVY9+bx0=",
+                          "parentSpanId": "9wHvr5cepa4=",
+                          "flags": 256,
+                          "name": "authorize",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399745905643",
+                          "endTimeUnixNano": "1791684399745927487",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "allow"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "uEO2mYIo3KkYqv857UAq6g==",
+                          "spanId": "0sZiPsueR9o=",
+                          "parentSpanId": "9wHvr5cepa4=",
+                          "flags": 256,
+                          "name": "notice_lookup",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399745984986",
+                          "endTimeUnixNano": "1791684399745997102",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "uEO2mYIo3KkYqv857UAq6g==",
+                          "spanId": "9wHvr5cepa4=",
+                          "flags": 256,
+                          "name": "security.request",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399745837904",
+                          "endTimeUnixNano": "1791684399746243075",
+                          "attributes": [
+                            {
+                              "key": "hands_on",
+                              "value": {
+                                "stringValue": "H18"
+                              }
+                            },
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f"
+                              }
+                            },
+                            {
+                              "key": "fixture",
+                              "value": {
+                                "stringValue": "notice-authorization"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "allow"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "prometheus": {
+            "parameters": {
+              "query": "sum by (decision) (guided_security_decisions_total{hands_on=\"H18\"})",
+              "time": 1791684401.924829
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "vector",
+                "result": [
+                  {
+                    "metric": {
+                      "decision": "allow"
+                    },
+                    "value": [
+                      1791684401.925,
+                      "1"
+                    ]
+                  },
+                  {
+                    "metric": {
+                      "decision": "block"
+                    },
+                    "value": [
+                      1791684401.925,
+                      "1"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "counter_baseline": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "decision": "allow"
+                },
+                "value": [
+                  1791684399.746,
+                  "0"
+                ]
+              },
+              {
+                "metric": {
+                  "decision": "block"
+                },
+                "value": [
+                  1791684399.746,
+                  "0"
+                ]
+              }
+            ]
+          }
+        },
+        "case_id": "normal-query",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 조회문을 다시 실행해 정상 조회와 인가 거부의 Log·Trace·Counter 변화를 확인했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "request_id": "c13bcef3-8984-4fa8-8b11-5d3059847fda",
+        "trace_id": "b52e0689d94516998b8cdc71cd6f585f",
+        "decision": "block",
+        "logs": 1,
+        "spans": [
+          "authorize",
+          "security.request"
+        ],
+        "counter_delta": {
+          "allow": 1.0,
+          "block": 1.0
+        },
+        "products": {
+          "loki": {
+            "parameters": {
+              "query": "{service_name=\"guided-h18-queries\"} | request_id = \"c13bcef3-8984-4fa8-8b11-5d3059847fda\"",
+              "start": 1791684399745656152,
+              "end": 1791684402203175435,
+              "limit": 200
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "stream": {
+                      "code_file_path": "/app/request_workflow.py",
+                      "code_function_name": "handle_action",
+                      "code_line_number": "88",
+                      "decision": "block",
+                      "detected_level": "INFO",
+                      "fixture": "notice-authorization",
+                      "flags": "1",
+                      "hands_on": "H18",
+                      "observed_timestamp": "1791684399746394029",
+                      "policy_rule": "notice-read-only",
+                      "request_id": "c13bcef3-8984-4fa8-8b11-5d3059847fda",
+                      "scope_name": "guided-security",
+                      "service_name": "guided-h18-queries",
+                      "severity_number": "9",
+                      "severity_text": "INFO",
+                      "span_id": "744861805672e2c9",
+                      "telemetry_sdk_language": "python",
+                      "telemetry_sdk_name": "opentelemetry",
+                      "telemetry_sdk_version": "1.37.0",
+                      "trace_id": "b52e0689d94516998b8cdc71cd6f585f"
+                    },
+                    "values": [
+                      [
+                        "1791684399746365440",
+                        "security_decision"
+                      ]
+                    ]
+                  }
+                ],
+                "stats": {
+                  "summary": {
+                    "bytesProcessedPerSecond": 52936,
+                    "linesProcessedPerSecond": 299,
+                    "totalBytesProcessed": 354,
+                    "totalLinesProcessed": 2,
+                    "execTime": 0.006687,
+                    "queueTime": 0.000525,
+                    "subqueries": 0,
+                    "totalEntriesReturned": 1,
+                    "splits": 0,
+                    "shards": 1,
+                    "totalPostFilterLines": 1,
+                    "totalStructuredMetadataBytesProcessed": 320
+                  },
+                  "querier": {
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": false,
+                      "chunk": {
+                        "headChunkBytes": 0,
+                        "headChunkLines": 0,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 0,
+                        "headChunkStructuredMetadataBytes": 0,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 0,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "ingester": {
+                    "totalReached": 1,
+                    "totalChunksMatched": 1,
+                    "totalBatches": 2,
+                    "totalLinesSent": 1,
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": true,
+                      "chunk": {
+                        "headChunkBytes": 354,
+                        "headChunkLines": 2,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 1,
+                        "headChunkStructuredMetadataBytes": 320,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 147256,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "cache": {
+                    "chunk": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "index": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "result": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "statsResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "volumeResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "seriesResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "labelResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "instantMetricResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    }
+                  },
+                  "index": {
+                    "totalChunks": 0,
+                    "postFilterChunks": 0,
+                    "shardsDuration": 0,
+                    "usedBloomFilters": false
+                  }
+                }
+              }
+            }
+          },
+          "tempo": {
+            "parameters": {},
+            "http_status": 200,
+            "response": {
+              "batches": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                          "stringValue": "python"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                          "stringValue": "opentelemetry"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                          "stringValue": "1.37.0"
+                        }
+                      },
+                      {
+                        "key": "service.name",
+                        "value": {
+                          "stringValue": "guided-h18-queries"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeSpans": [
+                    {
+                      "scope": {
+                        "name": "guided-course"
+                      },
+                      "spans": [
+                        {
+                          "traceId": "tS4GidlFFpmLjNxxzW9YXw==",
+                          "spanId": "KXje+6k0utY=",
+                          "parentSpanId": "dEhhgFZy4sk=",
+                          "flags": 256,
+                          "name": "authorize",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399746328834",
+                          "endTimeUnixNano": "1791684399746338501",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "c13bcef3-8984-4fa8-8b11-5d3059847fda"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "block"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "tS4GidlFFpmLjNxxzW9YXw==",
+                          "spanId": "dEhhgFZy4sk=",
+                          "flags": 256,
+                          "name": "security.request",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399746299219",
+                          "endTimeUnixNano": "1791684399746446404",
+                          "attributes": [
+                            {
+                              "key": "hands_on",
+                              "value": {
+                                "stringValue": "H18"
+                              }
+                            },
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "c13bcef3-8984-4fa8-8b11-5d3059847fda"
+                              }
+                            },
+                            {
+                              "key": "fixture",
+                              "value": {
+                                "stringValue": "notice-authorization"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "block"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "prometheus": {
+            "parameters": {
+              "query": "sum by (decision) (guided_security_decisions_total{hands_on=\"H18\"})",
+              "time": 1791684402.2031755
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "vector",
+                "result": [
+                  {
+                    "metric": {
+                      "decision": "allow"
+                    },
+                    "value": [
+                      1791684402.203,
+                      "1"
+                    ]
+                  },
+                  {
+                    "metric": {
+                      "decision": "block"
+                    },
+                    "value": [
+                      1791684402.203,
+                      "1"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "counter_baseline": {
+          "status": "success",
+          "data": {
+            "resultType": "vector",
+            "result": [
+              {
+                "metric": {
+                  "decision": "allow"
+                },
+                "value": [
+                  1791684399.746,
+                  "0"
+                ]
+              },
+              {
+                "metric": {
+                  "decision": "block"
+                },
+                "value": [
+                  1791684399.746,
+                  "0"
+                ]
+              }
+            ]
+          }
+        },
+        "case_id": "denied-query",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 조회문을 다시 실행해 정상 조회와 인가 거부의 Log·Trace·Counter 변화를 확인했습니다. 업무 저장소는 합성 fixture입니다."
+      }
+    ],
+    "query_attempts": [
+      {
+        "request_id": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f",
+        "trace_id": "b843b6998228dca918aaff39ed402aea",
+        "products": {
+          "loki": {
+            "parameters": {
+              "query": "{service_name=\"guided-h18-queries\"} | request_id = \"e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f\"",
+              "start": 1791684399745656152,
+              "end": 1791684402331914501,
+              "limit": 200
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "stream": {
+                      "code_file_path": "/app/request_workflow.py",
+                      "code_function_name": "handle_action",
+                      "code_line_number": "88",
+                      "decision": "allow",
+                      "detected_level": "INFO",
+                      "fixture": "notice-authorization",
+                      "flags": "1",
+                      "hands_on": "H18",
+                      "observed_timestamp": "1791684399746157117",
+                      "policy_rule": "notice-read-only",
+                      "request_id": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f",
+                      "scope_name": "guided-security",
+                      "service_name": "guided-h18-queries",
+                      "severity_number": "9",
+                      "severity_text": "INFO",
+                      "span_id": "f701efaf971ea5ae",
+                      "telemetry_sdk_language": "python",
+                      "telemetry_sdk_name": "opentelemetry",
+                      "telemetry_sdk_version": "1.37.0",
+                      "trace_id": "b843b6998228dca918aaff39ed402aea"
+                    },
+                    "values": [
+                      [
+                        "1791684399746064128",
+                        "security_decision"
+                      ]
+                    ]
+                  }
+                ],
+                "stats": {
+                  "summary": {
+                    "bytesProcessedPerSecond": 63955,
+                    "linesProcessedPerSecond": 361,
+                    "totalBytesProcessed": 354,
+                    "totalLinesProcessed": 2,
+                    "execTime": 0.005535,
+                    "queueTime": 0.000601,
+                    "subqueries": 0,
+                    "totalEntriesReturned": 1,
+                    "splits": 0,
+                    "shards": 1,
+                    "totalPostFilterLines": 1,
+                    "totalStructuredMetadataBytesProcessed": 320
+                  },
+                  "querier": {
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": false,
+                      "chunk": {
+                        "headChunkBytes": 0,
+                        "headChunkLines": 0,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 0,
+                        "headChunkStructuredMetadataBytes": 0,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 0,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "ingester": {
+                    "totalReached": 1,
+                    "totalChunksMatched": 1,
+                    "totalBatches": 2,
+                    "totalLinesSent": 1,
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": true,
+                      "chunk": {
+                        "headChunkBytes": 354,
+                        "headChunkLines": 2,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 1,
+                        "headChunkStructuredMetadataBytes": 320,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 125271,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "cache": {
+                    "chunk": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "index": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "result": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "statsResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "volumeResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "seriesResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "labelResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "instantMetricResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    }
+                  },
+                  "index": {
+                    "totalChunks": 0,
+                    "postFilterChunks": 0,
+                    "shardsDuration": 0,
+                    "usedBloomFilters": false
+                  }
+                }
+              }
+            }
+          },
+          "tempo": {
+            "parameters": {},
+            "http_status": 200,
+            "response": {
+              "batches": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                          "stringValue": "python"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                          "stringValue": "opentelemetry"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                          "stringValue": "1.37.0"
+                        }
+                      },
+                      {
+                        "key": "service.name",
+                        "value": {
+                          "stringValue": "guided-h18-queries"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeSpans": [
+                    {
+                      "scope": {
+                        "name": "guided-course"
+                      },
+                      "spans": [
+                        {
+                          "traceId": "uEO2mYIo3KkYqv857UAq6g==",
+                          "spanId": "V5JJVY9+bx0=",
+                          "parentSpanId": "9wHvr5cepa4=",
+                          "flags": 256,
+                          "name": "authorize",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399745905643",
+                          "endTimeUnixNano": "1791684399745927487",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "allow"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "uEO2mYIo3KkYqv857UAq6g==",
+                          "spanId": "0sZiPsueR9o=",
+                          "parentSpanId": "9wHvr5cepa4=",
+                          "flags": 256,
+                          "name": "notice_lookup",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399745984986",
+                          "endTimeUnixNano": "1791684399745997102",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "uEO2mYIo3KkYqv857UAq6g==",
+                          "spanId": "9wHvr5cepa4=",
+                          "flags": 256,
+                          "name": "security.request",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399745837904",
+                          "endTimeUnixNano": "1791684399746243075",
+                          "attributes": [
+                            {
+                              "key": "hands_on",
+                              "value": {
+                                "stringValue": "H18"
+                              }
+                            },
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "e5ca9c8e-b7e8-45a3-a08c-47c7d76aa04f"
+                              }
+                            },
+                            {
+                              "key": "fixture",
+                              "value": {
+                                "stringValue": "notice-authorization"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "allow"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "prometheus": {
+            "parameters": {
+              "query": "sum by (decision) (guided_security_decisions_total{hands_on=\"H18\"})",
+              "time": 1791684402.3319144
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "vector",
+                "result": [
+                  {
+                    "metric": {
+                      "decision": "allow"
+                    },
+                    "value": [
+                      1791684402.332,
+                      "1"
+                    ]
+                  },
+                  {
+                    "metric": {
+                      "decision": "block"
+                    },
+                    "value": [
+                      1791684402.332,
+                      "1"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "request_id": "c13bcef3-8984-4fa8-8b11-5d3059847fda",
+        "trace_id": "b52e0689d94516998b8cdc71cd6f585f",
+        "products": {
+          "loki": {
+            "parameters": {
+              "query": "{service_name=\"guided-h18-queries\"} | request_id = \"c13bcef3-8984-4fa8-8b11-5d3059847fda\"",
+              "start": 1791684399745656152,
+              "end": 1791684402382615801,
+              "limit": 200
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "stream": {
+                      "code_file_path": "/app/request_workflow.py",
+                      "code_function_name": "handle_action",
+                      "code_line_number": "88",
+                      "decision": "block",
+                      "detected_level": "INFO",
+                      "fixture": "notice-authorization",
+                      "flags": "1",
+                      "hands_on": "H18",
+                      "observed_timestamp": "1791684399746394029",
+                      "policy_rule": "notice-read-only",
+                      "request_id": "c13bcef3-8984-4fa8-8b11-5d3059847fda",
+                      "scope_name": "guided-security",
+                      "service_name": "guided-h18-queries",
+                      "severity_number": "9",
+                      "severity_text": "INFO",
+                      "span_id": "744861805672e2c9",
+                      "telemetry_sdk_language": "python",
+                      "telemetry_sdk_name": "opentelemetry",
+                      "telemetry_sdk_version": "1.37.0",
+                      "trace_id": "b52e0689d94516998b8cdc71cd6f585f"
+                    },
+                    "values": [
+                      [
+                        "1791684399746365440",
+                        "security_decision"
+                      ]
+                    ]
+                  }
+                ],
+                "stats": {
+                  "summary": {
+                    "bytesProcessedPerSecond": 54393,
+                    "linesProcessedPerSecond": 307,
+                    "totalBytesProcessed": 354,
+                    "totalLinesProcessed": 2,
+                    "execTime": 0.006508,
+                    "queueTime": 0.000237,
+                    "subqueries": 0,
+                    "totalEntriesReturned": 1,
+                    "splits": 0,
+                    "shards": 1,
+                    "totalPostFilterLines": 1,
+                    "totalStructuredMetadataBytesProcessed": 320
+                  },
+                  "querier": {
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": false,
+                      "chunk": {
+                        "headChunkBytes": 0,
+                        "headChunkLines": 0,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 0,
+                        "headChunkStructuredMetadataBytes": 0,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 0,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "ingester": {
+                    "totalReached": 1,
+                    "totalChunksMatched": 1,
+                    "totalBatches": 2,
+                    "totalLinesSent": 1,
+                    "store": {
+                      "totalChunksRef": 0,
+                      "totalChunksDownloaded": 0,
+                      "chunksDownloadTime": 0,
+                      "queryReferencedStructuredMetadata": true,
+                      "chunk": {
+                        "headChunkBytes": 354,
+                        "headChunkLines": 2,
+                        "decompressedBytes": 0,
+                        "decompressedLines": 0,
+                        "compressedBytes": 0,
+                        "totalDuplicates": 0,
+                        "postFilterLines": 1,
+                        "headChunkStructuredMetadataBytes": 320,
+                        "decompressedStructuredMetadataBytes": 0
+                      },
+                      "chunkRefsFetchTime": 99768,
+                      "congestionControlLatency": 0,
+                      "pipelineWrapperFilteredLines": 0
+                    }
+                  },
+                  "cache": {
+                    "chunk": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "index": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "result": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "statsResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "volumeResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "seriesResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "labelResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    },
+                    "instantMetricResult": {
+                      "entriesFound": 0,
+                      "entriesRequested": 0,
+                      "entriesStored": 0,
+                      "bytesReceived": 0,
+                      "bytesSent": 0,
+                      "requests": 0,
+                      "downloadTime": 0,
+                      "queryLengthServed": 0
+                    }
+                  },
+                  "index": {
+                    "totalChunks": 0,
+                    "postFilterChunks": 0,
+                    "shardsDuration": 0,
+                    "usedBloomFilters": false
+                  }
+                }
+              }
+            }
+          },
+          "tempo": {
+            "parameters": {},
+            "http_status": 200,
+            "response": {
+              "batches": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                          "stringValue": "python"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                          "stringValue": "opentelemetry"
+                        }
+                      },
+                      {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                          "stringValue": "1.37.0"
+                        }
+                      },
+                      {
+                        "key": "service.name",
+                        "value": {
+                          "stringValue": "guided-h18-queries"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeSpans": [
+                    {
+                      "scope": {
+                        "name": "guided-course"
+                      },
+                      "spans": [
+                        {
+                          "traceId": "tS4GidlFFpmLjNxxzW9YXw==",
+                          "spanId": "KXje+6k0utY=",
+                          "parentSpanId": "dEhhgFZy4sk=",
+                          "flags": 256,
+                          "name": "authorize",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399746328834",
+                          "endTimeUnixNano": "1791684399746338501",
+                          "attributes": [
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "c13bcef3-8984-4fa8-8b11-5d3059847fda"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "block"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        },
+                        {
+                          "traceId": "tS4GidlFFpmLjNxxzW9YXw==",
+                          "spanId": "dEhhgFZy4sk=",
+                          "flags": 256,
+                          "name": "security.request",
+                          "kind": "SPAN_KIND_INTERNAL",
+                          "startTimeUnixNano": "1791684399746299219",
+                          "endTimeUnixNano": "1791684399746446404",
+                          "attributes": [
+                            {
+                              "key": "hands_on",
+                              "value": {
+                                "stringValue": "H18"
+                              }
+                            },
+                            {
+                              "key": "request_id",
+                              "value": {
+                                "stringValue": "c13bcef3-8984-4fa8-8b11-5d3059847fda"
+                              }
+                            },
+                            {
+                              "key": "fixture",
+                              "value": {
+                                "stringValue": "notice-authorization"
+                              }
+                            },
+                            {
+                              "key": "decision",
+                              "value": {
+                                "stringValue": "block"
+                              }
+                            }
+                          ],
+                          "status": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "prometheus": {
+            "parameters": {
+              "query": "sum by (decision) (guided_security_decisions_total{hands_on=\"H18\"})",
+              "time": 1791684402.3826158
+            },
+            "http_status": 200,
+            "response": {
+              "status": "success",
+              "data": {
+                "resultType": "vector",
+                "result": [
+                  {
+                    "metric": {
+                      "decision": "allow"
+                    },
+                    "value": [
+                      1791684402.383,
+                      "1"
+                    ]
+                  },
+                  {
+                    "metric": {
+                      "decision": "block"
+                    },
+                    "value": [
+                      1791684402.383,
+                      "1"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "reason": "작성한 조회문을 다시 실행해 정상 조회와 인가 거부의 Log·Trace·Counter 변화를 확인했습니다. 업무 저장소는 합성 fixture입니다.",
+  "next_check": "현재 실행의 정상·거부 요청에 대한 조회문과 원시 저장소 응답을 확인합니다.",
+  "internal_activity_id": "H18",
+  "contract_version": 2,
+  "task_completed": true,
+  "case_verified": true,
+  "security_verdict": "PASS"
+}

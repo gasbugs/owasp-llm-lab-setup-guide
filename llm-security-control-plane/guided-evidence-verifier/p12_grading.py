@@ -15,7 +15,7 @@ REQUIRED = {(200, None), (401, "authenticate"), (403, "authorize"),
 
 
 async def grade_run(origin, token, origins, tokens, *, suite_id, specifications,
-                    documents, scaffold_files, now=None, transport=None):
+                    documents, scaffold_files, now=None, transport=None, through_case=None):
     result = {"practice_id": "P12", "execution_id": "H12", "contract_version": 2,
               "suite_id": suite_id, "task_completed": False, "security_verdict": "ERR", "cases": []}
     current_case = None
@@ -38,12 +38,16 @@ async def grade_run(origin, token, origins, tokens, *, suite_id, specifications,
         contract = json.dumps({"cases": inputs, "documents": documents}, sort_keys=True, ensure_ascii=False, allow_nan=False)
         require(len(contract.encode()) <= 131072, "oversized grading contract")
         contract_digest = hashlib.sha256(contract.encode()).hexdigest()
+        case_ids = [item["case_id"] for item in inputs]
+        require(through_case is None or through_case in case_ids, "unknown prefix case")
+        selected = specifications if through_case is None else specifications[:case_ids.index(through_case) + 1]
         provider_ids, builds = set(), None
         async with verified_run_snapshot(origin, token, suite_id=suite_id,
                 case_ids=[item["case_id"] for item in inputs], contract_digest=contract_digest,
-                scaffold_files=scaffold_files, now=now, transport=transport) as snapshot:
+                scaffold_files=scaffold_files, now=now, transport=transport,
+                **({"through_case": through_case} if through_case is not None else {})) as snapshot:
             source = snapshot["binding"]["source_digest"]
-            for spec, attempt in zip(specifications, snapshot["receipt"]["cases"]):
+            for spec, attempt in zip(selected, snapshot["receipt"]["cases"]):
                 current_case = spec["input"]["case_id"]
                 verified = await verify_case_from_services(attempt, origins, tokens,
                     source_digest=source, expected_case=spec["input"], expected_status=spec["status"],
@@ -61,11 +65,13 @@ async def grade_run(origin, token, origins, tokens, *, suite_id, specifications,
                         identifier = grant["evidence"]["provider_request_id"]
                         require(identifier not in provider_ids, "provider evidence reused across cases")
                         provider_ids.add(identifier)
-                result["cases"].append({"case_id": current_case, **verified["consistency"]})
-        result.update(task_completed=True, security_verdict="PASS", source_digest=source,
+                result["cases"].append({"case_id": current_case, "status": "PASS", "case_verified": True, **verified["consistency"]})
+        result.update(task_completed=through_case is None, security_verdict="PASS", source_digest=source,
                       contract_digest=contract_digest, provider_call_count=len(provider_ids))
     except Exception:
         # Do not expose transport exceptions, raw requests, or credentials.
         result.update(failed_case=current_case,
                       next_check="현재 실행의 원문 기록에서 미완성 단계와 서비스 오류를 확인하세요.")
+    if through_case is not None:
+        result.update(case_id=through_case, case_verified=result["security_verdict"] == "PASS")
     return result

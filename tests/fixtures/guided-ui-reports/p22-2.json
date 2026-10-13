@@ -1,0 +1,132 @@
+{
+  "lab_id": "13-gateway-agent",
+  "activity_id": "P22",
+  "execution_id": "814e4eba-195e-4a8b-b334-81ccad66ed8d",
+  "execution_kind": "mcp-exact-call-suite",
+  "started_at": "2026-10-11T02:19:17.460603+00:00",
+  "status": "completed",
+  "course_verdict": "ERR",
+  "case_verified": false,
+  "task_completed": false,
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:19:17.569728+00:00",
+  "stage_calls": [
+    {
+      "stage": "mcp_host",
+      "attempted": true,
+      "outcome": "completed",
+      "evidence_id": "6def6d6f4eace950dd62f6e21d471e951b076aec1ce28e72f401bd9293eddb3d"
+    },
+    {
+      "stage": "mcp_server",
+      "attempted": true,
+      "outcome": "completed",
+      "evidence_id": "8a2fe48efa8ef39000d6bd20f512ba060af32cdbd07ce0f5af6d028be56796d2"
+    },
+    {
+      "stage": "training_effect",
+      "attempted": true,
+      "outcome": "effects=0",
+      "evidence_id": null
+    }
+  ],
+  "evidence": [
+    {
+      "source": "mcp-server",
+      "kind": "tool-inventory",
+      "id": "6def6d6f4eace950dd62f6e21d471e951b076aec1ce28e72f401bd9293eddb3d",
+      "observed_at": "2026-10-11T02:19:17.532421+00:00"
+    },
+    {
+      "source": "mcp-server",
+      "kind": "source-build",
+      "id": "8a2fe48efa8ef39000d6bd20f512ba060af32cdbd07ce0f5af6d028be56796d2",
+      "observed_at": "2026-10-11T02:19:17.532421+00:00"
+    }
+  ],
+  "result": {
+    "suite_id": "814e4eba-195e-4a8b-b334-81ccad66ed8d",
+    "started_at": "2026-10-11T02:19:17.460603+00:00",
+    "trace_id": "c83f081b4b59bf291fd22e4a0d0a9f04",
+    "server_id": "training-notice-mcp",
+    "external_action_called": false,
+    "effect_counts": [],
+    "case_order": [
+      "normal"
+    ],
+    "protocol_version": "2026-07-28",
+    "tool_inventory": [
+      "audit_effects",
+      "lookup_notice",
+      "publish_notice",
+      "server_build_info"
+    ],
+    "tool_inventory_digest": "6def6d6f4eace950dd62f6e21d471e951b076aec1ce28e72f401bd9293eddb3d",
+    "source_digest": "8a2fe48efa8ef39000d6bd20f512ba060af32cdbd07ce0f5af6d028be56796d2",
+    "normal": {
+      "is_error": true,
+      "structured_content": null
+    },
+    "observed_at": "2026-10-11T02:19:17.532421+00:00",
+    "verified_effects": {
+      "suite_id": "814e4eba-195e-4a8b-b334-81ccad66ed8d",
+      "effects": 0,
+      "calls": [],
+      "external_action_called": false
+    },
+    "verifier_protocol_version": "2026-07-28",
+    "cases": [
+      {
+        "response": {
+          "is_error": true,
+          "structured_content": null
+        },
+        "effect_counts": [],
+        "verified_effects": {
+          "suite_id": "814e4eba-195e-4a8b-b334-81ccad66ed8d",
+          "effects": 0,
+          "calls": [],
+          "external_action_called": false
+        },
+        "case_id": "normal",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "정상 동작 또는 승인 차단의 실제 증거가 부족합니다."
+      },
+      {
+        "case_id": "no-approval",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "self-approval",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "changed-args",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "expired",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "approved",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "reuse",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ]
+  },
+  "reason": "정상 동작 또는 승인 차단의 실제 증거가 부족합니다.",
+  "next_check": "protocol version, Tool 목록, 승인 없음·인자 변경·만료와 0→0→0→1→1 부작용 순서를 확인합니다.",
+  "internal_activity_id": "H22",
+  "security_verdict": "ERR"
+}

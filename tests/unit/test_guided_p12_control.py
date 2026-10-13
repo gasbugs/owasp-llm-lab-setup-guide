@@ -24,9 +24,12 @@ class P12ControlTests(unittest.TestCase):
         self.mutate = lambda result: None
         self.run_state = 'finished'
 
-    async def receive(self, client, url, token, suite, deadline):
+    async def receive(self, client, url, token, suite, deadline, case_id=None):
         self.calls.append((url, token, suite, deadline))
         UUID(suite)
+        if url.endswith('/v1/run-case'):
+            state = 'paused' if case_id != self.server.P12_CASE_IDS[-1] else 'finished'
+            return {'suite_id': suite, 'run_state': 'error' if self.run_state == 'error' else state}
         if url.endswith('/v1/run'):
             return {'suite_id': suite, 'run_state': self.run_state}
         result = {'activity_id': 'P12', 'execution_id': suite, 'contract_version': 2,
@@ -34,6 +37,9 @@ class P12ControlTests(unittest.TestCase):
                   'security_verdict': 'PASS', 'course_verdict': 'PASS',
                   'result': {'practice_id': 'P12', 'execution_id': 'H12', 'suite_id': suite,
                              'contract_version': 2, 'task_completed': True, 'security_verdict': 'PASS'}}
+        if case_id is not None:
+            result.update(case_id=case_id,case_verified=True,task_completed=False)
+            result["result"].update(task_completed=False,cases=[{"case_id":case_id,"status":"PASS","case_verified":True}])
         self.mutate(result)
         return result
 
@@ -45,11 +51,23 @@ class P12ControlTests(unittest.TestCase):
             self.assertTrue(self.post().json()['task_completed'])
             self.assertTrue(self.post().json()['task_completed'])
         self.assertEqual([c[0] for c in self.calls[:2]],
-                         [self.server.LAB12_URL + '/v1/run', self.server.VERIFIER_URL + '/v1/verify/p12'])
+                         [self.server.LAB12_URL + '/v1/run-case', self.server.VERIFIER_URL + '/v1/verify/p12-case'])
         self.assertEqual(self.calls[0][2], self.calls[1][2])
-        self.assertNotEqual(self.calls[0][2], self.calls[2][2])
+        self.assertNotEqual(self.calls[0][2], self.calls[17][2])
         self.assertEqual([c[1] for c in self.calls[:2]], [self.server.LAB12_TOKEN, self.server.VERIFIER_TOKEN])
         self.assertFalse(self.server.ACTIVE_SESSIONS)
+
+    def test_failed_case_never_executes_later_case(self):
+        def fail(result):
+            if result.get("case_id") == self.server.P12_CASE_IDS[1]:
+                result.update(course_verdict="ERR",security_verdict="ERR",case_verified=False)
+                result["result"].update(security_verdict="ERR",cases=[])
+        self.mutate=fail
+        with patch.object(self.server,"p12_post_json",side_effect=self.receive):
+            result=self.post().json()
+        self.assertEqual(len(self.calls),4)
+        self.assertEqual([row["status"] for row in result["result"]["cases"]],["PASS","ERR"]+["미실행"]*6)
+        self.assertFalse(result["task_completed"])
 
     def test_no_browser_verdict_or_suite(self):
         with patch.object(self.server, 'p12_post_json', new_callable=AsyncMock) as downstream:
@@ -85,6 +103,7 @@ class P12ControlTests(unittest.TestCase):
         def incomplete(result):
             result.update(task_completed=False, security_verdict='ERR', course_verdict='ERR')
             result['result'].update(task_completed=False, security_verdict='ERR')
+            result['case_verified']=False
         self.mutate = incomplete
         with patch.object(self.server, 'p12_post_json', side_effect=self.receive):
             result = self.post().json()

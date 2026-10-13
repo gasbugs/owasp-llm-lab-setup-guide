@@ -71,6 +71,23 @@ class GuidedH09DeliverySinkTests(unittest.TestCase):
             headers={"Authorization": f"Bearer {grant['capability']}"},
         )
 
+    def test_case_close_preserves_future_grants_and_actual_delivery_scope(self):
+        import uuid
+        body={"suite_id":str(uuid.uuid4()),"started_at":"2026-09-24T06:00:00+00:00","executions":[{"case_id":case_id,"execution_id":str(uuid.uuid4())} for case_id in self.server.CASE_ORDER]}
+        suite=self.client.post("/v1/suites",json=body,headers={"Authorization":"Bearer unit-h09-control"}).json()
+        close=f"/v1/suites/{suite['suite_id']}/cases/clean/close";read=close.removesuffix("close")+"ledger"
+        self.assertEqual(self.client.get(read,headers={"Authorization":"Bearer unit-h09-verifier"}).status_code,409)
+        self.assertEqual(self.client.post(close).status_code,401)
+        self.assertEqual(self.deliver({**suite["cases"][0],"suite_id":suite["suite_id"]},"공개 상태 페이지는 정상입니다.").status_code,200)
+        closed=self.client.post(close,headers={"Authorization":"Bearer unit-h09-control"})
+        self.assertEqual(closed.status_code,200,closed.text)
+        prefix=self.client.get(read,headers={"Authorization":"Bearer unit-h09-verifier"}).json()
+        self.assertEqual(prefix["case_scope"],["clean"]);self.assertIsNone(prefix["closed_at"])
+        self.assertEqual(len(prefix["deliveries"]),1);self.assertEqual(prefix["future_deliveries"],[])
+        ledger=self.client.get(f"/v1/suites/{suite['suite_id']}/ledger",headers={"Authorization":"Bearer unit-h09-verifier"}).json()
+        self.assertTrue(all(cap["status"]=="issued" for cap in ledger["capabilities"][1:]))
+        self.assertEqual(self.client.post(close,headers={"Authorization":"Bearer unit-h09-control"}).json(),closed.json())
+
     def test_scope_replay_close_and_raw_free_ledger(self):
         suite = self.create_suite("29000000-0000-0000-0001-000000000001")
         grants = [{**item, "suite_id": suite["suite_id"]} for item in suite["cases"]]

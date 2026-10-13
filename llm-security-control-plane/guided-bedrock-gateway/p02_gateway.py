@@ -33,4 +33,31 @@ def configured_app(state_loader, database_path, *, provider_mode, control_token,
         return connection_evidence(state_loader(), mode=provider_mode,
                                    client_factory=lambda name: boto3.client(name, region_name=region, config=config))
 
-    return create_app(ledger, provider, control_token=control_token, verifier_token=verifier_token, resource_reader=resources)
+    def native_credentials(execution_id):
+        import json
+        current = provider()
+        if provider_mode == "contract":
+            return {"provider_mode": "contract", "region": region, "bucket": current.bucket,
+                "credentials": {"AccessKeyId": "contract-fixture-key", "SecretAccessKey": "contract-fixture-secret",
+                                "SessionToken": "contract-fixture-session"}}
+        policy = {"Version": "2012-10-17", "Statement": [
+            {"Effect": "Allow", "Action": "s3:PutObject",
+             "Resource": f"arn:aws:s3:::{current.bucket}/h02/knowledge/{execution_id}.md"},
+            {"Effect": "Allow", "Action": "bedrock:InvokeModel",
+             "Resource": f"arn:aws:bedrock:{region}::foundation-model/amazon.titan-embed-text-v2:0"}]}
+        try:
+            config = Config(connect_timeout=5, read_timeout=20, retries={"total_max_attempts": 1})
+            sts = boto3.client("sts", region_name=region, config=config)
+            try:
+                result = sts.get_federation_token(Name="p02-" + execution_id[:24],
+                    DurationSeconds=900, Policy=json.dumps(policy, separators=(",", ":")))
+            finally:
+                sts.close()
+            credentials = result["Credentials"]
+            return {"provider_mode": "aws", "region": region, "bucket": current.bucket,
+                "credentials": {key: credentials[key] for key in
+                    ("AccessKeyId", "SecretAccessKey", "SessionToken")}}
+        except Exception:
+            raise LedgerError(502) from None
+
+    return create_app(ledger, provider, native_credentials=native_credentials, control_token=control_token, verifier_token=verifier_token, resource_reader=resources)

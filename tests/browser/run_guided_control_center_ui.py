@@ -454,19 +454,20 @@ def main() -> int:
         "h08_hands_on": h08_verdict == "HIT"
         and h08_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h08_hands_on.get("result", {}).get("model_roles") == ["main", "self_check_input"]
-        and h08_hands_on.get("result", {}).get("self_check_calls") == 4
-        and h08_hands_on.get("result", {}).get("main_calls") == 4
+        and h08_hands_on.get("result", {}).get("self_check_calls") == 3
+        and h08_hands_on.get("result", {}).get("main_calls") == 3
         and len(h08_hands_on.get("result", {}).get("cases", [])) == 4
-        and len(h08_hands_on.get("result", {}).get("provider_calls", [])) == 8
+        and len(h08_hands_on.get("result", {}).get("provider_calls", [])) == 6
+        and [case.get("status") for case in h08_hands_on.get("result", {}).get("cases", [])] == ["PASS", "PASS", "HIT", "미실행"]
         and '"capability"' not in h08_raw_text,
         "h09_hands_on": h09_verdict == "HIT"
         and h09_hands_on.get("verified_by") == "guided-evidence-verifier"
         and h09_hands_on.get("result", {}).get("framework") == "microsoft-presidio"
         and h09_hands_on.get("result", {}).get("entities") == ["EMAIL_ADDRESS"]
         and h09_hands_on.get("result", {}).get("official_kr_rrn") is False
-        and h09_hands_on.get("result", {}).get("delivery_count") == 4
+        and h09_hands_on.get("result", {}).get("delivery_count") == 2
         and h09_hands_on.get("result", {}).get("raw_risk_cases")
-        == ["input-email", "input-kr-rrn", "output-email"]
+        == ["input-email"]
         and "learner@example.com" not in h09_raw_text
         and "900101-1234568" not in h09_raw_text
         and "security-team@example.com" not in h09_raw_text

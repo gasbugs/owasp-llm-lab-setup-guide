@@ -56,6 +56,24 @@ class RunServerTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response.json()
 
+    def test_one_case_at_a_time_no_skip_no_replay_and_restart(self):
+        self.cases.append({**self.cases[0], "case_id":"denied"})
+        self.client = TestClient(self.make_app())
+        def post(name):
+            return self.client.post("/v1/run-case", headers=self.headers("control"),
+                                    json={"suite_id":self.suite,"case_id":name})
+        self.assertEqual(post("denied").status_code,409)
+        self.assertFalse(self.calls)
+        self.assertEqual(post("normal").json()["run_state"],"paused")
+        self.assertEqual(len(self.calls),1)
+        self.assertEqual(post("normal").status_code,409)
+        self.assertEqual(self.run_suite().status_code,409)
+        self.client = TestClient(self.make_app())
+        self.assertEqual(post("denied").json()["run_state"],"finished")
+        self.assertEqual(len(self.calls),2)
+        self.assertEqual(post("denied").status_code,409)
+        self.assertEqual([x["case_id"] for x in self.receipt()["cases"]],["normal","denied"])
+
     def test_receipt_persists_before_side_effect_and_survives_restart(self):
         def inspect_pending():
             value = self.receipt()

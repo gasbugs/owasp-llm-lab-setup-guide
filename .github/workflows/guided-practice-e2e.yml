@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["llm-security-control-plane/**", "examples/security-monitoring/**", "tests/**", "tools/practice_*.py", ".github/workflows/guided-practice-e2e.yml"]
+    paths: ["llm-security-control-plane/**", "examples/security-monitoring/**", "tests/**", "tools/practice_*.py", "tools/check_guided_scaffold_digests.py", ".github/workflows/guided-practice-e2e.yml"]
   pull_request:
-    paths: ["llm-security-control-plane/**", "examples/security-monitoring/**", "tests/**", "tools/practice_*.py", ".github/workflows/guided-practice-e2e.yml"]
+    paths: ["llm-security-control-plane/**", "examples/security-monitoring/**", "tests/**", "tools/practice_*.py", "tools/check_guided_scaffold_digests.py", ".github/workflows/guided-practice-e2e.yml"]
 
 permissions:
   contents: read
@@ -22,6 +22,7 @@ jobs:
         activities: ["H06 H05", "H11 H10 H08 H07", "H13 H09 H16", "H15 H14", "H22 H21"]
     steps:
       - uses: actions/checkout@v6
+      - run: python3 tools/check_guided_scaffold_digests.py
       - uses: actions/setup-python@v6
         with: {python-version: "3.12"}
       - env:
@@ -65,12 +66,13 @@ jobs:
 
   problem-surface:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with: {python-version: "3.12"}
-      - run: |
+      - name: All 24 missions, report restoration and theme contrast
+        run: |
           python -m unittest discover -s tests/unit -p 'test_practice_*.py'
           python -m pip install -r tests/browser/requirements.txt
           python -m playwright install --with-deps chromium

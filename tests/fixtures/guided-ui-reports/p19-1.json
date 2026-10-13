@@ -1,0 +1,1795 @@
+{
+  "lab_id": "12-incident-alert",
+  "activity_id": "P19",
+  "execution_id": "ec1087b9-f9d6-4ad7-b8a6-79fcb6dcdf0c",
+  "execution_kind": "h19-native-suite",
+  "started_at": "2026-10-11T02:03:28.216254+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:03:30.568165+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "result": {
+    "analysis_executions": [
+      {
+        "case_id": "0-collected",
+        "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+        "expected_invalid": false,
+        "input_digest": "cfea25d00ae024e9c7d2adb49961e8f1c997140ee4d19631c8e779ee580b3948",
+        "execution_status": "returned",
+        "value": {
+          "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+          "trace_id": "5926e0254430e1533d255384418ffb95",
+          "decision": "allow",
+          "stages": [
+            "authenticate",
+            "authorize",
+            "notice_lookup"
+          ],
+          "stop_stage": null,
+          "downstream_count": 1
+        },
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "0-reversed",
+        "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+        "expected_invalid": false,
+        "input_digest": "e4a93925cc867c6af03e0daa64a74e8848d39bee6b7ecbd64d781a29959b55e7",
+        "execution_status": "returned",
+        "value": {
+          "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+          "trace_id": "5926e0254430e1533d255384418ffb95",
+          "decision": "allow",
+          "stages": [
+            "authenticate",
+            "authorize",
+            "notice_lookup"
+          ],
+          "stop_stage": null,
+          "downstream_count": 1
+        },
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "1-collected",
+        "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+        "expected_invalid": false,
+        "input_digest": "cfea25d00ae024e9c7d2adb49961e8f1c997140ee4d19631c8e779ee580b3948",
+        "execution_status": "returned",
+        "value": {
+          "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+          "trace_id": "8e0ef4c3d328bc3228a82ffe62d1d3b1",
+          "decision": "block",
+          "stages": [
+            "authenticate",
+            "authorize"
+          ],
+          "stop_stage": "authorize",
+          "downstream_count": 0
+        },
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "1-reversed",
+        "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+        "expected_invalid": false,
+        "input_digest": "e4a93925cc867c6af03e0daa64a74e8848d39bee6b7ecbd64d781a29959b55e7",
+        "execution_status": "returned",
+        "value": {
+          "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+          "trace_id": "8e0ef4c3d328bc3228a82ffe62d1d3b1",
+          "decision": "block",
+          "stages": [
+            "authenticate",
+            "authorize"
+          ],
+          "stop_stage": "authorize",
+          "downstream_count": 0
+        },
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "2-collected",
+        "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+        "expected_invalid": false,
+        "input_digest": "cfea25d00ae024e9c7d2adb49961e8f1c997140ee4d19631c8e779ee580b3948",
+        "execution_status": "returned",
+        "value": {
+          "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+          "trace_id": "4c585aff730d6aec661f1fc48b1e9f86",
+          "decision": "block",
+          "stages": [
+            "authenticate"
+          ],
+          "stop_stage": "authenticate",
+          "downstream_count": 0
+        },
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "2-reversed",
+        "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+        "expected_invalid": false,
+        "input_digest": "e4a93925cc867c6af03e0daa64a74e8848d39bee6b7ecbd64d781a29959b55e7",
+        "execution_status": "returned",
+        "value": {
+          "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+          "trace_id": "4c585aff730d6aec661f1fc48b1e9f86",
+          "decision": "block",
+          "stages": [
+            "authenticate"
+          ],
+          "stop_stage": "authenticate",
+          "downstream_count": 0
+        },
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "missing-log",
+        "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+        "expected_invalid": true,
+        "input_digest": "df54edc12179aae9b8ba01facb0f2ae8ff7e096b1c40ad05061b1a89b5f61201",
+        "execution_status": "invalid_evidence",
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "foreign-trace",
+        "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+        "expected_invalid": true,
+        "input_digest": "d179987b5c9306d9ab670c3a1e0f058182547081b9b0a80314363bb040f11245",
+        "execution_status": "invalid_evidence",
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "open-ledger",
+        "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+        "expected_invalid": true,
+        "input_digest": "bf19a8efbfd8b5931744d158e9f1d23c00958c41d48e3e0fcea6ebdd33d38bbb",
+        "execution_status": "invalid_evidence",
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      },
+      {
+        "case_id": "duplicate-span",
+        "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+        "expected_invalid": true,
+        "input_digest": "63b67db37e7e358d100a2e3787ec409bbc3cf91dc3fb0354f3d2b8e413b4c07c",
+        "execution_status": "invalid_evidence",
+        "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa"
+      }
+    ],
+    "execution_error": null,
+    "products": [
+      {
+        "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+        "query": "{service_name=\"guided-h19-investigation\"} | request_id = \"73059c5b-0033-432e-855a-e55ca8734d56\"",
+        "loki": {
+          "status": "success",
+          "data": {
+            "resultType": "streams",
+            "result": [
+              {
+                "stream": {
+                  "code_file_path": "/app/workflow.py",
+                  "code_function_name": "handle_request",
+                  "code_line_number": "71",
+                  "detected_level": "INFO",
+                  "flags": "1",
+                  "hands_on": "H19",
+                  "observed_timestamp": "1791684208256798724",
+                  "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+                  "scope_name": "p19-decisions",
+                  "service_name": "guided-h19-investigation",
+                  "severity_number": "9",
+                  "severity_text": "INFO",
+                  "span_id": "0a176a9aef9baa11",
+                  "telemetry_sdk_language": "python",
+                  "telemetry_sdk_name": "opentelemetry",
+                  "telemetry_sdk_version": "1.37.0",
+                  "trace_id": "5926e0254430e1533d255384418ffb95"
+                },
+                "values": [
+                  [
+                    "1791684208256671744",
+                    "{\"request_id\": \"73059c5b-0033-432e-855a-e55ca8734d56\", \"trace_id\": \"5926e0254430e1533d255384418ffb95\", \"decision\": \"allow\", \"stop_stage\": null, \"fixture\": \"notice-authorization\", \"client_ip\": \"192.0.2.10\", \"user_id\": \"reader\", \"policy_rule\": \"notice-lookup-allowed\"}"
+                  ]
+                ]
+              }
+            ],
+            "stats": {
+              "summary": {
+                "bytesProcessedPerSecond": 107855,
+                "linesProcessedPerSecond": 268,
+                "totalBytesProcessed": 402,
+                "totalLinesProcessed": 1,
+                "execTime": 0.003727,
+                "queueTime": 6.4e-05,
+                "subqueries": 0,
+                "totalEntriesReturned": 1,
+                "splits": 0,
+                "shards": 1,
+                "totalPostFilterLines": 1,
+                "totalStructuredMetadataBytesProcessed": 136
+              },
+              "querier": {
+                "store": {
+                  "totalChunksRef": 0,
+                  "totalChunksDownloaded": 0,
+                  "chunksDownloadTime": 0,
+                  "queryReferencedStructuredMetadata": false,
+                  "chunk": {
+                    "headChunkBytes": 0,
+                    "headChunkLines": 0,
+                    "decompressedBytes": 0,
+                    "decompressedLines": 0,
+                    "compressedBytes": 0,
+                    "totalDuplicates": 0,
+                    "postFilterLines": 0,
+                    "headChunkStructuredMetadataBytes": 0,
+                    "decompressedStructuredMetadataBytes": 0
+                  },
+                  "chunkRefsFetchTime": 0,
+                  "congestionControlLatency": 0,
+                  "pipelineWrapperFilteredLines": 0
+                }
+              },
+              "ingester": {
+                "totalReached": 1,
+                "totalChunksMatched": 1,
+                "totalBatches": 2,
+                "totalLinesSent": 1,
+                "store": {
+                  "totalChunksRef": 0,
+                  "totalChunksDownloaded": 0,
+                  "chunksDownloadTime": 0,
+                  "queryReferencedStructuredMetadata": true,
+                  "chunk": {
+                    "headChunkBytes": 402,
+                    "headChunkLines": 1,
+                    "decompressedBytes": 0,
+                    "decompressedLines": 0,
+                    "compressedBytes": 0,
+                    "totalDuplicates": 0,
+                    "postFilterLines": 1,
+                    "headChunkStructuredMetadataBytes": 136,
+                    "decompressedStructuredMetadataBytes": 0
+                  },
+                  "chunkRefsFetchTime": 124145,
+                  "congestionControlLatency": 0,
+                  "pipelineWrapperFilteredLines": 0
+                }
+              },
+              "cache": {
+                "chunk": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "index": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "result": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "statsResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "volumeResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "seriesResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "labelResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "instantMetricResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                }
+              },
+              "index": {
+                "totalChunks": 0,
+                "postFilterChunks": 0,
+                "shardsDuration": 0,
+                "usedBloomFilters": false
+              }
+            }
+          }
+        },
+        "tempo": {
+          "batches": [
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "WSbgJUQw4VM9JVOEQY/7lQ==",
+                      "spanId": "IvRvgyW7fzw=",
+                      "parentSpanId": "Chdqmu+bqhE=",
+                      "flags": 256,
+                      "name": "authenticate",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208230964074",
+                      "endTimeUnixNano": "1791684208231007282",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "73059c5b-0033-432e-855a-e55ca8734d56"
+                          }
+                        },
+                        {
+                          "key": "sequence",
+                          "value": {
+                            "intValue": "1"
+                          }
+                        },
+                        {
+                          "key": "accepted",
+                          "value": {
+                            "boolValue": true
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "WSbgJUQw4VM9JVOEQY/7lQ==",
+                      "spanId": "1CqqszgiKQ4=",
+                      "parentSpanId": "Chdqmu+bqhE=",
+                      "flags": 256,
+                      "name": "authorize",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208251375211",
+                      "endTimeUnixNano": "1791684208251403183",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "73059c5b-0033-432e-855a-e55ca8734d56"
+                          }
+                        },
+                        {
+                          "key": "sequence",
+                          "value": {
+                            "intValue": "2"
+                          }
+                        },
+                        {
+                          "key": "accepted",
+                          "value": {
+                            "boolValue": true
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "WSbgJUQw4VM9JVOEQY/7lQ==",
+                      "spanId": "On3aPGAMQUI=",
+                      "parentSpanId": "Chdqmu+bqhE=",
+                      "flags": 256,
+                      "name": "notice_lookup",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208254692355",
+                      "endTimeUnixNano": "1791684208254712015",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "73059c5b-0033-432e-855a-e55ca8734d56"
+                          }
+                        },
+                        {
+                          "key": "sequence",
+                          "value": {
+                            "intValue": "3"
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "WSbgJUQw4VM9JVOEQY/7lQ==",
+                      "spanId": "Chdqmu+bqhE=",
+                      "flags": 256,
+                      "name": "security.request",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208230839519",
+                      "endTimeUnixNano": "1791684208256897570",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "73059c5b-0033-432e-855a-e55ca8734d56"
+                          }
+                        },
+                        {
+                          "key": "hands_on",
+                          "value": {
+                            "stringValue": "H19"
+                          }
+                        },
+                        {
+                          "key": "fixture",
+                          "value": {
+                            "stringValue": "notice-authorization"
+                          }
+                        },
+                        {
+                          "key": "decision",
+                          "value": {
+                            "stringValue": "allow"
+                          }
+                        },
+                        {
+                          "key": "stop_stage",
+                          "value": {
+                            "stringValue": ""
+                          }
+                        },
+                        {
+                          "key": "stage_count",
+                          "value": {
+                            "intValue": "3"
+                          }
+                        },
+                        {
+                          "key": "client_ip",
+                          "value": {
+                            "stringValue": "192.0.2.10"
+                          }
+                        },
+                        {
+                          "key": "user_id",
+                          "value": {
+                            "stringValue": "reader"
+                          }
+                        },
+                        {
+                          "key": "policy_rule",
+                          "value": {
+                            "stringValue": "notice-lookup-allowed"
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+        "query": "{service_name=\"guided-h19-investigation\"} | request_id = \"bc7a584d-2c30-44e7-9ea0-13ad717e27c6\"",
+        "loki": {
+          "status": "success",
+          "data": {
+            "resultType": "streams",
+            "result": [
+              {
+                "stream": {
+                  "code_file_path": "/app/workflow.py",
+                  "code_function_name": "handle_request",
+                  "code_line_number": "71",
+                  "detected_level": "INFO",
+                  "flags": "1",
+                  "hands_on": "H19",
+                  "observed_timestamp": "1791684208261541389",
+                  "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+                  "scope_name": "p19-decisions",
+                  "service_name": "guided-h19-investigation",
+                  "severity_number": "9",
+                  "severity_text": "INFO",
+                  "span_id": "543f99089ebe189c",
+                  "telemetry_sdk_language": "python",
+                  "telemetry_sdk_name": "opentelemetry",
+                  "telemetry_sdk_version": "1.37.0",
+                  "trace_id": "8e0ef4c3d328bc3228a82ffe62d1d3b1"
+                },
+                "values": [
+                  [
+                    "1791684208261476608",
+                    "{\"request_id\": \"bc7a584d-2c30-44e7-9ea0-13ad717e27c6\", \"trace_id\": \"8e0ef4c3d328bc3228a82ffe62d1d3b1\", \"decision\": \"block\", \"stop_stage\": \"authorize\", \"fixture\": \"notice-authorization\", \"client_ip\": \"192.0.2.20\", \"user_id\": \"reader\", \"policy_rule\": \"notice-read-only\"}"
+                  ]
+                ]
+              }
+            ],
+            "stats": {
+              "summary": {
+                "bytesProcessedPerSecond": 61139,
+                "linesProcessedPerSecond": 151,
+                "totalBytesProcessed": 404,
+                "totalLinesProcessed": 1,
+                "execTime": 0.006608,
+                "queueTime": 0.000129,
+                "subqueries": 0,
+                "totalEntriesReturned": 1,
+                "splits": 0,
+                "shards": 1,
+                "totalPostFilterLines": 1,
+                "totalStructuredMetadataBytesProcessed": 136
+              },
+              "querier": {
+                "store": {
+                  "totalChunksRef": 0,
+                  "totalChunksDownloaded": 0,
+                  "chunksDownloadTime": 0,
+                  "queryReferencedStructuredMetadata": false,
+                  "chunk": {
+                    "headChunkBytes": 0,
+                    "headChunkLines": 0,
+                    "decompressedBytes": 0,
+                    "decompressedLines": 0,
+                    "compressedBytes": 0,
+                    "totalDuplicates": 0,
+                    "postFilterLines": 0,
+                    "headChunkStructuredMetadataBytes": 0,
+                    "decompressedStructuredMetadataBytes": 0
+                  },
+                  "chunkRefsFetchTime": 0,
+                  "congestionControlLatency": 0,
+                  "pipelineWrapperFilteredLines": 0
+                }
+              },
+              "ingester": {
+                "totalReached": 1,
+                "totalChunksMatched": 1,
+                "totalBatches": 2,
+                "totalLinesSent": 1,
+                "store": {
+                  "totalChunksRef": 0,
+                  "totalChunksDownloaded": 0,
+                  "chunksDownloadTime": 0,
+                  "queryReferencedStructuredMetadata": true,
+                  "chunk": {
+                    "headChunkBytes": 404,
+                    "headChunkLines": 1,
+                    "decompressedBytes": 0,
+                    "decompressedLines": 0,
+                    "compressedBytes": 0,
+                    "totalDuplicates": 0,
+                    "postFilterLines": 1,
+                    "headChunkStructuredMetadataBytes": 136,
+                    "decompressedStructuredMetadataBytes": 0
+                  },
+                  "chunkRefsFetchTime": 250359,
+                  "congestionControlLatency": 0,
+                  "pipelineWrapperFilteredLines": 0
+                }
+              },
+              "cache": {
+                "chunk": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "index": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "result": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "statsResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "volumeResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "seriesResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "labelResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "instantMetricResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                }
+              },
+              "index": {
+                "totalChunks": 0,
+                "postFilterChunks": 0,
+                "shardsDuration": 0,
+                "usedBloomFilters": false
+              }
+            }
+          }
+        },
+        "tempo": {
+          "batches": [
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "jg70w9MovDIoqC/+YtHTsQ==",
+                      "spanId": "6Ly/gZtznUA=",
+                      "parentSpanId": "VD+ZCJ6+GJw=",
+                      "flags": 256,
+                      "name": "authenticate",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208258587267",
+                      "endTimeUnixNano": "1791684208258601006",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6"
+                          }
+                        },
+                        {
+                          "key": "sequence",
+                          "value": {
+                            "intValue": "1"
+                          }
+                        },
+                        {
+                          "key": "accepted",
+                          "value": {
+                            "boolValue": true
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "jg70w9MovDIoqC/+YtHTsQ==",
+                      "spanId": "dK30u99MltU=",
+                      "parentSpanId": "VD+ZCJ6+GJw=",
+                      "flags": 256,
+                      "name": "authorize",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208260000168",
+                      "endTimeUnixNano": "1791684208260016601",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6"
+                          }
+                        },
+                        {
+                          "key": "sequence",
+                          "value": {
+                            "intValue": "2"
+                          }
+                        },
+                        {
+                          "key": "accepted",
+                          "value": {
+                            "boolValue": false
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "jg70w9MovDIoqC/+YtHTsQ==",
+                      "spanId": "VD+ZCJ6+GJw=",
+                      "flags": 256,
+                      "name": "security.request",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208258527872",
+                      "endTimeUnixNano": "1791684208261617411",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6"
+                          }
+                        },
+                        {
+                          "key": "hands_on",
+                          "value": {
+                            "stringValue": "H19"
+                          }
+                        },
+                        {
+                          "key": "fixture",
+                          "value": {
+                            "stringValue": "notice-authorization"
+                          }
+                        },
+                        {
+                          "key": "decision",
+                          "value": {
+                            "stringValue": "block"
+                          }
+                        },
+                        {
+                          "key": "stop_stage",
+                          "value": {
+                            "stringValue": "authorize"
+                          }
+                        },
+                        {
+                          "key": "stage_count",
+                          "value": {
+                            "intValue": "2"
+                          }
+                        },
+                        {
+                          "key": "client_ip",
+                          "value": {
+                            "stringValue": "192.0.2.20"
+                          }
+                        },
+                        {
+                          "key": "user_id",
+                          "value": {
+                            "stringValue": "reader"
+                          }
+                        },
+                        {
+                          "key": "policy_rule",
+                          "value": {
+                            "stringValue": "notice-read-only"
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+        "query": "{service_name=\"guided-h19-investigation\"} | request_id = \"78bc254c-0f74-4a19-9bd4-4572c0798604\"",
+        "loki": {
+          "status": "success",
+          "data": {
+            "resultType": "streams",
+            "result": [
+              {
+                "stream": {
+                  "code_file_path": "/app/workflow.py",
+                  "code_function_name": "handle_request",
+                  "code_line_number": "71",
+                  "detected_level": "INFO",
+                  "flags": "1",
+                  "hands_on": "H19",
+                  "observed_timestamp": "1791684208266402354",
+                  "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+                  "scope_name": "p19-decisions",
+                  "service_name": "guided-h19-investigation",
+                  "severity_number": "9",
+                  "severity_text": "INFO",
+                  "span_id": "87a2e470af3d6c01",
+                  "telemetry_sdk_language": "python",
+                  "telemetry_sdk_name": "opentelemetry",
+                  "telemetry_sdk_version": "1.37.0",
+                  "trace_id": "4c585aff730d6aec661f1fc48b1e9f86"
+                },
+                "values": [
+                  [
+                    "1791684208266330624",
+                    "{\"request_id\": \"78bc254c-0f74-4a19-9bd4-4572c0798604\", \"trace_id\": \"4c585aff730d6aec661f1fc48b1e9f86\", \"decision\": \"block\", \"stop_stage\": \"authenticate\", \"fixture\": \"notice-authorization\", \"client_ip\": \"192.0.2.20\", \"user_id\": null, \"policy_rule\": \"authentication-required\"}"
+                  ]
+                ]
+              }
+            ],
+            "stats": {
+              "summary": {
+                "bytesProcessedPerSecond": 93703,
+                "linesProcessedPerSecond": 228,
+                "totalBytesProcessed": 410,
+                "totalLinesProcessed": 1,
+                "execTime": 0.004376,
+                "queueTime": 0.000551,
+                "subqueries": 0,
+                "totalEntriesReturned": 1,
+                "splits": 0,
+                "shards": 1,
+                "totalPostFilterLines": 1,
+                "totalStructuredMetadataBytesProcessed": 136
+              },
+              "querier": {
+                "store": {
+                  "totalChunksRef": 0,
+                  "totalChunksDownloaded": 0,
+                  "chunksDownloadTime": 0,
+                  "queryReferencedStructuredMetadata": false,
+                  "chunk": {
+                    "headChunkBytes": 0,
+                    "headChunkLines": 0,
+                    "decompressedBytes": 0,
+                    "decompressedLines": 0,
+                    "compressedBytes": 0,
+                    "totalDuplicates": 0,
+                    "postFilterLines": 0,
+                    "headChunkStructuredMetadataBytes": 0,
+                    "decompressedStructuredMetadataBytes": 0
+                  },
+                  "chunkRefsFetchTime": 0,
+                  "congestionControlLatency": 0,
+                  "pipelineWrapperFilteredLines": 0
+                }
+              },
+              "ingester": {
+                "totalReached": 1,
+                "totalChunksMatched": 1,
+                "totalBatches": 2,
+                "totalLinesSent": 1,
+                "store": {
+                  "totalChunksRef": 0,
+                  "totalChunksDownloaded": 0,
+                  "chunksDownloadTime": 0,
+                  "queryReferencedStructuredMetadata": true,
+                  "chunk": {
+                    "headChunkBytes": 410,
+                    "headChunkLines": 1,
+                    "decompressedBytes": 0,
+                    "decompressedLines": 0,
+                    "compressedBytes": 0,
+                    "totalDuplicates": 0,
+                    "postFilterLines": 1,
+                    "headChunkStructuredMetadataBytes": 136,
+                    "decompressedStructuredMetadataBytes": 0
+                  },
+                  "chunkRefsFetchTime": 179381,
+                  "congestionControlLatency": 0,
+                  "pipelineWrapperFilteredLines": 0
+                }
+              },
+              "cache": {
+                "chunk": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "index": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "result": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "statsResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "volumeResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "seriesResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "labelResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                },
+                "instantMetricResult": {
+                  "entriesFound": 0,
+                  "entriesRequested": 0,
+                  "entriesStored": 0,
+                  "bytesReceived": 0,
+                  "bytesSent": 0,
+                  "requests": 0,
+                  "downloadTime": 0,
+                  "queryLengthServed": 0
+                }
+              },
+              "index": {
+                "totalChunks": 0,
+                "postFilterChunks": 0,
+                "shardsDuration": 0,
+                "usedBloomFilters": false
+              }
+            }
+          }
+        },
+        "tempo": {
+          "batches": [
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "TFha/3MNauxmHx/Eix6fhg==",
+                      "spanId": "J8Nx+cZ4hkI=",
+                      "parentSpanId": "h6LkcK89bAE=",
+                      "flags": 256,
+                      "name": "authenticate",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208263069812",
+                      "endTimeUnixNano": "1791684208263081029",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "78bc254c-0f74-4a19-9bd4-4572c0798604"
+                          }
+                        },
+                        {
+                          "key": "sequence",
+                          "value": {
+                            "intValue": "1"
+                          }
+                        },
+                        {
+                          "key": "accepted",
+                          "value": {
+                            "boolValue": false
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "resource": {
+                "attributes": [
+                  {
+                    "key": "telemetry.sdk.language",
+                    "value": {
+                      "stringValue": "python"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.name",
+                    "value": {
+                      "stringValue": "opentelemetry"
+                    }
+                  },
+                  {
+                    "key": "telemetry.sdk.version",
+                    "value": {
+                      "stringValue": "1.37.0"
+                    }
+                  },
+                  {
+                    "key": "service.name",
+                    "value": {
+                      "stringValue": "guided-h19-investigation"
+                    }
+                  }
+                ]
+              },
+              "scopeSpans": [
+                {
+                  "scope": {
+                    "name": "p19"
+                  },
+                  "spans": [
+                    {
+                      "traceId": "TFha/3MNauxmHx/Eix6fhg==",
+                      "spanId": "h6LkcK89bAE=",
+                      "flags": 256,
+                      "name": "security.request",
+                      "kind": "SPAN_KIND_INTERNAL",
+                      "startTimeUnixNano": "1791684208263020439",
+                      "endTimeUnixNano": "1791684208266498778",
+                      "attributes": [
+                        {
+                          "key": "request_id",
+                          "value": {
+                            "stringValue": "78bc254c-0f74-4a19-9bd4-4572c0798604"
+                          }
+                        },
+                        {
+                          "key": "hands_on",
+                          "value": {
+                            "stringValue": "H19"
+                          }
+                        },
+                        {
+                          "key": "fixture",
+                          "value": {
+                            "stringValue": "notice-authorization"
+                          }
+                        },
+                        {
+                          "key": "decision",
+                          "value": {
+                            "stringValue": "block"
+                          }
+                        },
+                        {
+                          "key": "stop_stage",
+                          "value": {
+                            "stringValue": "authenticate"
+                          }
+                        },
+                        {
+                          "key": "stage_count",
+                          "value": {
+                            "intValue": "1"
+                          }
+                        },
+                        {
+                          "key": "client_ip",
+                          "value": {
+                            "stringValue": "192.0.2.20"
+                          }
+                        },
+                        {
+                          "key": "user_id",
+                          "value": {
+                            "stringValue": ""
+                          }
+                        },
+                        {
+                          "key": "policy_rule",
+                          "value": {
+                            "stringValue": "authentication-required"
+                          }
+                        }
+                      ],
+                      "status": {}
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "activity_id": "P19",
+    "internal_activity_id": "H19",
+    "contract_version": 2,
+    "task_completed": true,
+    "case_verified": true,
+    "security_verdict": "PASS",
+    "analyses": [
+      {
+        "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+        "trace_id": "5926e0254430e1533d255384418ffb95",
+        "decision": "allow",
+        "stages": [
+          "authenticate",
+          "authorize",
+          "notice_lookup"
+        ],
+        "stop_stage": null,
+        "downstream_count": 1
+      },
+      {
+        "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+        "trace_id": "8e0ef4c3d328bc3228a82ffe62d1d3b1",
+        "decision": "block",
+        "stages": [
+          "authenticate",
+          "authorize"
+        ],
+        "stop_stage": "authorize",
+        "downstream_count": 0
+      },
+      {
+        "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+        "trace_id": "4c585aff730d6aec661f1fc48b1e9f86",
+        "decision": "block",
+        "stages": [
+          "authenticate"
+        ],
+        "stop_stage": "authenticate",
+        "downstream_count": 0
+      }
+    ],
+    "checks": [
+      {
+        "case_id": "0-collected",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+          "trace_id": "5926e0254430e1533d255384418ffb95",
+          "decision": "allow",
+          "stages": [
+            "authenticate",
+            "authorize",
+            "notice_lookup"
+          ],
+          "stop_stage": null,
+          "downstream_count": 1
+        }
+      },
+      {
+        "case_id": "0-reversed",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+          "trace_id": "5926e0254430e1533d255384418ffb95",
+          "decision": "allow",
+          "stages": [
+            "authenticate",
+            "authorize",
+            "notice_lookup"
+          ],
+          "stop_stage": null,
+          "downstream_count": 1
+        }
+      },
+      {
+        "case_id": "1-collected",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+          "trace_id": "8e0ef4c3d328bc3228a82ffe62d1d3b1",
+          "decision": "block",
+          "stages": [
+            "authenticate",
+            "authorize"
+          ],
+          "stop_stage": "authorize",
+          "downstream_count": 0
+        }
+      },
+      {
+        "case_id": "1-reversed",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+          "trace_id": "8e0ef4c3d328bc3228a82ffe62d1d3b1",
+          "decision": "block",
+          "stages": [
+            "authenticate",
+            "authorize"
+          ],
+          "stop_stage": "authorize",
+          "downstream_count": 0
+        }
+      },
+      {
+        "case_id": "2-collected",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+          "trace_id": "4c585aff730d6aec661f1fc48b1e9f86",
+          "decision": "block",
+          "stages": [
+            "authenticate"
+          ],
+          "stop_stage": "authenticate",
+          "downstream_count": 0
+        }
+      },
+      {
+        "case_id": "2-reversed",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+          "trace_id": "4c585aff730d6aec661f1fc48b1e9f86",
+          "decision": "block",
+          "stages": [
+            "authenticate"
+          ],
+          "stop_stage": "authenticate",
+          "downstream_count": 0
+        }
+      },
+      {
+        "case_id": "missing-log",
+        "input_kind": "damaged_copy",
+        "analysis_correct": true
+      },
+      {
+        "case_id": "foreign-trace",
+        "input_kind": "damaged_copy",
+        "analysis_correct": true
+      },
+      {
+        "case_id": "open-ledger",
+        "input_kind": "damaged_copy",
+        "analysis_correct": true
+      },
+      {
+        "case_id": "duplicate-span",
+        "input_kind": "damaged_copy",
+        "analysis_correct": true
+      }
+    ],
+    "source_digest": "3eb389234ba2db82a50f29e13ad1b9a5fd65ec7ea9fce1d3bc97ccd51a9677fa",
+    "cases": [
+      {
+        "case_id": "0-collected",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+          "trace_id": "5926e0254430e1533d255384418ffb95",
+          "decision": "allow",
+          "stages": [
+            "authenticate",
+            "authorize",
+            "notice_lookup"
+          ],
+          "stop_stage": null,
+          "downstream_count": 1
+        },
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "0-reversed",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "73059c5b-0033-432e-855a-e55ca8734d56",
+          "trace_id": "5926e0254430e1533d255384418ffb95",
+          "decision": "allow",
+          "stages": [
+            "authenticate",
+            "authorize",
+            "notice_lookup"
+          ],
+          "stop_stage": null,
+          "downstream_count": 1
+        },
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "1-collected",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+          "trace_id": "8e0ef4c3d328bc3228a82ffe62d1d3b1",
+          "decision": "block",
+          "stages": [
+            "authenticate",
+            "authorize"
+          ],
+          "stop_stage": "authorize",
+          "downstream_count": 0
+        },
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "1-reversed",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "bc7a584d-2c30-44e7-9ea0-13ad717e27c6",
+          "trace_id": "8e0ef4c3d328bc3228a82ffe62d1d3b1",
+          "decision": "block",
+          "stages": [
+            "authenticate",
+            "authorize"
+          ],
+          "stop_stage": "authorize",
+          "downstream_count": 0
+        },
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "2-collected",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+          "trace_id": "4c585aff730d6aec661f1fc48b1e9f86",
+          "decision": "block",
+          "stages": [
+            "authenticate"
+          ],
+          "stop_stage": "authenticate",
+          "downstream_count": 0
+        },
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "2-reversed",
+        "input_kind": "current_evidence",
+        "analysis_correct": true,
+        "analysis": {
+          "request_id": "78bc254c-0f74-4a19-9bd4-4572c0798604",
+          "trace_id": "4c585aff730d6aec661f1fc48b1e9f86",
+          "decision": "block",
+          "stages": [
+            "authenticate"
+          ],
+          "stop_stage": "authenticate",
+          "downstream_count": 0
+        },
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "missing-log",
+        "input_kind": "damaged_copy",
+        "analysis_correct": true,
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "foreign-trace",
+        "input_kind": "damaged_copy",
+        "analysis_correct": true,
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "open-ledger",
+        "input_kind": "damaged_copy",
+        "analysis_correct": true,
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      },
+      {
+        "case_id": "duplicate-span",
+        "input_kind": "damaged_copy",
+        "analysis_correct": true,
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다."
+      }
+    ]
+  },
+  "reason": "작성한 함수가 정상·거부 요청의 기록을 연결하고 손상된 사본은 거부했습니다. 업무 저장소는 합성 fixture입니다.",
+  "next_check": "정상 요청과 두 거부 요청의 중단 단계·저장소 호출 수를 원시 기록과 비교합니다.",
+  "internal_activity_id": "H19",
+  "contract_version": 2,
+  "task_completed": true,
+  "case_verified": true,
+  "security_verdict": "PASS"
+}

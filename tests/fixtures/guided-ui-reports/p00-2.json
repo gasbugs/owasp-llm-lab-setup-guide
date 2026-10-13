@@ -1,0 +1,47 @@
+{
+  "completed": false,
+  "cases": [
+    {
+      "case_id": "JSON 객체 형식",
+      "expected": "JSON 객체",
+      "actual": "dict",
+      "case_verified": true
+    },
+    {
+      "case_id": "필드 이름과 개수",
+      "expected": [
+        "message",
+        "max_tokens"
+      ],
+      "actual": [
+        "message",
+        "max_tokens"
+      ],
+      "case_verified": true
+    },
+    {
+      "case_id": "질문 문장",
+      "expected": "계정 보안을 위한 조언을 한 문장으로 알려 주세요.",
+      "actual": "계정 보안을 위한 조언을 한 문장으로 알려 주세요.",
+      "case_verified": true
+    },
+    {
+      "case_id": "출력 상한의 자료형과 값",
+      "expected": {
+        "type": "int",
+        "value": 64
+      },
+      "actual": {
+        "type": "str",
+        "value": "64"
+      },
+      "case_verified": false
+    }
+  ],
+  "upstream_called": false,
+  "feedback": "JSON 객체, 두 필드의 이름, 질문 문장, 숫자 max_tokens=64를 확인하세요.",
+  "received": {
+    "message": "계정 보안을 위한 조언을 한 문장으로 알려 주세요.",
+    "max_tokens": "64"
+  }
+}

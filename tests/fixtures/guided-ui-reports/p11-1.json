@@ -1,0 +1,202 @@
+{
+  "lab_id": "07-rag-boundary",
+  "activity_id": "P11",
+  "execution_id": "d1e434bf-6991-488c-ba59-18dd7c40fa1d",
+  "execution_kind": "h11-rag-provenance-suite",
+  "started_at": "2026-10-11T00:19:23.736018+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T00:19:32.031084+00:00",
+  "stage_calls": [
+    {
+      "stage": "authenticate",
+      "attempted": true,
+      "outcome": "server-principal",
+      "evidence_id": "d1e434bf-6991-488c-ba59-18dd7c40fa1d"
+    },
+    {
+      "stage": "provenance_filter",
+      "attempted": true,
+      "outcome": "server-owned-filter-applied",
+      "evidence_id": "4a55e2b2a0967affe479b72a1b23cdd8dc0843ace0605f8ceba2a13bd0f8c3f0"
+    },
+    {
+      "stage": "titan_embedding",
+      "attempted": true,
+      "outcome": "7-1024d-vectors",
+      "evidence_id": "431481cd-78e4-4165-81e6-1056615c0dee"
+    },
+    {
+      "stage": "vector_retrieval",
+      "attempted": true,
+      "outcome": "server-owned-filter-applied",
+      "evidence_id": "d1e434bf-6991-488c-ba59-18dd7c40fa1d"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "guided-h11-rag-provenance",
+      "kind": "learner-suite",
+      "id": "d1e434bf-6991-488c-ba59-18dd7c40fa1d",
+      "observed_at": "2026-10-11T00:19:31.945983+00:00"
+    },
+    {
+      "source": "guided-bedrock-gateway",
+      "kind": "titan-embedding",
+      "id": "16f30075-6e3b-47ec-b24f-97782afdd129",
+      "observed_at": "2026-10-11T00:19:24.838339+00:00"
+    },
+    {
+      "source": "guided-bedrock-gateway",
+      "kind": "titan-embedding",
+      "id": "95f2b784-9b71-489f-9bbb-a83fd8e703bd",
+      "observed_at": "2026-10-11T00:19:25.995547+00:00"
+    },
+    {
+      "source": "guided-bedrock-gateway",
+      "kind": "titan-embedding",
+      "id": "2838d9b9-f20e-4c17-a5fe-4cbf1dead99a",
+      "observed_at": "2026-10-11T00:19:27.116729+00:00"
+    },
+    {
+      "source": "guided-bedrock-gateway",
+      "kind": "titan-embedding",
+      "id": "4064f492-5bdd-4e85-b8ca-ece36ea57064",
+      "observed_at": "2026-10-11T00:19:28.266289+00:00"
+    },
+    {
+      "source": "guided-bedrock-gateway",
+      "kind": "titan-embedding",
+      "id": "1cab2a1c-946a-44ad-bf5e-a85b5643460c",
+      "observed_at": "2026-10-11T00:19:29.468706+00:00"
+    },
+    {
+      "source": "guided-bedrock-gateway",
+      "kind": "titan-embedding",
+      "id": "84a7d691-90f3-433f-9ac0-bfc37aa9a41d",
+      "observed_at": "2026-10-11T00:19:30.695487+00:00"
+    },
+    {
+      "source": "guided-bedrock-gateway",
+      "kind": "titan-embedding",
+      "id": "431481cd-78e4-4165-81e6-1056615c0dee",
+      "observed_at": "2026-10-11T00:19:31.936088+00:00"
+    }
+  ],
+  "result": {
+    "source_digest": "47538b19bc2c7e5dacd6910344dc4abfe66327c315286322d07f29afc6c279a6",
+    "policy_digest": "4a55e2b2a0967affe479b72a1b23cdd8dc0843ace0605f8ceba2a13bd0f8c3f0",
+    "embedding_model_id": "amazon.titan-embed-text-v2:0",
+    "dimensions": 1024,
+    "embedding_calls": 7,
+    "cases": [
+      {
+        "case_id": "normal-approved",
+        "principal": {
+          "subject": "u-acme-1",
+          "tenant": "acme",
+          "roles": [
+            "analyst"
+          ]
+        },
+        "client_claims": {},
+        "candidate_ids": [
+          "doc-public"
+        ],
+        "selected_document_id": "doc-public",
+        "selected_source_uri": "h11://acme/reviewed/access.md",
+        "selected_score": 1.0,
+        "forbidden_ids": [],
+        "query_provider_request_id": "4064f492-5bdd-4e85-b8ca-ece36ea57064",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "승인된 본인 tenant 문서를 정상 검색했습니다."
+      },
+      {
+        "case_id": "client-self-approval",
+        "principal": {
+          "subject": "u-acme-1",
+          "tenant": "acme",
+          "roles": [
+            "analyst"
+          ]
+        },
+        "client_claims": {
+          "require_approved": false
+        },
+        "candidate_ids": [
+          "doc-public"
+        ],
+        "selected_document_id": "doc-public",
+        "selected_source_uri": "h11://acme/reviewed/access.md",
+        "selected_score": 0.356524,
+        "forbidden_ids": [
+          "doc-draft"
+        ],
+        "query_provider_request_id": "1cab2a1c-946a-44ad-bf5e-a85b5643460c",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "위조 요청을 적용하지 않고 문서 권한을 유지했습니다."
+      },
+      {
+        "case_id": "client-tenant-spoof",
+        "principal": {
+          "subject": "u-acme-1",
+          "tenant": "acme",
+          "roles": [
+            "analyst"
+          ]
+        },
+        "client_claims": {
+          "tenant": "beta"
+        },
+        "candidate_ids": [
+          "doc-public"
+        ],
+        "selected_document_id": "doc-public",
+        "selected_source_uri": "h11://acme/reviewed/access.md",
+        "selected_score": 0.173639,
+        "forbidden_ids": [
+          "doc-foreign"
+        ],
+        "query_provider_request_id": "84a7d691-90f3-433f-9ac0-bfc37aa9a41d",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "위조 요청을 적용하지 않고 문서 권한을 유지했습니다."
+      },
+      {
+        "case_id": "client-role-spoof",
+        "principal": {
+          "subject": "u-acme-view",
+          "tenant": "acme",
+          "roles": [
+            "viewer"
+          ]
+        },
+        "client_claims": {
+          "roles": [
+            "analyst"
+          ]
+        },
+        "candidate_ids": [],
+        "selected_document_id": null,
+        "selected_source_uri": null,
+        "selected_score": null,
+        "forbidden_ids": [
+          "doc-public"
+        ],
+        "query_provider_request_id": "431481cd-78e4-4165-81e6-1056615c0dee",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "위조 요청을 적용하지 않고 문서 권한을 유지했습니다."
+      }
+    ],
+    "forbidden_candidate_cases": []
+  },
+  "reason": "서버 인증 principal과 저장된 provenance만 후보 필터에 사용되어 정상 source는 유지되고 세 위조 요청은 forbidden source를 후보로 만들지 못했습니다.",
+  "next_check": "각 Case의 server principal, client claims, candidate_ids와 selected source URI를 나란히 확인합니다.",
+  "internal_activity_id": "H11",
+  "security_verdict": "PASS",
+  "task_completed": true
+}

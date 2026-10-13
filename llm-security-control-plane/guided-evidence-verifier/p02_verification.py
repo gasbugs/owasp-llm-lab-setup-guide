@@ -8,11 +8,12 @@ from uuid import UUID
 
 from p02_results import EvidenceError, digest, require, stamp, verify_case
 
-FILES = ("cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py", "requirements.txt", "Containerfile")
+FILES = ("cases.py", "aws_auth.py", "native_runtime.py", "execution.py", "service_client.py", "workflow.py", "run_server.py", "requirements.txt", "Containerfile")
 
 
 class Verification:
-    def __init__(self, runner_root, app_url, gateway_url, app_token, gateway_token):
+    def __init__(self, runner_root, app_url, gateway_url, app_token, gateway_token, *, native_sdk=False):
+        self.native_sdk = native_sdk
         root = Path(runner_root)
         spec = importlib.util.spec_from_file_location("p02_server_owned_cases", root / "cases.py")
         module = importlib.util.module_from_spec(spec)
@@ -24,7 +25,7 @@ class Verification:
         self.app_url, self.gateway_url = app_url.rstrip("/"), gateway_url.rstrip("/")
         self.app_token, self.gateway_token = app_token, gateway_token
 
-    def collect(self, suite_id, client):
+    def collect(self, suite_id, client, *, on_progress=None):
         require(str(UUID(suite_id)) == suite_id)
         deadline = time.monotonic() + 180
 
@@ -83,6 +84,8 @@ class Verification:
         before = resources()
         results, calls, provider_ids = [], [], set()
         for expected, row in zip(self.cases, rows):
+            if on_progress:
+                on_progress(results, {"case_id": expected["case_id"], "status": "채점 중", "started_at": time.time()})
             execution_id = row["execution_id"]
             ledger = gateway("/executions/" + execution_id)
             require(started <= stamp(ledger["started_at"]) <= stamp(ledger["closed_at"]) <= finished)
@@ -90,12 +93,14 @@ class Verification:
             case_result = verify_case({**expected, "suite_id": suite_id, "execution_id": execution_id},
                                       row["execution"], ledger, source, source_digest=build["source_digest"],
                                       runner_digest=self.runner_digest, bucket=before["binding"]["source_bucket"],
-                                      provider_mode=before["provider_mode"])
+                                      provider_mode=before["provider_mode"], native_sdk=self.native_sdk)
             current_ids = case_result.get("provider_request_ids", []) + ([case_result["source_read_request_id"]] if "source_read_request_id" in case_result else [])
             require(not provider_ids.intersection(current_ids))
             provider_ids.update(current_ids)
-            results.append({"case_id": expected["case_id"], **case_result})
+            results.append({"case_id": expected["case_id"], "input": expected["body"], **case_result})
             calls.append({"case_id": expected["case_id"], "ledger": ledger, "source_requery": source})
+            if on_progress:
+                on_progress(results, None)
         after = resources()
         require(before["binding"] == after["binding"] and before["provider_mode"] == after["provider_mode"])
         require(app("/v1/build-info") == build and app("/v1/receipts/" + suite_id) == root)

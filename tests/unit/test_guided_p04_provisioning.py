@@ -168,7 +168,8 @@ class ProvisioningTests(unittest.TestCase):
         self.assertNotIn('security_verdict', response.json())
         read_path = '/resources/preparations/' + self.operation
         self.assertEqual(client.get(read_path, headers=headers(PROVISION)).status_code, 401)
-        self.assertEqual(client.get(read_path, headers=headers(VERIFIER)).json(), response.json())
+        self.assertEqual(client.get(read_path, headers=headers(VERIFIER)).json(),
+                         {k:v for k,v in response.json().items() if k != "resource_progress"})
         suite = str(uuid4())
         rows = [{'case_id': case['case_id'], 'execution_id': str(uuid4())} for case in load_cases()]
         registered = client.post('/suites', json={'suite_id': suite, 'cases': rows}, headers=headers(CONTROL))

@@ -32,7 +32,7 @@ def digest(value):
     return value
 
 
-def verify_case(expected, execution, ledger, source_evidence, *, source_digest, runner_digest, bucket, provider_mode="aws"):
+def verify_case(expected, execution, ledger, source_evidence, *, source_digest, runner_digest, bucket, provider_mode="aws", native_sdk=False):
     """Expected inputs and build digests belong to the verifier, not a Browser submission.
 
     The caller separately validates the full suite, resource configuration, freshness
@@ -52,6 +52,16 @@ def verify_case(expected, execution, ledger, source_evidence, *, source_digest, 
         require(0 <= end - start < 180 and execution["started_at"] == start and execution["closure"]["closed_at"] == end)
         worker = execution["execution"]
         require(worker["source_digest"] == source_digest)
+        if native_sdk:
+            require(worker.get("native_sdk") is True and provider_mode in {"aws", "contract"})
+            clients = worker.get("sdk_clients")
+            require(isinstance(clients, list))
+            if expected["valid"]:
+                require(worker.get("provider_mode") == provider_mode)
+                require(len(clients) == 2 and {c["service"] for c in clients} == {"s3", "bedrock-runtime"}
+                        and all(c["region"] == "us-east-1" and c["native_sdk"] is True for c in clients))
+            else:
+                require(clients == [])
         calls, worker_calls = ledger["calls"], worker["calls"]
         require(isinstance(calls, list) and isinstance(worker_calls, list))
         if expected["valid"] is False:
@@ -66,6 +76,9 @@ def verify_case(expected, execution, ledger, source_evidence, *, source_digest, 
         previous_end = start
         identities = []
         for index, (call, local, operation, payload) in enumerate(zip(calls, worker_calls, ("store_source", "embed"), payloads), 1):
+            if native_sdk:
+                require(local.get("native_sdk") is True and local.get("sdk_service") == ("s3" if index == 1 else "bedrock-runtime")
+                        and local.get("sdk_operation") == ("PutObject" if index == 1 else "InvokeModel"))
             require(call["execution_id"] == expected["execution_id"] and call["operation"] == operation
                     and type(call["sequence"]) is int and call["sequence"] == index and call["state"] == "complete")
             call_start, call_end = stamp(call["started_at"]), stamp(call["finished_at"])
@@ -97,6 +110,15 @@ def verify_case(expected, execution, ledger, source_evidence, *, source_digest, 
         require(type(norm) in (int, float) and math.isfinite(norm) and abs(norm - 1) < 0.001)
         digest(embedding["vector_digest"])
         require(worker["result"] == {"source": stored, "embedding": embedding})
+        if native_sdk:
+            native = worker["native_result"]
+            require(native["source"]["ResponseMetadata"]["RequestId"] == identities[0]
+                    and native["source"]["ResponseMetadata"]["HTTPStatusCode"] == 200)
+            vector = native["embedding"]["embedding"]
+            require(isinstance(vector, list) and len(vector) == 1024
+                    and all(type(v) in (int, float) and math.isfinite(v) for v in vector)
+                    and native["embedding"]["inputTextTokenCount"] == embedding["input_token_count"]
+                    and sha(json.dumps(vector, separators=(",", ":"), allow_nan=False).encode()) == embedding["vector_digest"])
         return {"execution_id": expected["execution_id"], "case_verified": True, "calls": 2,
                 "provider_request_ids": identities, "source_read_request_id": read_id}
     except (KeyError, TypeError, ValueError, AttributeError, OverflowError):

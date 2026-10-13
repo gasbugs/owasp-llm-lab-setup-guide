@@ -108,7 +108,7 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(self.requests, [])
 
     def test_starter_syntax_failure_and_invalid_return_are_distinct(self):
-        cases = ((ROOT.joinpath("learner.py").read_text(), "not_implemented"),
+        cases = (("async def prepare_document(*args): raise NotImplementedError()", "not_implemented"),
                  ("def broken(:", "runtime_error"),
                  ("async def prepare_document(*args): return 1", "invalid_return"))
         for source, status in cases:

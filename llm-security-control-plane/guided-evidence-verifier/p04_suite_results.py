@@ -81,7 +81,7 @@ class SuiteContract:
             effect = None
             if case["backend"] == "provider":
                 effect = verify_product_response(case, checked["response"], resources["guardrail"])
-            outcomes.append({"case_id": case["case_id"], "execution_id": row["execution_id"],
+            outcomes.append({"case_id": case["case_id"], "input": case["body"], "execution_id": row["execution_id"],
                              "binding": checked, "product": effect})
         require(sum(row["product"] is not None for row in outcomes) == 4)
         return {"suite_contract_verified": True, "provider_mode": resources["provider_mode"],

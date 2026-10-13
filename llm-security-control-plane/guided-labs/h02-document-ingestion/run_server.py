@@ -11,16 +11,22 @@ import time
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from cases import CONTRACT_VERSION, cases as default_cases
 
-RUNNER_FILES = ("cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py", "requirements.txt", "Containerfile")
+RUNNER_FILES = ("cases.py", "aws_auth.py", "native_runtime.py", "execution.py", "service_client.py", "workflow.py", "run_server.py", "requirements.txt", "Containerfile")
 
 
 class Run(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: UUID
+
+
+class Upload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=10, max_length=4000)
 
 
 def create_app(*, workflow, tokens, database, source_root=None, cases=None, now=time.time):
@@ -93,6 +99,33 @@ def create_app(*, workflow, tokens, database, source_root=None, cases=None, now=
             raise HTTPException(404, "P02 execution not found")
         return json.loads(row["receipt"])
 
+    @app.get("/v1/progress/{suite_id}")
+    def progress(suite_id: str, authorization: str | None = Header(default=None)):
+        require("control", authorization)
+        with connect() as db:
+            row = db.execute("SELECT receipt FROM p02_runs WHERE suite_id=?", (suite_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "P02 execution not found")
+        root = json.loads(row["receipt"])
+        completed = [{"case_id": item["case_id"], "status": "실행 완료 · 증거 대조 대기"}
+                     for item in root["cases"] if item["execution"] is not None]
+        return {"suite_id": suite_id, "total": len(root["cases"]), "cases": completed,
+                "current_case": root.get("current_case"),
+                "phase": "running" if root["run_state"] == "running" else "verifying"}
+
+    @app.post("/v1/upload")
+    def upload(request: Upload, authorization: str | None = Header(default=None)):
+        require("control", authorization)
+        if not lock.acquire(blocking=False):
+            raise HTTPException(409, "P02 실행이 진행 중입니다.")
+        try:
+            baseline = build()
+            execution = workflow.run_case(root / "learner.py", request.model_dump(),
+                suite_id=str(uuid4()), execution_id=str(uuid4()), runner_digest=baseline["runner_digest"], timeout=75)
+            return {"practice_id": "P02", "graded": False, "execution": execution}
+        finally:
+            lock.release()
+
     @app.post("/v1/run")
     def run(request: Run, authorization: str | None = Header(default=None)):
         require("control", authorization)
@@ -118,15 +151,20 @@ def create_app(*, workflow, tokens, database, source_root=None, cases=None, now=
                         raise TimeoutError("suite deadline")
                     if build() != baseline:
                         raise ValueError("source changed")
+                    result["current_case"] = {"case_id": case["case_id"], "status": "실행 중",
+                                              "started_at": now()}
+                    save(result)
                     row["execution"] = workflow.run_case(root / "learner.py", deepcopy(case["body"]),
                         suite_id=suite, execution_id=row["execution_id"], runner_digest=baseline["runner_digest"],
                         timeout=min(75, remaining))
+                    result["current_case"] = None
                     save(result)
                 if build() != baseline:
                     raise ValueError("source changed")
                 result["run_state"] = "finished"
             except Exception:
                 result["run_state"] = "error"
+            result["current_case"] = None
             result["finished_at"] = now()
             try:
                 result["final_build"] = build()
@@ -144,7 +182,7 @@ def create_app(*, workflow, tokens, database, source_root=None, cases=None, now=
 def configured_app():
     from workflow import Workflow
     return create_app(workflow=Workflow(os.getenv("GUIDED_GATEWAY_URL", "http://guided-bedrock-gateway:8080"),
-                                       os.environ["GUIDED_H02_GATEWAY_TOKEN"]),
+                                       os.environ["GUIDED_H02_GATEWAY_TOKEN"], native_sdk=True),
                       tokens={"control": os.environ["GUIDED_CONTROL_LAB02_TOKEN"],
                               "verifier": os.environ["GUIDED_VERIFIER_LAB02_TOKEN"]},
                       database=os.getenv("GUIDED_H02_DATABASE", "/tmp/h02-receipts.sqlite3"))

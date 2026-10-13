@@ -11,17 +11,17 @@ RUN chmod 0755 /app/p01-runner
 COPY --chmod=0444 guided-contracts/p12.json /app/p12.json
 COPY --chmod=0444 guided-evidence-verifier/server.py /app/server.py
 COPY --chmod=0444 guided-evidence-verifier/p02_results.py guided-evidence-verifier/p02_verification.py /app/
-COPY --chmod=0444 guided-labs/h02-document-ingestion/cases.py guided-labs/h02-document-ingestion/execution.py guided-labs/h02-document-ingestion/service_client.py guided-labs/h02-document-ingestion/workflow.py guided-labs/h02-document-ingestion/run_server.py guided-labs/h02-document-ingestion/requirements.txt guided-labs/h02-document-ingestion/Containerfile /app/p02-runner/
+COPY --chmod=0444 guided-labs/h02-document-ingestion/cases.py guided-labs/h02-document-ingestion/aws_auth.py guided-labs/h02-document-ingestion/native_runtime.py guided-labs/h02-document-ingestion/execution.py guided-labs/h02-document-ingestion/service_client.py guided-labs/h02-document-ingestion/workflow.py guided-labs/h02-document-ingestion/run_server.py guided-labs/h02-document-ingestion/requirements.txt guided-labs/h02-document-ingestion/Containerfile /app/p02-runner/
 RUN chmod 0755 /app/p02-runner
 COPY --chmod=0444 guided-evidence-verifier/p03_results.py guided-evidence-verifier/p03_suite_verification.py guided-evidence-verifier/p03_grading_api.py /app/
-COPY --chmod=0444 guided-labs/h03-ingestion-search/cases.py guided-labs/h03-ingestion-search/execution.py guided-labs/h03-ingestion-search/service_client.py guided-labs/h03-ingestion-search/workflow.py guided-labs/h03-ingestion-search/run_server.py guided-labs/h03-ingestion-search/requirements.txt guided-labs/h03-ingestion-search/Containerfile /app/p03-runner/
+COPY --chmod=0444 guided-labs/h03-ingestion-search/aws_auth.py guided-labs/h03-ingestion-search/native_runtime.py guided-labs/h03-ingestion-search/cases.py guided-labs/h03-ingestion-search/execution.py guided-labs/h03-ingestion-search/service_client.py guided-labs/h03-ingestion-search/workflow.py guided-labs/h03-ingestion-search/run_server.py guided-labs/h03-ingestion-search/requirements.txt guided-labs/h03-ingestion-search/Containerfile /app/p03-runner/
 RUN chmod 0755 /app/p03-runner
 COPY --chmod=0444 guided-evidence-verifier/p04_results.py guided-evidence-verifier/p04_product.py guided-evidence-verifier/p04_suite_results.py guided-evidence-verifier/p04_suite_verification.py guided-evidence-verifier/p04_grading_api.py /app/
 COPY --chmod=0444 guided-labs/h04-bedrock-guardrail/cases.py guided-labs/h04-bedrock-guardrail/execution.py guided-labs/h04-bedrock-guardrail/service_client.py guided-labs/h04-bedrock-guardrail/workflow.py guided-labs/h04-bedrock-guardrail/run_server.py guided-labs/h04-bedrock-guardrail/requirements.txt guided-labs/h04-bedrock-guardrail/Containerfile /app/p04-runner/
 RUN chmod 0755 /app/p04-runner
 COPY --chmod=0444 guided-evidence-verifier/p12_results.py guided-evidence-verifier/p12_verification.py guided-evidence-verifier/p12_binding.py /app/
 COPY --chmod=0444 guided-evidence-verifier/p12_grading.py /app/
-COPY --chmod=0444 guided-evidence-verifier/p12_api.py /app/
+COPY --chmod=0444 guided-evidence-verifier/p12_api.py guided-evidence-verifier/h13_sequential.py /app/
 COPY --chmod=0444 guided-evidence-verifier/p12_deployment.py /app/
 COPY --chmod=0444 guided-labs/h12-application-pipeline/Containerfile guided-labs/h12-application-pipeline/execution.py guided-labs/h12-application-pipeline/service_client.py guided-labs/h12-application-pipeline/workflow.py guided-labs/h12-application-pipeline/run_server.py /app/p12-runner/
 RUN chmod 0755 /app/p12-runner
@@ -43,6 +43,11 @@ COPY --chmod=0444 guided-labs/observability/server.py /app/p18-runner/server.py
 COPY --chmod=0444 guided-labs/observability/query_execution.py /app/p18-runner/query_execution.py
 COPY --chmod=0444 guided-labs/h18-product-queries/request_workflow.py /app/p18-runner/request_workflow.py
 RUN chmod 0755 /app/p18-runner && install -d -o 65532 -g 65532 -m 0700 /state
+
+COPY --chmod=0444 guided-evidence-verifier/p23_verification.py /app/
+COPY --chmod=0444 guided-labs/h23-model-call/server.py /app/p23-runner.py
+
+COPY --chmod=0444 guided-evidence-verifier/exploration_read.py /app/
 
 USER 65532:65532
 EXPOSE 8000

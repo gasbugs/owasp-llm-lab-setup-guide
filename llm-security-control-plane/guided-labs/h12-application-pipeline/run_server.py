@@ -12,6 +12,7 @@ import time
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Header, HTTPException
+from datetime import datetime, timezone
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
@@ -22,6 +23,10 @@ FILES = ("Containerfile", "pipeline.py", "execution.py", "service_client.py", "w
 class Run(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: UUID
+
+
+class RunCase(Run):
+    case_id: str
 
 
 def create_app(*, workflow, cases, documents, tokens, database, source_root=None, now=time.time):
@@ -107,9 +112,35 @@ def create_app(*, workflow, cases, documents, tokens, database, source_root=None
             raise HTTPException(404, "receipt not found")
         return json.loads(row["receipt"])
 
+    @app.get("/v1/progress/{suite_id}")
+    def progress(suite_id: UUID, authorization: str | None = Header(default=None)):
+        require("control",authorization)
+        with connect() as db:
+            row=db.execute("SELECT receipt FROM p12_runs WHERE suite_id=?",(str(suite_id),)).fetchone()
+        if not row:raise HTTPException(404,"execution not started")
+        root=json.loads(row['receipt']);done=[];current=None
+        for case in root['cases']:
+            if case['finished_at'] is not None:
+                done.append({'case_id':case['case_id'],'status':'실행 완료','reason':'독립 검증 대기'})
+            else:
+                current={'case_id':case['case_id'],'status':'실행 중','started_at':datetime.fromtimestamp(case['started_at'],timezone.utc).isoformat()}
+        return {'suite_id':str(suite_id),'cases':done,'current_case':current,
+                'total':len(ids),'phase':'running' if root['run_state']=='running' else 'finished'}
+
+    @app.post("/v1/run-case")
+    def run_case(body: RunCase, authorization: str | None = Header(default=None)):
+        return run_selected(body, authorization, case_id=body.case_id)
+
     @app.post("/v1/run")
-    def run(body: Run, authorization: str | None = Header(default=None)):
+    def run(body: Run, authorization: str | None = Header(default=None), x_preview_case: str | None = Header(default=None)):
+        return run_selected(body, authorization, x_preview_case=x_preview_case)
+
+    def run_selected(body, authorization, x_preview_case=None, *, case_id=None):
         require("control", authorization)
+        if case_id is not None and case_id not in ids:
+            raise HTTPException(422, "unknown server-owned case")
+        if x_preview_case is not None and x_preview_case not in ids:
+            raise HTTPException(422,"unknown server-owned scenario")
         if not lock.acquire(blocking=False):
             raise HTTPException(409, "another P12 run is active")
         try:
@@ -117,17 +148,37 @@ def create_app(*, workflow, cases, documents, tokens, database, source_root=None
                 unchanged()
             except Exception:
                 raise HTTPException(503, "execution source changed") from None
-            receipt = {"practice_id": "P12", "execution_id": "H12", "contract_version": 2,
-                       "suite_id": str(body.suite_id), "started_at": now(), "finished_at": None,
-                       "run_state": "running", "build": baseline, "cases": []}
-            try:
-                with connect() as db:
-                    db.execute("INSERT INTO p12_runs VALUES(?,?)", (receipt["suite_id"], json.dumps(receipt)))
-            except sqlite3.IntegrityError:
-                raise HTTPException(409, "suite already recorded") from None
+            with connect() as db:
+                previous = db.execute("SELECT receipt FROM p12_runs WHERE suite_id=?", (str(body.suite_id),)).fetchone()
+            if previous:
+                receipt = json.loads(previous["receipt"])
+                prefix = [item["case_id"] for item in receipt["cases"]]
+                if (case_id is None or receipt["run_state"] != "paused"
+                        or receipt["build"] != baseline or prefix != ids[:len(prefix)]
+                        or len(prefix) >= len(ids) or ids[len(prefix)] != case_id
+                        or any(item["finished_at"] is None for item in receipt["cases"])
+                        or now() - receipt["started_at"] > 900):
+                    raise HTTPException(409, "suite cannot advance to this case")
+                receipt.update(run_state="running", finished_at=None)
+                save(receipt)
+            else:
+                if case_id is not None and case_id != ids[0]:
+                    raise HTTPException(409, "first fixed case required")
+                receipt = {"practice_id": "P12", "execution_id": "H12", "contract_version": 2,
+                           "suite_id": str(body.suite_id), "started_at": now(), "finished_at": None,
+                           "run_state": "running", "build": baseline, "cases": []}
+                try:
+                    with connect() as db:
+                        db.execute("INSERT INTO p12_runs VALUES(?,?)", (receipt["suite_id"], json.dumps(receipt)))
+                except sqlite3.IntegrityError:
+                    raise HTTPException(409, "suite already recorded") from None
             try:
                 deadline = time.monotonic() + 600
                 for case in cases:
+                    if case_id is not None and case["case_id"] != case_id:
+                        continue
+                    if x_preview_case is not None and case["case_id"] != x_preview_case:
+                        continue
                     if time.monotonic() >= deadline:
                         raise TimeoutError("suite time budget reached")
                     unchanged()
@@ -148,7 +199,7 @@ def create_app(*, workflow, cases, documents, tokens, database, source_root=None
                     execution = lifecycle["execution"]
                     if execution["source_digest"] != baseline["files"]["pipeline.py"]:
                         raise ValueError("executed source mismatch")
-                receipt["run_state"] = "finished"
+                receipt["run_state"] = "paused" if case_id is not None and len(receipt["cases"]) < len(ids) else "finished"
             except Exception:
                 receipt["run_state"] = "error"
             receipt["finished_at"] = now()

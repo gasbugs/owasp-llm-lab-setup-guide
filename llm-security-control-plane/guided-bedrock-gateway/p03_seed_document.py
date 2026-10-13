@@ -10,6 +10,7 @@ import logging
 import re
 import time
 from uuid import UUID
+from resource_progress import step
 
 from botocore.exceptions import ConnectionClosedError
 
@@ -74,11 +75,13 @@ def prepare_document(specification, connection, operation_id, *, s3, agent, vect
             finally:
                 body.close()
 
+        step(9)
         existed = listed()
         if not existed:
             call(s3.put_object, **source, Key=key, Body=DOCUMENT, ContentType="text/markdown; charset=utf-8",
                  IfNoneMatch="*", Metadata={"practice": "P03", "sha256": DOCUMENT_SHA})
         verify_source()
+        step(10)
         started = call(agent.start_ingestion_job, knowledgeBaseId=kb, dataSourceId=ds,
                        clientToken="p03-ingest-" + operation.hex,
                        description="P03 current training document ingestion")["ingestionJob"]
@@ -105,6 +108,7 @@ def prepare_document(specification, connection, operation_id, *, s3, agent, vect
             raise LedgerError(409)
         # An empty rebuilt index can coexist with a stale INDEXED document marker.
         # Audit the actual vectors, not only the ingestion job's COMPLETE status.
+        step(11)
         def has_vectors():
             args, seen = {"indexArn": t["index_arn"], "maxResults": 100}, set()
             for _ in range(100):

@@ -37,7 +37,9 @@ class GuidedPackagingTests(unittest.TestCase):
             (6, "h06-nemo-action", ("Containerfile", "config/config.yml", "config/flows.co", "server.py")),
             (7, "h07-content-safety", ("Containerfile", "config/prompts.yml", "server.py")),
             (8, "h08-self-check-input", ("Containerfile", "config/config.yml", "server.py")),
+            (9, "h09-presidio-redaction", ("Containerfile", "requirements.txt", "server.py")),
             (10, "h10-self-check-output", ("Containerfile", "server.py", "config/config.yml")),
+            (11, "h11-rag-provenance", ("Containerfile", "server.py")),
         ):
             with self.subTest(activity=number):
                 digest = hashlib.sha256()

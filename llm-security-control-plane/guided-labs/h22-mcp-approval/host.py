@@ -289,3 +289,86 @@ def receipt(suite_id: str, _authorized: None = Depends(require_verifier)) -> dic
     if row is None:
         raise HTTPException(status_code=404, detail="receipt not found")
     return json.loads(row["receipt_json"])
+
+
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+class PreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation: Literal["lookup", "publish-unapproved", "publish-approved"] = "lookup"
+    message: str = Field(default="H22 훈련 공지", min_length=1, max_length=200)
+
+@app.post("/v1/preview")
+async def preview(body:PreviewRequest, _authorized: None = Depends(require_control)):
+    suite_id=str(uuid.uuid4());call_id=str(uuid.uuid4());trace_id=secrets.token_hex(16)
+    async with Client(MCP_URL,mode=PROTOCOL_VERSION) as client:
+        if body.operation == "lookup":
+            result=await client.call_tool("lookup_notice",{"suite_id":suite_id})
+        else:
+            approval=approve(suite_id,call_id,trace_id,"course-requester","course-reviewer",body.message) if body.operation == "publish-approved" else ""
+            result=await client.call_tool("publish_notice",{"suite_id":suite_id,"call_id":call_id,
+                "trace_id":trace_id,"requester":"course-requester","notice":body.message,"approval_token":approval})
+        count=await effect_count(client,suite_id)
+    return {"graded":False,"suite_id":suite_id,"operation":body.operation,
+            "result": {"is_error":result.is_error,"content":[item.model_dump() for item in result.content]},"effect_count":count}
+
+import asyncio
+class CaseRunRequest(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    suite_id:str
+    started_at:str
+    case_id:str
+
+CASE_ORDER=['normal','no-approval','self-approval','changed-args','expired','approved','reuse']
+SEQUENCES={}
+SEQUENCE_LOCK=asyncio.Lock()
+@app.post('/v1/run-case')
+async def run_sequence_case(body:CaseRunRequest,_authorized:None=Depends(require_control)):
+    if str(uuid.UUID(body.suite_id))!=body.suite_id:raise HTTPException(422,'invalid suite')
+    async with SEQUENCE_LOCK:
+        state=SEQUENCES.get(body.suite_id)
+        if state is None:
+            if body.case_id!='normal':raise HTTPException(409,'first case required')
+            state={'receipt':{'suite_id':body.suite_id,'started_at':body.started_at,'trace_id':secrets.token_hex(16),
+                'server_id':SERVER_ID,'external_action_called':False,'effect_counts':[],'case_order':[]},'running':False}
+            SEQUENCES[body.suite_id]=state
+        receipt=state['receipt'];index=len(receipt['case_order'])
+        if (index>=len(CASE_ORDER) or CASE_ORDER[index]!=body.case_id or receipt['started_at']!=body.started_at
+                or state['running']):raise HTTPException(409,'invalid case order')
+        state['running']=True
+        async with Client(MCP_URL,mode=PROTOCOL_VERSION) as client:
+            build=tool_payload(await client.call_tool('server_build_info',{})) or {}
+            current=build.get('source_digest')
+            if index and receipt['source_digest']!=current:raise HTTPException(409,'MCP policy changed')
+            if index==0:
+                tools=await client.list_tools();inventory=sorted(tool.name for tool in tools.tools)
+                receipt.update(protocol_version=client.protocol_version,tool_inventory=inventory,
+                    tool_inventory_digest=hashlib.sha256('\n'.join(inventory).encode()).hexdigest(),source_digest=current)
+            requester='course-requester';reviewer='course-reviewer';notice='H22 훈련 공지';trace=receipt['trace_id'];suite=body.suite_id
+            if body.case_id=='normal':
+                receipt['normal']=result_summary(await client.call_tool('lookup_notice',{'suite_id':suite}))
+            elif body.case_id=='self-approval':
+                try:
+                    approve(suite,str(uuid.uuid4()),trace,requester,requester,notice)
+                    receipt['self_approval']={'denied':False,'reason':None}
+                except ValueError as exc:receipt['self_approval']={'denied':True,'reason':str(exc)}
+            else:
+                call_id=str(uuid.uuid4());token='';sent_notice=notice
+                if body.case_id=='changed-args':
+                    receipt['approved_call_id']=str(uuid.uuid4())
+                    state['approval']=approve(suite,receipt['approved_call_id'],trace,requester,reviewer,notice)
+                    token=state['approval'];sent_notice='승인하지 않은 변경 공지'
+                elif body.case_id=='expired':
+                    token=approve(suite,call_id,trace,requester,reviewer,notice,expires_at=int(time.time())-1)
+                elif body.case_id in {'approved','reuse'}:
+                    token=state['approval'];call_id=receipt['approved_call_id']
+                response=await client.call_tool('publish_notice',{'suite_id':suite,'call_id':call_id,'trace_id':trace,
+                    'requester':requester,'notice':sent_notice,'approval_token':token})
+                key={'no-approval':'no_approval','changed-args':'changed_args'}.get(body.case_id,body.case_id)
+                receipt[key]=result_summary(response)
+                receipt['effect_counts'].append(await effect_count(client,suite))
+            receipt['case_order'].append(body.case_id);receipt['observed_at']=datetime.now(timezone.utc).isoformat()
+            state['running']=False
+            with connect() as database:
+                database.execute('INSERT OR REPLACE INTO receipts VALUES(?,?)',(suite,json.dumps(receipt,ensure_ascii=False)))
+            return {'suite_id':suite,'case_id':body.case_id}

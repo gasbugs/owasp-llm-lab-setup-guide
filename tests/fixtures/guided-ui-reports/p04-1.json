@@ -1,0 +1,27 @@
+{
+  "lab_id": "03-bedrock-guardrail",
+  "activity_id": "P04",
+  "execution_id": "4e7aa1c4-2228-437c-aa75-3cc8fffcf328",
+  "execution_kind": "p04-guardrail-suite",
+  "contract_version": "p04-guardrail-v1",
+  "status": "completed",
+  "task_completed": false,
+  "security_verdict": "ERR",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T05:18:09.877787+00:00",
+  "stage_calls": [],
+  "result": {
+    "suite_contract_verified": false,
+    "cases": [],
+    "practice_id": "P04",
+    "activity_id": "H04",
+    "contract_version": "p04-guardrail-v1",
+    "suite_id": "4e7aa1c4-2228-437c-aa75-3cc8fffcf328",
+    "task_completed": false,
+    "security_verdict": "ERR",
+    "source_digest": null
+  },
+  "reason": "현재 실행의 필수 기록을 확인하지 못해 과제는 미완료입니다.",
+  "next_check": "사례별 실행 코드와 Gateway의 호출·정책·응답 기록을 확인하세요."
+}

@@ -210,7 +210,7 @@ class RealSuiteTests(unittest.TestCase):
 
     def test_real_starter_27_closed_attempts_are_not_whole_suite_success(self):
         fixture = self.fixture
-        fixture.fixture.source.write_text((binding.flow.worker.LAB / "learner.py").read_text())
+        fixture.fixture.source.write_text("async def invoke_guarded(body, guardrail, services):\n    raise NotImplementedError(\"Implement invoke_guarded\")\n")
         root = fixture.execute_suite()
         records = [fixture.fixture.ledger.read(row["execution_id"]) for row in root["cases"]]
         with self.assertRaises(binding.results.EvidenceError):

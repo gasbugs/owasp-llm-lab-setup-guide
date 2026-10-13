@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 from pathlib import Path
+from typing import Literal
 import signal
 import subprocess
 import sys
@@ -27,6 +28,11 @@ class RunRequest(BaseModel):
     started_at: str
 
 
+CASE_IDS=['normal-lookup','unauthorized-publish','anonymous-lookup']
+class CaseRequest(RunRequest):
+    case_id: Literal['normal-lookup','unauthorized-publish','anonymous-lookup']
+
+
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -37,7 +43,7 @@ def save(path, value):
     temporary.replace(path)
 
 
-def execute(source, baseline, timeout=25):
+def execute(source, baseline, timeout=25, selected_case=None):
     if source.stat().st_size > 65536:
         return {'closed': False, 'execution_error': 'source_too_large'}
     # The worker may reach the provided collector but receives no service/AWS tokens.
@@ -46,7 +52,7 @@ def execute(source, baseline, timeout=25):
             stdin=subprocess.PIPE, stdout=output, stderr=errors, start_new_session=True,
             env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONDONTWRITEBYTECODE': '1'})
         try:
-            process.communicate(json.dumps({'source': str(source), 'baseline': baseline}).encode(), timeout=timeout)
+            process.communicate(json.dumps({'source': str(source), 'baseline': baseline, 'selected_case': selected_case}).encode(), timeout=timeout)
         except subprocess.TimeoutExpired:
             os.killpg(process.pid, signal.SIGKILL)
             process.communicate()
@@ -128,8 +134,7 @@ def create_app(control_token=None, verifier_token=None, state=None, source=None,
         return {'source_digest': digest(source),
                 'runner_digests': {name: digest(BASE / name) for name in RUNNER_FILES}}
 
-    @app.post('/v1/run/H17')
-    def run(body: RunRequest, authorization: str | None = Header(None)):
+    def run_selected(body,authorization,selected_case=None):
         auth(authorization, control)
         suite = canonical(body.suite_id)
         try:
@@ -153,10 +158,11 @@ def create_app(control_token=None, verifier_token=None, state=None, source=None,
                        'suite_id': suite, 'started_at': body.started_at,
                        'source_digest': digest(source), 'query_start_ns': time.time_ns(),
                        'counter_before': baseline, 'provider_mode': 'synthetic-notice-store'}
+            if selected_case is not None: receipt['selected_case']=selected_case
             executed = {'closed': False, 'execution_error': 'not_started'}
             try:
                 receipt['query_start_ns'] = sampler(time.time_ns())
-                executed = executor(source, baseline)
+                executed = executor(source, baseline) if selected_case is None else executor(source,baseline,selected_case=selected_case)
                 if 'counter_values' in executed and 'metrics' in executed:
                     save(metrics_path, {'values': executed['counter_values'], 'text': executed['metrics']})
                     receipt['query_end_ns'] = sampler(time.time_ns())
@@ -171,6 +177,14 @@ def create_app(control_token=None, verifier_token=None, state=None, source=None,
             return receipt
         finally:
             lock.release()
+
+    @app.post('/v1/run/H17')
+    def run(body:RunRequest,authorization:str|None=Header(None)):
+        return run_selected(body,authorization)
+
+    @app.post('/v1/run-case/H17')
+    def run_case(body:CaseRequest,authorization:str|None=Header(None)):
+        return run_selected(body,authorization,CASE_IDS.index(body.case_id))
 
     def read(path):
         if not path.is_file():

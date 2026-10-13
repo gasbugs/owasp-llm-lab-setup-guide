@@ -1,5 +1,6 @@
 """P04 Gateway wiring; startup and contract execution never create SDK clients."""
 import hashlib
+from resource_progress import tracked
 import importlib.util
 from pathlib import Path
 
@@ -40,7 +41,11 @@ def configured_app(database_path, *, provider_mode, control_token, verifier_toke
         if prepared_resources is not None:
             raise ValueError("P04 preparation journal owns the resource reader")
         journal = PreparationStore(database_path)
-        preparation = Provisioner(journal, region=region)
+        class TrackedProvisioner(Provisioner):
+            @tracked("P04")
+            def prepare(self, operation_id):
+                return super().prepare(operation_id)
+        preparation = TrackedProvisioner(journal, region=region)
         prepared_resources = journal.resources
 
     def resources():
@@ -64,7 +69,8 @@ def configured_app(database_path, *, provider_mode, control_token, verifier_toke
             row = store.lookup(suite, execution)
             case, snapshot = row["case"], row["resources"]
             if case["backend"] == "provider" and snapshot["provider_mode"] == "aws":
-                invoke = BedrockBackend(case["body"], snapshot["guardrail"], region=region)
+                invoke = BedrockBackend(case["body"], snapshot["guardrail"], region=region,
+                                        preview_tokens=2048 if case["case_id"] == "direct-converse" else None)
             else:
                 invoke = ContractBackend(case, snapshot["guardrail"])
             return invoke(operation, payload)

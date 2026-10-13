@@ -1,0 +1,647 @@
+{
+  "lab_id": "06-privacy-output",
+  "activity_id": "P09",
+  "execution_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+  "execution_kind": "h09-presidio-delivery-suite",
+  "started_at": "2026-10-11T01:03:03.422438+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T01:03:03.917482+00:00",
+  "stage_calls": [
+    {
+      "stage": "presidio_analyzer",
+      "attempted": true,
+      "outcome": "4-cases-completed",
+      "evidence_id": "1f4b44782999c8fd5f809d94e252a1dc720e66402942b9f2ff03c3242a10b4f1"
+    },
+    {
+      "stage": "presidio_anonymizer",
+      "attempted": true,
+      "outcome": "replace-operator-observed",
+      "evidence_id": "8228f848-3930-4005-88e4-4a6eea46169b"
+    },
+    {
+      "stage": "h09_delivery_sink",
+      "attempted": true,
+      "outcome": "raw-delivered=0",
+      "evidence_id": "8228f848-3930-4005-88e4-4a6eea46169b"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "guided-h09-presidio-redaction",
+      "kind": "learner-suite",
+      "id": "8228f848-3930-4005-88e4-4a6eea46169b",
+      "observed_at": "2026-10-11T01:03:03.833868+00:00"
+    },
+    {
+      "source": "guided-h09-delivery-sink",
+      "kind": "delivery",
+      "id": "a05e6dc6-cd96-4ee6-a9ab-64e2dabdffc4",
+      "observed_at": "2026-10-11T01:03:03.474937+00:00"
+    },
+    {
+      "source": "guided-h09-delivery-sink",
+      "kind": "delivery",
+      "id": "6474378b-b301-443b-929a-cb58b9326002",
+      "observed_at": "2026-10-11T01:03:03.698230+00:00"
+    },
+    {
+      "source": "guided-h09-delivery-sink",
+      "kind": "delivery",
+      "id": "0707a5c8-5149-453a-a8b1-5ca51fd46253",
+      "observed_at": "2026-10-11T01:03:03.763004+00:00"
+    },
+    {
+      "source": "guided-h09-delivery-sink",
+      "kind": "delivery",
+      "id": "6743630e-2fc5-4c22-ace7-37652ade22af",
+      "observed_at": "2026-10-11T01:03:03.830181+00:00"
+    }
+  ],
+  "result": {
+    "source_digest": "1f4b44782999c8fd5f809d94e252a1dc720e66402942b9f2ff03c3242a10b4f1",
+    "framework": "microsoft-presidio",
+    "framework_version": "2.2.362",
+    "entities": [
+      "EMAIL_ADDRESS",
+      "KR_RRN"
+    ],
+    "official_kr_rrn": true,
+    "cases": [
+      {
+        "case_id": "clean",
+        "stage": "input",
+        "input_digest": "be1ddfd19d09959c6944489a0914e3b8252c04a6ea9949ec231238a0a7aeab3a",
+        "candidate_digest": "be1ddfd19d09959c6944489a0914e3b8252c04a6ea9949ec231238a0a7aeab3a",
+        "released_digest": "be1ddfd19d09959c6944489a0914e3b8252c04a6ea9949ec231238a0a7aeab3a",
+        "released_bytes": 43,
+        "entities": [
+          "EMAIL_ADDRESS",
+          "KR_RRN"
+        ],
+        "recognizer_classes": [
+          "CreditCardRecognizer",
+          "CryptoRecognizer",
+          "DateRecognizer",
+          "EmailRecognizer",
+          "IbanRecognizer",
+          "IpRecognizer",
+          "KrRrnRecognizer",
+          "MacAddressRecognizer",
+          "MedicalLicenseRecognizer",
+          "NhsRecognizer",
+          "PhoneRecognizer",
+          "SpacyRecognizer",
+          "UrlRecognizer",
+          "UsBankRecognizer",
+          "UsItinRecognizer",
+          "UsLicenseRecognizer",
+          "UsPassportRecognizer",
+          "UsSsnRecognizer"
+        ],
+        "recognizers": [
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.korea.kr_rrn_recognizer",
+            "class": "KrRrnRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.uk.uk_nhs_recognizer",
+            "class": "NhsRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.medical_license_recognizer",
+            "class": "MedicalLicenseRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_bank_recognizer",
+            "class": "UsBankRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_driver_license_recognizer",
+            "class": "UsLicenseRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_itin_recognizer",
+            "class": "UsItinRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_passport_recognizer",
+            "class": "UsPassportRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_ssn_recognizer",
+            "class": "UsSsnRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.credit_card_recognizer",
+            "class": "CreditCardRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.crypto_recognizer",
+            "class": "CryptoRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.date_recognizer",
+            "class": "DateRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.email_recognizer",
+            "class": "EmailRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.iban_recognizer",
+            "class": "IbanRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.ip_recognizer",
+            "class": "IpRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.mac_recognizer",
+            "class": "MacAddressRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.phone_recognizer",
+            "class": "PhoneRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.url_recognizer",
+            "class": "UrlRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.nlp_engine_recognizers.spacy_recognizer",
+            "class": "SpacyRecognizer"
+          }
+        ],
+        "operator": "replace",
+        "detections": [],
+        "capability_digest": "ee6f9be6f8d8c2f8dd232da8f2c218531b4f06c1168207b30072f80a0bbb1363",
+        "execution_id": "cbd789ae-046d-4871-8697-b3555dbcfb8e",
+        "delivery_id": "a05e6dc6-cd96-4ee6-a9ab-64e2dabdffc4",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "정상 문장은 유지됐고 현재 케이스까지의 실제 전달 결과가 개인정보 치환 계약과 일치합니다."
+      },
+      {
+        "case_id": "input-email",
+        "stage": "input",
+        "input_digest": "7b16da42a33ba8f87b8a40187841fae4486755699c0854d541575e4af1bd9604",
+        "candidate_digest": "e5ce4d54713a9f78dff1933b5feacf024ea9359b6a56c343532219989dbe4c09",
+        "released_digest": "e5ce4d54713a9f78dff1933b5feacf024ea9359b6a56c343532219989dbe4c09",
+        "released_bytes": 67,
+        "entities": [
+          "EMAIL_ADDRESS",
+          "KR_RRN"
+        ],
+        "recognizer_classes": [
+          "CreditCardRecognizer",
+          "CryptoRecognizer",
+          "DateRecognizer",
+          "EmailRecognizer",
+          "IbanRecognizer",
+          "IpRecognizer",
+          "KrRrnRecognizer",
+          "MacAddressRecognizer",
+          "MedicalLicenseRecognizer",
+          "NhsRecognizer",
+          "PhoneRecognizer",
+          "SpacyRecognizer",
+          "UrlRecognizer",
+          "UsBankRecognizer",
+          "UsItinRecognizer",
+          "UsLicenseRecognizer",
+          "UsPassportRecognizer",
+          "UsSsnRecognizer"
+        ],
+        "recognizers": [
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.korea.kr_rrn_recognizer",
+            "class": "KrRrnRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.uk.uk_nhs_recognizer",
+            "class": "NhsRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.medical_license_recognizer",
+            "class": "MedicalLicenseRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_bank_recognizer",
+            "class": "UsBankRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_driver_license_recognizer",
+            "class": "UsLicenseRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_itin_recognizer",
+            "class": "UsItinRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_passport_recognizer",
+            "class": "UsPassportRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_ssn_recognizer",
+            "class": "UsSsnRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.credit_card_recognizer",
+            "class": "CreditCardRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.crypto_recognizer",
+            "class": "CryptoRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.date_recognizer",
+            "class": "DateRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.email_recognizer",
+            "class": "EmailRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.iban_recognizer",
+            "class": "IbanRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.ip_recognizer",
+            "class": "IpRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.mac_recognizer",
+            "class": "MacAddressRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.phone_recognizer",
+            "class": "PhoneRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.url_recognizer",
+            "class": "UrlRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.nlp_engine_recognizers.spacy_recognizer",
+            "class": "SpacyRecognizer"
+          }
+        ],
+        "operator": "replace",
+        "detections": [
+          {
+            "entity_type": "EMAIL_ADDRESS",
+            "start": 10,
+            "end": 29,
+            "score": 1.0
+          }
+        ],
+        "capability_digest": "c3f959a0958470adc7f907d57417a7929edd8f2d6cecae953da9a9cf0e9d998e",
+        "execution_id": "e7f22ae1-e824-4471-99c0-b445a7f84e28",
+        "delivery_id": "6474378b-b301-443b-929a-cb58b9326002",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "정상 문장은 유지됐고 현재 케이스까지의 실제 전달 결과가 개인정보 치환 계약과 일치합니다."
+      },
+      {
+        "case_id": "input-kr-rrn",
+        "stage": "input",
+        "input_digest": "a46e05cf910b77c35720b01211760dff9e54f67f2aedfce4246529c71beff8b5",
+        "candidate_digest": "2a32118c4d366c2cf1f9753b8f50f80fff7f624f706fb6d395b2870efa680e50",
+        "released_digest": "2a32118c4d366c2cf1f9753b8f50f80fff7f624f706fb6d395b2870efa680e50",
+        "released_bytes": 52,
+        "entities": [
+          "EMAIL_ADDRESS",
+          "KR_RRN"
+        ],
+        "recognizer_classes": [
+          "CreditCardRecognizer",
+          "CryptoRecognizer",
+          "DateRecognizer",
+          "EmailRecognizer",
+          "IbanRecognizer",
+          "IpRecognizer",
+          "KrRrnRecognizer",
+          "MacAddressRecognizer",
+          "MedicalLicenseRecognizer",
+          "NhsRecognizer",
+          "PhoneRecognizer",
+          "SpacyRecognizer",
+          "UrlRecognizer",
+          "UsBankRecognizer",
+          "UsItinRecognizer",
+          "UsLicenseRecognizer",
+          "UsPassportRecognizer",
+          "UsSsnRecognizer"
+        ],
+        "recognizers": [
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.korea.kr_rrn_recognizer",
+            "class": "KrRrnRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.uk.uk_nhs_recognizer",
+            "class": "NhsRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.medical_license_recognizer",
+            "class": "MedicalLicenseRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_bank_recognizer",
+            "class": "UsBankRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_driver_license_recognizer",
+            "class": "UsLicenseRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_itin_recognizer",
+            "class": "UsItinRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_passport_recognizer",
+            "class": "UsPassportRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_ssn_recognizer",
+            "class": "UsSsnRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.credit_card_recognizer",
+            "class": "CreditCardRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.crypto_recognizer",
+            "class": "CryptoRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.date_recognizer",
+            "class": "DateRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.email_recognizer",
+            "class": "EmailRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.iban_recognizer",
+            "class": "IbanRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.ip_recognizer",
+            "class": "IpRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.mac_recognizer",
+            "class": "MacAddressRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.phone_recognizer",
+            "class": "PhoneRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.url_recognizer",
+            "class": "UrlRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.nlp_engine_recognizers.spacy_recognizer",
+            "class": "SpacyRecognizer"
+          }
+        ],
+        "operator": "replace",
+        "detections": [
+          {
+            "entity_type": "KR_RRN",
+            "start": 13,
+            "end": 27,
+            "score": 1.0
+          }
+        ],
+        "capability_digest": "647daad0ad8fac6523386293b1556dd1bff8a169b9a8058175fa473f8f314a07",
+        "execution_id": "aea76e9f-ad62-48da-815a-da5234f4c733",
+        "delivery_id": "0707a5c8-5149-453a-a8b1-5ca51fd46253",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "정상 문장은 유지됐고 현재 케이스까지의 실제 전달 결과가 개인정보 치환 계약과 일치합니다."
+      },
+      {
+        "case_id": "output-email",
+        "stage": "output",
+        "input_digest": "d972553091085296c196041a488dd41bb7134bdde88bc591862d9d5e94b9b9c9",
+        "candidate_digest": "886e61cf4740d39b4e573904fbbf2866d97f9dce5f603371ecdc04114b9d3bc7",
+        "released_digest": "886e61cf4740d39b4e573904fbbf2866d97f9dce5f603371ecdc04114b9d3bc7",
+        "released_bytes": 59,
+        "entities": [
+          "EMAIL_ADDRESS",
+          "KR_RRN"
+        ],
+        "recognizer_classes": [
+          "CreditCardRecognizer",
+          "CryptoRecognizer",
+          "DateRecognizer",
+          "EmailRecognizer",
+          "IbanRecognizer",
+          "IpRecognizer",
+          "KrRrnRecognizer",
+          "MacAddressRecognizer",
+          "MedicalLicenseRecognizer",
+          "NhsRecognizer",
+          "PhoneRecognizer",
+          "SpacyRecognizer",
+          "UrlRecognizer",
+          "UsBankRecognizer",
+          "UsItinRecognizer",
+          "UsLicenseRecognizer",
+          "UsPassportRecognizer",
+          "UsSsnRecognizer"
+        ],
+        "recognizers": [
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.korea.kr_rrn_recognizer",
+            "class": "KrRrnRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.uk.uk_nhs_recognizer",
+            "class": "NhsRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.medical_license_recognizer",
+            "class": "MedicalLicenseRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_bank_recognizer",
+            "class": "UsBankRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_driver_license_recognizer",
+            "class": "UsLicenseRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_itin_recognizer",
+            "class": "UsItinRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_passport_recognizer",
+            "class": "UsPassportRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.country_specific.us.us_ssn_recognizer",
+            "class": "UsSsnRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.credit_card_recognizer",
+            "class": "CreditCardRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.crypto_recognizer",
+            "class": "CryptoRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.date_recognizer",
+            "class": "DateRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.email_recognizer",
+            "class": "EmailRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.iban_recognizer",
+            "class": "IbanRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.ip_recognizer",
+            "class": "IpRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.mac_recognizer",
+            "class": "MacAddressRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.phone_recognizer",
+            "class": "PhoneRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.generic.url_recognizer",
+            "class": "UrlRecognizer"
+          },
+          {
+            "module": "presidio_analyzer.predefined_recognizers.nlp_engine_recognizers.spacy_recognizer",
+            "class": "SpacyRecognizer"
+          }
+        ],
+        "operator": "replace",
+        "detections": [
+          {
+            "entity_type": "EMAIL_ADDRESS",
+            "start": 7,
+            "end": 32,
+            "score": 1.0
+          }
+        ],
+        "capability_digest": "cc576b4e497edaa207496d8f94ef0a4b15c6add5e764ac5b5ac524fbe7ec6f38",
+        "execution_id": "faa1d4c0-d1a7-4534-8c91-07d8f22a8836",
+        "delivery_id": "6743630e-2fc5-4c22-ace7-37652ade22af",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "정상 문장은 유지됐고 현재 케이스까지의 실제 전달 결과가 개인정보 치환 계약과 일치합니다."
+      }
+    ],
+    "capabilities": [
+      {
+        "capability_digest": "ee6f9be6f8d8c2f8dd232da8f2c218531b4f06c1168207b30072f80a0bbb1363",
+        "suite_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+        "execution_id": "cbd789ae-046d-4871-8697-b3555dbcfb8e",
+        "case_id": "clean",
+        "issued_at": "2026-10-11T01:03:03.430811+00:00",
+        "expires_at": "2026-10-11T01:18:03.430811+00:00",
+        "status": "completed",
+        "consumed_at": "2026-10-11T01:03:03.474937+00:00"
+      },
+      {
+        "capability_digest": "c3f959a0958470adc7f907d57417a7929edd8f2d6cecae953da9a9cf0e9d998e",
+        "suite_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+        "execution_id": "e7f22ae1-e824-4471-99c0-b445a7f84e28",
+        "case_id": "input-email",
+        "issued_at": "2026-10-11T01:03:03.430897+00:00",
+        "expires_at": "2026-10-11T01:18:03.430897+00:00",
+        "status": "completed",
+        "consumed_at": "2026-10-11T01:03:03.698230+00:00"
+      },
+      {
+        "capability_digest": "647daad0ad8fac6523386293b1556dd1bff8a169b9a8058175fa473f8f314a07",
+        "suite_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+        "execution_id": "aea76e9f-ad62-48da-815a-da5234f4c733",
+        "case_id": "input-kr-rrn",
+        "issued_at": "2026-10-11T01:03:03.430922+00:00",
+        "expires_at": "2026-10-11T01:18:03.430922+00:00",
+        "status": "completed",
+        "consumed_at": "2026-10-11T01:03:03.763004+00:00"
+      },
+      {
+        "capability_digest": "cc576b4e497edaa207496d8f94ef0a4b15c6add5e764ac5b5ac524fbe7ec6f38",
+        "suite_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+        "execution_id": "faa1d4c0-d1a7-4534-8c91-07d8f22a8836",
+        "case_id": "output-email",
+        "issued_at": "2026-10-11T01:03:03.430941+00:00",
+        "expires_at": "2026-10-11T01:18:03.430941+00:00",
+        "status": "completed",
+        "consumed_at": "2026-10-11T01:03:03.830181+00:00"
+      }
+    ],
+    "deliveries": [
+      {
+        "delivery_id": "a05e6dc6-cd96-4ee6-a9ab-64e2dabdffc4",
+        "capability_digest": "ee6f9be6f8d8c2f8dd232da8f2c218531b4f06c1168207b30072f80a0bbb1363",
+        "suite_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+        "execution_id": "cbd789ae-046d-4871-8697-b3555dbcfb8e",
+        "case_id": "clean",
+        "delivered_digest": "be1ddfd19d09959c6944489a0914e3b8252c04a6ea9949ec231238a0a7aeab3a",
+        "delivered_bytes": 43,
+        "raw_marker_observed": false,
+        "observed_at": "2026-10-11T01:03:03.474937+00:00"
+      },
+      {
+        "delivery_id": "6474378b-b301-443b-929a-cb58b9326002",
+        "capability_digest": "c3f959a0958470adc7f907d57417a7929edd8f2d6cecae953da9a9cf0e9d998e",
+        "suite_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+        "execution_id": "e7f22ae1-e824-4471-99c0-b445a7f84e28",
+        "case_id": "input-email",
+        "delivered_digest": "e5ce4d54713a9f78dff1933b5feacf024ea9359b6a56c343532219989dbe4c09",
+        "delivered_bytes": 67,
+        "raw_marker_observed": false,
+        "observed_at": "2026-10-11T01:03:03.698230+00:00"
+      },
+      {
+        "delivery_id": "0707a5c8-5149-453a-a8b1-5ca51fd46253",
+        "capability_digest": "647daad0ad8fac6523386293b1556dd1bff8a169b9a8058175fa473f8f314a07",
+        "suite_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+        "execution_id": "aea76e9f-ad62-48da-815a-da5234f4c733",
+        "case_id": "input-kr-rrn",
+        "delivered_digest": "2a32118c4d366c2cf1f9753b8f50f80fff7f624f706fb6d395b2870efa680e50",
+        "delivered_bytes": 52,
+        "raw_marker_observed": false,
+        "observed_at": "2026-10-11T01:03:03.763004+00:00"
+      },
+      {
+        "delivery_id": "6743630e-2fc5-4c22-ace7-37652ade22af",
+        "capability_digest": "cc576b4e497edaa207496d8f94ef0a4b15c6add5e764ac5b5ac524fbe7ec6f38",
+        "suite_id": "8228f848-3930-4005-88e4-4a6eea46169b",
+        "execution_id": "faa1d4c0-d1a7-4534-8c91-07d8f22a8836",
+        "case_id": "output-email",
+        "delivered_digest": "886e61cf4740d39b4e573904fbbf2866d97f9dce5f603371ecdc04114b9d3bc7",
+        "delivered_bytes": 59,
+        "raw_marker_observed": false,
+        "observed_at": "2026-10-11T01:03:03.830181+00:00"
+      }
+    ],
+    "delivery_count": 4,
+    "raw_risk_cases": []
+  },
+  "reason": "정상 문장은 유지되고 이메일·합성 주민번호는 공식 Presidio 결과로 치환된 뒤 전달됐습니다.",
+  "next_check": "각 Case의 Entity·span·score, 치환 후보와 실제 Sink 전달 digest를 나란히 확인합니다.",
+  "internal_activity_id": "H09",
+  "security_verdict": "PASS",
+  "task_completed": true
+}

@@ -75,3 +75,37 @@ def h18_build_info(authorization:str|None=Header(None)):
     if 'H18' not in ACTIVITIES: raise HTTPException(404,'unknown activity')
     return {'source_digest':sha('/app/h18.yaml'),'queries':yaml.safe_load(Path('/app/h18.yaml').read_text()),
             'runner_digests':{name:sha(f'/app/{name}') for name in ('server.py','query_execution.py','request_workflow.py')}}
+
+@app.post('/v1/prepare/H18')
+def prepare_h18(body:dict,authorization:str|None=Header(None)):
+    auth(authorization,CONTROL)
+    if set(body)!={'suite_id','started_at'}:raise HTTPException(422,'server-owned preparation required')
+    from request_workflow import run_suite
+    if not P18_LOCK.acquire(blocking=False):raise HTTPException(409,'suite already running')
+    try:
+        result=run_suite(body,Path('/app/h18.yaml'),TRACER,LOGGER,COUNTER,tp,lp,STATE,prepare_only=True)
+        (STATE/f"H18-{result['suite_id']}.json").write_text(json.dumps(result))
+        return {'suite_id':result['suite_id']}
+    finally:P18_LOCK.release()
+
+@app.post('/v1/run-case/H18')
+def run_case_h18(body:dict,authorization:str|None=Header(None)):
+    auth(authorization,CONTROL)
+    if set(body)!={'suite_id','started_at','case_id'}:raise HTTPException(422,'server-owned case required')
+    suite=str(uuid.UUID(body['suite_id']))
+    if suite!=body['suite_id']:raise HTTPException(422,'invalid suite')
+    from request_workflow import collected_queries
+    if not P18_LOCK.acquire(blocking=False):raise HTTPException(409,'suite already running')
+    try:
+        path=STATE/f'H18-{suite}.json';receipt=json.loads(path.read_text());index=len(receipt.get('query_executions',[]))
+        names=['normal-query','denied-query']
+        if (index>=2 or names[index]!=body['case_id'] or receipt['started_at']!=body['started_at']
+                or receipt['source_digest']!=sha('/app/h18.yaml') or receipt.get('query_error')):
+            raise HTTPException(409,'query order or applied source changed')
+        try:
+            result=collected_queries(receipt['queries'],[receipt['cases'][index]],receipt['query_start_ns'])
+            receipt['query_executions'].extend(result)
+        except (ValueError,KeyError,TypeError,httpx.HTTPError,TimeoutError):
+            receipt['query_error']='learner query or product request failed'
+        path.write_text(json.dumps(receipt));return {'suite_id':suite,'case_id':body['case_id']}
+    finally:P18_LOCK.release()

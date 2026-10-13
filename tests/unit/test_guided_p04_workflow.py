@@ -103,7 +103,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(len(self.backend_calls), 9)
 
     def test_starter_closes_observed_zero_calls_without_a_verdict(self):
-        self.source.write_text((worker.LAB / "learner.py").read_text())
+        self.source.write_text("async def invoke_guarded(body, guardrail, services):\n    raise NotImplementedError()\n")
         result, record = self.run_case()
         self.assertEqual(result["execution"]["execution_status"], "not_implemented")
         self.assertTrue(record["closed"])

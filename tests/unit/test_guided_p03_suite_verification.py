@@ -71,6 +71,7 @@ class SuiteChecks(unittest.TestCase):
         self.assertTrue(result["case_contract_verified"])
         self.assertEqual(result["provider_mode"], "contract")
         self.assertEqual(len(result["cases"]), 19)
+        self.assertTrue(all("input" in case and "scenario" in case["input"] for case in result["cases"]))
         self.assertTrue(all(case["case_verified"] for case in result["cases"]))
         self.assertEqual(len(result["provider_evidence"]), 19)
         self.assertEqual(result["root"], root)

@@ -1,0 +1,194 @@
+{
+  "lab_id": "07-rag-boundary",
+  "activity_id": "P12",
+  "execution_id": "2491661a-b799-4e94-8a40-3c9d0dd795a6",
+  "execution_kind": "p12-native-pipeline-suite",
+  "contract_version": 2,
+  "status": "completed",
+  "task_completed": true,
+  "security_verdict": "PASS",
+  "course_verdict": "PASS",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T01:24:26.160125+00:00",
+  "stage_calls": [
+    {
+      "stage": "normal",
+      "attempted": true,
+      "outcome": "authenticate → authorize → input_privacy → input_rail → retrieval → retrieval_rail → main → output_rail → output_privacy"
+    },
+    {
+      "stage": "input-pii",
+      "attempted": true,
+      "outcome": "authenticate → authorize → input_privacy → input_rail → retrieval → retrieval_rail → main → output_rail → output_privacy"
+    },
+    {
+      "stage": "invalid-credential",
+      "attempted": true,
+      "outcome": "authenticate"
+    },
+    {
+      "stage": "no-scope",
+      "attempted": true,
+      "outcome": "authenticate → authorize"
+    },
+    {
+      "stage": "input-block",
+      "attempted": true,
+      "outcome": "authenticate → authorize → input_privacy → input_rail"
+    },
+    {
+      "stage": "retrieval-block",
+      "attempted": true,
+      "outcome": "authenticate → authorize → input_privacy → input_rail → retrieval → retrieval_rail"
+    },
+    {
+      "stage": "output-block",
+      "attempted": true,
+      "outcome": "authenticate → authorize → input_privacy → input_rail → retrieval → retrieval_rail → main → output_rail"
+    },
+    {
+      "stage": "no-hits",
+      "attempted": true,
+      "outcome": "authenticate → authorize → input_privacy → input_rail → retrieval"
+    }
+  ],
+  "result": {
+    "practice_id": "P12",
+    "execution_id": "H12",
+    "contract_version": 2,
+    "suite_id": "2491661a-b799-4e94-8a40-3c9d0dd795a6",
+    "task_completed": true,
+    "security_verdict": "PASS",
+    "cases": [
+      {
+        "case_id": "normal",
+        "status": "PASS",
+        "case_verified": true,
+        "evidence_consistent": true,
+        "stages": [
+          "authenticate",
+          "authorize",
+          "input_privacy",
+          "input_rail",
+          "retrieval",
+          "retrieval_rail",
+          "main",
+          "output_rail",
+          "output_privacy"
+        ],
+        "retrieval_count": 1,
+        "provider_calls": 4
+      },
+      {
+        "case_id": "input-pii",
+        "status": "PASS",
+        "case_verified": true,
+        "evidence_consistent": true,
+        "stages": [
+          "authenticate",
+          "authorize",
+          "input_privacy",
+          "input_rail",
+          "retrieval",
+          "retrieval_rail",
+          "main",
+          "output_rail",
+          "output_privacy"
+        ],
+        "retrieval_count": 1,
+        "provider_calls": 4
+      },
+      {
+        "case_id": "invalid-credential",
+        "status": "PASS",
+        "case_verified": true,
+        "evidence_consistent": true,
+        "stages": [
+          "authenticate"
+        ],
+        "retrieval_count": 0,
+        "provider_calls": 0
+      },
+      {
+        "case_id": "no-scope",
+        "status": "PASS",
+        "case_verified": true,
+        "evidence_consistent": true,
+        "stages": [
+          "authenticate",
+          "authorize"
+        ],
+        "retrieval_count": 0,
+        "provider_calls": 0
+      },
+      {
+        "case_id": "input-block",
+        "status": "PASS",
+        "case_verified": true,
+        "evidence_consistent": true,
+        "stages": [
+          "authenticate",
+          "authorize",
+          "input_privacy",
+          "input_rail"
+        ],
+        "retrieval_count": 0,
+        "provider_calls": 1
+      },
+      {
+        "case_id": "retrieval-block",
+        "status": "PASS",
+        "case_verified": true,
+        "evidence_consistent": true,
+        "stages": [
+          "authenticate",
+          "authorize",
+          "input_privacy",
+          "input_rail",
+          "retrieval",
+          "retrieval_rail"
+        ],
+        "retrieval_count": 1,
+        "provider_calls": 2
+      },
+      {
+        "case_id": "output-block",
+        "status": "PASS",
+        "case_verified": true,
+        "evidence_consistent": true,
+        "stages": [
+          "authenticate",
+          "authorize",
+          "input_privacy",
+          "input_rail",
+          "retrieval",
+          "retrieval_rail",
+          "main",
+          "output_rail"
+        ],
+        "retrieval_count": 1,
+        "provider_calls": 4
+      },
+      {
+        "case_id": "no-hits",
+        "status": "PASS",
+        "case_verified": true,
+        "evidence_consistent": true,
+        "stages": [
+          "authenticate",
+          "authorize",
+          "input_privacy",
+          "input_rail",
+          "retrieval"
+        ],
+        "retrieval_count": 1,
+        "provider_calls": 1
+      }
+    ],
+    "source_digest": "3c6895c8c9795c7e3e12a7a4a5d4f5818c7f0a1a8651791aeed84cb200c84699",
+    "contract_digest": "fa305865651410e8cc8f70ebcddb0ac1144bac8ac99fb890b85778d256743b67",
+    "provider_call_count": 16
+  },
+  "reason": "정상 요청과 각 중단 지점의 실제 제품 호출·전달값·정상 종료를 확인했습니다.",
+  "next_check": "각 사례의 마지막 단계와 검색·모델 호출 수를 확인하세요."
+}

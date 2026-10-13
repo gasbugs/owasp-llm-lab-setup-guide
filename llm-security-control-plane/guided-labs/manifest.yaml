@@ -29,9 +29,10 @@ execution_ids:
   P20: H20
   P21: H21
   P22: H22
+  P23: H23
 tabs:
   - {id: 01-nova, hands_on: [H01], hands_on_status: implemented}
-  - {id: 02-embedding-kb, hands_on: [H02, H03], hands_on_status: implemented, implemented_hands_on: [H02, H03]}
+  - {id: 02-embedding-kb, hands_on: [H23, H02, H03], hands_on_status: implemented, implemented_hands_on: [H23, H02, H03]}
   - {id: 03-bedrock-guardrail, hands_on: [H04], hands_on_status: implemented, implemented_hands_on: [H04]}
   - {id: 04-nemo-dialog-action, hands_on: [H05, H06], hands_on_status: implemented, implemented_hands_on: [H05, H06]}
   - {id: 05-input-safety, hands_on: [H07, H08], hands_on_status: implemented, implemented_hands_on: [H07, H08]}
@@ -88,12 +89,16 @@ hands_on_H02:
   executor: guided-h02-document-app
   provider: guided-bedrock-gateway
   verifier: guided-evidence-verifier
+  sdk_client: learner-created-boto3
+  authentication: server-issued-single-document-sts-900-seconds
   embedding_model_id: amazon.titan-embed-text-v2:0
   required_evidence:
     - closed-execution-ledger
     - current-suite-and-runner-digest
     - source-requery-sha256
     - s3-and-titan-native-request-ids
+    - learner-created-native-sdk-clients
+    - actual-sdk-source-and-parsed-embedding-responses
     - embedding_dimension: 1024
     - kb-data-source-index-binding
     - normal-and-boundary-cases: 4
@@ -105,6 +110,8 @@ hands_on_H03:
   executor: guided-h03-sync-app
   provider: guided-bedrock-gateway
   verifier: guided-evidence-verifier
+  sdk_client: learner-created-boto3
+  authentication: server-issued-kb-readonly-sts-900-seconds
   required_evidence:
     - source_digest
     - ingestion_job_id
@@ -458,3 +465,5 @@ hands_on_H21:
     - state-owner-mismatch
     - oauth-audience-invalid
     - shared-trace-id
+
+hands_on_H23: {public_id: P23, contract_version: 1, executor: guided-model-call, verifier: guided-evidence-verifier, learner_function: forward_question, cases: [normal, blank, provider-error], normal_provider: aws-bedrock, error_provider: dedicated-failure-fixture}

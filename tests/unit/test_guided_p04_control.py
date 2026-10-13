@@ -30,8 +30,16 @@ class P04ControlTests(unittest.TestCase):
         if request.url.path.endswith('/resources/prepare'):
             value = {'practice_id': 'P04', 'operation_id': body['operation_id'], 'state': 'ready',
                      'resources': {'provider_mode': 'aws'}, 'evidence': {}}
-        elif request.url.path == '/v1/run':
-            value = {'suite_id': body['suite_id'], 'run_state': 'finished'}
+        elif request.url.path == '/v1/chat':
+            value = {'practice_id':'P04', 'graded':False, 'message':body['message'], 'execution':{}}
+        elif request.url.path == '/v1/start':
+            value = {'suite_id':body['suite_id'],'started_at':1000,'cases':[{'case_id':f'case-{i}'} for i in range(27)]}
+        elif request.url.path == '/v1/step':
+            value = {**body,'case_id':f"case-{body['index']}"}
+        elif request.url.path == '/v1/finish':
+            value = {'suite_id':body['suite_id'],'run_state':'error' if body['stopped'] else 'finished'}
+        elif request.url.path == '/v1/verify/p04-case':
+            value = {**body,'case_id':f"case-{body['index']}",'status':'PASS','case_verified':True}
         else:
             self.assertEqual(request.url.path, '/v1/verify/p04')
             value = {'activity_id': 'P04', 'execution_id': body['suite_id'],
@@ -45,21 +53,46 @@ class P04ControlTests(unittest.TestCase):
         with patch.object(self.server.httpx, 'AsyncClient', side_effect=self.factory):
             return self.client.post('/api/practice/P04/' + action, headers=self.headers, **kwargs)
 
+    def test_custom_chat_does_not_grade_or_accept_client_policy(self):
+        response = self.post('chat', json={'message':'이메일을 확인해 주세요.'})
+        self.assertEqual(response.status_code,200)
+        self.assertFalse(response.json()['graded'])
+        self.assertEqual(len(self.calls),1)
+        self.assertEqual(self.calls[0][0],'/v1/chat')
+        self.assertEqual(self.calls[0][1],{'message':'이메일을 확인해 주세요.'})
+        self.assertEqual(self.post('chat',json={'message':'문장','guardrailIdentifier':'spoof'}).status_code,422)
+        self.assertEqual(self.client.post('/api/practice/P04/chat',json={'message':'문장'}).status_code,403)
+
     def test_fresh_suite_and_role_separation_with_raw_result_preserved(self):
         for _ in range(2):
             result = self.post()
             self.assertEqual(result.status_code, 200)
             self.assertTrue(result.json()['task_completed'])
             self.assertEqual(result.json()['result']['provider_mode'], 'contract')
-        first, grade, second, _ = self.calls
-        self.assertEqual([first[0], grade[0]], ['/v1/run', '/v1/verify/p04'])
-        self.assertEqual(set(first[1]), {'suite_id'})
-        UUID(first[1]['suite_id'])
-        self.assertEqual(first[1], grade[1])
-        self.assertNotEqual(first[1], second[1])
-        self.assertEqual(first[2], 'Bearer ' + self.server.LAB04_TOKEN)
-        self.assertEqual(grade[2], 'Bearer ' + self.server.VERIFIER_TOKEN)
+        starts=[call for call in self.calls if call[0]=='/v1/start']
+        self.assertEqual(len(starts),2)
+        self.assertNotEqual(starts[0][1],starts[1][1])
+        self.assertEqual(starts[0][2],'Bearer '+self.server.LAB04_TOKEN)
+        for index,call in enumerate(self.calls[:54]):
+            if index:
+                self.assertEqual(call[0],'/v1/step' if index%2 else '/v1/verify/p04-case')
+        self.assertEqual(sum(call[0]=='/v1/step' for call in self.calls),54)
         self.assertFalse(self.server.ACTIVE_SESSIONS)
+
+    def test_first_case_failure_stops_remaining_calls_and_keeps_progress(self):
+        self.change=lambda path,row: {**row,'status':'ERR','case_verified':False} if path=='/v1/verify/p04-case' else row
+        result=self.post().json()
+        self.assertFalse(result['task_completed'])
+        self.assertEqual(result['security_verdict'],'ERR')
+        self.assertEqual(sum(call[0]=='/v1/step' for call in self.calls),1)
+        self.assertEqual([call[0] for call in self.calls],['/v1/start','/v1/step','/v1/verify/p04-case','/v1/finish'])
+        self.assertTrue(self.calls[-1][1]['stopped'])
+        self.assertEqual(result['result']['cases'][0]['status'],'ERR')
+        self.assertEqual(sum(row['status']=='미실행' for row in result['result']['cases']),26)
+        progress=self.client.get('/api/test-progress/P04').json()
+        self.assertEqual(progress['phase'],'finished')
+        self.assertEqual(len(progress['cases']),1)
+        self.assertIsNone(progress['current_case'])
 
     def test_browser_fields_and_missing_auth_are_rejected_before_downstream(self):
         for action in ('verify', 'provision'):
@@ -83,9 +116,9 @@ class P04ControlTests(unittest.TestCase):
                 self.assertFalse(self.server.ACTIVE_SESSIONS)
 
     def test_runner_wrong_suite_stops_before_grading(self):
-        self.change = lambda path, row: {**row, 'suite_id': 'stale'} if path == '/v1/run' else row
+        self.change = lambda path, row: {**row, 'suite_id': 'stale'} if path == '/v1/start' else row
         self.assertEqual(self.post().status_code, 502)
-        self.assertEqual(len(self.calls), 1)
+        self.assertFalse(any(call[0] == "/v1/step" for call in self.calls))
         self.assertFalse(self.server.ACTIVE_SESSIONS)
 
     def test_incomplete_after_success_is_not_cached(self):
@@ -122,7 +155,7 @@ class P04ControlTests(unittest.TestCase):
         self.change = fail
         result = self.post()
         self.assertEqual(result.status_code, 502)
-        self.assertIn('호출이 없었다고 판단할 수 없습니다', result.json()['detail']['next_check'])
+        self.assertIn('중단', result.json()['detail']['reason'])
         self.assertNotIn('private provider detail', result.text)
         self.assertFalse(self.server.ACTIVE_SESSIONS)
         self.assertEqual(self.client.get('/readyz').status_code, 200)

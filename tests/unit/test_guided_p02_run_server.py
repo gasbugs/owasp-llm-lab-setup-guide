@@ -56,6 +56,11 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(len(root["cases"]), 22)
         self.assertEqual(len({row["execution_id"] for row in root["cases"]}), 22)
         self.assertEqual(root["build"], root["final_build"])
+        progress = self.client.get("/v1/progress/" + self.suite, headers=self.control).json()
+        self.assertEqual(len(progress["cases"]), 22)
+        self.assertIsNone(progress["current_case"])
+        self.assertEqual(progress["phase"], "verifying")
+        self.assertTrue(all("PASS" not in row["status"] for row in progress["cases"]))
         self.assertNotIn("task_completed", root)
         self.assertEqual(self.workflow.run_case.call_count, 22)
         restarted = self.make_client()
@@ -64,6 +69,18 @@ class RunnerTests(unittest.TestCase):
         for call in self.workflow.run_case.call_args_list:
             self.assertLessEqual(call.kwargs["timeout"], 75)
             self.assertEqual(call.kwargs["suite_id"], self.suite)
+
+    def test_upload_runs_one_user_document_without_suite_receipt(self):
+        body = {"title":"내 문서", "body":"사용자가 입력한 문서 본문입니다."}
+        response = self.client.post("/v1/upload", headers=self.control, json=body)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["graded"])
+        self.workflow.run_case.assert_called_once()
+        self.assertEqual(self.workflow.run_case.call_args.args[1], body)
+        suite = self.workflow.run_case.call_args.kwargs["suite_id"]
+        self.assertEqual(self.client.get("/v1/receipts/"+suite,headers=self.verifier).status_code,404)
+        self.assertEqual(self.client.post("/v1/upload",headers=self.control,json={**body,"document_id":"spoof"}).status_code,422)
+        self.assertEqual(self.client.post("/v1/upload",json=body).status_code,401)
 
     def test_contract_has_four_normal_and_eighteen_invalid_cases(self):
         cases = case_module.cases()
@@ -128,6 +145,13 @@ class RunnerTests(unittest.TestCase):
             self.assertTrue(entered.wait(timeout=3))
             response = self.client.post("/v1/run", headers=self.control, json={"suite_id": str(uuid4())})
             self.assertEqual(response.status_code, 409)
+            snapshot = self.client.get("/v1/progress/" + self.suite, headers=self.control)
+            self.assertEqual(snapshot.status_code, 200)
+            self.assertEqual(snapshot.json()["current_case"]["status"], "실행 중")
+            self.assertEqual(snapshot.json()["cases"], [])
+            self.assertEqual(snapshot.json()["total"], 22)
+            self.assertNotIn("execution_id", snapshot.text)
+            self.assertEqual(self.client.get("/v1/progress/" + self.suite).status_code, 401)
             self.assertEqual(self.client.get("/readyz").status_code, 200)
         finally:
             release.set()

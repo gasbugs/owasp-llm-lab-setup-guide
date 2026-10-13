@@ -69,6 +69,11 @@ class Workflow:
                         "mapping_digest": mapping_digest, "prepared": True}:
             raise LifecycleError()
 
+    def prepare_direct(self, *, suite_id, execution_id, text):
+        result = self._post("/direct", {"suite_id":suite_id,"execution_id":execution_id,"text":text}, timeout=30)
+        if result != {"suite_id":suite_id,"execution_id":execution_id,"graded":False,"prepared":True}:
+            raise LifecycleError()
+
     def run_case(self, source_path, *, suite_id, execution_id, runner_digest, timeout=75):
         if str(UUID(suite_id)) != suite_id or str(UUID(execution_id)) != execution_id:
             raise ValueError("server-issued UUIDs required")

@@ -29,6 +29,10 @@ class RunRequest(BaseModel):
     started_at: str
 
 
+class CaseRequest(RunRequest):
+    case_id: str
+
+
 class Signals:
     def __init__(self):
         from opentelemetry.sdk.resources import Resource
@@ -102,8 +106,7 @@ def create_app(control_token=None, verifier_token=None, state=None, source=None,
         auth(authorization, verifier)
         return {'source_digest': sha(source), 'runner_digests': {name: sha(BASE / name) for name in RUNNER_FILES}}
 
-    @app.post('/v1/run/H19')
-    def run(body: RunRequest, authorization: str | None = Header(None)):
+    def prepare(body,authorization,perform_analysis=True):
         auth(authorization, control)
         suite_id = canonical_id(body.suite_id)
         try:
@@ -135,7 +138,7 @@ def create_app(control_token=None, verifier_token=None, state=None, source=None,
                     raise TimeoutError('signal export incomplete')
                 observed = collection.collect(cases, store.calls)
                 receipt.update(observed)
-                for case in analysis_inputs.build_inputs(observed['bundle'], [case['request_id'] for case in cases]):
+                for case in (analysis_inputs.build_inputs(observed['bundle'], [case['request_id'] for case in cases]) if perform_analysis else []):
                     result = execution.execute(source, case['bundle'], case['request_id'])
                     receipt['analysis_executions'].append({key: value for key, value in case.items() if key != 'bundle'} | result)
             except (httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError, OSError, RuntimeError) as exc:
@@ -144,6 +147,31 @@ def create_app(control_token=None, verifier_token=None, state=None, source=None,
             return receipt
         finally:
             lock.release()
+
+    @app.post('/v1/run/H19')
+    def run(body:RunRequest,authorization:str|None=Header(None)):
+        return prepare(body,authorization)
+
+    @app.post('/v1/prepare/H19')
+    def prepare_cases(body:RunRequest,authorization:str|None=Header(None)):
+        return prepare(body,authorization,False)
+
+    @app.post('/v1/run-case/H19')
+    def run_case(body:CaseRequest,authorization:str|None=Header(None)):
+        auth(authorization,control);suite=canonical_id(body.suite_id)
+        if not lock.acquire(blocking=False):raise HTTPException(409,'analysis already running')
+        try:
+            path=state/f'H19-{suite}.json';receipt=read(path)
+            if (receipt['started_at']!=body.started_at or receipt['source_digest']!=sha(source)
+                    or receipt.get('execution_error')):raise HTTPException(409,'source or preparation changed')
+            inputs=analysis_inputs.build_inputs(receipt['bundle'],[case['request_id'] for case in receipt['cases']])
+            index=len(receipt['analysis_executions'])
+            if index>=len(inputs) or inputs[index]['case_id']!=body.case_id:raise HTTPException(409,'invalid case order')
+            case=inputs[index];result=execution.execute(source,case['bundle'],case['request_id'])
+            if receipt['source_digest']!=sha(source):raise HTTPException(409,'source changed during analysis')
+            receipt['analysis_executions'].append({key:value for key,value in case.items() if key!='bundle'}|result)
+            save(path,receipt);return {'suite_id':suite,'case_id':body.case_id}
+        finally:lock.release()
 
     @app.get('/v1/receipts/H19/{suite_id}')
     def receipt(suite_id: str, authorization: str | None = Header(None)):

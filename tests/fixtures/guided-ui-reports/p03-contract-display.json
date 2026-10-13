@@ -1,0 +1,165 @@
+{
+  "activity_id": "P03",
+  "execution_id": "display-only-P03",
+  "course_verdict": "PASS",
+  "security_verdict": "PASS",
+  "task_completed": true,
+  "verified_by": "display-fixture-only",
+  "reason": "UI 표시용 샘플",
+  "result": {
+    "cases": [
+      {
+        "case_id": "current-complete",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "ready",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "contract-complete",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "ready",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "queued",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "waiting",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "starting",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "waiting",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "in-progress",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "waiting",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "different-job",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "missing-job",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "failed",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "stopping",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "stopped",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "unknown-status",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "null-status",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "number-status",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "boolean-status",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "array-status",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "object-status",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "missing-status",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "rejected",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "job_status-error",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "provider_error",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      },
+      {
+        "case_id": "retrieve-error",
+        "case_verified": true,
+        "status": "PASS",
+        "input": null,
+        "expected": "provider_error",
+        "actual": "UI 표시용 샘플 — 실제 모델·AWS 검증 결과가 아닙니다."
+      }
+    ]
+  }
+}

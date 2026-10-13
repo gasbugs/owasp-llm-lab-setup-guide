@@ -44,3 +44,23 @@ async def run(body:dict,authorization:str|None=Header(None)):
 @app.get('/v1/artifacts/{suite}')
 def artifact(suite:str,authorization:str|None=Header(None)):
     auth(authorization,VERIFY); return json.loads((STATE/f'{suite}.json').read_text())
+
+@app.post('/v1/prepare')
+def prepare(body:dict,authorization:str|None=Header(None)):
+    auth(authorization,CONTROL)
+    if set(body)!={'suite_id','started_at'}:raise HTTPException(422,'server-owned fields required')
+    suite=str(uuid.UUID(body['suite_id']))
+    raw=Path('/work/attack.py').read_bytes()
+    if len(raw)>65536:raise HTTPException(422,'source too large')
+    config=module.attack_contract()
+    record={'activity_id':'H15','suite_id':suite,'started_at':body['started_at'],'config':config,'source_digest':hashlib.sha256(raw).hexdigest()}
+    path=STATE/f'{suite}.preflight.json'
+    with path.open('x',encoding='utf-8') as stream:json.dump(record,stream)
+    return {'suite_id':suite}
+
+@app.get('/v1/preflight/{suite}')
+def preflight(suite:str,authorization:str|None=Header(None)):
+    auth(authorization,VERIFY)
+    suite=str(uuid.UUID(suite));record=json.loads((STATE/f'{suite}.preflight.json').read_text())
+    record['current_source_digest']=hashlib.sha256(Path('/work/attack.py').read_bytes()).hexdigest()
+    return record

@@ -11,7 +11,7 @@ import httpx
 
 import test_guided_p04_suite_results as suites
 
-with patch.dict(sys.modules, {"p04_results": suites.binding.results, "p04_suite_results": suites.suite_module}):
+with patch.dict(sys.modules, {"p04_results": suites.binding.results, "p04_suite_results": suites.suite_module, "p04_product": suites.product_test.product}):
     collector = suites.binding.load("p04_suite_verification")
 grading = suites.binding.load("p04_grading_api")
 
@@ -61,6 +61,18 @@ class CollectionTests(unittest.TestCase):
     def collect(self):
         with patch.object(collector.time, "time", return_value=1002):
             return self.verification.collect(self.fixture.suite)
+
+    def test_individual_case_verification_accepts_running_prefix_and_rejects_wrong_result(self):
+        f=self.fixture
+        f.root['run_state']='running';f.root['finished_at']=None
+        for row in f.root['cases'][1:]:row['execution']=None
+        with patch.object(collector.time,'time',return_value=1002):
+            result=self.verification.collect_case(f.suite,0)
+        self.assertEqual(result['status'],'PASS')
+        self.assertEqual(result['case_id'],f.root['cases'][0]['case_id'])
+        f.root['cases'][0]['execution']['execution']['execution_status']='runtime_error'
+        with patch.object(collector.time,'time',return_value=1002),self.assertRaises(suites.binding.results.EvidenceError):
+            self.verification.collect_case(f.suite,0)
 
     def test_complete_get_only_collection_refetches_every_record_and_root(self):
         result = self.collect()

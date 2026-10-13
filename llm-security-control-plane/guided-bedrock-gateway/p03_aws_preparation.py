@@ -1,5 +1,6 @@
 """Explicit preparation coordinator. Never called from health or suite lookup."""
 import boto3
+from resource_progress import step
 from botocore.config import Config
 
 from p03_create_resources import prepare_resources
@@ -25,6 +26,7 @@ def prepare_aws(path, operation_id, account_id, *, client_factory=clients):
         document = prepare_document(specification, connection, operation_id,
                                     s3=sdk["s3"], agent=sdk["agent"], vectors=sdk["vectors"])
         evidence = {"connection": connection, "document": document["evidence"]}
+        step(12)
         store.publish(operation_id, document["snapshot"], evidence=evidence)
     except Exception:
         store.fail(operation_id)

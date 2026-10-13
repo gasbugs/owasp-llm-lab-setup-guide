@@ -91,7 +91,7 @@ def main():
             temporary = Path(cleanup.enter_context(tempfile.TemporaryDirectory(prefix="p02-build-")))
             target = temporary / "guided-labs/h02-document-ingestion"
             target.mkdir(parents=True)
-            for name in ("cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py",
+            for name in ("cases.py", "aws_auth.py", "native_runtime.py", "execution.py", "service_client.py", "workflow.py", "run_server.py",
                          "Containerfile", "requirements.txt"):
                 shutil.copyfile(LAB / name, target / name)
             (target / "learner.py").write_bytes(source)
@@ -126,7 +126,7 @@ def main():
             live.launch("learner", learner_image, {
                 "GUIDED_GATEWAY_URL": "http://gateway:8080", "GUIDED_H02_GATEWAY_TOKEN": "publisher-p02-runtime",
                 "GUIDED_CONTROL_LAB02_TOKEN": "publisher-test-control",
-                "GUIDED_VERIFIER_LAB02_TOKEN": "publisher-test-verifier"}, ["--network-alias", "learner"])
+                "GUIDED_VERIFIER_LAB02_TOKEN": "publisher-test-verifier"}, ["--network-alias", "learner"] + (["--network", egress] if mode == "aws" else []))
             live.start_verifier(verifier_image, {"GUIDED_LAB02_URL": "http://learner:8000",
                 "GUIDED_VERIFIER_LAB02_TOKEN": "publisher-test-verifier",
                 "GUIDED_BEDROCK_GATEWAY_URL": "http://gateway:8080",

@@ -56,6 +56,31 @@ class SuiteStore:
             db.execute("""CREATE TABLE IF NOT EXISTS p04_suite_cases (
                 execution_id TEXT PRIMARY KEY, suite_id TEXT NOT NULL, case_id TEXT NOT NULL,
                 ordinal INTEGER NOT NULL, UNIQUE(suite_id, case_id))""")
+            db.execute("CREATE TABLE IF NOT EXISTS p04_direct_cases (execution_id TEXT PRIMARY KEY, case_json TEXT NOT NULL)")
+
+    def prepare_direct(self, suite_id, execution_id, text):
+        identifier(suite_id)
+        identifier(execution_id)
+        if not isinstance(text, str) or not text.strip() or len(text) > 1000:
+            raise LedgerError(422)
+        snapshot = resource_snapshot(self.resource_reader())
+        if snapshot["provider_mode"] != "aws":
+            raise LedgerError(409)
+        case = {"case_id":"direct-converse", "backend":"provider",
+                "body":{"operation":"converse", "text":text},
+                "expected":"returned", "provider_error":False}
+        case_json = canonical(case).decode()
+        started = self.stamp()
+        try:
+            with self.connect() as db:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute("INSERT INTO p04_suites VALUES(?,?,?,?,'prepared',?)",
+                           (suite_id, hashlib.sha256(canonical(case)).hexdigest(), started, started, canonical(snapshot).decode()))
+                db.execute("INSERT INTO p04_suite_cases VALUES(?,?,?,0)", (execution_id,suite_id,"direct-converse"))
+                db.execute("INSERT INTO p04_direct_cases VALUES(?,?)", (execution_id,case_json))
+        except sqlite3.IntegrityError:
+            raise LedgerError(409) from None
+        return {"suite_id":suite_id, "execution_id":execution_id, "graded":False, "prepared":True}
 
     def connect(self):
         db = sqlite3.connect(self.path, timeout=10)
@@ -122,7 +147,11 @@ class SuiteStore:
     def lookup(self, suite_id, execution_id):
         identifier(execution_id)
         root = self.read(suite_id)
-        if (root["state"] != "prepared" or root["contract_digest"] != self.contract_digest
+        with self.connect() as db:
+            direct = db.execute("SELECT case_json FROM p04_direct_cases WHERE execution_id=?", (execution_id,)).fetchone()
+        direct_case = json.loads(direct[0]) if direct else None
+        expected_digest = hashlib.sha256(canonical(direct_case)).hexdigest() if direct_case else self.contract_digest
+        if (root["state"] != "prepared" or root["contract_digest"] != expected_digest
                 or not 0 <= self.stamp() - root["started_at"] < 900):
             raise LedgerError(409)
         row = next((row for row in root["cases"] if row["execution_id"] == execution_id), None)
@@ -131,7 +160,7 @@ class SuiteStore:
         snapshot = resource_snapshot(root["resources"])
         if resource_snapshot(self.resource_reader()) != snapshot:
             raise LedgerError(409)
-        return {"case": json.loads(canonical(self.contracts[row["case_id"]])), "resources": snapshot}
+        return {"case": (direct_case if direct_case else json.loads(canonical(self.contracts[row["case_id"]]))), "resources": snapshot}
 
     def resolve(self, suite_id, execution_id):
         row = self.lookup(suite_id, execution_id)

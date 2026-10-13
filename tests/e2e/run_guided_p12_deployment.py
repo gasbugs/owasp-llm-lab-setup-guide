@@ -65,8 +65,8 @@ def main():
     grade = envelope['result']
     assert grade['suite_id'] == suite and grade['contract_version'] == 2
     status, receipt = request(runner, '/v1/receipts/' + suite, token=read_token)
-    assert status == 200 and receipt['run_state'] == 'finished', receipt
-    assert len(receipt['cases']) == 8
+    assert status == 200 and receipt['run_state'] == ('finished' if expected else 'paused'), receipt
+    assert len(receipt['cases']) == (8 if expected else 1)
     status, build = request(runner, '/v1/build-info', token=read_token)
     assert status == 200
     assert receipt['build']['files']['pipeline.py'] == hashlib.sha256(Path('/app/learner/pipeline.py').read_bytes()).hexdigest()
@@ -74,12 +74,17 @@ def main():
         assert len(grade['cases']) == 8 and grade['provider_call_count'] == 16
         assert grade['source_digest'] == receipt['build']['files']['pipeline.py']
     else:
+        assert [case['status'] for case in grade['cases']] == ['ERR'] + ['미실행'] * 7
         assert all(case['lifecycle']['execution']['execution_status'] == 'not_implemented' for case in receipt['cases'])
     assert request(verifier, '/v1/verify/p12', token='wrong', body={'suite_id': suite})[0] == 401
     assert request(verifier, '/v1/verify/p12', token=control_token,
                    body={'suite_id': suite, 'task_completed': True})[0] == 422
     status, rechecked = request(verifier, '/v1/verify/p12', token=control_token, body={'suite_id': suite})
-    assert status == 200 and rechecked['result'] == grade
+    assert status == 200
+    if expected:
+        assert rechecked['result'] == grade
+    else:
+        assert rechecked['security_verdict'] == 'ERR' and rechecked['task_completed'] is False
     assert request(runner, '/v1/receipts/' + suite, token=read_token)[1] == receipt
     assert request(runner, '/v1/build-info', token=read_token)[1] == build
     evidence = {'scope': 'default Gateway/runner/common verifier/Control Center over TCP; actual products; no Browser or full Compose',

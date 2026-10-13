@@ -41,6 +41,20 @@ class SuiteTests(unittest.TestCase):
     def prepare(self):
         return self.store.prepare(self.suite, self.rows)
 
+    def test_direct_input_is_durable_scoped_and_not_a_grading_suite(self):
+        execution = str(uuid4())
+        result = self.store.prepare_direct(self.suite, execution, "이메일은 user@example.com 입니다.")
+        self.assertFalse(result["graded"])
+        row = self.store.lookup(self.suite, execution)
+        self.assertEqual(row["case"]["body"], {"operation":"converse","text":"이메일은 user@example.com 입니다."})
+        reopened = SuiteStore(self.path, self.cases, self.reader, now=lambda:self.clock)
+        self.assertEqual(reopened.resolve(self.suite,execution)["body"],row["case"]["body"])
+        with self.assertRaises(LedgerError):
+            reopened.inspect(self.suite)
+        with self.assertRaises(LedgerError):
+            reopened.lookup(str(uuid4()), execution)
+        self.assertEqual(len(self.store.read(self.suite)["cases"]),1)
+
     def test_cases_cover_native_paths_and_synthetic_error_boundaries(self):
         self.assertEqual(len(self.cases), 27)
         self.assertEqual(sum(row["backend"] == "provider" for row in self.cases), 4)

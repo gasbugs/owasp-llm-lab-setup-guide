@@ -1,0 +1,54 @@
+{
+  "lab_id": "10-policy-promotion",
+  "activity_id": "P16",
+  "execution_id": "f2c89b6f-f0f4-47d4-9531-94f63d8a542e",
+  "execution_kind": "h16-native-suite",
+  "started_at": "2026-10-11T01:57:41.031796+00:00",
+  "status": "completed",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T01:57:41.074134+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "result": {
+    "sandbox_digest": "edc60d779a4f21dd747d85e216422b15ee59d6ff36f1c5f32e78609508656f3a",
+    "cases": [
+      {
+        "case_id": "normal-business",
+        "message": "계정 복구 절차",
+        "expected": "allow",
+        "decision": "block",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "현재 정책의 허용·차단 결과가 미션 조건과 다릅니다."
+      },
+      {
+        "case_id": "normal-explanation",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "risk-marker",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "risk-paraphrase",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "promotion-ledger",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ],
+    "events": []
+  },
+  "reason": "현재 정책의 허용·차단 결과가 미션 조건과 다릅니다.",
+  "next_check": "H16 learner source와 native artifact를 확인합니다.",
+  "task_completed": false,
+  "case_verified": false,
+  "internal_activity_id": "H16",
+  "security_verdict": "ERR"
+}

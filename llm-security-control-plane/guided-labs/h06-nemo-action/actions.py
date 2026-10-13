@@ -14,8 +14,6 @@ from nemoguardrails.actions import action
 ALLOWED_ACTIONS = frozenset(
     {
         "get_account_balance",
-        "transfer_training_funds",
-        "get_account_balance_and_transfer",
     }
 )
 PROVIDER_URL = os.environ["GUIDED_H06_PROVIDER_URL"].rstrip("/")

@@ -16,16 +16,22 @@ import time
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from cases import CONTRACT_VERSION, cases as default_cases
+from workflow import LifecycleError
 
-RUNNER_FILES = ("cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py", "requirements.txt", "Containerfile")
+RUNNER_FILES = ("aws_auth.py", "native_runtime.py", "cases.py", "execution.py", "service_client.py", "workflow.py", "run_server.py", "requirements.txt", "Containerfile")
 
 
 class Run(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: UUID
+
+
+class Search(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(min_length=1, max_length=1000)
 
 
 def create_app(*, workflow, tokens, database, source_root=None, now=time.time):
@@ -103,6 +109,28 @@ def create_app(*, workflow, tokens, database, source_root=None, now=time.time):
             raise HTTPException(404, "P03 execution not found")
         return json.loads(row["receipt"])
 
+    @app.post("/v1/search")
+    def search(request: Search, authorization: str | None = Header(default=None)):
+        require("control", authorization)
+        if not request.query.strip():
+            raise HTTPException(422, "검색어를 입력하세요.")
+        if not lock.acquire(blocking=False):
+            raise HTTPException(409, "P03 execution already running")
+        try:
+            baseline, suite = build(), str(uuid4())
+            mapping = [{"case_id": case["case_id"], "execution_id": str(uuid4())} for case in cases]
+            workflow.prepare_suite(suite_id=suite, executions=deepcopy(mapping), timeout=30)
+            execution = workflow.run_case(root / "learner.py", suite_id=suite,
+                execution_id=mapping[0]["execution_id"], runner_digest=baseline["runner_digest"],
+                timeout=75, query=request.query.strip())
+            return {"practice_id": "P03", "graded": False, "query": request.query.strip(), "execution": execution}
+        except LifecycleError as exc:
+            if exc.status == 409:
+                raise HTTPException(409, "검색 미실행 — AWS 자원의 준비 기록이 없습니다. AWS 자원 준비를 완료한 뒤 다시 검색하세요.") from None
+            raise HTTPException(502, "검색 준비 단계에서 실패했습니다. Gateway 연결과 자원 상태를 확인하세요.") from None
+        finally:
+            lock.release()
+
     @app.post("/v1/run")
     def run(request: Run, authorization: str | None = Header(default=None)):
         require("control", authorization)
@@ -160,7 +188,7 @@ def configured_app():
     return create_app(
         workflow=Workflow(
             os.getenv("GUIDED_BEDROCK_GATEWAY_URL", "http://guided-bedrock-gateway:8080"),
-            os.environ["GUIDED_H03_GATEWAY_TOKEN"],
+            os.environ["GUIDED_H03_GATEWAY_TOKEN"], native_sdk=True,
         ),
         tokens={"control": os.environ["GUIDED_CONTROL_LAB03_TOKEN"],
                 "verifier": os.environ["GUIDED_VERIFIER_LAB03_TOKEN"]},

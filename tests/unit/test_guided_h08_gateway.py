@@ -98,6 +98,28 @@ class GuidedH08GatewayTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    def test_case_closure_revokes_only_current_grants_and_preserves_actual_prefix_evidence(self):
+        suite_id="08000000-0000-0000-0007-000000000001";suite=self.create_suite(suite_id)
+        normal,risk=suite["cases"][:2]
+        close_url=f"/v1/h08/suites/{suite_id}/cases/normal-password-reset/close"
+        read_url=close_url.removesuffix("close")+"ledger"
+        self.assertEqual(self.client.get(read_url,headers={"Authorization":"Bearer h08-verifier"}).status_code,409)
+        self.assertEqual(self.client.post(close_url).status_code,401)
+        self.assertEqual(self.invoke(normal["roles"]["main"]).status_code,200)
+        closed=self.client.post(close_url,headers={"Authorization":"Bearer h08-control"})
+        self.assertEqual(closed.status_code,200,closed.text)
+        self.assertEqual(self.invoke(normal["roles"]["self_check_input"]).status_code,409)
+        ledger=self.get_ledger(suite_id)
+        self.assertIsNone(ledger["closed_at"])
+        self.assertTrue(all(cap["status"]=="issued" for cap in ledger["capabilities"] if cap["case_id"]=="normal-report-injection"))
+        prefix=self.client.get(read_url,headers={"Authorization":"Bearer h08-verifier"}).json()
+        self.assertEqual(prefix["case_closed_at"],closed.json()["case_closed_at"])
+        self.assertEqual(prefix["case_scope"],["normal-password-reset"])
+        self.assertEqual(len(prefix["capabilities"]),2);self.assertEqual(prefix["future_calls"],[])
+        self.assertEqual(self.invoke(risk["roles"]["main"]).status_code,200)
+        self.assertEqual(len(self.client.get(read_url,headers={"Authorization":"Bearer h08-verifier"}).json()["future_calls"]),1)
+        self.assertEqual(self.client.post(close_url,headers={"Authorization":"Bearer h08-control"}).json(),closed.json())
+
     def test_suite_is_server_owned_and_capabilities_are_role_bound(self):
         suite_id = "08000000-0000-0000-0000-000000000001"
         suite = self.create_suite(suite_id)

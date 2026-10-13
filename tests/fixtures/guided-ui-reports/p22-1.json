@@ -1,0 +1,303 @@
+{
+  "lab_id": "13-gateway-agent",
+  "activity_id": "P22",
+  "execution_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+  "execution_kind": "mcp-exact-call-suite",
+  "started_at": "2026-10-11T02:19:04.347254+00:00",
+  "status": "completed",
+  "course_verdict": "PASS",
+  "case_verified": true,
+  "task_completed": true,
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:19:05.117021+00:00",
+  "stage_calls": [
+    {
+      "stage": "mcp_host",
+      "attempted": true,
+      "outcome": "completed",
+      "evidence_id": "6def6d6f4eace950dd62f6e21d471e951b076aec1ce28e72f401bd9293eddb3d"
+    },
+    {
+      "stage": "mcp_server",
+      "attempted": true,
+      "outcome": "completed",
+      "evidence_id": "bebe411a28be82e76a739d1f27d38160dfcfbab2981f9785dda927ca3c5e2d6f"
+    },
+    {
+      "stage": "training_effect",
+      "attempted": true,
+      "outcome": "effects=1",
+      "evidence_id": "1e42c378-ead3-460b-a9b2-1dcdddc7670d"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "mcp-server",
+      "kind": "tool-inventory",
+      "id": "6def6d6f4eace950dd62f6e21d471e951b076aec1ce28e72f401bd9293eddb3d",
+      "observed_at": "2026-10-11T02:19:05.002661+00:00"
+    },
+    {
+      "source": "mcp-server",
+      "kind": "source-build",
+      "id": "bebe411a28be82e76a739d1f27d38160dfcfbab2981f9785dda927ca3c5e2d6f",
+      "observed_at": "2026-10-11T02:19:05.002661+00:00"
+    }
+  ],
+  "result": {
+    "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+    "started_at": "2026-10-11T02:19:04.347254+00:00",
+    "trace_id": "142112f2b38ddb2f0c7ca43b3648d9df",
+    "server_id": "training-notice-mcp",
+    "external_action_called": false,
+    "effect_counts": [
+      0,
+      0,
+      0,
+      1,
+      1
+    ],
+    "case_order": [
+      "normal",
+      "no-approval",
+      "self-approval",
+      "changed-args",
+      "expired",
+      "approved",
+      "reuse"
+    ],
+    "protocol_version": "2026-07-28",
+    "tool_inventory": [
+      "audit_effects",
+      "lookup_notice",
+      "publish_notice",
+      "server_build_info"
+    ],
+    "tool_inventory_digest": "6def6d6f4eace950dd62f6e21d471e951b076aec1ce28e72f401bd9293eddb3d",
+    "source_digest": "bebe411a28be82e76a739d1f27d38160dfcfbab2981f9785dda927ca3c5e2d6f",
+    "normal": {
+      "is_error": false,
+      "structured_content": {
+        "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+        "effects": 0,
+        "external_action_called": false
+      }
+    },
+    "observed_at": "2026-10-11T02:19:05.002661+00:00",
+    "no_approval": {
+      "is_error": true,
+      "structured_content": null
+    },
+    "self_approval": {
+      "denied": true,
+      "reason": "self-approval-denied"
+    },
+    "approved_call_id": "1e42c378-ead3-460b-a9b2-1dcdddc7670d",
+    "changed_args": {
+      "is_error": true,
+      "structured_content": null
+    },
+    "expired": {
+      "is_error": true,
+      "structured_content": null
+    },
+    "approved": {
+      "is_error": false,
+      "structured_content": {
+        "decision": "allow",
+        "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+        "call_id": "1e42c378-ead3-460b-a9b2-1dcdddc7670d",
+        "trace_id": "142112f2b38ddb2f0c7ca43b3648d9df",
+        "effects": 1,
+        "external_action_called": false
+      }
+    },
+    "reuse": {
+      "is_error": true,
+      "structured_content": null
+    },
+    "verified_effects": {
+      "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+      "effects": 1,
+      "calls": [
+        {
+          "call_id": "1e42c378-ead3-460b-a9b2-1dcdddc7670d",
+          "trace_id": "142112f2b38ddb2f0c7ca43b3648d9df",
+          "notice": "H22 훈련 공지"
+        }
+      ],
+      "external_action_called": false
+    },
+    "verifier_protocol_version": "2026-07-28",
+    "cases": [
+      {
+        "response": {
+          "is_error": false,
+          "structured_content": {
+            "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+            "effects": 0,
+            "external_action_called": false
+          }
+        },
+        "effect_counts": [],
+        "verified_effects": {
+          "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+          "effects": 0,
+          "calls": [],
+          "external_action_called": false
+        },
+        "case_id": "normal",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "현재 승인 사례의 응답과 실제 공지 원장이 일치합니다."
+      },
+      {
+        "response": {
+          "is_error": true,
+          "structured_content": null
+        },
+        "effect_counts": [
+          0
+        ],
+        "verified_effects": {
+          "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+          "effects": 0,
+          "calls": [],
+          "external_action_called": false
+        },
+        "case_id": "no-approval",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "현재 승인 사례의 응답과 실제 공지 원장이 일치합니다."
+      },
+      {
+        "response": {
+          "denied": true,
+          "reason": "self-approval-denied"
+        },
+        "effect_counts": [
+          0
+        ],
+        "verified_effects": {
+          "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+          "effects": 0,
+          "calls": [],
+          "external_action_called": false
+        },
+        "case_id": "self-approval",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "현재 승인 사례의 응답과 실제 공지 원장이 일치합니다."
+      },
+      {
+        "response": {
+          "is_error": true,
+          "structured_content": null
+        },
+        "effect_counts": [
+          0,
+          0
+        ],
+        "verified_effects": {
+          "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+          "effects": 0,
+          "calls": [],
+          "external_action_called": false
+        },
+        "case_id": "changed-args",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "현재 승인 사례의 응답과 실제 공지 원장이 일치합니다."
+      },
+      {
+        "response": {
+          "is_error": true,
+          "structured_content": null
+        },
+        "effect_counts": [
+          0,
+          0,
+          0
+        ],
+        "verified_effects": {
+          "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+          "effects": 0,
+          "calls": [],
+          "external_action_called": false
+        },
+        "case_id": "expired",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "현재 승인 사례의 응답과 실제 공지 원장이 일치합니다."
+      },
+      {
+        "response": {
+          "is_error": false,
+          "structured_content": {
+            "decision": "allow",
+            "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+            "call_id": "1e42c378-ead3-460b-a9b2-1dcdddc7670d",
+            "trace_id": "142112f2b38ddb2f0c7ca43b3648d9df",
+            "effects": 1,
+            "external_action_called": false
+          }
+        },
+        "effect_counts": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "verified_effects": {
+          "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+          "effects": 1,
+          "calls": [
+            {
+              "call_id": "1e42c378-ead3-460b-a9b2-1dcdddc7670d",
+              "trace_id": "142112f2b38ddb2f0c7ca43b3648d9df",
+              "notice": "H22 훈련 공지"
+            }
+          ],
+          "external_action_called": false
+        },
+        "case_id": "approved",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "현재 승인 사례의 응답과 실제 공지 원장이 일치합니다."
+      },
+      {
+        "response": {
+          "is_error": true,
+          "structured_content": null
+        },
+        "effect_counts": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        "verified_effects": {
+          "suite_id": "9277b8c5-f783-43e4-86bf-1af1fbc0955a",
+          "effects": 1,
+          "calls": [
+            {
+              "call_id": "1e42c378-ead3-460b-a9b2-1dcdddc7670d",
+              "trace_id": "142112f2b38ddb2f0c7ca43b3648d9df",
+              "notice": "H22 훈련 공지"
+            }
+          ],
+          "external_action_called": false
+        },
+        "case_id": "reuse",
+        "status": "PASS",
+        "case_verified": true,
+        "reason": "현재 승인 사례의 응답과 실제 공지 원장이 일치합니다."
+      }
+    ]
+  },
+  "reason": "정상 조회를 유지하고 승인 없음·self-approval·인자 변경·만료·재사용을 막았으며 정확한 승인 한 건만 실행했습니다.",
+  "next_check": "protocol version, Tool 목록, 승인 없음·인자 변경·만료와 0→0→0→1→1 부작용 순서를 확인합니다.",
+  "internal_activity_id": "H22",
+  "security_verdict": "PASS"
+}

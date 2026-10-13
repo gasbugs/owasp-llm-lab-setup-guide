@@ -9,17 +9,17 @@ SCAFFOLD = {"Containerfile", "execution.py", "service_client.py", "workflow.py",
 
 
 def validate_run_binding(receipt, build_info, *, suite_id, case_ids, contract_digest,
-                         scaffold_files, now):
+                         scaffold_files, now, through_case=None):
     """Expected inputs come from verifier configuration, never the Browser/receipt."""
     try:
-        return _validate(receipt, build_info, suite_id, case_ids, contract_digest, scaffold_files, now)
+        return _validate(receipt, build_info, suite_id, case_ids, contract_digest, scaffold_files, now, through_case)
     except EvidenceError:
         raise
     except (KeyError, TypeError, ValueError, IndexError, AttributeError):
         raise EvidenceError("incomplete P12 run binding") from None
 
 
-def _validate(receipt, info, suite, ids, contract, scaffold, now):
+def _validate(receipt, info, suite, ids, contract, scaffold, now, through_case):
     require(isinstance(suite, str) and str(UUID(suite)) == suite, "invalid root suite")
     require(isinstance(ids, list) and 1 <= len(ids) <= 32
             and all(isinstance(value, str) and value for value in ids)
@@ -33,7 +33,10 @@ def _validate(receipt, info, suite, ids, contract, scaffold, now):
             and type(receipt["contract_version"]) is int and receipt["contract_version"] == 2
             and type(info["contract_version"]) is int and info["contract_version"] == 2,
             "wrong problem contract")
-    require(receipt["suite_id"] == suite and receipt["run_state"] == "finished", "run incomplete")
+    require(through_case is None or through_case in ids, "unknown prefix case")
+    prefix = ids if through_case is None else ids[:ids.index(through_case) + 1]
+    expected_state = "paused" if len(prefix) < len(ids) else "finished"
+    require(receipt["suite_id"] == suite and receipt["run_state"] == expected_state, "run incomplete")
     start, end = stamp(receipt["started_at"]), stamp(receipt["finished_at"])
     require(start <= end <= stamp(now) and now - end <= 900, "run time window mismatch")
     build = receipt["build"]
@@ -48,7 +51,7 @@ def _validate(receipt, info, suite, ids, contract, scaffold, now):
     require(build["source_digest"] == hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest(),
             "build digest mismatch")
     attempts = receipt["cases"]
-    require(isinstance(attempts, list) and [item["case_id"] for item in attempts] == ids,
+    require(isinstance(attempts, list) and [item["case_id"] for item in attempts] == prefix,
             "missing duplicate or reordered cases")
     seen, previous = {suite}, start
     for attempt in attempts:
@@ -65,4 +68,4 @@ def _validate(receipt, info, suite, ids, contract, scaffold, now):
                 and lifecycle["execution_id"] == attempt["execution_id"]
                 and lifecycle["lifecycle_status"] == "finished", "child lifecycle mismatch")
         require(lifecycle["execution"]["source_digest"] == files["pipeline.py"], "child source mismatch")
-    return {"run_bound": True, "suite_id": suite, "source_digest": files["pipeline.py"], "case_ids": list(ids)}
+    return {"run_bound": True, "suite_id": suite, "source_digest": files["pipeline.py"], "case_ids": list(prefix)}

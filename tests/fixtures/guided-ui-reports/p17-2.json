@@ -1,0 +1,190 @@
+{
+  "lab_id": "11-raw-observability",
+  "activity_id": "P17",
+  "execution_id": "0f82ac87-013c-439b-adf8-3e1829bcb690",
+  "execution_kind": "h17-native-suite",
+  "started_at": "2026-10-11T02:01:02.094016+00:00",
+  "status": "completed",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T02:01:05.284185+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "result": {
+    "execution": {
+      "source_digest": "faa73df70e8387160e4935475ecfe54370119c22c7e01d15ee71155832ea035c",
+      "cases": [
+        {
+          "request_id": "d00237c6-b662-4dca-91b7-02da902d867d",
+          "principal": "reader",
+          "action": "notice_lookup",
+          "started_ns": 1791684063646048652,
+          "returned": {
+            "decision": "allow",
+            "stop_stage": null,
+            "downstream_count": 1,
+            "result": {
+              "notice_id": "p17-training-notice",
+              "text": "P17 교육용 공지입니다."
+            }
+          },
+          "execution_status": "returned",
+          "finished_ns": 1791684063646117601,
+          "ledger": {
+            "request_id": "d00237c6-b662-4dca-91b7-02da902d867d",
+            "invocations": 1,
+            "stages": [
+              {
+                "request_id": "d00237c6-b662-4dca-91b7-02da902d867d",
+                "stage": "authenticate",
+                "sequence": 1,
+                "trace_id": "00000000000000000000000000000000",
+                "span_id": "0000000000000000"
+              },
+              {
+                "request_id": "d00237c6-b662-4dca-91b7-02da902d867d",
+                "stage": "authorize",
+                "sequence": 2,
+                "trace_id": "00000000000000000000000000000000",
+                "span_id": "0000000000000000"
+              },
+              {
+                "request_id": "d00237c6-b662-4dca-91b7-02da902d867d",
+                "stage": "notice_lookup",
+                "sequence": 3,
+                "trace_id": "00000000000000000000000000000000",
+                "span_id": "0000000000000000"
+              }
+            ],
+            "downstream_calls": [
+              {
+                "request_id": "d00237c6-b662-4dca-91b7-02da902d867d",
+                "stage": "notice_lookup",
+                "sequence": 3,
+                "trace_id": "00000000000000000000000000000000",
+                "span_id": "0000000000000000",
+                "result": {
+                  "notice_id": "p17-training-notice",
+                  "text": "P17 교육용 공지입니다."
+                }
+              }
+            ],
+            "closures": [
+              {
+                "request_id": "d00237c6-b662-4dca-91b7-02da902d867d",
+                "closed": true,
+                "decision": "allow",
+                "stop_stage": null,
+                "downstream_count": 1,
+                "result": {
+                  "notice_id": "p17-training-notice",
+                  "text": "P17 교육용 공지입니다."
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "closed": true,
+      "export_flushed": true,
+      "metrics": "# HELP guided_p17_decisions_total P17 business decisions\n# TYPE guided_p17_decisions_total counter\nguided_p17_decisions_total{decision=\"allow\"} 1.0\nguided_p17_decisions_total{decision=\"block\"} 2.0\n# HELP guided_p17_decisions_created P17 business decisions\n# TYPE guided_p17_decisions_created gauge\nguided_p17_decisions_created{decision=\"allow\"} 1.7916840636457067e+09\nguided_p17_decisions_created{decision=\"block\"} 1.7916840636457217e+09\n",
+      "counter_values": {
+        "allow": 1.0,
+        "block": 2.0
+      }
+    },
+    "execution_error": null,
+    "prometheus_before": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "__name__": "guided_p17_decisions_total",
+              "decision": "allow",
+              "instance": "guided-h17-telemetry:8000",
+              "job": "guided-h17-telemetry"
+            },
+            "value": [
+              1791684063.191,
+              "1"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "guided_p17_decisions_total",
+              "decision": "block",
+              "instance": "guided-h17-telemetry:8000",
+              "job": "guided-h17-telemetry"
+            },
+            "value": [
+              1791684063.191,
+              "2"
+            ]
+          }
+        ]
+      }
+    },
+    "prometheus_after": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "__name__": "guided_p17_decisions_total",
+              "decision": "allow",
+              "instance": "guided-h17-telemetry:8000",
+              "job": "guided-h17-telemetry"
+            },
+            "value": [
+              1791684065.247,
+              "1"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "guided_p17_decisions_total",
+              "decision": "block",
+              "instance": "guided-h17-telemetry:8000",
+              "job": "guided-h17-telemetry"
+            },
+            "value": [
+              1791684065.247,
+              "2"
+            ]
+          }
+        ]
+      }
+    },
+    "source_digest": "faa73df70e8387160e4935475ecfe54370119c22c7e01d15ee71155832ea035c",
+    "cases": [
+      {
+        "case_id": "normal-lookup",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "현재 실행의 계측 결과가 과제 조건과 일치하지 않습니다."
+      },
+      {
+        "case_id": "unauthorized-publish",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "anonymous-lookup",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ],
+    "products": [],
+    "failed_requirement": "Counter delta differs"
+  },
+  "reason": "현재 실행의 계측 결과가 과제 조건과 일치하지 않습니다.",
+  "next_check": "현재 계측 함수의 실행 상태와 실패한 요구사항을 확인합니다.",
+  "internal_activity_id": "H17",
+  "contract_version": 2,
+  "task_completed": false,
+  "case_verified": false,
+  "security_verdict": "ERR"
+}

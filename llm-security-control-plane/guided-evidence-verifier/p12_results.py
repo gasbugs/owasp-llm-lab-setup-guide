@@ -39,6 +39,7 @@ def validate_case(attempt, ledgers, builds, *, source_digest, expected_case, exp
     try:
         result = _validate(attempt, ledgers, builds, source_digest, expected_status, expected_stop, now)
         _validate_inputs(attempt, ledgers, expected_case)
+        result["input"] = dict(expected_case)
         return result
     except EvidenceError:
         raise

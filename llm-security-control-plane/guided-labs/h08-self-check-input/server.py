@@ -187,7 +187,20 @@ def project_activated_rail(rail) -> dict:
 
 def load_case_rails(grant: CaseGrant) -> LLMRails:
     """Read the learner's disk config for every case, then inject transient grants."""
-    config = RailsConfig.from_path(str(CONFIG_PATH))
+    try:
+        config = RailsConfig.from_path(str(CONFIG_PATH))
+    except Exception as exc:
+        import yaml
+        if isinstance(exc, yaml.YAMLError):
+            mark = getattr(exc, "problem_mark", None)
+            position = f"{mark.line + 1}행 {mark.column + 1}열" if mark else "YAML 문법"
+            raise HTTPException(500, detail={"diagnosis": {
+                "cause": f"설정 파일의 YAML 문법 오류: {position}",
+                "field": position, "stopped_stage": "NeMo 설정 파일 해석",
+                "model_calls": "0회 — 설정 해석에서 중단", "evidence": "실제 YAML 파서 오류",
+                "next_action": "config.yml·prompts.yml의 들여쓰기·콜론·따옴표를 해당 위치에서 확인하고 다시 적용하세요."
+            }}) from None
+        raise
     roles = [model.type for model in config.models]
     if roles.count("main") != 1 or roles.count("self_check_input") != 1:
         raise ValueError("H08 config must have one main and one self_check_input model")
@@ -207,17 +220,33 @@ def load_case_rails(grant: CaseGrant) -> LLMRails:
             "default_headers": {
                 "Authorization": f"Bearer {capabilities[model.type]}"
             },
+            **({"max_tokens": 1024} if model.type == "main" and (_NATIVE_CONTEXT.get() or {}).get("selected") else {}),
             "max_retries": 0,
             "timeout": 90.0,
         }
-    return LLMRails(config)
+    try:
+        return LLMRails(config)
+    except Exception as exc:
+        if type(exc).__name__ == "InvalidRailsConfigurationError":
+            import re
+            found = re.search(r"provided (input|output) rail flow `([^`]+)` does not exist", str(exc))
+            direction = found.group(1) if found else "input/output"
+            flow = found.group(2) if found and re.fullmatch(r"[\w .=$-]{1,120}", found.group(2)) else "설정의 Rail"
+            raise HTTPException(500, detail={"diagnosis": {
+                "cause": f"등록되지 않은 {direction} Rail: {flow}",
+                "field": f"rails.{direction}.flows", "stopped_stage": "NeMo 설정 초기화",
+                "model_calls": "0회 — LLMRails 초기화에서 중단", "evidence": "실제 설정 검증 오류",
+                "next_action": "config.yml의 Rail 이름을 공식 흐름 이름과 맞춘 뒤 코드 적용하기 명령을 실행하세요."
+            }}) from None
+        raise
 
 
 async def execute_case(grant: CaseGrant) -> dict:
     rails = load_case_rails(grant)
+    input_text = (_NATIVE_CONTEXT.get() or {}).get("message") or CASES[grant.case_id]
     try:
         generated = await rails.generate_async(
-            messages=[{"role": "user", "content": CASES[grant.case_id]}],
+            messages=[{"role": "user", "content": input_text}],
             options={
                 "output_vars": True,
                 "log": {"activated_rails": True, "llm_calls": True},
@@ -228,7 +257,8 @@ async def execute_case(grant: CaseGrant) -> dict:
         return {
             "case_id": grant.case_id,
             "execution_id": grant.execution_id,
-            "input_digest": digest_bytes(CASES[grant.case_id].encode()),
+            **({"reply":text,"input":input_text} if (_NATIVE_CONTEXT.get() or {}).get("selected") == grant.case_id else {}),
+            "input_digest": digest_bytes(input_text.encode()),
             "self_check_input_capability_digest": capability_digest(
                 grant.self_check_input_capability
             ),
@@ -318,6 +348,36 @@ async def run(request: RunRequest, _authorized: None = Depends(require_control))
     return await execute_suite(request)
 
 
+class RunCaseRequest(RunRequest):
+    case_id: CaseId
+
+
+@app.post("/v1/run-case")
+async def run_case(request: RunCaseRequest, _authorized: None = Depends(require_control)) -> dict:
+    if tuple(grant.case_id for grant in request.cases) != CASE_ORDER or len({grant.execution_id for grant in request.cases}) != len(CASE_ORDER):
+        raise HTTPException(422, "run does not match fixed H08 cases")
+    if run_lock.locked():
+        raise HTTPException(409, "H08 execution already running")
+    async with run_lock:
+        with connect() as database:
+            row = database.execute("SELECT receipt_json FROM receipts WHERE suite_id=?", (request.suite_id,)).fetchone()
+        previous = json.loads(row[0]) if row else None
+        completed = previous["cases"] if previous else []
+        grant_digest = digest_bytes(json.dumps([grant.model_dump() for grant in request.cases],sort_keys=True).encode())
+        if len(completed) >= len(CASE_ORDER) or request.case_id != CASE_ORDER[len(completed)] or [case["case_id"] for case in completed] != list(CASE_ORDER[:len(completed)]):
+            raise HTTPException(409, "only the next server-owned H08 case may run")
+        if previous and (previous["started_at"] != request.started_at or previous["source_digest"] != source_digest() or previous.get("grant_digest") != grant_digest):
+            raise HTTPException(409, "H08 suite source or grants changed")
+        grant = request.cases[len(completed)]
+        result = await execute_case(grant)
+        receipt = {"suite_id":request.suite_id,"started_at":request.started_at,"observed_at":datetime.now(timezone.utc).isoformat(),
+            "source_digest":source_digest(),"config_digest":config_digest(),"scaffold_digest":scaffold_digest(),
+            "framework":"nemoguardrails","framework_version":FRAMEWORK_VERSION,"grant_digest":grant_digest,"cases":completed+[result]}
+        with connect() as database:
+            database.execute("INSERT OR REPLACE INTO receipts VALUES(?,?)", (request.suite_id,json.dumps(receipt,ensure_ascii=False)))
+        return {"suite_id":request.suite_id,"source_digest":receipt["source_digest"],"config_digest":receipt["config_digest"]}
+
+
 @app.get("/v1/build-info")
 def build_info(_authorized: None = Depends(require_verifier)) -> dict:
     config = RailsConfig.from_path(str(CONFIG_PATH))
@@ -343,3 +403,80 @@ def receipt(suite_id: str, _authorized: None = Depends(require_verifier)) -> dic
     if row is None:
         raise HTTPException(status_code=404, detail="receipt not found")
     return json.loads(row["receipt_json"])
+
+# Runtime-owned progress: execution completion is not a grading verdict.
+import contextvars as _progress_contextvars
+import functools as _progress_functools
+import inspect as _progress_inspect
+from fastapi import Request as _ProgressRequest
+_NATIVE_CONTEXT = _progress_contextvars.ContextVar("native_case_context", default=None)
+_NATIVE_PROGRESS = {}
+
+def _native_case(function):
+    @_progress_functools.wraps(function)
+    async def observed(*args, **kwargs):
+        state = _NATIVE_CONTEXT.get()
+        bound = _progress_inspect.signature(function).bind(*args, **kwargs).arguments
+        grant = bound.get("grant") or bound.get("request")
+        definition = bound.get("definition") or {}
+        case_id = bound.get("case_id") or getattr(grant, "case_id", None) or definition.get("case_id")
+        if state and state.get("selected") and case_id != state["selected"]:
+            return {"case_id":case_id,"direct_skipped":True}
+        if state:
+            state["current_case"]={"case_id":case_id or "현재 기능", "status":"실행 중", "started_at":datetime.now(timezone.utc).isoformat()}
+        try:
+            result = await function(*args, **kwargs)
+        except Exception:
+            if state:
+                state["cases"].append({"case_id":case_id,"status":"ERR","reason":"실행 중 오류가 발생했습니다."})
+                state["current_case"]=None
+            raise
+        if state:
+            state["cases"].append({"case_id":case_id,"status":"실행 완료", "reason":"독립 검증 대기"})
+            state["current_case"]=None
+        return result
+    return observed
+
+def _install_native_progress(application, control_token):
+    @application.middleware("http")
+    async def native_progress_boundary(request: _ProgressRequest, call_next):
+        if request.method != "POST" or request.url.path not in {"/v1/run", "/v1/run-suite"}:
+            return await call_next(request)
+        if not hmac.compare_digest(request.headers.get("authorization", ""), "Bearer " + control_token):
+            return await call_next(request)
+        try:
+            body=await request.json()
+        except ValueError:
+            return await call_next(request)
+        key=body.get("suite_id") or body.get("execution_id") or request.headers.get("x-progress-id")
+        if not isinstance(key,str):
+            return await call_next(request)
+        selected=request.headers.get("x-preview-case")
+        message=None
+        if selected and request.headers.get("x-preview-message"):
+            import base64
+            try:message=base64.urlsafe_b64decode(request.headers["x-preview-message"]).decode()
+            except (ValueError,UnicodeError):raise HTTPException(422,"invalid preview input")
+            if not message.strip() or len(message)>1000:raise HTTPException(422,"preview input too long")
+        total=len(body.get("cases",body.get("execution_ids",[]))) or len(CASES)
+        state={"suite_id":key,"phase":"running","cases":[],"current_case":None,"total":1 if selected else total,"selected":selected,"message":message}
+        if len(_NATIVE_PROGRESS)>=32:
+            removable=next((k for k,v in _NATIVE_PROGRESS.items() if v["phase"]=="finished"),None)
+            if removable:_NATIVE_PROGRESS.pop(removable)
+        _NATIVE_PROGRESS[key]=state
+        context=_NATIVE_CONTEXT.set(state)
+        try:
+            return await call_next(request)
+        finally:
+            state["phase"]="finished";state["current_case"]=None
+            _NATIVE_CONTEXT.reset(context)
+    @application.get("/v1/progress/{suite_id}")
+    async def native_progress_snapshot(suite_id:str, authorization:str|None=Header(default=None)):
+        if not hmac.compare_digest(authorization or "", "Bearer " + control_token):
+            raise HTTPException(401,"invalid progress credential")
+        state=_NATIVE_PROGRESS.get(suite_id)
+        if state is None:raise HTTPException(404,"execution not started")
+        return {k:v for k,v in state.items() if k not in {"selected","message"}}
+
+execute_case = _native_case(execute_case)
+_install_native_progress(app, CONTROL_TOKEN)

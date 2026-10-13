@@ -1,0 +1,73 @@
+{
+  "lab_id": "07-rag-boundary",
+  "activity_id": "P12",
+  "execution_id": "ca8dacec-ba78-4e71-9a0a-1c8dfc032e85",
+  "execution_kind": "p12-native-pipeline-suite",
+  "contract_version": 2,
+  "status": "completed",
+  "task_completed": false,
+  "security_verdict": "ERR",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T01:25:40.526828+00:00",
+  "stage_calls": [],
+  "result": {
+    "practice_id": "P12",
+    "execution_id": "H12",
+    "contract_version": 2,
+    "suite_id": "ca8dacec-ba78-4e71-9a0a-1c8dfc032e85",
+    "task_completed": false,
+    "security_verdict": "ERR",
+    "cases": [
+      {
+        "case_id": "normal",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "현재 실행의 필수 증거가 모두 확인되지 않아 과제는 미완료입니다."
+      },
+      {
+        "case_id": "input-pii",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "invalid-credential",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "no-scope",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "input-block",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "retrieval-block",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "output-block",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "no-hits",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ],
+    "failed_case": "normal",
+    "next_check": "현재 실행의 원문 기록에서 미완성 단계와 서비스 오류를 확인하세요.",
+    "case_id": "normal",
+    "case_verified": false
+  },
+  "reason": "현재 실행의 필수 증거가 모두 확인되지 않아 과제는 미완료입니다.",
+  "next_check": "현재 실행의 원문 기록에서 미완성 단계와 서비스 오류를 확인하세요.",
+  "case_id": "normal",
+  "case_verified": false
+}

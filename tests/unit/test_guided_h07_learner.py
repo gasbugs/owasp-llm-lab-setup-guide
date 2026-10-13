@@ -173,6 +173,28 @@ class H07LearnerTest(unittest.TestCase):
         self.assertEqual(receipt.status_code, 200, receipt.text)
         return receipt.json()
 
+    def test_sequential_execution_saves_only_one_case_and_rejects_grant_change(self):
+        (self.learner_root / "config/config.yml").write_text(FIXED_CONFIG)
+        body={"suite_id":str(uuid.uuid4()),"started_at":"2026-10-11T00:00:00+00:00","cases":[
+            {"case_id":case,"execution_id":str(uuid.uuid4()),"content_safety_capability":CAPABILITIES[prefix+"-content"],"main_capability":CAPABILITIES[prefix+"-main"]}
+            for case,prefix in (("normal-phishing-defense","normal"),("risk-phishing-kit","risk"))]}
+        headers={"Authorization":f"Bearer {CONTROL_TOKEN}"}
+        self.assertEqual(self.client.post("/v1/run-case",json={**body,"case_id":"risk-phishing-kit"},headers=headers).status_code,409)
+        self.assertEqual(FakeGatewayHandler.calls,[])
+        normal=self.client.post("/v1/run-case",json={**body,"case_id":"normal-phishing-defense"},headers=headers)
+        self.assertEqual(normal.status_code,200,normal.text)
+        self.assertEqual([(call["case_id"],call["role"]) for call in FakeGatewayHandler.calls],[("normal-phishing-defense","content_safety"),("normal-phishing-defense","main")])
+        changed={**body,"cases":[{**grant,"execution_id":str(uuid.uuid4())} for grant in body["cases"]]}
+        self.assertEqual(self.client.post("/v1/run-case",json={**changed,"case_id":"risk-phishing-kit"},headers=headers).status_code,409)
+        self.assertEqual(self.client.post("/v1/run-case",json={**body,"case_id":"normal-phishing-defense"},headers=headers).status_code,409)
+        risk=self.client.post("/v1/run-case",json={**body,"case_id":"risk-phishing-kit"},headers=headers)
+        self.assertEqual(risk.status_code,200,risk.text)
+        self.assertEqual(len(FakeGatewayHandler.calls),3)
+        receipt=self.client.get("/v1/receipts/"+body["suite_id"],headers={"Authorization":f"Bearer {VERIFIER_TOKEN}"}).json()
+        self.assertEqual([case["case_id"] for case in receipt["cases"]],list(self.module.CASE_ORDER))
+        self.assertTrue(any(rail["stop"] for rail in receipt["cases"][1]["activated_rails"]))
+        self.assertNotIn(CAPABILITIES["risk-main"],json.dumps(receipt))
+
     def test_starter_calls_only_main_for_both_cases(self):
         receipt = self.run_suite()
         self.assertEqual(

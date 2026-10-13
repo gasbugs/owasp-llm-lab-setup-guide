@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -13,6 +14,8 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from policy import allowed_documents
@@ -46,6 +49,7 @@ def connect() -> sqlite3.Connection:
 
 with connect() as database:
     database.execute("CREATE TABLE IF NOT EXISTS receipts (suite_id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL)")
+    database.execute("CREATE TABLE IF NOT EXISTS sequential_vectors (suite_id TEXT PRIMARY KEY, vectors_json TEXT NOT NULL)")
 
 
 class RunRequest(BaseModel):
@@ -100,7 +104,7 @@ def readyz() -> dict[str, str]:
 
 
 @app.post("/v1/run")
-async def run(request: RunRequest, authorization: str | None = Header(default=None)) -> dict:
+async def run(request: RunRequest, authorization: str | None = Header(default=None), x_preview_case: str | None = Header(default=None), x_preview_query: str | None = Header(default=None)) -> dict:
     require(CONTROL_TOKEN, authorization)
     with connect() as database:
         if database.execute("SELECT 1 FROM receipts WHERE suite_id=?", (request.suite_id,)).fetchone():
@@ -114,7 +118,9 @@ async def run(request: RunRequest, authorization: str | None = Header(default=No
             document_provider_ids[document["id"]] = result["provider_request_id"]
         results = []
         for case in CASES:
-            embedded = await embed(client, request, f"query-{case['id']}", case["query"])
+            if x_preview_case and case["id"] != x_preview_case:
+                continue
+            embedded = await embed(client, request, f"query-{case['id']}", (x_preview_query or case["query"]))
             candidates = allowed_documents(case["principal"], DOCUMENTS, case["claims"])
             ranked = sorted(
                 ({"document": item, "score": cosine(embedded["vector"], document_vectors[item["id"]])} for item in candidates),
@@ -150,6 +156,83 @@ async def run(request: RunRequest, authorization: str | None = Header(default=No
     return {"suite_id": request.suite_id, "source_digest": receipt["source_digest"]}
 
 
+CASE_LOCK = asyncio.Lock()
+
+
+class CaseRequest(RunRequest):
+    case_id: Literal["normal-approved", "client-self-approval", "client-tenant-spoof", "client-role-spoof"]
+
+
+@app.post("/v1/run-case")
+async def run_case(request: CaseRequest, authorization: str | None = Header(default=None)) -> dict:
+    async with CASE_LOCK:
+        return await execute_next_case(request, authorization)
+
+
+async def execute_next_case(request: CaseRequest, authorization: str | None) -> dict:
+    require(CONTROL_TOKEN, authorization)
+    with connect() as database:
+        row = database.execute("SELECT receipt_json FROM receipts WHERE suite_id=?", (request.suite_id,)).fetchone()
+        previous = json.loads(row[0]) if row else None
+        cached = database.execute("SELECT vectors_json FROM sequential_vectors WHERE suite_id=?", (request.suite_id,)).fetchone()
+    source_digest = digest_files((ROOT / "Containerfile", ROOT / "policy.py", ROOT / "server.py"))
+    done = previous["cases"] if previous else []
+    case_ids = [case["id"] for case in CASES]
+    if len(done) >= len(CASES) or request.case_id != case_ids[len(done)] or [case["case_id"] for case in done] != case_ids[:len(done)]:
+        raise HTTPException(409, "only the next server-owned case may run")
+    if previous and (previous["source_digest"] != source_digest or previous["started_at"] != request.started_at or previous["execution_id"] != request.execution_id or not cached):
+        raise HTTPException(409, "suite source or execution changed")
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        document_vectors = json.loads(cached[0]) if cached else {}
+        document_provider_ids = previous["document_provider_request_ids"] if previous else {}
+        if not previous:
+            for document in DOCUMENTS:
+                result = await embed(client, request, document["id"], document["body"])
+                document_vectors[document["id"]] = result["vector"]
+                document_provider_ids[document["id"]] = result["provider_request_id"]
+        results = list(done)
+        for case in CASES:
+            if case["id"] != request.case_id:
+                continue
+            embedded = await embed(client, request, f"query-{case['id']}", case["query"])
+            candidates = allowed_documents(case["principal"], DOCUMENTS, case["claims"])
+            ranked = sorted(
+                ({"document": item, "score": cosine(embedded["vector"], document_vectors[item["id"]])} for item in candidates),
+                key=lambda item: item["score"], reverse=True,
+            )
+            selected = ranked[0] if ranked else None
+            results.append({
+                "case_id": case["id"],
+                "principal": case["principal"],
+                "client_claims": case["claims"],
+                "candidate_ids": [item["id"] for item in candidates],
+                "selected_document_id": selected["document"]["id"] if selected else None,
+                "selected_source_uri": selected["document"]["source_uri"] if selected else None,
+                "selected_score": round(selected["score"], 6) if selected else None,
+                "forbidden_ids": case["forbidden"],
+                "query_provider_request_id": embedded["provider_request_id"],
+            })
+    receipt = {
+        "suite_id": request.suite_id,
+        "execution_id": request.execution_id,
+        "started_at": request.started_at,
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "source_digest": digest_files((ROOT / "Containerfile", ROOT / "policy.py", ROOT / "server.py")),
+        "scaffold_digest": digest_files((ROOT / "Containerfile", ROOT / "server.py")),
+        "policy_digest": digest_files((ROOT / "policy.py",)),
+        "embedding_model_id": "amazon.titan-embed-text-v2:0",
+        "dimensions": 1024,
+        "document_provider_request_ids": document_provider_ids,
+        "cases": results,
+    }
+    with connect() as database:
+        database.execute("INSERT OR REPLACE INTO receipts VALUES(?,?)", (request.suite_id, json.dumps(receipt, ensure_ascii=False)))
+        database.execute("INSERT OR REPLACE INTO sequential_vectors VALUES(?,?)", (request.suite_id, json.dumps(document_vectors)))
+    return {"suite_id": request.suite_id, "source_digest": receipt["source_digest"]}
+
+
+
+
 @app.get("/v1/build-info")
 def build_info(authorization: str | None = Header(default=None)) -> dict:
     require(VERIFIER_TOKEN, authorization)
@@ -171,3 +254,24 @@ def receipt(suite_id: str, authorization: str | None = Header(default=None)) -> 
     if row is None:
         raise HTTPException(status_code=404, detail="receipt not found")
     return json.loads(row["receipt_json"])
+
+
+class PreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    case_id: str = Field(min_length=1, max_length=100)
+    query: str | None = Field(default=None,min_length=1,max_length=1000)
+
+
+@app.post("/v1/preview")
+async def preview(body: PreviewRequest, authorization: str | None = Header(default=None)):
+    from uuid import uuid4
+    require(CONTROL_TOKEN, authorization)
+    case = next((case for case in CASES if case["id"] == body.case_id), None)
+    if case is None:raise HTTPException(422,"unknown server-owned scenario")
+    request=RunRequest(suite_id=str(uuid4()),execution_id=str(uuid4()),started_at=datetime.now(timezone.utc).isoformat())
+    await run(request,authorization,body.case_id,body.query)
+    with connect() as database:
+        raw=database.execute("SELECT receipt_json FROM receipts WHERE suite_id=?",(request.suite_id,)).fetchone()[0]
+    result=json.loads(raw);case_result=result["cases"][0]
+    document=next((doc for doc in DOCUMENTS if doc["id"]==case_result["selected_document_id"]),None)
+    return {"graded":False,"input":body.query or case["query"],"documents":[document] if document else [],"details":result}

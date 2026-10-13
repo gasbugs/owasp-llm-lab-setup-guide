@@ -38,6 +38,24 @@ class ProgressTests(unittest.TestCase):
         self.assertNotIn('secret', str(reopened.history()))
         self.assertEqual(len(reopened.history()), 1)
 
+    def test_p00_persists_for_signed_browser_after_server_restart(self):
+        token = self.client.get('/api/bootstrap').json()['p00_submission_token']
+        response = self.client.post('/api/practice/P00/check', headers={'Authorization': 'Bearer ' + token},
+            json={'message': '계정 보안을 위한 조언을 한 문장으로 알려 주세요.', 'max_tokens': 64})
+        self.assertTrue(response.json()['completed'])
+        reopened = self.server.ProgressStore(self.path)
+        self.addCleanup(reopened.db.close)
+        self.server.PROGRESS = reopened
+        self.server.SESSIONS.clear()
+        self.client.get('/')
+        restored = self.client.get('/api/practice/P00/result').json()
+        self.assertTrue(restored['completed'])
+        self.assertNotIn('received', restored)
+        other = TestClient(self.server.app)
+        other.get('/')
+        self.assertFalse(other.get('/api/practice/P00/result').json()['completed'])
+        self.assertEqual(reopened.history(), [])
+
     def test_only_verified_completion_is_saved(self):
         for changes in ({'task_completed': False}, {'course_verdict': 'ERR'},
                         {'verified_by': 'browser'}, {'activity_id': 'P02'},

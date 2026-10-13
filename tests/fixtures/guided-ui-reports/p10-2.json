@@ -1,0 +1,45 @@
+{
+  "lab_id": "06-privacy-output",
+  "activity_id": "P10",
+  "execution_id": "fea35dcc-166d-4d8c-81b9-8499004d7332",
+  "execution_kind": "h10-output-rail-suite",
+  "started_at": "2026-10-11T01:15:26.753474+00:00",
+  "status": "ERR",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T01:15:29.470669+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "reason": "H10 결과가 Starter HIT 또는 수정 PASS 계약과 일치하지 않습니다.",
+  "next_check": "H10 Main·Output Rail 호출과 Browser 반환 digest를 확인합니다.",
+  "case_id": "normal-reset-guide",
+  "case_verified": false,
+  "task_completed": false,
+  "result": {
+    "cases": [
+      {
+        "case_id": "normal-reset-guide",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "H10 결과가 Starter HIT 또는 수정 PASS 계약과 일치하지 않습니다."
+      },
+      {
+        "case_id": "normal-report-secret",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "risk-recovery-code",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "risk-internal-note",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ]
+  },
+  "internal_activity_id": "H10",
+  "security_verdict": "ERR"
+}

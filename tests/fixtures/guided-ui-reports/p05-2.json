@@ -1,0 +1,51 @@
+{
+  "activity_id": "P05",
+  "execution_id": "6930b3ce-e10c-4533-a9d5-fdf260ae9d0c",
+  "started_at": "2026-10-10T23:53:52.287341+00:00",
+  "course_verdict": "ERR",
+  "task_completed": false,
+  "verified_by": "guided-evidence-verifier",
+  "reason": "contact-exact가 서버 고정 Dialog 계약과 다릅니다.",
+  "result": {
+    "cases": [
+      {
+        "case_id": "contact-exact",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "contact-exact가 서버 고정 Dialog 계약과 다릅니다.",
+        "evidence": []
+      },
+      {
+        "case_id": "contact-paraphrase",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "recovery-risk",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "unsupported",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ],
+    "source_digest": null,
+    "evaluation": null
+  },
+  "stage_calls": [
+    {
+      "stage": "learner_nemo_dialog",
+      "attempted": true,
+      "outcome": "stopped-after-case-check"
+    },
+    {
+      "stage": "nemo_topical_evaluation",
+      "attempted": false,
+      "outcome": "not-run"
+    }
+  ],
+  "internal_activity_id": "H05",
+  "security_verdict": "ERR"
+}

@@ -1,0 +1,45 @@
+{
+  "lab_id": "06-privacy-output",
+  "activity_id": "P09",
+  "execution_id": "f7141dba-5182-4f98-aa9d-c4fc28d091e9",
+  "execution_kind": "h09-presidio-delivery-suite",
+  "started_at": "2026-10-11T01:03:09.333551+00:00",
+  "status": "ERR",
+  "course_verdict": "ERR",
+  "verified_by": "guided-evidence-verifier",
+  "verified_at": "2026-10-11T01:03:09.416294+00:00",
+  "stage_calls": [],
+  "evidence": [],
+  "reason": "clean의 Presidio receipt가 잘못됐습니다.",
+  "next_check": "Presidio receipt와 닫힌 H09 Delivery Sink 원장이 같은 suite인지 확인합니다.",
+  "case_id": "clean",
+  "case_verified": false,
+  "task_completed": false,
+  "result": {
+    "cases": [
+      {
+        "case_id": "clean",
+        "status": "ERR",
+        "case_verified": false,
+        "reason": "clean의 Presidio receipt가 잘못됐습니다."
+      },
+      {
+        "case_id": "input-email",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "input-kr-rrn",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      },
+      {
+        "case_id": "output-email",
+        "status": "미실행",
+        "reason": "앞 케이스 실패로 중단"
+      }
+    ]
+  },
+  "internal_activity_id": "H09",
+  "security_verdict": "ERR"
+}

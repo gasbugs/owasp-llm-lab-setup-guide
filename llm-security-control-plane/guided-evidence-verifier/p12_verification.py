@@ -14,7 +14,7 @@ from p12_binding import validate_run_binding
 
 @asynccontextmanager
 async def verified_run_snapshot(origin, token, *, suite_id, case_ids, contract_digest,
-                                scaffold_files, now=None, transport=None):
+                                scaffold_files, now=None, transport=None, through_case=None):
     """Read-only root bracket. Consume results only after successful context exit.
 
     The caller checks downstream products inside this scope. Binding alone does
@@ -45,7 +45,7 @@ async def verified_run_snapshot(origin, token, *, suite_id, case_ids, contract_d
             path = f"/v1/receipts/{suite_id}"
             receipt = await get(path, 2 * 1024 * 1024)
             options = {"suite_id": suite_id, "case_ids": case_ids, "contract_digest": contract_digest,
-                       "scaffold_files": scaffold_files}
+                       "scaffold_files": scaffold_files, **({"through_case": through_case} if through_case is not None else {})}
             binding = validate_run_binding(receipt, build, now=time.time() if now is None else now, **options)
             # Keep private snapshots: caller mutation must not rewrite the comparison baseline.
             baseline = json.dumps({"receipt": receipt, "build": build}, sort_keys=True, allow_nan=False)
