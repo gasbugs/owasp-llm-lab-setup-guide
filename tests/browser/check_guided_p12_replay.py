@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from threading import Thread
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2] / 'llm-security-control-plane/guided-control-center'
 
@@ -73,7 +73,7 @@ def main():
                 assert 'SQLite' in problem and 'HTTP 200일 때만' not in problem
                 for index, expected in enumerate(cases):
                     page.locator('#h12-verify').click()
-                    page.wait_for_function('(reason) => JSON.parse(document.querySelector("#raw").textContent).reason === reason', arg=expected['reason'])
+                    expect(page.locator('#raw')).to_contain_text(str(expected['reason']))
                     raw = json.loads(page.locator('#raw').inner_text())
                     assert raw == expected
                     assert page.locator('#task-completion').inner_text() == 'P12 과제: ' + ('완료' if expected['task_completed'] else '미완료')

@@ -6,7 +6,7 @@ import time
 from urllib.error import URLError
 from urllib.request import build_opener, ProxyHandler
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from output_ui_helpers import validate_loopback_origin
 
 
@@ -51,7 +51,7 @@ def main():
             assert result['task_completed'] is complete
             assert result['security_verdict'] == ('PASS' if complete else 'ERR')
             label = 'P17 과제: ' + ('완료' if complete else '미완료')
-            page.wait_for_function('(label) => document.querySelector("#task-completion").textContent === label', arg=label)
+            expect(page.locator('#task-completion')).to_have_text(label)
             rendered = json.loads(page.locator('#raw').inner_text())
             if rendered != result:
                 args.output.with_suffix('.mismatch.json').write_text(json.dumps(

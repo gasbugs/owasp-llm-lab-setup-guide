@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from output_ui_helpers import validate_loopback_origin
 
 
@@ -38,7 +38,7 @@ def main():
                     json.dumps(preparation, ensure_ascii=False, indent=2))
                 assert preparation_response.status == 200 and preparation["resource_ready"] is True
                 assert preparation["task_completed"] is False and "security_verdict" not in preparation
-                page.wait_for_function('document.querySelector("#task-completion").textContent === "P03 과제: 미완료"')
+                expect(page.locator('#task-completion')).to_have_text('P03 과제: 미완료')
                 assert json.loads(page.locator("#raw").inner_text()) == preparation
             with page.expect_response(lambda response: response.url.endswith("/api/practice/P03/verify"), timeout=240000) as pending:
                 page.locator("#h03-verify").click()
@@ -50,7 +50,7 @@ def main():
             assert result["task_completed"] is complete
             assert result["security_verdict"] == ("PASS" if complete else "ERR")
             label = "P03 과제: " + ("완료" if complete else "미완료")
-            page.wait_for_function('(label) => document.querySelector("#task-completion").textContent === label', arg=label)
+            expect(page.locator('#task-completion')).to_have_text(label)
             assert json.loads(page.locator("#raw").inner_text()) == result
             provider_label = "AWS + 합성 경계 사례" if args.prepare_aws else "합성 사례"
             assert page.locator("#provider-id").inner_text() == (provider_label if complete else "—")

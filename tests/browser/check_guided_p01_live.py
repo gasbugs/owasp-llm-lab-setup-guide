@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from output_ui_helpers import validate_loopback_origin
 
 
@@ -39,8 +39,7 @@ def main():
             assert result['task_completed'] is complete
             assert result['security_verdict'] == ('PASS' if complete else 'ERR')
             label = 'P01 과제: ' + ('완료' if complete else '미완료')
-            page.wait_for_function('(label) => document.querySelector("#task-completion").textContent === label', arg=label)
-            page.wait_for_function('executionPending === false')
+            expect(page.locator('#task-completion')).to_have_text(label)
             assert page.locator('#practice-progress-count').inner_text() == ('1 / 22' if complete else '0 / 22')
             assert ('is-complete' in page.locator('#practice-tab-0').get_attribute('class')) is complete
             if complete:

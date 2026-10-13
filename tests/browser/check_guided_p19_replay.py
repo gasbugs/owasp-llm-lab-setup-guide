@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from threading import Thread
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2] / 'llm-security-control-plane/guided-control-center'
 
@@ -74,9 +74,9 @@ def main():
                 for expected, completed in ((passed, True), (failed, False), (error, False)):
                     page.locator('#h19-verify').click()
                     label = 'P19 과제: ' + ('완료' if completed else '미완료')
-                    page.wait_for_function('(label) => document.querySelector("#task-completion").textContent === label', arg=label)
+                    expect(page.locator('#task-completion')).to_have_text(label)
                     # A repeated incomplete label is insufficient: wait for the new raw result.
-                    page.wait_for_function('(reason) => JSON.parse(document.querySelector("#raw").textContent).reason === reason', arg=expected.get('reason'))
+                    expect(page.locator('#raw')).to_contain_text(str(expected.get('reason')))
                     raw = json.loads(page.locator('#raw').inner_text())
                     for key, value in expected.items():
                         assert raw[key] == value
