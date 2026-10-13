@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { test } = require("node:test");
 const source = fs.readFileSync(path.join(__dirname, "../../llm-security-control-plane/guided-control-center/app.js"), "utf8");
+const controlCenterHtml = fs.readFileSync(path.join(__dirname, "../../llm-security-control-plane/guided-control-center/index.html"), "utf8");
 const context = {};
 const learning = {};
 vm.runInNewContext(source.slice(source.indexOf('function verificationSummary('), source.indexOf('function renderLearningSupport(')), learning);
@@ -16,6 +17,12 @@ function completionHarness() {
   vm.runInNewContext(source.slice(source.indexOf('function recordPracticeCompletion('), source.indexOf('function selectTab(')), ctx);
   return {ctx, celebrated};
 }
+
+test('P04-05 states the Analyzer and recognizer language contract', () => {
+  assert.match(controlCenterHtml, /Analyzer는 <code>LANGUAGE = "en"<\/code>으로 실행됩니다/);
+  assert.match(controlCenterHtml, /<code>supported_language<\/code>를 현재 <code>LANGUAGE<\/code>와 같게 지정해야 합니다/);
+  assert.match(controlCenterHtml, /Registry 목록에는 보여도 영어 분석 요청에는 참여하지 않아/);
+});
 
 test('completion celebration needs the requested problem and a verified completed result', () => {
   const {ctx, celebrated} = completionHarness();
