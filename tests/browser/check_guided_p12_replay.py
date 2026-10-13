@@ -66,6 +66,7 @@ def main():
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 page.route('**/*', lambda route: route.continue_() if route.request.url.startswith(origin + '/') else route.abort())
                 page.goto(origin, wait_until='networkidle')
+                page.locator('#home-next').click()
                 page.locator('#mission-menu-toggle').click()
                 page.locator('#practice-menu-P12').click()
                 assert page.locator('html').get_attribute('data-theme') == 'dark'

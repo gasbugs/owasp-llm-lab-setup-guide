@@ -36,6 +36,7 @@ def main():
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin, wait_until='networkidle')
+            page.locator('#home-next').click()
             page.locator('#mission-menu-toggle').click()
             page.locator('#practice-menu-P20').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
