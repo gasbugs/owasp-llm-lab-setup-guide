@@ -33,8 +33,8 @@ def main():
             body = response.json()
             args.output.with_suffix('.response.json').write_text(json.dumps(body, ensure_ascii=False, indent=2))
             complete = not args.incomplete
-            assert response.status == (200 if complete else 502)
-            result = body if complete else body['detail']
+            assert response.status == 200
+            result = body
             assert result['activity_id'] == 'P01'
             assert result['task_completed'] is complete
             assert result['security_verdict'] == ('PASS' if complete else 'ERR')

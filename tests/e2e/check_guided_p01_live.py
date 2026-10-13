@@ -165,8 +165,8 @@ def main():
             proof.update(http_status=status, response=response, images=live.images, ledger=snapshot(project))
             records, receipts = proof['ledger']['executions'], proof['ledger']['receipts']
             if args.starter:
-                assert status == 502 and response['detail']['task_completed'] is False
-                assert response['detail']['security_verdict'] == 'ERR'
+                assert status == 200 and response['task_completed'] is False
+                assert response['security_verdict'] == 'ERR'
                 assert len(records) == 1 and records[0]['http_status'] == 501 and records[0]['closed'] is True
                 assert records[0]['provider_attempts'] == 0 and receipts == []
             else:
