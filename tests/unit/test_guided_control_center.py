@@ -375,8 +375,8 @@ class GuidedControlCenterTests(unittest.TestCase):
                 self.assertIn('class="mission-brief"', section)
                 self.assertIn('미션 해결 조건', section)
                 self.assertIn('코드 적용하기', section)
-                self.assertIn('docker compose', section)
-                self.assertIn('--force-recreate', section)
+                self.assertIn('~/owasp-llm-practice/', section)
+                self.assertRegex(section, r'\./tools/apply-guided-practice\.sh P\d{2}-\d{2}')
                 self.assertIn('미션 채점', section)
 
     def test_problem_conditions_are_direct_and_include_required_values(self):
