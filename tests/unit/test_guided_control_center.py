@@ -1524,6 +1524,12 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn('status.textContent = "복사했습니다."', javascript)
         self.assertNotIn("innerHTML", javascript[javascript.index("function appendAdminInline"):javascript.index("async function showAdminAnswer")])
 
+    def test_recheck_history_is_grouped_in_one_sidebar_line(self):
+        javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
+        self.assertIn('`↻ 재검증 필요 ${problems.length}개 · ${problems.join(", ")}`', javascript)
+        self.assertIn('row.title = [...new Set(recheckPractices.values())].join(" · ")', javascript)
+        self.assertNotIn('`${problem} ↻ 재검증 필요 · ${reason}`', javascript)
+
     def test_web_code_blocks_only_contain_apply_commands_and_resource_templates(self):
         html = self.home.text
         blocks = re.findall(r"<pre>([\s\S]*?)</pre>", html)

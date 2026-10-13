@@ -240,9 +240,11 @@ function renderPracticeProgress() {
   renderHomeProgress();
   const history = byId("practice-history");
   history.replaceChildren();
-  for (const [problem, reason] of recheckPractices) {
+  if (recheckPractices.size) {
     const row = document.createElement("p");
-    row.textContent = `${problem} ↻ 재검증 필요 · ${reason}`;
+    const problems = [...recheckPractices.keys()].sort();
+    row.textContent = `↻ 재검증 필요 ${problems.length}개 · ${problems.join(", ")}`;
+    row.title = [...new Set(recheckPractices.values())].join(" · ");
     history.append(row);
   }
 }
