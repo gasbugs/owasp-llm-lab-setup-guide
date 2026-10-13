@@ -25,7 +25,7 @@ def main():
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.goto(origin, wait_until="networkidle")
-            page.locator('#home-missions .home-mission[data-problem="P03"]').click()
+            page.locator('#practice-menu-P03').click(force=True)
             assert page.locator("html").get_attribute("data-theme") == "dark"
             assert "learner.py" in page.locator("#h02-work").inner_text()
             if args.prepare_aws:

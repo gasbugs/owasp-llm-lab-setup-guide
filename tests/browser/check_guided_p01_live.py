@@ -25,7 +25,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin, wait_until='networkidle')
             assert page.locator('html').get_attribute('data-theme') == 'dark'
-            page.locator('#home-missions .home-mission[data-problem="P01"]').click()
+            page.locator('#practice-tab-0').click(force=True)
             page.locator('#p01-grade-tab').click()
             with page.expect_response(lambda response: response.url.endswith('/api/practice/P01/verify'), timeout=240000) as pending:
                 page.locator('#verify').click()
