@@ -1544,9 +1544,15 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("function prepareAdminAnswerMarkdown(source)", javascript)
         self.assertIn('renderAdminMarkdown(output, prepareAdminAnswerMarkdown(payload.answer))', javascript)
         self.assertIn('root.querySelectorAll("pre:not([id])")', javascript)
+        self.assertIn('toolbar.className = "copy-block-toolbar"', javascript)
+        self.assertIn('label.textContent = "코드 블록"', javascript)
+        self.assertIn("toolbar.append(label, button); wrapper.append(toolbar, pre)", javascript)
         self.assertIn("navigator.clipboard.writeText(text)", javascript)
         self.assertIn('button.textContent = copied ? "복사됨" : "복사 실패"', javascript)
         self.assertIn("prepareCopyableBlocks(output)", javascript)
+        stylesheet = (CONTROL / "guided-control-center/app.css").read_text(encoding="utf-8")
+        self.assertIn(".copyable-block { margin: 1.25rem 0; overflow: hidden; border: 2px solid var(--line-strong)", stylesheet)
+        self.assertIn(".copy-block-toolbar { display: flex;", stylesheet)
         self.assertNotIn("innerHTML", javascript[javascript.index("function appendAdminInline"):javascript.index("async function showAdminAnswer")])
         self.assertNotIn("P03은 P02·P11과 별도의 문서와 자원을 사용합니다.", self.home.text)
 
@@ -1608,7 +1614,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         problem = html.split('<div id="h19-work"', 1)[1].split('<div id="h20-work"', 1)[0]
         self.assertNotIn('JOIN_KEY', problem)
         for required in ('미션 채점', 'analyze_incident', 'downstream_calls', 'ValueError',
-                         'build guided-h19-investigation', '--no-deps', '교육용 공지 저장소',
+                         'build guided-h19-investigation', '--no-deps', '실제 저장소 호출',
                          'aria-describedby="h19-help"', 'role="note"'):
             self.assertIn(required, problem)
 

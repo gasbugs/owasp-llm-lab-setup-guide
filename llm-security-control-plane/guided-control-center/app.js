@@ -634,6 +634,8 @@ function prepareCopyableBlocks(root = document) {
   for (const pre of root.querySelectorAll("pre:not([id])")) {
     if (pre.parentElement?.classList.contains("copyable-block")) continue;
     const wrapper = document.createElement("div"); wrapper.className = "copyable-block";
+    const toolbar = document.createElement("div"); toolbar.className = "copy-block-toolbar";
+    const label = document.createElement("span"); label.textContent = "코드 블록";
     const button = document.createElement("button");
     button.type = "button"; button.className = "secondary copy-block-button";
     button.textContent = "복사"; button.setAttribute("aria-label", "이 블록 복사");
@@ -642,7 +644,7 @@ function prepareCopyableBlocks(root = document) {
       button.textContent = copied ? "복사됨" : "복사 실패";
       window.setTimeout(() => { button.textContent = "복사"; }, 1600);
     });
-    pre.replaceWith(wrapper); wrapper.append(pre, button);
+    pre.replaceWith(wrapper); toolbar.append(label, button); wrapper.append(toolbar, pre);
   }
 }
 
