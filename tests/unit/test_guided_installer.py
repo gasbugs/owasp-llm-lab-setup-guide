@@ -6,6 +6,10 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools/install-guided-practice.sh"
 COMPOSE = ROOT / "examples/security-monitoring/compose.guided.yaml"
+PRACTICE_MANIFEST = ROOT / "tools/guided-practice-files.tsv"
+PRACTICE_INIT = ROOT / "tools/initialize-guided-practice.sh"
+PRACTICE_PREPARE = ROOT / "tools/prepare-guided-practice-build.sh"
+PRACTICE_APPLY = ROOT / "tools/apply-guided-practice.sh"
 
 
 class GuidedInstallerTests(unittest.TestCase):
@@ -43,6 +47,44 @@ class GuidedInstallerTests(unittest.TestCase):
         self.assertIn("docker image inspect --format '{{.Id}}'", self.text)
         self.assertIn('if [[ "$running_image" != "$current_image" ]]', self.text)
         self.assertIn("최신 로컬 이미지를 사용하지 않는 서비스", self.text)
+
+    def test_practice_work_uses_numbered_home_files_and_shadow_build_context(self):
+        rows = [line.split("|") for line in PRACTICE_MANIFEST.read_text().splitlines()
+                if line and not line.startswith("#")]
+        self.assertEqual(len(rows), 24)
+        self.assertEqual(len({row[0] for row in rows}), 23)
+        for display_id, source, workspace_name, services in rows:
+            with self.subTest(display_id=display_id, workspace_name=workspace_name):
+                self.assertTrue(workspace_name.startswith(f"{display_id}_"))
+                self.assertTrue((ROOT / "llm-security-control-plane" / source).is_file())
+                self.assertTrue(services)
+
+        init = PRACTICE_INIT.read_text()
+        prepare = PRACTICE_PREPARE.read_text()
+        apply = PRACTICE_APPLY.read_text()
+        self.assertIn('$HOME/owasp-llm-practice', init)
+        self.assertIn('[[ ! -e "$workspace_file" ]]', init)
+        self.assertIn('show "HEAD:llm-security-control-plane/$source_path"', init)
+        self.assertIn('archive HEAD llm-security-control-plane', prepare)
+        self.assertIn('install -D -m 0644 "$workspace_file" "$BUILD_ROOT/$source_path"', prepare)
+        self.assertIn('--file "$override_file" build', apply)
+        self.assertNotIn('cp "$workspace_file" "$CONTROL_ROOT/', apply)
+        self.assertIn('initialize-guided-practice.sh', self.text)
+        self.assertIn('prepare-guided-practice-build.sh', self.text)
+        self.assertIn('--file "$PRACTICE_OVERRIDE"', self.text)
+
+    def test_control_center_edits_and_applies_numbered_workspace_files(self):
+        html = (ROOT / "llm-security-control-plane/guided-control-center/index.html").read_text()
+        rows = [line.split("|") for line in PRACTICE_MANIFEST.read_text().splitlines()
+                if line and not line.startswith("#")]
+        for display_id, _source, workspace_name, _services in rows:
+            with self.subTest(display_id=display_id, workspace_name=workspace_name):
+                self.assertIn(f"vi ~/owasp-llm-practice/{workspace_name}", html)
+                self.assertIn(f"./tools/apply-guided-practice.sh {display_id}", html)
+        self.assertNotIn(
+            "vi ~/owasp-llm-lab-setup-guide/llm-security-control-plane/guided-labs/",
+            html,
+        )
 
 
 if __name__ == "__main__":

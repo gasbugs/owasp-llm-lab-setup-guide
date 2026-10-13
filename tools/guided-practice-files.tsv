@@ -1,0 +1,25 @@
+# 표시번호|Starter 상대 경로|사용자 작업 파일명|빌드할 Compose 서비스(쉼표 구분)
+P01-01|guided-labs/h23-model-call/learner.py|P01-01_learner.py|guided-model-call
+P01-02|guided-labs/h02-document-ingestion/learner.py|P01-02_learner.py|guided-h02-document-app
+P01-03|guided-labs/h03-ingestion-search/learner.py|P01-03_learner.py|guided-h03-sync-app
+P02-01|guided-labs/h04-bedrock-guardrail/learner.py|P02-01_learner.py|guided-h04-guardrail-app
+P03-01|guided-labs/h01-bedrock-gateway/learner.py|P03-01_learner.py|guided-h01-gateway
+P04-01|guided-labs/h05-nemo-dialog/config/flows.co|P04-01_flows.co|guided-h05-nemo-dialog
+P04-02|guided-labs/h06-nemo-action/actions.py|P04-02_actions.py|guided-h06-nemo-action
+P04-03|guided-labs/h07-content-safety/config/config.yml|P04-03_config.yml|guided-h07-content-safety
+P04-04|guided-labs/h08-self-check-input/config/prompts.yml|P04-04_prompts.yml|guided-h08-self-check-input
+P04-05|guided-labs/h09-presidio-redaction/policy.py|P04-05_policy.py|guided-h09-presidio-redaction
+P04-06|guided-labs/h10-self-check-output/config/prompts.yml|P04-06_prompts.yml|guided-h10-self-check-output
+P04-07|guided-labs/h11-rag-provenance/policy.py|P04-07_policy.py|guided-h11-rag-provenance
+P04-08|guided-labs/h12-application-pipeline/pipeline.py|P04-08_pipeline.py|guided-h12-application-pipeline
+P05-01|guided-labs/h13-promptfoo/promptfooconfig.yaml|P05-01_promptfooconfig.yaml|guided-h13-promptfoo
+P05-02|guided-labs/h14-garak/garak-config.yaml|P05-02_garak-config.yaml|guided-h14-garak
+P05-03|guided-labs/h15-pyrit/attack.py|P05-03_attack.py|guided-h15-pyrit
+P05-04|guided-labs/h16-policy-promotion/policy.py|P05-04_policy.py|guided-h16-policy-promotion
+P06-01|guided-labs/h17-telemetry/instrumentation.py|P06-01_instrumentation.py|guided-h17-telemetry
+P06-02|guided-labs/h18-product-queries/queries.yaml|P06-02_queries.yaml|guided-h18-queries
+P06-03|guided-labs/h19-incident-investigation/investigation.py|P06-03_investigation.py|guided-h19-investigation
+P06-04|guided-labs/h20-alert-dashboard/rules.yaml|P06-04_rules.yaml|guided-h20-alerts,guided-h20-prometheus,guided-h20-grafana
+P06-04|guided-labs/h20-alert-dashboard/dashboard.json|P06-04_dashboard.json|guided-h20-alerts,guided-h20-prometheus,guided-h20-grafana
+P07-01|guided-labs/h21-agent-policy/policy.py|P07-01_policy.py|guided-h21-provider,guided-h21-trusted-mcp,guided-h21-untrusted-mcp,guided-h21-host
+P07-02|guided-labs/h22-mcp-approval/server.py|P07-02_server.py|guided-h22-mcp-server,guided-h22-host

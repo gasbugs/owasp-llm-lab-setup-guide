@@ -1576,7 +1576,7 @@ class GuidedControlCenterTests(unittest.TestCase):
                 continue
             if text in ("mkdir -p ~/work/control-center-tutorial\nvi ~/work/control-center-tutorial/request.json", "cat ~/work/control-center-tutorial/request.json", "제출 명령을 준비하고 있습니다."):
                 continue
-            self.assertTrue(text.startswith("docker compose ") or text.startswith("cd ~/owasp-llm-lab-setup-guide") or text.startswith("vi ~/owasp-llm-lab-setup-guide/llm-security-control-plane/guided-labs/"), text[:120])
+            self.assertTrue(text.startswith("docker compose ") or text.startswith("cd ~/owasp-llm-lab-setup-guide") or text.startswith("vi ~/owasp-llm-practice/"), text[:120])
             self.assertNotIn("cat >", text)
             self.assertNotIn("python -c", text)
         self.assertEqual(len(templates), 2)

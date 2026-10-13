@@ -10,7 +10,7 @@ log() { printf '\n[%s] %s\n' "$1" "$2"; }
 fail() { printf '\n[오류] %s\n' "$1" >&2; exit 1; }
 
 log "1/5" "필수 프로그램과 AWS 자격 증명을 확인합니다."
-for command_name in docker aws openssl python3 grep sort; do
+for command_name in docker aws openssl python3 grep sort git tar; do
   command -v "$command_name" >/dev/null 2>&1 ||
     fail "$command_name 명령을 찾지 못했습니다. 01 테넌트 환경 준비를 먼저 완료하세요."
 done
@@ -75,17 +75,20 @@ for variable_name in "${required_variables[@]}"; do
 done
 chmod 600 "$ENV_FILE"
 
-log "3/5" "Docker·Compose·디스크·포트 상태를 점검합니다."
+log "3/5" "Practice Starter를 사용자 작업 폴더에 복제하고 실행 환경을 점검합니다."
+"$SETUP_ROOT/tools/initialize-guided-practice.sh"
+PRACTICE_OVERRIDE="$("$SETUP_ROOT/tools/prepare-guided-practice-build.sh")"
 python3 "$SETUP_ROOT/tools/practice_preflight.py" \
   --root "$SETUP_ROOT" --env-file "$ENV_FILE" --file "$COMPOSE_FILE"
 
 log "4/5" "실습 이미지를 Build하고 최신 이미지로 공통 플랫폼을 다시 생성합니다."
 docker compose --env-file "$ENV_FILE" \
-  --file "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
+  --file "$COMPOSE_FILE" --file "$PRACTICE_OVERRIDE" \
+  up -d --build --force-recreate --remove-orphans
 
 log "5/5" "설치 결과를 확인합니다."
 docker compose --env-file "$ENV_FILE" \
-  --file "$COMPOSE_FILE" ps --all
+  --file "$COMPOSE_FILE" --file "$PRACTICE_OVERRIDE" ps --all
 
 stale_services=()
 while IFS= read -r container_id; do
@@ -95,7 +98,7 @@ while IFS= read -r container_id; do
   if [[ "$running_image" != "$current_image" ]]; then
     stale_services+=("$(docker inspect --format '{{index .Config.Labels \"com.docker.compose.service\"}}' "$container_id")")
   fi
-done < <(docker compose --env-file "$ENV_FILE" --file "$COMPOSE_FILE" ps -q)
+done < <(docker compose --env-file "$ENV_FILE" --file "$COMPOSE_FILE" --file "$PRACTICE_OVERRIDE" ps -q)
 
 if (( ${#stale_services[@]} > 0 )); then
   fail "최신 로컬 이미지를 사용하지 않는 서비스가 남았습니다: ${stale_services[*]}"

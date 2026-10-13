@@ -23,6 +23,14 @@ def unsafe_copies(text):
 
 
 class SolutionBoundaryTests(unittest.TestCase):
+    def test_p01_01_repository_keeps_unsolved_starter(self):
+        source = (ROOT / 'guided-labs/h23-model-call/learner.py').read_text()
+        self.assertIn('TODO 1:', source)
+        self.assertIn('TODO 2, 3, 4:', source)
+        self.assertIn('raise NotImplementedError("Implement forward_question")', source)
+        self.assertNotIn('boto3.client("bedrock-runtime"', source)
+        self.assertNotIn('client.converse(', source)
+
     def test_p13_public_problem_includes_fixed_inputs_without_assertion_solution(self):
         html = (ROOT / 'guided-control-center/index.html').read_text()
         section = html.split('id="h13-work"', 1)[1].split('id="h14-work"', 1)[0]
