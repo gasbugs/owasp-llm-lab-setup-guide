@@ -588,6 +588,28 @@ function renderAdminMarkdown(container, source) {
   }
 }
 
+function prepareAdminAnswerMarkdown(source) {
+  const lines = String(source || "").replace(/\r\n?/g, "\n").split("\n");
+  const visible = [];
+  let excluded = false;
+  for (const line of lines) {
+    if (/^#\s+/.test(line)) continue;
+    const section = line.match(/^##\s+(.+)$/);
+    if (section) {
+      excluded = /^(판정|누락|남은 누락|최종 결론)/.test(section[1]);
+      if (excluded) continue;
+      const label = /^(완성 답( 전체)?|전체 완성 답|정확한 제출 답)$/.test(section[1])
+        ? "정답 코드"
+        : /^(조건 충족 확인|요구사항과의 대응|채점 조건과의 대응|답의 근거|구현이 충족하는 조건)$/.test(section[1])
+          ? "코드 설명"
+          : section[1];
+      visible.push(`## ${label}`); continue;
+    }
+    if (!excluded) visible.push(line);
+  }
+  return visible.join("\n").trim();
+}
+
 async function writeClipboard(text) {
   let fallbackField = null;
   try {
@@ -637,7 +659,7 @@ async function showAdminAnswer(problem) {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "관리자 답안을 불러오지 못했습니다.");
     if (requestNumber === adminAnswerRequest) {
-      renderAdminMarkdown(output, payload.answer);
+      renderAdminMarkdown(output, prepareAdminAnswerMarkdown(payload.answer));
       prepareCopyableBlocks(output);
     }
   } catch (error) {

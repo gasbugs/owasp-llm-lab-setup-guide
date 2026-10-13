@@ -1517,14 +1517,16 @@ class GuidedControlCenterTests(unittest.TestCase):
     def test_admin_answer_renderer_uses_text_content(self):
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("function renderAdminMarkdown(container, source)", javascript)
-        self.assertIn("renderAdminMarkdown(output, payload.answer)", javascript)
         self.assertIn('code.textContent = codeLines.join("\\n")', javascript)
         self.assertIn("function prepareCopyableBlocks(root = document)", javascript)
+        self.assertIn("function prepareAdminAnswerMarkdown(source)", javascript)
+        self.assertIn('renderAdminMarkdown(output, prepareAdminAnswerMarkdown(payload.answer))', javascript)
         self.assertIn('root.querySelectorAll("pre:not([id])")', javascript)
         self.assertIn("navigator.clipboard.writeText(text)", javascript)
         self.assertIn('button.textContent = copied ? "복사됨" : "복사 실패"', javascript)
         self.assertIn("prepareCopyableBlocks(output)", javascript)
         self.assertNotIn("innerHTML", javascript[javascript.index("function appendAdminInline"):javascript.index("async function showAdminAnswer")])
+        self.assertNotIn("P03은 P02·P11과 별도의 문서와 자원을 사용합니다.", self.home.text)
 
     def test_recheck_history_is_grouped_in_one_sidebar_line(self):
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")

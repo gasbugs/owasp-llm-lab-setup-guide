@@ -370,7 +370,7 @@ docker compose \
             <div>
               <p class="label">P03 · LEARNER-OWNED SYNC APP</p>
               <h3 id="h03-code-title">현재 동기화가 끝난 뒤에만 검색하기</h3>
-              <p>고객지원 문서를 고쳤지만 검색용 정리는 아직 진행 중입니다. 정리가 끝나기 전에 검색하면 최신 문서를 확인했다고 믿기 어렵습니다. 동기화(ingestion)는 S3 원문을 Knowledge Base의 검색 저장소에 반영하는 작업입니다. P03은 P02·P11과 별도의 문서와 자원을 사용합니다.</p>
+              <p>고객지원 문서를 고쳤지만 검색용 정리는 아직 진행 중입니다. 정리가 끝나기 전에 검색하면 최신 문서를 확인했다고 믿기 어렵습니다. 동기화(ingestion)는 S3 원문을 Knowledge Base의 검색 저장소에 반영하는 작업입니다.</p>
               <p><code>~/owasp-llm-lab-setup-guide/llm-security-control-plane/guided-labs/h03-ingestion-search/learner.py</code>의 <code>async search_current(current_job_id, aws)</code>를 작성하세요. 제공된 <code>load_aws_session(aws)</code>가 조회·검색 전용 15분 인증과 <code>binding</code>을 불러옵니다. 미구현 표시를 제거하고 그 아래 TODO를 구현하세요.</p>
               <p>Starter에는 <code>load_aws_session</code>과 <code>Config</code> import가 있습니다. 제공 골격은 <code>session, binding = load_aws_session(aws)</code>와 <code>Config(connect_timeout=5, read_timeout=20, retries={"total_max_attempts":1})</code>입니다. <code>binding</code>의 <code>knowledgeBaseId</code>·<code>dataSourceId</code>·<code>ingestionJobId</code> 중 하나라도 없으면 <code>ValueError</code>로 거부하세요.</p>
               <p><code>session.client("bedrock-agent", region_name="us-east-1", config=config)</code>와 <code>bedrock-agent-runtime</code> 객체를 직접 만드세요. <code>agent.get_ingestion_job(**binding)</code> 응답의 <code>ingestionJob.ingestionJobId</code>가 <code>binding["ingestionJobId"]</code>와 같은지 확인합니다. 서버가 전달한 <code>current_job_id</code>는 채점용 작업 번호이며 AWS 작업 ID는 binding에 있습니다.</p>

@@ -710,16 +710,17 @@ details.admin-answer {
   border: 2px solid var(--accent, #6f5bd3);
   border-radius: 0.75rem;
 }
-details.admin-answer > summary { cursor: pointer; font-weight: 700; }
+details.admin-answer > summary { cursor: pointer; font-weight: 800; font-size: 1rem; color: var(--accent, #6f5bd3); }
 .copyable-block { position: relative; margin: 1em 0; }
 .copyable-block > pre { margin: 0; padding-right: 5rem; }
 .copy-block-button { position: absolute; top: .55rem; right: .55rem; z-index: 1; padding: .3rem .55rem; font-size: .76rem; }
 .clipboard-fallback { position: fixed; left: -9999px; top: 0; }
-.admin-answer-content { max-height: 65vh; overflow: auto; margin-top: 1rem; padding-right: .5rem; }
-.admin-answer-content h2, .admin-answer-content h3, .admin-answer-content h4 { margin: 1.35rem 0 .65rem; line-height: 1.3; }
+.admin-answer-content { max-height: 65vh; overflow: auto; margin-top: 1rem; padding: 0 1rem 1rem; border-radius: .65rem; background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%); }
+.admin-answer-content h2, .admin-answer-content h3, .admin-answer-content h4 { margin: 1.5rem 0 .75rem; line-height: 1.3; }
+.admin-answer-content h3 { padding-bottom: .5rem; border-bottom: 1px solid var(--line); color: var(--text); }
 .admin-answer-content h2:first-child { margin-top: 0; }
-.admin-answer-content p, .admin-answer-content li { line-height: 1.65; }
-.admin-answer-content ul, .admin-answer-content ol { padding-left: 1.4rem; }
+.admin-answer-content p, .admin-answer-content li { max-width: 78ch; line-height: 1.72; }
+.admin-answer-content ul, .admin-answer-content ol { max-width: 78ch; padding: .8rem 1rem .8rem 2rem; border-left: 3px solid var(--accent, #6f5bd3); background: var(--soft, rgba(127,127,127,.08)); }
 .admin-answer-content pre { overflow-x: auto; padding: 1rem 5rem 1rem 1rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--code, #111827); color: var(--code-text, #f8fafc); white-space: pre; }
 .admin-answer-content code { font-family: "IBM Plex Mono", monospace; }
 .admin-answer-content p code, .admin-answer-content li code { padding: .12rem .3rem; border-radius: .25rem; background: var(--soft, rgba(127,127,127,.14)); }
