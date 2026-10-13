@@ -47,7 +47,7 @@ def main():
             assert ('is-complete' in page.locator('#practice-tab-0').get_attribute('class')) is complete
             if complete:
                 page.locator('#completion-toast').wait_for(state='visible')
-                assert 'P01' in page.locator('#completion-title').inner_text()
+                assert page.evaluate('missionLabel("P01")') in page.locator('#completion-title').inner_text()
                 page.screenshot(path=str(args.output.with_suffix('.completion.png')))
             else:
                 assert page.locator('#completion-toast').is_hidden()
