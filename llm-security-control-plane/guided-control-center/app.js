@@ -520,19 +520,85 @@ function selectWorkspace(name) {
   }
 }
 
+function appendAdminInline(parent, text) {
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+  for (const part of parts) {
+    if (part.startsWith("`") && part.endsWith("`")) {
+      const code = document.createElement("code");
+      code.textContent = part.slice(1, -1);
+      parent.append(code);
+    } else if (part.startsWith("**") && part.endsWith("**")) {
+      const strong = document.createElement("strong");
+      strong.textContent = part.slice(2, -2);
+      parent.append(strong);
+    } else {
+      parent.append(document.createTextNode(part));
+    }
+  }
+}
+
+function renderAdminMarkdown(container, source) {
+  container.replaceChildren();
+  const lines = String(source || "").replace(/\r\n?/g, "\n").split("\n");
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) { index += 1; continue; }
+    const fence = line.match(/^```([\w+-]*)\s*$/);
+    if (fence) {
+      const codeLines = [];
+      index += 1;
+      while (index < lines.length && !lines[index].startsWith("```")) codeLines.push(lines[index++]);
+      if (index < lines.length) index += 1;
+      const pre = document.createElement("pre");
+      const code = document.createElement("code");
+      if (fence[1]) code.className = `language-${fence[1]}`;
+      code.textContent = codeLines.join("\n");
+      pre.append(code); container.append(pre); continue;
+    }
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      const level = Math.min(heading[1].length + 1, 4);
+      const node = document.createElement(`h${level}`);
+      appendAdminInline(node, heading[2]);
+      container.append(node); index += 1; continue;
+    }
+    const bullet = line.match(/^[-*]\s+(.+)$/);
+    const numbered = line.match(/^\d+\.\s+(.+)$/);
+    if (bullet || numbered) {
+      const list = document.createElement(numbered ? "ol" : "ul");
+      const pattern = numbered ? /^\d+\.\s+(.+)$/ : /^[-*]\s+(.+)$/;
+      while (index < lines.length) {
+        const item = lines[index].match(pattern);
+        if (!item) break;
+        const li = document.createElement("li"); appendAdminInline(li, item[1]); list.append(li); index += 1;
+      }
+      container.append(list); continue;
+    }
+    const paragraphLines = [line.trim()];
+    index += 1;
+    while (index < lines.length && lines[index].trim() && !/^(#{1,4})\s+|^```|^[-*]\s+|^\d+\.\s+/.test(lines[index])) {
+      paragraphLines.push(lines[index].trim()); index += 1;
+    }
+    const paragraph = document.createElement("p");
+    appendAdminInline(paragraph, paragraphLines.join(" "));
+    container.append(paragraph);
+  }
+}
+
 async function showAdminAnswer(problem) {
   if (!adminMode || !adminAnswerPanel) return;
   const requestNumber = ++adminAnswerRequest;
   const host = problem === "P00" ? byId("tutorial-panel") : byId(`h${problem.slice(1)}-work`);
   host.append(adminAnswerPanel);
   adminAnswerPanel.open = false;
-  const output = adminAnswerPanel.querySelector("pre");
+  const output = adminAnswerPanel.querySelector(".admin-answer-content");
   output.textContent = "관리자 답안을 불러오는 중입니다…";
   try {
     const response = await fetch(`/api/admin/answers/${problem}`);
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "관리자 답안을 불러오지 못했습니다.");
-    if (requestNumber === adminAnswerRequest) output.textContent = payload.answer;
+    if (requestNumber === adminAnswerRequest) renderAdminMarkdown(output, payload.answer);
   } catch (error) {
     if (requestNumber === adminAnswerRequest) output.textContent = error.message;
   }
@@ -545,7 +611,7 @@ function prepareAdminAnswers() {
   const title = document.createElement("summary"); title.textContent = "관리자 답안";
   const note = document.createElement("p");
   note.textContent = "현재 문제의 제한된 조건과 Starter만 사용한 독립 풀이입니다.";
-  const output = document.createElement("pre");
+  const output = document.createElement("div"); output.className = "admin-answer-content";
   adminAnswerPanel.append(title, note, output);
 }
 

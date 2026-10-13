@@ -1516,8 +1516,10 @@ class GuidedControlCenterTests(unittest.TestCase):
 
     def test_admin_answer_renderer_uses_text_content(self):
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
-        self.assertIn('output.textContent = payload.answer', javascript)
-        self.assertNotIn('innerHTML = payload.answer', javascript)
+        self.assertIn("function renderAdminMarkdown(container, source)", javascript)
+        self.assertIn("renderAdminMarkdown(output, payload.answer)", javascript)
+        self.assertIn('code.textContent = codeLines.join("\\n")', javascript)
+        self.assertNotIn("innerHTML", javascript[javascript.index("function appendAdminInline"):javascript.index("async function showAdminAnswer")])
 
     def test_web_code_blocks_only_contain_apply_commands_and_resource_templates(self):
         html = self.home.text
