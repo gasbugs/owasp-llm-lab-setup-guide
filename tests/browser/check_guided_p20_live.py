@@ -36,7 +36,7 @@ def main():
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin, wait_until='networkidle')
-            page.locator('.tab[data-tab-index="11"]').click()
+            page.locator('#practice-menu-P20').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
             with page.expect_response(lambda response: response.url.endswith('/api/practice/P20/verify'), timeout=180000) as pending:
                 page.locator('#h20-verify').click()

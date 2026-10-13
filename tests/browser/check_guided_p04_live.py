@@ -25,7 +25,7 @@ def main():
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin, wait_until='networkidle')
-            page.locator('.tab[data-tab-index="2"]').click()
+            page.locator('#practice-menu-P04').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
             assert 'invoke_guarded' in page.locator('#h04-work').inner_text()
             if args.prepare_aws:

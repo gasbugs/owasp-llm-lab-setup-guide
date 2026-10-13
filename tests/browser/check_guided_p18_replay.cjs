@@ -43,7 +43,7 @@ async function main() {
     const errors = [];
     page.on('pageerror', err => errors.push(err.message));
     await page.goto(origin, { waitUntil: 'networkidle' });
-    await page.locator('.tab[data-tab-index="10"]').click();
+    await page.locator('#practice-menu-P18').click();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
     const problem = await page.locator('#h18-work').innerText();
     assert(problem.includes('P18') && problem.includes('queries.yaml'));

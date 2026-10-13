@@ -39,7 +39,7 @@ def main():
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin, wait_until='networkidle')
-            page.locator('.tab[data-tab-index="11"]').click()
+            page.locator('#practice-menu-P19').click()
             with page.expect_response(lambda response: response.url.endswith('/api/practice/P19/verify'), timeout=180000) as pending:
                 page.locator('#h19-verify').click()
             response = pending.value

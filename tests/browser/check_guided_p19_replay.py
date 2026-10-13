@@ -66,7 +66,7 @@ def main():
                 errors = []
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 page.goto(origin, wait_until='networkidle')
-                page.locator('.tab[data-tab-index="11"]').click()
+                page.locator('#practice-menu-P19').click()
                 assert page.locator('html').get_attribute('data-theme') == 'dark'
                 problem = page.locator('#h19-work').inner_text()
                 assert 'analyze_incident' in problem and 'JOIN_KEY' not in problem
