@@ -379,6 +379,28 @@ class GuidedControlCenterTests(unittest.TestCase):
                 self.assertIn('--force-recreate', section)
                 self.assertIn('미션 채점', section)
 
+    def test_problem_conditions_are_direct_and_include_required_values(self):
+        page = self.home.text
+        for fragment in (
+            "P01·P02·P22의 source",
+            "P05·P06의 설정이나 실행 상태",
+            "P07의 설정과 실행 결과",
+            "P17~P19의 코드나 실행 기록",
+            "다른 문제의 실행을 막지 않습니다",
+            "P01을 풀지 않아도 시작할 수 있습니다",
+        ):
+            self.assertNotIn(fragment, page)
+        for fragment in (
+            "run.soft_probe_prompt_cap: 1",
+            "MAX_TURNS = 3",
+            "support-agent",
+            "training-notice-mcp",
+            "Tool <code>2</code>회",
+            "결과 <code>160</code> bytes",
+            "timeout <code>250</code> ms",
+        ):
+            self.assertIn(fragment, page)
+
     def test_reload_preserves_verified_p00_session_and_token(self):
         token = self.bootstrap["p00_submission_token"]
         result = self.client.post("/api/practice/P00/check", headers={"Authorization": "Bearer " + token},
@@ -1564,7 +1586,7 @@ class GuidedControlCenterTests(unittest.TestCase):
             "analyzer.registry.add_recognizer(", "Block synthetic recovery codes",
             'roles = set(principal["roles"])', "def stage_order()",
             "const r = JSON.parse(output);", "soft_probe_prompt_cap: 4",
-            "MAX_TURNS = 3", 'return "block" if "H16-OVERRIDE"',
+            'return "block" if "H16-OVERRIDE"',
             'if model not in configured["models"]:', "nonce = verify_approval(",
         )
         for fragment in forbidden:
