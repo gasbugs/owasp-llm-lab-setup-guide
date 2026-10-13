@@ -41,6 +41,30 @@ const themeModes = ["system", "light", "dark"];
 
 const byId = (id) => document.getElementById(id);
 
+function closeActionTips(except = null) {
+  document.querySelectorAll(".action-control").forEach(control => {
+    if (control !== except) control.classList.add("tip-dismissed");
+  });
+}
+
+function bindActionTips() {
+  document.querySelectorAll(".action-control > button[aria-describedby]").forEach(trigger => {
+    const control = trigger.closest(".action-control");
+    const show = () => {
+      closeActionTips(control);
+      control.classList.remove("tip-dismissed");
+    };
+    trigger.addEventListener("focus", show);
+    control.addEventListener("mouseenter", show);
+    trigger.addEventListener("keydown", event => {
+      if (event.key === "Escape") closeActionTips();
+    });
+  });
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".action-control")) closeActionTips();
+  });
+}
+
 function gradingCredentialKey(key) {
   return /^(authorization|access_token|refresh_token|password|csrf_token|p00_submission_token|cookie|credential|credentials|secret|capability|token|aws_access_key_id|aws_secret_access_key|aws_session_token)$/i.test(key);
 }
@@ -1838,6 +1862,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 
 async function bootstrap() {
   renderTabs();
+  bindActionTips();
   setMissionMenu(sidebarPinned && window.matchMedia("(min-width: 761px)").matches);
   renderPracticeProgress();
   const response = await fetch("/api/bootstrap");
