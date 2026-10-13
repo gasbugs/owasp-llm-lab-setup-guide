@@ -18,7 +18,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -65,7 +65,6 @@ if not P01_PATH.exists():
 P01_CONTRACT = json.loads(P01_PATH.read_text())
 APP_VERSION = os.getenv("RELEASE_VERSION", os.getenv("APP_VERSION", "dev"))
 SESSION_SECRET = os.environ["GUIDED_SESSION_SECRET"].encode()
-ADMIN_TOKEN = os.environ["GUIDED_ADMIN_TOKEN"].encode()
 ADMIN_ANSWERS = ROOT / "admin-answers"
 LAB_URL = os.getenv("GUIDED_LAB01_URL", "http://guided-h01-gateway:8000")
 LAB02_URL = os.getenv("GUIDED_LAB02_URL", "http://guided-h02-document-app:8000")
@@ -313,7 +312,7 @@ async def boundary_middleware(request: Request, call_next):
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, mode: str | None = None, admin_token: str | None = None) -> Response:
+def index(request: Request, mode: str | None = None) -> Response:
     session = None
     try:
         session = session_from_cookie(request.cookies.get("guided_session"))
@@ -342,18 +341,7 @@ def index(request: Request, mode: str | None = None, admin_token: str | None = N
         session = (session_id, state)
     session_id, state = session
     if mode == "admin":
-        if admin_token is not None:
-            if not hmac.compare_digest(admin_token.encode(), ADMIN_TOKEN):
-                raise HTTPException(status_code=403, detail="admin token is invalid")
-            state["admin"] = True
-            response = RedirectResponse(url="/?mode=admin", status_code=303)
-            response.set_cookie(
-                "guided_session", sign(session_id), httponly=True, samesite="strict",
-                secure=False, path="/", max_age=SESSION_COOKIE_SECONDS,
-            )
-            return response
-        if not state.get("admin"):
-            raise HTTPException(status_code=403, detail="admin token is required")
+        state["admin"] = True
     else:
         state["admin"] = False
     html = (ROOT / "index.html").read_text(encoding="utf-8").replace(

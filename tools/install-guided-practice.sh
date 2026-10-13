@@ -103,8 +103,7 @@ fi
 
 printf '\n설치가 완료되었습니다.\n'
 printf 'Control Center: http://127.0.0.1:28097\n'
-admin_token="$(sed -n 's/^GUIDED_ADMIN_TOKEN=//p' "$ENV_FILE")"
-printf '관리자 답안:   http://127.0.0.1:28097/?mode=admin&admin_token=%s\n' "$admin_token"
+printf '관리자 답안:   http://127.0.0.1:28097/?mode=admin\n'
 printf 'NeMo Chat UI:  http://127.0.0.1:28192\n'
 printf 'P20 Grafana:    http://127.0.0.1:23002/d/guided-p20\n'
 printf 'Grafana 비밀번호 확인: grep -E '\''^(GUIDED_GRAFANA_PASSWORD|GUIDED_P20_GRAFANA_PASSWORD)='\'' %s\n' "$ENV_FILE"

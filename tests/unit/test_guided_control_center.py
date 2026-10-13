@@ -22,7 +22,6 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTROL = ROOT / "llm-security-control-plane"
 COMPOSE = ROOT / "examples/security-monitoring/compose.guided.yaml"
 os.environ.setdefault("GUIDED_SESSION_SECRET", "unit-session-secret")
-os.environ.setdefault("GUIDED_ADMIN_TOKEN", "unit-admin-token")
 os.environ.setdefault("GUIDED_CONTROL_LAB01_TOKEN", "unit-control-lab")
 os.environ.setdefault("GUIDED_CONTROL_LAB02_TOKEN", "unit-control-lab02")
 os.environ.setdefault("GUIDED_CONTROL_LAB03_TOKEN", "unit-control-lab03")
@@ -1496,7 +1495,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/admin/answers/P01").status_code, 403)
 
         admin = TestClient(self.server.app)
-        response = admin.get("/?mode=admin&admin_token=unit-admin-token")
+        response = admin.get("/?mode=admin")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.url.query, b"mode=admin")
         self.assertTrue(admin.get("/api/bootstrap").json()["admin_mode"])
@@ -1510,13 +1509,10 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertFalse(admin.get("/api/bootstrap").json()["admin_mode"])
         self.assertEqual(admin.get("/api/admin/answers/P01").status_code, 403)
 
-    def test_invalid_or_missing_admin_token_is_rejected(self):
+    def test_admin_mode_requires_only_the_url_mode(self):
         browser = TestClient(self.server.app)
-        self.assertEqual(browser.get("/?mode=admin", follow_redirects=False).status_code, 403)
-        self.assertEqual(
-            browser.get("/?mode=admin&admin_token=wrong", follow_redirects=False).status_code,
-            403,
-        )
+        self.assertEqual(browser.get("/?mode=admin").status_code, 200)
+        self.assertTrue(browser.get("/api/bootstrap").json()["admin_mode"])
 
     def test_admin_answer_renderer_uses_text_content(self):
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
