@@ -133,7 +133,7 @@ class ServiceClient:
             allowed, evidence = result["allowed"], result["evidence"]
             gateway = evidence["gateway"]
             if (type(allowed) is not bool or evidence["stage"] != stage
-                    or evidence["input_digest"] != digest(text) or evidence["version"] != "0.22.0"
+                    or evidence["input_digest"] != digest(text) or evidence["version"] != "0.24.1"
                     or evidence["classifier_answer"] not in {"Yes", "No"}
                     or allowed != (evidence["classifier_answer"] == "No")
                     or evidence["native_stop"] is not (not allowed)

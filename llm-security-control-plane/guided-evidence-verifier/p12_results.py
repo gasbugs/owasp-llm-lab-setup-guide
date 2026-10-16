@@ -39,7 +39,6 @@ def validate_case(attempt, ledgers, builds, *, source_digest, expected_case, exp
     try:
         result = _validate(attempt, ledgers, builds, source_digest, expected_status, expected_stop, now)
         _validate_inputs(attempt, ledgers, expected_case)
-        result["input"] = dict(expected_case)
         return result
     except EvidenceError:
         raise
@@ -129,7 +128,7 @@ def _validate(attempt, ledgers, builds, source_digest, expected_status, expected
                 require(proof[field] is allowed and call["allowed"] is allowed, "identity decision mismatch")
             elif stage.endswith("_rail"):
                 answer = "Yes" if stage == expected_stop else "No"
-                require(proof["version"] == "0.22.0" and proof["framework"] == "nemo-guardrails"
+                require(proof["version"] == "0.24.1" and proof["framework"] == "nemo-guardrails"
                         and proof["classifier_answer"] == answer and proof["native_stop"] is (answer == "Yes")
                         and call["allowed"] is (answer == "No"), "invalid classifier result")
             elif stage.endswith("_privacy"):

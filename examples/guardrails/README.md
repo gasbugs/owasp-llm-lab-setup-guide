@@ -13,7 +13,7 @@ CLI가 아니다. 이 저장소가 정상·위험 사례를 반복 검증하려�
 
 ```bash
 docker build -f examples/guardrails/nemo-guardrails/Containerfile \
-  -t localhost/llm-security-nemo-dialog-rails:0.22.0 examples/guardrails/nemo-guardrails
+  -t localhost/llm-security-nemo-dialog-rails:0.24.1 examples/guardrails/nemo-guardrails
 docker build -f examples/guardrails/presidio/Containerfile \
   -t localhost/guardrails-presidio:2.2.362 examples/guardrails/presidio
 docker build -t localhost/guardrails-guardrail-ui:latest docker/vuln-rag
@@ -39,7 +39,7 @@ docker run --rm --network llm-security-control-plane \
   -e MODEL_GATEWAY_URL=http://llm-security-bedrock-gateway:8080 \
   -e BEDROCK_GATEWAY_TOKEN="$BEDROCK_GATEWAY_TOKEN" \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
-  localhost/llm-security-nemo-dialog-rails:0.22.0 --suite
+  localhost/llm-security-nemo-dialog-rails:0.24.1 --suite
 ```
 
 ## HTTP 통합 실행
@@ -60,7 +60,7 @@ docker run -d --name llm-security-nemo-dialog-rails \
   -e MODEL_GATEWAY_URL=http://llm-security-bedrock-gateway:8080 \
   -e BEDROCK_GATEWAY_TOKEN="$BEDROCK_GATEWAY_TOKEN" \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
-  localhost/llm-security-nemo-dialog-rails:0.22.0
+  localhost/llm-security-nemo-dialog-rails:0.24.1
 
 docker rm -f guardrails-guardrail-ui >/dev/null 2>&1 || true
 

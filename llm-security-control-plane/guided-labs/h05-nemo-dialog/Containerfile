@@ -13,7 +13,7 @@ RUN apt-get update \
     && python -m pip install \
       fastapi==0.116.1 \
       fastembed==0.7.3 \
-      nemoguardrails==0.22.0 \
+      nemoguardrails==0.24.1 \
       sentence-transformers==5.1.2 \
       uvicorn==0.52.0 \
     && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2', cache_dir='/opt/nemo-cache').embed(['한국어 cache 준비']))" \

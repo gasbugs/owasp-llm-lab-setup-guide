@@ -10,7 +10,7 @@ RUN apt-get update \
     && python -m pip install \
       fastapi==0.116.1 \
       fastembed==0.7.3 \
-      nemoguardrails==0.22.0 \
+      nemoguardrails==0.24.1 \
       uvicorn==0.52.0 \
     && apt-get purge -y --auto-remove gcc g++ python3-dev \
     && rm -rf /var/lib/apt/lists/*

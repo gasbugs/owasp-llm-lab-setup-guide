@@ -26,8 +26,8 @@ CONTROL_TOKEN = os.environ["GUIDED_CONTROL_LAB05_TOKEN"]
 VERIFIER_TOKEN = os.environ["GUIDED_VERIFIER_LAB05_TOKEN"]
 DATABASE_PATH = Path(os.getenv("GUIDED_H05_DATABASE", "/tmp/h05-receipts.sqlite3"))
 FRAMEWORK_VERSION = version("nemoguardrails")
-if FRAMEWORK_VERSION != "0.22.0":
-    raise RuntimeError("H05 requires nemoguardrails 0.22.0")
+if FRAMEWORK_VERSION != "0.24.1":
+    raise RuntimeError("H05 requires nemoguardrails 0.24.1")
 CASES = {
     "contact-exact": "보안팀 연락처를 알려 주세요.",
     "contact-paraphrase": "침해 사고를 신고할 곳을 알려 주세요.",

@@ -951,7 +951,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                 "llm_calls_count": llm_calls,
                 "source_digest": "6" * 64 if mismatched_digest else digest,
                 "framework": framework,
-                "framework_version": "0.22.0",
+                "framework_version": "0.24.1",
             }
 
         def get(url, **_kwargs):
@@ -964,7 +964,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                             self.server.H05_SCAFFOLD_DIGEST if valid_scaffold else "0" * 64
                         ),
                         "framework": framework,
-                        "framework_version": "0.22.0",
+                        "framework_version": "0.24.1",
                     }
                 )
             if "/v1/evaluations/" in url:
@@ -1479,7 +1479,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             "source_digest": digest,
             "scaffold_digest": self.server.H06_SCAFFOLD_DIGEST,
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "allowed_actions": allowed_actions,
         }
         receipt = {
@@ -1489,7 +1489,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             "source_digest": digest,
             "scaffold_digest": self.server.H06_SCAFFOLD_DIGEST,
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "allowed_actions": allowed_actions,
             "cases": cases,
         }
@@ -1813,7 +1813,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             "config_digest": "8" * 64,
             "scaffold_digest": self.server.H07_SCAFFOLD_DIGEST,
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "model_roles": roles,
             "model_markers": [markers[role] for role in roles],
             "case_ids": [item[0] for item in cases],
@@ -1826,7 +1826,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             "config_digest": build["config_digest"],
             "scaffold_digest": self.server.H07_SCAFFOLD_DIGEST,
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "cases": receipt_cases,
         }
         ledger = {
@@ -2105,7 +2105,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             "config_digest": "b" * 64,
             "scaffold_digest": self.server.H08_SCAFFOLD_DIGEST,
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "model_roles": ["main", "self_check_input"],
             "model_markers": [markers["main"], markers["self_check_input"]],
             "case_ids": [item[0] for item in cases],
@@ -2120,7 +2120,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
             "config_digest": build["config_digest"],
             "scaffold_digest": self.server.H08_SCAFFOLD_DIGEST,
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "cases": receipt_cases,
         }
         ledger = {
@@ -2275,7 +2275,7 @@ class GuidedEvidenceVerifierTests(unittest.TestCase):
                 cases.append({"case_id":case_id,"execution_id":f"case-{index}","browser_marker_observed":risk and not stopped,"activated_rails":[{"type":"output","name":"self check output","stop":stopped,"actions":["self_check_output"]}],"llm_tasks":["general","self_check_output"]})
             if variant==5:calls[0]["stop_reason"]="max_tokens"
             if variant==6:calls[1]["output_text"]=None
-            build={"component":"guided-h10-self-check-output","framework_version":"0.22.0","roles":["main","self_check_output"],"case_ids":ids,"scaffold_digest":self.server.H10_SCAFFOLD_DIGEST,"source_digest":"a"*64,"config_digest":"b"*64}
+            build={"component":"guided-h10-self-check-output","framework_version":"0.24.1","roles":["main","self_check_output"],"case_ids":ids,"scaffold_digest":self.server.H10_SCAFFOLD_DIGEST,"source_digest":"a"*64,"config_digest":"b"*64}
             receipt={"suite_id":suite,"started_at":started,"observed_at":"2026-10-10T00:00:02+00:00","source_digest":build["source_digest"],"config_digest":build["config_digest"],"scaffold_digest":build["scaffold_digest"],"cases":cases[:scope]}
             ledger={"suite_id":suite,"calls":calls[:2*scope+int(future)]}
             def get(url,**kwargs):return FakeResponse(copy.deepcopy(build if url.endswith("build-info") else receipt if "/receipts/" in url else ledger))

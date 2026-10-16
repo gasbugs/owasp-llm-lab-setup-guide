@@ -66,7 +66,7 @@ docker run -d --name module08-learning-dialog --network "$NETWORK" \
   -e "BEDROCK_GATEWAY_TOKEN=$BEDROCK_TOKEN" \
   -e BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0 \
   -e PRESIDIO_URL=http://module08-learning-presidio:8013 \
-  localhost/llm-security-nemo-dialog-rails:0.22.0 >/dev/null
+  localhost/llm-security-nemo-dialog-rails:0.24.1 >/dev/null
 wait_json "http://127.0.0.1:${DIALOG_HOST_PORT}/healthz" '.ok == true and .bedrock_model == "us.amazon.nova-lite-v1:0"'
 
 curl -fsS --max-time 60 -X POST "http://127.0.0.1:${DIALOG_HOST_PORT}/api/scan" \

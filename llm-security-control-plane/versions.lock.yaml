@@ -24,7 +24,7 @@ test_tools:
 python_packages:
   fastapi: 0.116.1
   httpx: 0.28.1
-  nemoguardrails: 0.22.0
+  nemoguardrails: 0.24.1
   presidio_analyzer: 2.2.362
   presidio_anonymizer: 2.2.362
   pydantic: 2.13.4

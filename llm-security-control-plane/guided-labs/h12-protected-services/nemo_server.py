@@ -166,7 +166,7 @@ def create_app(*, model_factory, database=None, tokens=None, now=time.time, time
                 raise ValueError("service source changed during processing")
             evidence = result["evidence"]
             if (type(result["allowed"]) is not bool or evidence["input_digest"] != digest
-                or evidence["stage"] != body.stage or evidence["version"] != "0.22.0"
+                or evidence["stage"] != body.stage or evidence["version"] != "0.24.1"
                 or evidence["classifier_answer"] not in {"Yes", "No"}
                 or result["allowed"] != (evidence["classifier_answer"] == "No")
                 or evidence["native_stop"] is not (not result["allowed"])):

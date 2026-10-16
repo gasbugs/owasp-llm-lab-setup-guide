@@ -59,7 +59,7 @@ write_module08_compose_env() {
     printf 'ASSURANCE_PROFILE=high-assurance\n'
     printf 'ENABLE_LAB_ENDPOINTS=true\n'
     printf 'IMAGE_VERSION=1.0.0\n'
-    printf 'DIALOG_IMAGE_VERSION=0.22.0\n'
+    printf 'DIALOG_IMAGE_VERSION=0.24.1\n'
   } > "$compose_env_file"
   chmod 0600 "$compose_env_file"
 }

@@ -46,7 +46,7 @@ class ServiceClientTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(body["capability"], self.caps[body["stage"]])
             result.update(allowed=self.answer == "No", evidence={
                 "stage": body["stage"], "input_digest": module.digest(body["text"]),
-                "version": "0.22.0", "classifier_answer": self.answer, "native_stop": self.answer == "Yes",
+                "version": "0.24.1", "classifier_answer": self.answer, "native_stop": self.answer == "Yes",
                 "service_digest": "b" * 64, "gateway": {
                     "capability_digest": module.digest(body["capability"]), "request_digest": "c" * 64,
                     "response_digest": module.digest(self.answer), "provider_request_id": "fixture-classifier"}})

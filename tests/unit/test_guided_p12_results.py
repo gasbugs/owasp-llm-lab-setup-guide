@@ -12,7 +12,9 @@ from p12_results import validate_case, EvidenceError
 
 class ResultsTests(unittest.TestCase):
     def setUp(self):
-        self.fixture = json.loads((ROOT / "tests/fixtures/p12_recorded_evidence.json").read_text())
+        # Preserve the historical capture on disk; replay its shape against the current pinned rail version.
+        captured = (ROOT / "tests/fixtures/p12_recorded_evidence.json").read_text()
+        self.fixture = json.loads(captured.replace("\"version\": \"0.22.0\"", "\"version\": \"0.24.1\""))
         self.normal = self.fixture["cases"][0]
 
     def verify(self, case, **overrides):
@@ -88,6 +90,7 @@ class ResultsTests(unittest.TestCase):
         result = self.verify(self.normal)
         self.assertNotIn("task_completed", result)
         self.assertNotIn("security_verdict", result)
+        self.assertNotIn("input", result)  # The server-owned original message must not be returned.
 
     def test_main_must_use_checked_question_and_retrieved_context(self):
         changes = [{"schema_valid": False}, {"prompt_digest": "0" * 64},

@@ -61,7 +61,7 @@ with sync_playwright() as p:
             if mission == "P00":
                 expect(page.locator("#tutorial-grade-panel")).to_be_visible()
             else:
-                assert page.evaluate("activeProblem") == mission
+                page.wait_for_function("(expected) => activeProblem === expected", arg=mission, timeout=10000)
                 grade = "#p01-grade-panel" if mission == "P01" else "#h23-grade-tab"
                 expect(page.locator(grade)).to_be_visible()
                 if mission != "P01":

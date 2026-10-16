@@ -858,7 +858,7 @@ services:
     build:
       context: ../../llm-security-control-plane
       dockerfile: official-uis/nemo/Containerfile
-    image: localhost/llm-security-nemo-official-ui:0.22.0
+    image: localhost/llm-security-nemo-official-ui:0.24.1
     container_name: llm-security-guided-nemo-ui
     environment:
       BEDROCK_GATEWAY_TOKEN: ${GUIDED_NEMO_GATEWAY_TOKEN:?Set GUIDED_NEMO_GATEWAY_TOKEN}

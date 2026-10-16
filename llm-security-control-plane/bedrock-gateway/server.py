@@ -73,7 +73,7 @@ PRICING_INFO.labels(
 
 
 class TextContentPart(BaseModel):
-    """OpenAI-compatible text part used by NeMo Guardrails 0.22."""
+    """OpenAI-compatible text part used by NeMo Guardrails 0.24.1."""
 
     model_config = ConfigDict(extra="forbid")
     type: Literal["text"]

@@ -152,7 +152,7 @@ hands_on_H05:
   executor: guided-h05-nemo-dialog
   provider: nvidia-nemo-guardrails
   verifier: guided-evidence-verifier
-  framework_version: 0.22.0
+  framework_version: 0.24.1
   required_evidence:
     - source_digest
     - scaffold_digest
@@ -183,7 +183,7 @@ hands_on_H06:
   executor: guided-h06-nemo-action
   provider: guided-h06-action-provider
   verifier: guided-evidence-verifier
-  framework_version: 0.22.0
+  framework_version: 0.24.1
   required_evidence:
     - source_digest
     - scaffold_digest
@@ -207,7 +207,7 @@ hands_on_H07:
   executor: guided-h07-content-safety
   provider: guided-bedrock-gateway
   verifier: guided-evidence-verifier
-  framework_version: 0.22.0
+  framework_version: 0.24.1
   model_id: us.amazon.nova-lite-v1:0
   required_evidence:
     build:
@@ -265,7 +265,7 @@ hands_on_H08:
   gateway_prefix: /v1/h08
   provider: guided-bedrock-gateway
   verifier: guided-evidence-verifier
-  framework_version: 0.22.0
+  framework_version: 0.24.1
   model_id: us.amazon.nova-lite-v1:0
   required_evidence:
     build:
@@ -364,7 +364,7 @@ hands_on_H10:
   executor_endpoint: /v1/run
   provider: guided-bedrock-gateway
   verifier: guided-evidence-verifier
-  framework_version: 0.22.0
+  framework_version: 0.24.1
   model_id: us.amazon.nova-lite-v1:0
   required_evidence:
     - source_digest

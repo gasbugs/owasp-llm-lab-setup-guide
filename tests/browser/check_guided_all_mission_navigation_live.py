@@ -38,7 +38,7 @@ with sync_playwright() as p:
    if mid=='P00': expect(page.locator('#tutorial-grade-panel')).to_be_visible()
    elif mid=='P01': expect(page.locator('#p01-grade-panel')).to_be_visible()
    else:
-    assert page.evaluate('activeProblem')==mid
+    page.wait_for_function('(expected) => activeProblem === expected', arg=mid, timeout=10000)
     assert page.locator('#h23-grade-tab').get_attribute('aria-selected')=='true'
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),mid
   print(f'PASS width={width}: 576 menu transitions + 24 grade-pane reloads',flush=True)

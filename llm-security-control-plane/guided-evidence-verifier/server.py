@@ -132,12 +132,12 @@ H09_SINK_URL = os.getenv(
 H06_PROVIDER_URL = os.getenv(
     "GUIDED_H06_PROVIDER_URL", "http://guided-h06-action-provider:8000"
 )
-H05_SCAFFOLD_DIGEST = "16d545633d6b0f4c14ec0dbbb6aac7a9869bc3eae1ac18377a9cf27b8a48c3dc"
-H06_SCAFFOLD_DIGEST = "e3086201e73f5547aef8feedb2765ec60374579fe07a26eb41fe0ce6d50e9a57"
-H07_SCAFFOLD_DIGEST = "a98172d070601c8d6f4b76c79d169c2080e2c8427902c4c3f6f1233c1d5453ab"
-H08_SCAFFOLD_DIGEST = "4d6e417d5822895ee43fffd92c019618101df8bcd5cd0da1b8cd35bad8919e89"
+H05_SCAFFOLD_DIGEST = "cd46dde2dc5a855d0aa3ad30bdc91e559b59f53f87478a839bebc36dba9ae038"
+H06_SCAFFOLD_DIGEST = "4ce5a36f1107742bfb8925f82e1cef0ec59038a40b1cf9ec6c50c1aea3bad441"
+H07_SCAFFOLD_DIGEST = "2da595a0517a8c41703c135466a30bf81e924bb513420e8c9c359c00d8bbfa87"
+H08_SCAFFOLD_DIGEST = "314f28bea8af0aeac68785afa07f99caf3216c6ad830b8d6b26e01eb389e7f54"
 H09_SCAFFOLD_DIGEST = "0059b03306a1aea17097c4a82e304dc7d87d7b35f7f9e1745d41673e9ed541c3"
-H10_SCAFFOLD_DIGEST = "938c82047c9fb004900b362a3368605b9ea5627f667b3749cc8cdfe2f4c8b926"
+H10_SCAFFOLD_DIGEST = "c3d171327dd09028fa98e6409e5a594ac2118152c25969360a02068979cef0cb"
 H11_SCAFFOLD_DIGEST = "760f73d58b6a58217dcd4d9cde35734a59f56003333b882719b306485ff3a569"
 H13_SCAFFOLD_DIGEST = "6c091ab6a82d5e2c3e30457b5628e9595a259eea8094fefcaea4aab8c0809717"
 H22_HOST_URL = os.getenv("GUIDED_H22_HOST_URL", "http://guided-h22-host:8000")
@@ -1451,7 +1451,7 @@ def check_h05_evidence(
             (
                 build.get("component") == "guided-h05-nemo-dialog",
                 build.get("framework") == "nemoguardrails",
-                build.get("framework_version") == "0.22.0",
+                build.get("framework_version") == "0.24.1",
                 build.get("scaffold_digest") == H05_SCAFFOLD_DIGEST,
                 isinstance(source_digest, str),
                 len(source_digest or "") == 64,
@@ -1459,7 +1459,7 @@ def check_h05_evidence(
             )
         )
         if not build_ok:
-            return fail("현재 H05 build가 NeMo Guardrails 0.22.0 source와 일치하지 않습니다.")
+            return fail("현재 H05 build가 NeMo Guardrails 0.24.1 source와 일치하지 않습니다.")
 
         evidence = []
         reservations = []
@@ -1492,7 +1492,7 @@ def check_h05_evidence(
                 return fail(f"{expected.case_id} 시각 증거가 잘못됐습니다.")
             bindings = {"execution_id": expected.execution_id, "case_id": expected.case_id,
                 "started_at": expected.started_at, "source_digest": source_digest,
-                "framework": "nemoguardrails", "framework_version": "0.22.0", "llm_calls_count": 0}
+                "framework": "nemoguardrails", "framework_version": "0.24.1", "llm_calls_count": 0}
             for field, value in bindings.items():
                 if receipt.get(field) != value:
                     return fail(f"{expected.case_id}의 {field}가 현재 실행과 다릅니다.", field, value)
@@ -1830,7 +1830,7 @@ def check_h06_evidence(
         (
             build.get("component") == "guided-h06-nemo-action",
             build.get("framework") == "nemoguardrails",
-            build.get("framework_version") == "0.22.0",
+            build.get("framework_version") == "0.24.1",
             build.get("scaffold_digest") == H06_SCAFFOLD_DIGEST,
             isinstance(source_digest, str),
             len(source_digest or "") == 64,
@@ -1858,7 +1858,7 @@ def check_h06_evidence(
             receipt.get("source_digest") == source_digest,
             receipt.get("scaffold_digest") == H06_SCAFFOLD_DIGEST,
             receipt.get("framework") == "nemoguardrails",
-            receipt.get("framework_version") == "0.22.0",
+            receipt.get("framework_version") == "0.24.1",
             receipt.get("allowed_actions") == allowed_actions,
             ledger.get("suite_id") == request.suite_id,
             ledger.get("started_at") == request.started_at,
@@ -2279,7 +2279,7 @@ def check_h06_evidence(
             "source_digest": source_digest,
             "provider_suite_id": request.suite_id,
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "allowed_actions": allowed_actions,
             "cases": receipt_cases,
             "provider_calls": calls,
@@ -2361,7 +2361,7 @@ def check_h07_evidence(request: H07VerifyRequest, case_only: bool = False) -> di
         (
             build.get("component") == "guided-h07-content-safety",
             build.get("framework") == "nemoguardrails",
-            build.get("framework_version") == "0.22.0",
+            build.get("framework_version") == "0.24.1",
             build.get("scaffold_digest") == H07_SCAFFOLD_DIGEST,
             build.get("case_ids") == case_order,
             hexadecimal(source_digest),
@@ -2369,7 +2369,7 @@ def check_h07_evidence(request: H07VerifyRequest, case_only: bool = False) -> di
             starter or fixed,
         )
     ):
-        return h07_err_envelope(request, "현재 H07 build가 고정 NeMo 0.22.0 scaffold와 역할 모델 계약에 맞지 않습니다.")
+        return h07_err_envelope(request, "현재 H07 build가 고정 NeMo 0.24.1 scaffold와 역할 모델 계약에 맞지 않습니다.")
 
     if case_only:
         case_order = case_order[:case_order.index(request.case_id)+1]
@@ -2395,7 +2395,7 @@ def check_h07_evidence(request: H07VerifyRequest, case_only: bool = False) -> di
             receipt.get("config_digest") == config_digest,
             receipt.get("scaffold_digest") == H07_SCAFFOLD_DIGEST,
             receipt.get("framework") == "nemoguardrails",
-            receipt.get("framework_version") == "0.22.0",
+            receipt.get("framework_version") == "0.24.1",
             ledger.get("suite_id") == request.suite_id,
             ledger.get("started_at") == request.started_at,
             ledger_started_at == suite_started_at,
@@ -2649,7 +2649,7 @@ def check_h07_evidence(request: H07VerifyRequest, case_only: bool = False) -> di
             "provider_suite_id": request.suite_id,
             "provider_mode": ledger["provider_mode"],
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "model_roles": model_roles,
             "cases": receipt_cases,
             "capabilities": capabilities,
@@ -2746,7 +2746,7 @@ def check_h08_evidence(request: H08VerifyRequest, case_only: bool = False) -> di
         (
             build.get("component") == "guided-h08-self-check-input",
             build.get("framework") == "nemoguardrails",
-            build.get("framework_version") == "0.22.0",
+            build.get("framework_version") == "0.24.1",
             build.get("scaffold_digest") == H08_SCAFFOLD_DIGEST,
             build.get("case_ids") == case_order,
             build.get("model_roles") == ["main", "self_check_input"],
@@ -2757,7 +2757,7 @@ def check_h08_evidence(request: H08VerifyRequest, case_only: bool = False) -> di
     ):
         return h08_err_envelope(
             request,
-            "현재 H08 build가 고정 NeMo 0.22.0 scaffold와 두 역할 모델 계약에 맞지 않습니다.",
+            "현재 H08 build가 고정 NeMo 0.24.1 scaffold와 두 역할 모델 계약에 맞지 않습니다.",
         )
 
     if case_only:
@@ -2788,7 +2788,7 @@ def check_h08_evidence(request: H08VerifyRequest, case_only: bool = False) -> di
             receipt.get("config_digest") == config_digest,
             receipt.get("scaffold_digest") == H08_SCAFFOLD_DIGEST,
             receipt.get("framework") == "nemoguardrails",
-            receipt.get("framework_version") == "0.22.0",
+            receipt.get("framework_version") == "0.24.1",
             ledger.get("suite_id") == request.suite_id,
             ledger.get("started_at") == request.started_at,
             ledger_started_at == suite_started_at,
@@ -3248,7 +3248,7 @@ def check_h08_evidence(request: H08VerifyRequest, case_only: bool = False) -> di
             "provider_suite_id": request.suite_id,
             "provider_mode": ledger["provider_mode"],
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "model_roles": build["model_roles"],
             "cases": receipt_cases,
             "capabilities": capabilities,
@@ -3742,7 +3742,7 @@ def check_h10_evidence(request:H10VerifyRequest,case_only:bool=False)->dict:
     if not all(
         (
             build.get("component") == "guided-h10-self-check-output",
-            build.get("framework_version") == "0.22.0",
+            build.get("framework_version") == "0.24.1",
             build.get("roles") == ["main", "self_check_output"],
             build.get("case_ids") == case_ids,
             build.get("scaffold_digest") == H10_SCAFFOLD_DIGEST,
@@ -3870,7 +3870,7 @@ def check_h10_evidence(request:H10VerifyRequest,case_only:bool=False)->dict:
             "source_digest": build["source_digest"],
             "config_digest": build["config_digest"],
             "framework": "nemoguardrails",
-            "framework_version": "0.22.0",
+            "framework_version": "0.24.1",
             "cases": cases,
             "provider_calls": calls,
             "main_calls": len(case_ids),

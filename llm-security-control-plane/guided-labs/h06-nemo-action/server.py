@@ -26,8 +26,8 @@ CONTROL_TOKEN = os.environ["GUIDED_CONTROL_LAB06_TOKEN"]
 VERIFIER_TOKEN = os.environ["GUIDED_VERIFIER_LAB06_TOKEN"]
 DATABASE_PATH = Path(os.getenv("GUIDED_H06_DATABASE", "/tmp/h06-receipts.sqlite3"))
 FRAMEWORK_VERSION = version("nemoguardrails")
-if FRAMEWORK_VERSION != "0.22.0":
-    raise RuntimeError("H06 requires nemoguardrails 0.22.0")
+if FRAMEWORK_VERSION != "0.24.1":
+    raise RuntimeError("H06 requires nemoguardrails 0.24.1")
 
 CASES = {
     "balance-read": {

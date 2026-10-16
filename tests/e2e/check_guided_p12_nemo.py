@@ -50,7 +50,7 @@ class NativeRailTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(model.calls[0]["kwargs"]["max_tokens"], 3)
                     self.assertEqual(model.calls[0]["kwargs"]["temperature"], 0.0)
                     self.assertIn("교육용 검사 문장", str(model.calls[0]["prompt"]))
-                    self.assertEqual(result["evidence"]["version"], "0.22.0")
+                    self.assertEqual(result["evidence"]["version"], "0.24.1")
                     self.assertNotIn("교육용 검사 문장", json.dumps(result, ensure_ascii=False))
                     self.assertNotIn("task_completed", result)
                     self.assertIn(module.STAGES[stage][1], result["evidence"]["actions"])
@@ -106,5 +106,5 @@ if __name__ == "__main__":
     program = unittest.main(verbosity=2, exit=False)
     if not program.result.wasSuccessful():
         sys.exit(1)
-    print(json.dumps({"scope": "actual NeMo 0.22 input/output and custom retrieval rails; deterministic classifier fixture, no AWS or external retrieval",
+    print(json.dumps({"scope": "actual NeMo 0.24.1 input/output and custom retrieval rails; deterministic classifier fixture, no AWS or external retrieval",
                       "tests": program.result.testsRun, "native_results": NativeRailTests.records}, ensure_ascii=False))

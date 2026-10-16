@@ -26,8 +26,8 @@ GATEWAY_URL = os.environ["GUIDED_H10_GATEWAY_URL"].rstrip("/") + "/v1/h10"
 GATEWAY_TOKEN = os.environ["GUIDED_H10_GATEWAY_TOKEN"]
 DATABASE_PATH = Path(os.getenv("GUIDED_H10_DATABASE", "/state/receipts.sqlite3"))
 FRAMEWORK_VERSION = version("nemoguardrails")
-if FRAMEWORK_VERSION != "0.22.0":
-    raise RuntimeError("H10 requires nemoguardrails 0.22.0")
+if FRAMEWORK_VERSION != "0.24.1":
+    raise RuntimeError("H10 requires nemoguardrails 0.24.1")
 
 CASES = {
     "normal-reset-guide": "본인 확인 뒤 비밀번호 재설정 순서를 40자 이내 한 문장으로 알려 주세요.",

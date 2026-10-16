@@ -43,13 +43,13 @@ jobs:
         run: |
           bash llm-security-control-plane/deploy/build-images.sh
           docker build -f examples/guardrails/nemo-guardrails/Containerfile \
-            -t localhost/llm-security-nemo-dialog-rails:0.22.0 \
+            -t localhost/llm-security-nemo-dialog-rails:0.24.1 \
             examples/guardrails/nemo-guardrails
           docker build -f examples/guardrails/presidio/Containerfile \
             -t localhost/guardrails-presidio:2.2.362 \
             examples/guardrails/presidio
           docker build -f llm-security-control-plane/official-uis/nemo/Containerfile \
-            -t localhost/llm-security-nemo-official-ui:0.22.0 \
+            -t localhost/llm-security-nemo-official-ui:0.24.1 \
             llm-security-control-plane
           docker build -f llm-security-control-plane/official-uis/promptfoo/Containerfile \
             -t localhost/llm-security-promptfoo-official-ui:0.121.20 \
@@ -131,7 +131,7 @@ jobs:
             --network-alias llm-security-nemo-official-ui \
             --publish 127.0.0.1:28192:8000 \
             --env BEDROCK_GATEWAY_TOKEN=e2e-bedrock-token \
-            localhost/llm-security-nemo-official-ui:0.22.0
+            localhost/llm-security-nemo-official-ui:0.24.1
           docker run --detach --name promptfoo-official-ui \
             --network llm-security-control-plane \
             --network-alias llm-security-promptfoo-official-ui \

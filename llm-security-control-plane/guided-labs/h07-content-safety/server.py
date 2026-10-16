@@ -26,8 +26,8 @@ VERIFIER_TOKEN = os.environ["GUIDED_VERIFIER_LAB07_TOKEN"]
 GATEWAY_BASE_URL = os.environ["GUIDED_H07_GATEWAY_URL"].rstrip("/") + "/v1/h07"
 DATABASE_PATH = Path(os.getenv("GUIDED_H07_DATABASE", "/state/receipts.sqlite3"))
 FRAMEWORK_VERSION = version("nemoguardrails")
-if FRAMEWORK_VERSION != "0.22.0":
-    raise RuntimeError("H07 requires nemoguardrails 0.22.0")
+if FRAMEWORK_VERSION != "0.24.1":
+    raise RuntimeError("H07 requires nemoguardrails 0.24.1")
 
 MODEL_IDS = {
     "main": "us.amazon.nova-lite-v1:0#h07-main",
@@ -256,7 +256,7 @@ async def execute_case(grant: CaseGrant) -> dict:
             ],
         }
     finally:
-        # NeMo 0.22's default framework pools HTTP clients across the two roles.
+        # NeMo 0.24.1's default framework pools HTTP clients across the two roles.
         await get_framework(get_default_framework()).aclose()
 
 

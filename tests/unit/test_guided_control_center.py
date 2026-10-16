@@ -281,7 +281,7 @@ class FakeAsyncClient:
                     **(
                         {
                             "framework": "nemoguardrails",
-                            "framework_version": "0.22.0",
+                            "framework_version": "0.24.1",
                             "evaluation": {
                                 "evaluation_id": "nemo-topical-unit-evaluation",
                                 "processed_samples": 4,
@@ -300,7 +300,7 @@ class FakeAsyncClient:
                         {
                             "provider_suite_id": json["suite_id"],
                             "framework": "nemoguardrails",
-                            "framework_version": "0.22.0",
+                            "framework_version": "0.24.1",
                             "provider_calls": [{"action_id": "get_account_balance"}],
                             "effect_count": 0,
                             "balance": 10000,

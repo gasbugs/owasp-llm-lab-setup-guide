@@ -11,7 +11,7 @@ from nemoguardrails.rails.llm.options import GenerationResponse
 
 
 FRAMEWORK = "nvidia-nemo-guardrails"
-FRAMEWORK_VERSION = "0.22.0"
+FRAMEWORK_VERSION = "0.24.1"
 DEFAULT_MODEL = "us.amazon.nova-lite-v1:0"
 
 CASES = {
@@ -208,7 +208,7 @@ async def run_main_only(text: str) -> tuple[str, dict]:
     generated = require_generation_response(
         await rails.generate_async(
             messages=[{"role": "user", "content": text}],
-            # NeMo 0.22 groups main response generation under the dialog
+            # NeMo 0.24.1 groups main response generation under the dialog
             # category. An empty list disables generation and echoes the input.
             options=log_options(["dialog"]),
         )

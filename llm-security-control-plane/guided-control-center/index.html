@@ -455,7 +455,7 @@ vi ~/owasp-llm-practice/P01-01_learner.py</pre>
               <p class="label">DIALOG PATH + TOPICAL EVALUATION</p>
               <h3 id="h05-eval-title">정확한 연결과 안전한 답을 따로 확인하기</h3>
               <p>검증은 정확한 연락처 질문, 처음 보는 비슷한 표현, 복구 코드 요청, 지원하지 않는 요청을 차례로 보냅니다. 각 요청의 <code>UserMessage → UserIntent → BotIntent → BotMessage</code> event와 별도의 activated flow를 확인한 뒤 같은 설정으로 NeMo Topical 평가를 실행합니다.</p>
-              <p>NeMo 0.22.0의 이 평가는 UserIntent가 맞으면 BotIntent와 BotMessage도 맞다고 가정합니다. 따라서 <code>0/0/0</code>은 보류한 한국어 문장의 UserIntent 분류가 맞고 bot 오류 counter가 늘지 않았다는 뜻일 뿐, 실제 답을 확인한 안전 점수는 아닙니다. 실제 BotIntent·BotMessage와 합성 marker는 별도의 고정 네 요청이 판정합니다.</p>
+              <p>NeMo 0.24.1의 이 평가는 UserIntent가 맞으면 BotIntent와 BotMessage도 맞다고 가정합니다. 따라서 <code>0/0/0</code>은 보류한 한국어 문장의 UserIntent 분류가 맞고 bot 오류 counter가 늘지 않았다는 뜻일 뿐, 실제 답을 확인한 안전 점수는 아닙니다. 실제 BotIntent·BotMessage와 합성 marker는 별도의 고정 네 요청이 판정합니다.</p>
             </div>
           </section>
 

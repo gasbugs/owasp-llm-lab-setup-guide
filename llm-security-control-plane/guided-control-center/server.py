@@ -1672,7 +1672,7 @@ async def verify_h07_content_safety(
                             "stopped_stage": "guided_h07_content_safety",
                             "downstream_called": True,
                             "course_verdict": "ERR",
-                            "next_check": "H07 image, NeMo 0.22.0 설정과 입력 Rail 문법을 확인합니다.",
+                            "next_check": "H07 image, NeMo 0.24.1 설정과 입력 Rail 문법을 확인합니다.",
                         },
                     )
                 if executed.json().get("suite_id") != suite_id:
@@ -1859,7 +1859,7 @@ async def verify_h08_self_check_input(
                             "stopped_stage": "guided_h08_self_check_input",
                             "downstream_called": True,
                             "course_verdict": "ERR",
-                            "next_check": "H08 image, NeMo 0.22.0 설정과 self check input Prompt를 확인합니다.",
+                            "next_check": "H08 image, NeMo 0.24.1 설정과 self check input Prompt를 확인합니다.",
                         },
                     )
                 if executed.json().get("suite_id") != suite_id:

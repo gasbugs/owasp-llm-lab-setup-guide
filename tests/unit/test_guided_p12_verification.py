@@ -15,7 +15,9 @@ from p12_results import EvidenceError
 
 class VerificationTests(unittest.TestCase):
     def setUp(self):
-        self.fixture = json.loads((ROOT / "tests/fixtures/p12_recorded_evidence.json").read_text())
+        # Preserve the historical capture on disk; replay its shape against the current pinned rail version.
+        captured = (ROOT / "tests/fixtures/p12_recorded_evidence.json").read_text()
+        self.fixture = json.loads(captured.replace("\"version\": \"0.22.0\"", "\"version\": \"0.24.1\""))
         self.case = self.fixture["cases"][0]
         self.origins = {key: "http://" + key for key in self.case["ledgers"]}
         self.tokens = {key: key + "-verifier-readonly" for key in self.origins}
