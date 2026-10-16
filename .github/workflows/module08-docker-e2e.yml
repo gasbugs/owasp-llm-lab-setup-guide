@@ -158,6 +158,9 @@ jobs:
           jq -e '.choices[0].message.content == "보안팀 연락처: security@example.com"' \
             /tmp/nemo-official-chat.json
 
+      - name: Verify retrieval fails closed when Presidio is unavailable
+        run: bash tests/e2e/guardrails/test_retrieval_fail_closed.sh
+
       - name: Run the complete control-plane E2E without intermediate errors
         env:
           MODEL_PROVIDER: amazon-bedrock

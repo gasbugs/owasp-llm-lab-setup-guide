@@ -270,7 +270,21 @@ async def run_retrieval_details(
     )
     records, _blocked_stage = activated_rails(generated)
     output_data = generated.output_data or {}
-    sanitized = str(output_data.get("relevant_chunks", text))
+    sanitized = output_data.get("relevant_chunks")
+    required = (
+        "retrieval_pii_detected",
+        "retrieval_entity_types",
+        "retrieval_redaction_applied",
+        "retrieval_application_decision",
+    )
+    if not isinstance(sanitized, str) or any(
+        key not in output_data for key in required
+    ):
+        raise RuntimeError("retrieval PII inspection did not complete")
+    if output_data["retrieval_application_decision"] not in {
+        "allow", "redact", "allow_unredacted"
+    }:
+        raise RuntimeError("retrieval PII inspection returned an invalid decision")
     return {
         "context": sanitized,
         "pii_detected": bool(output_data.get("retrieval_pii_detected", False)),
