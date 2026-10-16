@@ -47,6 +47,7 @@ def main():
             response = pending.value
             assert response.status == 200
             result = response.json()
+            args.output.with_suffix('.response.json').write_text(json.dumps(result, ensure_ascii=False, indent=2))
             complete = not args.incomplete
             assert result['activity_id'] == 'P17'
             assert result['task_completed'] is complete
@@ -58,21 +59,21 @@ def main():
                 args.output.with_suffix('.mismatch.json').write_text(json.dumps(
                     {'response': result, 'rendered': rendered}, ensure_ascii=False, indent=2))
             assert rendered == result
-            execution = result['result']['execution']
-            assert execution['source_digest'] == args.source_digest
-            if execution.get('execution_error'):
-                assert not complete
-                assert execution['closed'] is False
-            elif complete:
-                assert len(execution['cases']) == 3
-            else:
-                assert 0 < len(execution['cases']) <= 3
+            details = result['result']
             if complete:
-                assert len(result['result']['products']) == 3
-                assert [c['downstream_count'] for c in result['result']['cases']] == [1, 0, 0]
-                assert result['result']['counter_delta'] == {'allow': 1, 'block': 2}
+                assert details['source_digest'] == args.source_digest
+                assert len(details['cases']) == len(details['children']) == 3
+                assert all(case['case_verified'] is True for case in details['cases'])
+                assert [case['downstream_count'] for case in details['cases']] == [1, 0, 0]
+                assert details['counter_delta'] == {'allow': 1, 'block': 2}
             else:
-                assert result['result'].get('failed_requirement')
+                execution = details['execution']
+                assert execution['source_digest'] == args.source_digest
+                if details.get('execution_error'):
+                    assert execution['closed'] is False
+                else:
+                    assert 0 < len(execution['cases']) <= 3
+                assert details.get('failed_requirement')
             boundary = page.evaluate('''async () => {
                 const bootstrap = await (await fetch('/api/bootstrap')).json();
                 const rejected = await fetch('/api/practice/P17/verify', {

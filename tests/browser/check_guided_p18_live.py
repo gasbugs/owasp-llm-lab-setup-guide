@@ -43,7 +43,10 @@ def main():
             page.locator('#h23-grade-tab').click()
             assert page.locator('html').get_attribute('data-theme') == 'dark'
             problem = page.locator('#h18-work').text_content()
-            assert 'P18' in problem and 'P06-02_queries.yaml' in problem
+            display_id = page.evaluate('missionLabel("P18")')
+            if display_id not in problem or 'P06-02_queries.yaml' not in problem:
+                args.output.with_suffix('.problem.txt').write_text(problem or '')
+            assert display_id in problem and 'P06-02_queries.yaml' in problem
             examples = '\n'.join(page.locator('#h18-work pre').all_text_contents())
             assert 'logql:' not in examples and 'sum by (' not in examples
             with page.expect_response(lambda response: response.url.endswith('/api/practice/P18/verify'),
