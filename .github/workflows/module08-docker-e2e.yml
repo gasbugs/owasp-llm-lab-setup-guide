@@ -96,6 +96,11 @@ jobs:
             --entrypoint python \
             localhost/llm-security-guardrail-proxy-api:0.1.0 \
             /app/test_admin_lifecycle.py
+          docker run --rm --network none \
+            --volume "$PWD/llm-security-control-plane/guardrail-proxy/test_retrieval_native.py:/app/test_retrieval_native.py:ro" \
+            --entrypoint python \
+            localhost/llm-security-guardrail-proxy-api:0.1.0 \
+            /app/test_retrieval_native.py
       - name: Validate the standalone Module 10 Compose model
         run: |
           install -d -m 0700 llm-security-control-plane/.state/application-auth
