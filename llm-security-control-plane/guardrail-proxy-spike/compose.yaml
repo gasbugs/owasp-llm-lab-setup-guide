@@ -1,0 +1,59 @@
+# CUSTOM FILE: isolated publisher technical spike; not a learner deployment.
+# Docker Compose format: https://docs.docker.com/reference/compose-file/ (Apache-2.0).
+name: llm-security-guardrail-spike
+services:
+  gateway:
+    image: localhost/llm-security-guardrail-spike-gateway:0.1.0
+    build:
+      context: ..
+      dockerfile: bedrock-gateway/Containerfile
+    user: ${LOCAL_UID:?required}:${LOCAL_GID:?required}
+    environment:
+      BEDROCK_GATEWAY_TOKEN: ${SPIKE_GATEWAY_TOKEN:?required}
+      AWS_PROFILE: default
+      AWS_REGION: us-east-1
+      BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
+    volumes:
+      - ${HOME}/.aws:/tmp/.aws:ro
+    networks: [private, egress]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3))['ok']"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+  privacy:
+    image: localhost/llm-security-guardrail-spike-privacy:0.1.0
+    build:
+      context: ..
+      dockerfile: spokes/presidio-privacy/Containerfile
+    environment:
+      PRESIDIO_INTERNAL_TOKEN: ${SPIKE_PRIVACY_TOKEN:?required}
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8013/healthz', timeout=3))['ok']"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+  runner:
+    image: localhost/llm-security-guardrail-spike-runner:0.1.0
+    build:
+      context: ..
+      dockerfile: guided-labs/h12-protected-services/Containerfile.nemo
+    command: ["python", "/spike/runner.py"]
+    environment:
+      SPIKE_GATEWAY_TOKEN: ${SPIKE_GATEWAY_TOKEN:?required}
+      SPIKE_PRIVACY_TOKEN: ${SPIKE_PRIVACY_TOKEN:?required}
+    volumes:
+      - ./runner.py:/spike/runner.py:ro
+      - ./native_rails.py:/spike/native_rails.py:ro
+      - ./policy:/spike/policy:ro
+    networks: [private]
+    depends_on:
+      gateway: {condition: service_healthy}
+      privacy: {condition: service_healthy}
+    profiles: [probe]
+networks:
+  private: {internal: true}
+  egress: {}

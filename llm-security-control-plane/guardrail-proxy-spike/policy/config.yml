@@ -1,0 +1,12 @@
+# CUSTOM FILE
+# Format: https://docs.nvidia.com/nemo/guardrails/v0.24.1/user-guides/configuration-guide.html
+# Upstream format license: Apache-2.0
+models: []
+lowest_temperature: 0.0
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output
