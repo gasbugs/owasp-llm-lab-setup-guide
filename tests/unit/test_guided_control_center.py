@@ -342,6 +342,13 @@ class GuidedControlCenterTests(unittest.TestCase):
         FakeAsyncClient.h07_run_request_error = False
         FakeAsyncClient.h07_close_statuses = []
 
+    def test_copyable_blocks_are_controlled_by_server_environment(self):
+        self.assertTrue(self.bootstrap["copyable_code_blocks"])
+        with patch.dict(os.environ, {"GUIDED_COPYABLE_CODE_BLOCKS": "false"}):
+            self.assertFalse(self.client.get("/api/bootstrap").json()["copyable_code_blocks"])
+        with patch.dict(os.environ, {"GUIDED_COPYABLE_CODE_BLOCKS": "true"}):
+            self.assertTrue(self.client.get("/api/bootstrap").json()["copyable_code_blocks"])
+
     def test_native_initialization_diagnosis_reaches_grading_case(self):
         original=FakeAsyncClient.post
         async def post(client,url,**kwargs):
@@ -1543,9 +1550,11 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("function prepareCopyableBlocks(root = document)", javascript)
         self.assertIn("function prepareAdminAnswerMarkdown(source)", javascript)
         self.assertIn('renderAdminMarkdown(output, prepareAdminAnswerMarkdown(payload.answer))', javascript)
-        self.assertIn('root.querySelectorAll("pre:not([id])")', javascript)
+        self.assertIn('root.querySelectorAll("pre:not([id]), pre#tutorial-submit-command")', javascript)
         self.assertIn('toolbar.className = "copy-block-toolbar"', javascript)
-        self.assertIn('label.textContent = "코드 블록"', javascript)
+        self.assertIn('pre.dataset.codeTitle', javascript)
+        self.assertIn('data-code-title="curl 요청"', self.home.text)
+        self.assertIn('copyableCodeBlocksEnabled = payload.copyable_code_blocks === true', javascript)
         self.assertIn("toolbar.append(label, button); wrapper.append(toolbar, pre)", javascript)
         self.assertIn("navigator.clipboard.writeText(text)", javascript)
         self.assertIn('button.textContent = copied ? "복사됨" : "복사 실패"', javascript)

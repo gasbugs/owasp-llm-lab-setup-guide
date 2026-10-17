@@ -421,6 +421,7 @@ def refresh_session(response: Response, session: tuple[str, dict] = Depends(requ
 @app.get("/api/bootstrap")
 def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
     payload = {
+        "copyable_code_blocks": os.environ.get("GUIDED_COPYABLE_CODE_BLOCKS", "true").lower() in {"1", "true", "yes", "on"},
         "resource_total_steps": RESOURCE_TOTAL_STEPS, "csrf_token": session[1]["csrf"],
         "p00_submission_token": session[1]["p00_token"],
         "admin_mode": bool(session[1].get("admin")),
