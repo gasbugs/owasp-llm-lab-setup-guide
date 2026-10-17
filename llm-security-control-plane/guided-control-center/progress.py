@@ -15,6 +15,14 @@ class ProgressStore:
             self.db.execute('''CREATE TABLE IF NOT EXISTS progress (
                 problem TEXT PRIMARY KEY, attempt TEXT NOT NULL, needs_check INTEGER NOT NULL,
                 execution TEXT, digest TEXT, completed_at TEXT)''')
+            self.db.execute('CREATE TABLE IF NOT EXISTS installation_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+            self.db.execute('INSERT OR IGNORE INTO installation_meta VALUES (?, ?)',
+                            ('reset_generation', uuid.uuid4().hex))
+
+    def reset_generation(self):
+        with self.lock:
+            return self.db.execute('SELECT value FROM installation_meta WHERE key=?',
+                                   ('reset_generation',)).fetchone()[0]
 
     def tutorial_completed(self, owner):
         with self.lock, self.db:

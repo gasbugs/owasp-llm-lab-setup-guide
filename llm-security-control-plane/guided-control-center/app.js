@@ -34,6 +34,7 @@ let sidebarPinned = false;
 try { sidebarPinned = localStorage.getItem("guided-sidebar-pinned") === "true"; } catch {}
 const rawResponses = new WeakMap();
 const missionResults = new Map();
+let currentResetGeneration = null;
 let executionPending = false;
 let executionTimer = null;
 const themePreference = window.matchMedia("(prefers-color-scheme: dark)");
@@ -97,6 +98,25 @@ function cacheGradingResult(problem, payload, startedAt) {
   restoreGradingRaw(display);
   if (problem !== "P00") missionResults.set(problem, display);
   try { sessionStorage.setItem(`guided-grading-result-${problem}`, serialized); } catch {}
+}
+
+function syncResetGeneration(generation, reloadOnChange = false) {
+  if (typeof generation !== "string" || !generation) return false;
+  const key = "guided-reset-generation";
+  let previous = null;
+  try { previous = sessionStorage.getItem(key); } catch {}
+  if (previous === generation || currentResetGeneration === generation) return false;
+  const changedDuringPage = currentResetGeneration !== null;
+  for (const problem of missionOrder) {
+    try { sessionStorage.removeItem(`guided-grading-result-${problem}`); } catch {}
+  }
+  missionResults.clear();
+  celebratedPractices.clear();
+  p00Completed = false;
+  currentResetGeneration = generation;
+  try { sessionStorage.setItem(key, generation); } catch {}
+  if (reloadOnChange && changedDuringPage) location.reload();
+  return reloadOnChange && changedDuringPage;
 }
 
 function restoreGradingResults() {
@@ -377,6 +397,7 @@ async function restorePracticeProgress() {
     if (!response.ok) throw new Error("progress unavailable");
     const payload = await response.json();
     if (revision !== progressRequest || executionPending) return;
+    if (syncResetGeneration(payload.reset_generation, true)) return;
     completedPractices.clear();
     recheckPractices.clear();
     for (const record of payload.records || []) {
@@ -1897,6 +1918,7 @@ async function bootstrap() {
   prepareAdminAnswers();
   prepareCopyableBlocks();
   applyMissionDisplayLabels();
+  syncResetGeneration(payload.reset_generation);
   restoreGradingResults();
   selectTab(0);
   selectWorkspace("home");

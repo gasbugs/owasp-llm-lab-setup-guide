@@ -408,7 +408,7 @@ async def progress(session: tuple[str, dict] = Depends(require_session)) -> dict
                     pass
             return {**{key: record[key] for key in ('problem', 'execution', 'completed_at')},
                     'state': state, 'reason': reason}
-        return {'scope': 'installation', 'records': await asyncio.gather(*(inspect(r) for r in records))}
+        return {'scope': 'installation', 'reset_generation': PROGRESS.reset_generation(), 'records': await asyncio.gather(*(inspect(r) for r in records))}
 
 
 @app.post("/api/session/refresh")
@@ -425,6 +425,7 @@ def bootstrap(session: tuple[str, dict] = Depends(require_session)) -> dict:
         "resource_total_steps": RESOURCE_TOTAL_STEPS, "csrf_token": session[1]["csrf"],
         "p00_submission_token": session[1]["p00_token"],
         "admin_mode": bool(session[1].get("admin")),
+        "reset_generation": PROGRESS.reset_generation(),
         "workspace": "practice",
         "course": {
             "tabs": 13,
