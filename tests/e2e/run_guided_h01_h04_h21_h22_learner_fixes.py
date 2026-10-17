@@ -30,8 +30,11 @@ ACTIVITIES = {
         "path": CONTROL / "guided-labs/h21-agent-policy/policy.py",
         "replacements": [
             (
-                '''    configured = POLICIES[principal]
-    # TODO(H21): 요청값을 그대로 믿지 말고 model·server·tool·state owner를 검사한다.
+                '''    configured = POLICIES.get(principal)
+    # TODO 1: 설정이 없는 principal은 PolicyDenied로 호출 전에 거부하세요.
+    # TODO 2: model·server·tool 허용 목록과 state_owner를 검사하세요.
+    # TODO 3: 요청한 Tool 횟수·결과 bytes·timeout이 정책 상한을 넘으면 거부하세요.
+    # TODO 4: 허용되면 요청값 대신 configured의 상한으로 Admission을 만드세요.
     return Admission(
         principal=principal,
         model=model,
@@ -41,7 +44,9 @@ ACTIVITIES = {
         max_result_bytes=requested_result_bytes,
         tool_timeout_ms=requested_timeout_ms,
     )''',
-                '''    configured = POLICIES[principal]
+                '''    configured = POLICIES.get(principal)
+    if configured is None:
+        raise PolicyDenied("principal-not-allowed")
     if model not in configured["models"]:
         raise PolicyDenied("model-not-allowed")
     if server_id not in configured["servers"]:

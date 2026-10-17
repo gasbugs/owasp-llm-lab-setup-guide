@@ -29,7 +29,10 @@ models:
       temperature: 0.0
       max_tokens: 120
 
-# TODO(H07): content_safety 모델과 정확한 input flow를 연결한다.
+# TODO 1: Main과 구분되는 content_safety 역할로 같은 Nova Lite를 등록하세요.
+# alias는 문제 화면의 h07-content-safety 값을 사용하세요.
+# TODO 2: rails.input.flows에 공식 content safety 입력 flow를 연결하세요.
+# 위험 입력은 Main 호출 전에 멈추고 정상 입력은 Main으로 이어져야 합니다.
 rails:
   input:
     flows: []
