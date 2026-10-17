@@ -13,6 +13,9 @@ with sync_playwright() as p:
  page.evaluate('selectTab(0,"P01");selectP01Pane("grade");document.querySelector("#case-progress").hidden=false;renderCaseProgress({phase:"running",total:23,cases:[{case_id:"finished",status:"PASS",elapsed_seconds:0.5}],current_case:{number:2,case_id:"active",status:"실행 중",started_at:new Date(Date.now()-2000).toISOString()}});updateCaseElapsed()')
  expect(page.locator('#case-progress-list .case-running-bar')).to_have_count(1);expect(page.locator('#case-progress-list .case-elapsed').last).to_have_text('대기 2초')
  expect(page.locator('#case-progress-list .case-elapsed').first).to_have_text('0.5초')
+ page.evaluate('renderCaseProgress({phase:"running",total:23,cases:[{case_id:"finished",status:"PASS",elapsed_seconds:0.5}],current_case:{number:2,case_id:"active",status:"실행 중",started_at:new Date(Date.now()-2000).toISOString()}})')
+ assert int(page.locator('#case-progress-list .case-elapsed').last.inner_text().split(' ')[1][:-1]) >= 2
+ expect(page.locator('#case-progress-list .case-elapsed').first).to_have_text('0.5초')
  assert not errors,errors
- print('PASS: P00 four pending bars and adjacent elapsed; no invented percentage; P01 active case and completed duration; wait ends on response')
+ print('PASS: P00 four pending bars and adjacent elapsed; no invented percentage; P01 redraw keeps active elapsed and completed duration; wait ends on response')
  b.close()

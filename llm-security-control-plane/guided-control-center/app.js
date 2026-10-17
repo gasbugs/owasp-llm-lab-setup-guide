@@ -1502,8 +1502,11 @@ function createCaseCard(item, index) {
   heading.append(title, badge);
   if (item.started_at || item.elapsed_seconds !== undefined) {
     const elapsed = document.createElement("span"); elapsed.className = "case-elapsed";
-    if (item.started_at) elapsed.dataset.startedAt = typeof item.started_at === "number" ? new Date(item.started_at * 1000).toISOString() : item.started_at;
-    elapsed.textContent = item.elapsed_seconds !== undefined ? `${item.elapsed_seconds}초` : "대기 0초";
+    const startedAt = typeof item.started_at === "number" ? new Date(item.started_at * 1000).toISOString() : item.started_at;
+    if (startedAt && ["실행 중", "채점 중", "결과 조회 중", "독립 검증 중"].includes(status)) {
+      elapsed.dataset.startedAt = startedAt;
+    }
+    elapsed.textContent = item.elapsed_seconds !== undefined ? `${item.elapsed_seconds}초` : caseElapsedText(startedAt);
     heading.append(elapsed);
   }
 
@@ -1612,10 +1615,14 @@ function renderReportedCases(payload) {
   if (Array.isArray(cases)) cases.forEach((item, index) => list.append(createCaseCard(caseDisplayContext(item, payload), index)));
 }
 
+function caseElapsedText(startedAt, now = Date.now()) {
+  const started = Date.parse(startedAt);
+  return `대기 ${Number.isFinite(started) ? Math.max(0, Math.floor((now - started) / 1000)) : 0}초`;
+}
+
 function updateCaseElapsed() {
   document.querySelectorAll(".case-elapsed[data-started-at]").forEach(node => {
-    const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(node.dataset.startedAt)) / 1000));
-    node.textContent = `대기 ${seconds}초`;
+    node.textContent = caseElapsedText(node.dataset.startedAt);
   });
 }
 

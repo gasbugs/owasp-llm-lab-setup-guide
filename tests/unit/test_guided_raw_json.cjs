@@ -250,9 +250,9 @@ test("P02 summary requires verified cases and never turns missing evidence into 
 
 function caseHarness() {
   const elements = {};
-  const element = () => ({children: [], textContent: '', hidden: false,
-    append(...items) { this.children.push(...items); }, replaceChildren() { this.children = []; }});
-  const ctx = {caseCatalog: {}, activeProblem: "P05", gradingCredentialKey: key => /^(token|authorization|password)$/.test(key), formatRawJson: context.formatRawJson, document: {createElement: element}, byId: id => elements[id] ||= element()};
+  const element = () => ({children: [], textContent: '', hidden: false, dataset: {},
+    append(...items) { this.children.push(...items); }, replaceChildren() { this.children = []; }, setAttribute() {}});
+  const ctx = {caseCatalog: {}, activeProblem: "P05", gradingCredentialKey: key => /^(token|authorization|password)$/.test(key), formatRawJson: context.formatRawJson, document: {createElement: element}, byId: id => elements[id] ||= element(), setText: () => {}};
   Object.assign(ctx, {caseCatalog: {}, activeProblem: "P05", gradingCredentialKey: key => /^(token|authorization|password)$/.test(key), formatRawJson: context.formatRawJson});
   vm.runInNewContext(source.slice(source.indexOf('function displayCaseValue('), source.indexOf('function selectP01Pane(')), ctx);
   return {ctx, elements};
@@ -266,6 +266,19 @@ test('case cards preserve reported state and HTTP evidence without inferring PAS
   const ready = ctx.createCaseCard({outcome:'ready'}, 0);
   assert.equal(ready.className, 'case-card case-neutral');
   assert.equal(ready.children[0].children[1].textContent, 'ready');
+});
+test('poll redraw keeps a running case elapsed time and freezes completed duration', () => {
+  const {ctx, elements} = caseHarness();
+  const started_at = new Date(Date.now() - 5200).toISOString();
+  const progress = {phase:'running', cases:[{case_id:'done', status:'PASS', started_at, elapsed_seconds:1.25}],
+    current_case:{case_id:'active', status:'실행 중', started_at}};
+  ctx.renderCaseProgress(progress);
+  const first = elements['case-progress-list'].children[1].children[0].children[2];
+  assert.match(first.textContent, /^대기 [5-9]초$/);
+  ctx.renderCaseProgress(progress);
+  const second = elements['case-progress-list'].children[1].children[0].children[2];
+  assert.match(second.textContent, /^대기 [5-9]초$/);
+  assert.equal(elements['case-progress-list'].children[0].children[0].children[2].textContent, '1.25초');
 });
 test('case cards show structured execution logs inside each case', () => {
   const {ctx} = caseHarness();
