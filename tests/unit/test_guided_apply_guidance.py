@@ -30,6 +30,20 @@ class ApplyBlocks(HTMLParser):
 
 
 class ApplyGuidanceTests(unittest.TestCase):
+    def test_p14_examples_keep_parallel_attempts_in_system(self):
+        import re
+        import yaml
+
+        page = (ROOT / "llm-security-control-plane/guided-control-center/index.html").read_text()
+        answer = (ROOT / "llm-security-control-plane/guided-control-center/admin-answers/P14.md").read_text()
+        self.assertIn("<code>parallel_attempts</code>는 별도 <code>system</code> 아래", page)
+        examples = re.findall(r"```yaml\n(.*?)\n```", answer, re.S)
+        self.assertGreaterEqual(len(examples), 4)
+        for example in examples:
+            config = yaml.safe_load(example)
+            self.assertEqual(config["system"]["parallel_attempts"], 1)
+            self.assertNotIn("parallel_attempts", config["run"])
+
     def test_each_mission_has_copyable_direct_apply_command(self):
         html = (ROOT / "llm-security-control-plane/guided-control-center/index.html").read_text()
         self.assertNotIn("apply-guided-practice.sh P", html)
