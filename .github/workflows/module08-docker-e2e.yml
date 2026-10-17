@@ -58,6 +58,29 @@ jobs:
             -t localhost/llm-security-pyrit-official-ui:1.0.1 \
             llm-security-control-plane
 
+      - name: Verify native proxy privacy boundary
+        run: |
+          docker run --rm --network none \
+            --volume "$PWD/llm-security-control-plane/spokes/presidio-privacy/test_proxy_privacy.py:/app/test_proxy_privacy.py:ro" \
+            --entrypoint python \
+            localhost/llm-security-presidio-privacy-spoke:1.0.0 \
+            /app/test_proxy_privacy.py
+      - name: Verify file-backed guardrail proxy API
+        run: |
+          docker build \
+            -f llm-security-control-plane/guardrail-proxy/Containerfile \
+            -t localhost/llm-security-guardrail-proxy-api:0.1.0 \
+            llm-security-control-plane
+          docker run --rm --network none \
+            --volume "$PWD/llm-security-control-plane/guardrail-proxy/test_privacy_response.py:/app/test_privacy_response.py:ro" \
+            --entrypoint python \
+            localhost/llm-security-guardrail-proxy-api:0.1.0 \
+            /app/test_privacy_response.py
+          docker run --rm --network none \
+            --volume "$PWD/llm-security-control-plane/guardrail-proxy/test_proxy.py:/app/test_proxy.py:ro" \
+            --entrypoint python \
+            localhost/llm-security-guardrail-proxy-api:0.1.0 \
+            /app/test_proxy.py
       - name: Validate the standalone Module 10 Compose model
         run: |
           install -d -m 0700 llm-security-control-plane/.state/application-auth

@@ -72,7 +72,7 @@ class PrivacyAnalyzer:
                 patterns=[
                     Pattern(
                         "synthetic_demo_api_key",
-                        r"\bDEMO_API_KEY=[A-Za-z0-9-]+\b",
+                        r"\bDEMO_API_KEY\s*=\s*[A-Za-z0-9-]+\b",
                         0.95,
                     )
                 ],
@@ -138,6 +138,6 @@ class PrivacyAnalyzer:
                 "KR_RRN": "KrRrnRecognizer",
             },
             "custom_recognizers": {
-                "DEMO_API_KEY": r"\bDEMO_API_KEY=[A-Za-z0-9-]+\b",
+                "DEMO_API_KEY": r"\bDEMO_API_KEY\s*=\s*[A-Za-z0-9-]+\b",
             },
         }

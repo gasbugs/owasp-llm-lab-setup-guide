@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 from pathlib import Path
 import time
 from uuid import uuid4
@@ -98,10 +99,34 @@ async def privacy_scan(stage, text, request_id):
     if response.status_code != 200:
         raise ValueError(f"privacy status {response.status_code}")
     result = response.json()
-    candidate = result["sanitized_candidate"]
-    entities = result["entity_types"]
-    if not isinstance(candidate, str) or len(candidate) > 8000 or not isinstance(entities, list):
-        raise ValueError("invalid privacy response")
+    if (not isinstance(result, dict) or result.get("request_id") != request_id
+            or result.get("stage") != stage or result.get("spoke") != "presidio-privacy"):
+        raise ValueError("invalid privacy response identity")
+    candidate = result.get("sanitized_candidate")
+    entities = result.get("entity_types")
+    detections = result.get("detections")
+    valid = result.get("valid")
+    if (not isinstance(candidate, str) or len(candidate) > 8000
+            or not isinstance(entities, list) or not isinstance(detections, list)
+            or type(valid) is not bool or valid != (len(detections) == 0)):
+        raise ValueError("invalid privacy response shape")
+    if not all(isinstance(entity, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{1,63}", entity)
+               for entity in entities):
+        raise ValueError("invalid privacy entity type")
+    detected_types = set()
+    for finding in detections:
+        if not isinstance(finding, dict):
+            raise ValueError("invalid privacy detection")
+        entity = finding.get("entity_type")
+        start, end = finding.get("start"), finding.get("end")
+        if (entity not in entities or type(start) is not int or type(end) is not int
+                or not 0 <= start < end <= len(text)):
+            raise ValueError("invalid privacy detection")
+        detected_types.add(entity)
+        if text[start:end] in candidate:
+            raise ValueError("detected text remains in privacy candidate")
+    if detected_types != set(entities) or (not detections and candidate != text):
+        raise ValueError("privacy decision and candidate disagree")
     return candidate, entities
 
 

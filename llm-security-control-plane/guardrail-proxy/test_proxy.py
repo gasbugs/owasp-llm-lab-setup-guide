@@ -15,12 +15,12 @@ os.environ.setdefault("PRIVACY_URL", "http://unused")
 import server
 
 
-MODE = {"input_block": False, "output_block": False, "privacy_error": False,
+MODE = {"input_block": False, "output_block": False, "privacy_error_stage": None,
         "main_calls": 0, "privacy_output_calls": 0}
 
 
 async def fake_privacy(stage, text, request_id):
-    if MODE["privacy_error"]:
+    if MODE["privacy_error_stage"] == stage:
         raise TimeoutError("fixture")
     if stage == "output":
         MODE["privacy_output_calls"] += 1
@@ -78,16 +78,24 @@ async def check():
         assert MODE["privacy_output_calls"] == before
 
         MODE["output_block"] = False
-        MODE["privacy_error"] = True
+        MODE["privacy_error_stage"] = "input"
         error = await client.post("/v1/chat", headers=auth, json={"message": "hello"})
         assert error.status_code == 502 and error.json()["decision"] == "ERR"
         assert error.json()["upstream_called"] is False
+        MODE["privacy_error_stage"] = "output"
+        before = MODE["main_calls"]
+        late_error = await client.post("/v1/chat", headers=auth, json={"message": "hello"})
+        assert late_error.status_code == 502 and late_error.json()["decision"] == "ERR"
+        assert late_error.json()["stopped_at"] == "presidio_output"
+        assert late_error.json()["upstream_called"] is True and MODE["main_calls"] == before + 1
+        assert "sample@example.com" not in late_error.text
+        MODE["privacy_error_stage"] = None
 
         records = (await client.get("/v1/requests", headers=auth)).json()["requests"]
-        assert len(records) == 4 and "sample@example.com" not in str(records)
+        assert len(records) == 5 and "sample@example.com" not in str(records)
         assert all(item["policy_digest"] == server.POLICY_DIGEST for item in records)
 
 
 if __name__ == "__main__":
     asyncio.run(check())
-    print("proxy_api_contract=PASS cases=auth,validation,block,allow,output_block,error,records")
+    print("proxy_api_contract=PASS cases=auth,validation,block,allow,output_block,input_error,output_timeout,records")
