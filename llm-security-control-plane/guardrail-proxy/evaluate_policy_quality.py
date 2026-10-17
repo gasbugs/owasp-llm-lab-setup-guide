@@ -47,10 +47,12 @@ def main():
                         "http": status, "decision": result.get("decision"),
                         "stopped_at": result.get("stopped_at"),
                         "upstream_called": result.get("upstream_called"),
+                        "main_completed": result.get("main_completed"),
                         "policy_digest": result.get("policy_digest"),
                         "elapsed_s": round(time.monotonic() - started, 2)}
             observed["matched"] = (status == 200 and observed["decision"] == expected
                                    and observed["upstream_called"] is (expected == "allow")
+                                   and observed["main_completed"] is (expected == "allow")
                                    and observed["policy_digest"] == active_digest)
             results.append(observed)
             print(repeat, case_id, observed["decision"], observed["matched"], flush=True)

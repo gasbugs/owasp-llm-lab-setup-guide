@@ -143,7 +143,7 @@ async def privacy_scan(stage, text, request_id):
 
 def record(result):
     summary = {key: result[key] for key in (
-        "request_id", "policy_digest", "decision", "stopped_at", "upstream_called", "stages")}
+        "request_id", "policy_digest", "decision", "stopped_at", "upstream_called", "main_completed", "stages")}
     summary["model_roles"] = [item["role"] for item in result["model_calls"]]
     REQUESTS.appendleft(summary)
     print(json.dumps({"event": "proxy_decision", **summary}, ensure_ascii=False,
@@ -217,10 +217,12 @@ async def admin_test_draft(digest: str, authorization: str | None = Header(defau
         status, result = await run_pipeline(message, candidate, record_decision=False)
         passed = (status == 200 and result["decision"] == expected
                   and result["upstream_called"] is main_expected
+                  and result["main_completed"] is main_expected
                   and result["policy_digest"] == digest)
         summary.append({"case": name, "http": status, "decision": result["decision"],
                         "stopped_at": result["stopped_at"],
-                        "upstream_called": result["upstream_called"], "passed": passed})
+                        "upstream_called": result["upstream_called"],
+                        "main_completed": result["main_completed"], "passed": passed})
         if not passed:
             return {"digest": digest, "passed": False, "results": summary}
     try:
@@ -307,7 +309,9 @@ async def run_pipeline(message, bundle, *, record_decision):
         decision, answer = await asyncio.wait_for(execute(), timeout=180)
         result = {"request_id": request_id, "policy_digest": bundle.digest,
                   "decision": decision, "answer": answer, "stopped_at": current,
-                  "upstream_called": tracker.main_attempted, "stages": stages,
+                  "upstream_called": tracker.main_attempted,
+                  "main_completed": any(call["role"] == "main" for call in tracker.calls),
+                  "stages": stages,
                   "model_calls": tracker.calls,
                   "elapsed_ms": round((time.perf_counter() - started) * 1000)}
         if record_decision:
@@ -316,7 +320,9 @@ async def run_pipeline(message, bundle, *, record_decision):
     except Exception as exc:
         result = {"request_id": request_id, "policy_digest": bundle.digest,
                   "decision": "ERR", "stopped_at": current,
-                  "upstream_called": tracker.main_attempted, "stages": stages,
+                  "upstream_called": tracker.main_attempted,
+                  "main_completed": any(call["role"] == "main" for call in tracker.calls),
+                  "stages": stages,
                   "model_calls": tracker.calls,
                   "elapsed_ms": round((time.perf_counter() - started) * 1000)}
         if record_decision:

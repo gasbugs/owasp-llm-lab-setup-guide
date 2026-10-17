@@ -13,6 +13,7 @@ function byId(id){return document.getElementById(id)}
 function setText(id,value){byId(id).textContent = value}
 function shortDigest(value){return value ? `${value.slice(0,8)}…${value.slice(-6)}` : "—"}
 function decisionLabel(value){return value === "allow" ? "허용" : value === "block" ? "차단" : value === "ERR" ? "오류" : "대기"}
+function mainProgress(item){return !item.upstream_called ? "요청 없음" : item.main_completed ? "요청·응답 확인" : "요청 시도·응답 없음"}
 function page(){
   const target = names[location.hash.slice(1)] ? location.hash.slice(1) : "overview";
   document.querySelectorAll(".page").forEach(node=>node.classList.toggle("active",node.id===target));
@@ -67,7 +68,7 @@ function renderFlow(record){
   const explanation=byId("flow-explanation");explanation.replaceChildren();
   if(!record){explanation.textContent="기록이 없습니다. 정책 테스트에서 실제 요청을 실행해 보세요.";return}
   const strong=document.createElement("strong");strong.textContent=`${decisionLabel(record.decision)} · ${stageLabels[record.stopped_at]||record.stopped_at}`;
-  const detail=document.createElement("span");detail.textContent=` Main 호출: ${record.upstream_called?"예":"아니요"} · 정책 ${shortDigest(record.policy_digest)}`;
+  const detail=document.createElement("span");detail.textContent=` Main ${mainProgress(record)} · 정책 ${shortDigest(record.policy_digest)}`;
   const id=document.createElement("code");id.textContent=record.request_id;
   explanation.append(strong,detail,id);
 }
@@ -81,12 +82,12 @@ function renderRecords(){
     const row=document.createElement("div");row.className="request-mini";
     const info=document.createElement("div"),title=document.createElement("strong"),sub=document.createElement("small");
     title.textContent=`${decisionLabel(item.decision)} · ${stageLabels[item.stopped_at]||item.stopped_at}`;
-    sub.textContent=`${item.request_id} · Main 호출 ${item.upstream_called?"예":"아니요"}`;
+    sub.textContent=`${item.request_id} · Main ${mainProgress(item)}`;
     info.append(title,sub);row.append(info);return row;
   }):[Object.assign(document.createElement("p"),{textContent:"기록 없음"})]));
   byId("request-rows").replaceChildren(...(records.length?records.map(item=>{
     const row=document.createElement("tr");
-    [item.request_id,stageLabels[item.stopped_at]||item.stopped_at,decisionLabel(item.decision),shortDigest(item.policy_digest),item.upstream_called?"예":"아니요"].forEach(value=>{const cell=document.createElement("td");cell.textContent=value;row.append(cell)});
+    [item.request_id,stageLabels[item.stopped_at]||item.stopped_at,decisionLabel(item.decision),shortDigest(item.policy_digest),mainProgress(item)].forEach(value=>{const cell=document.createElement("td");cell.textContent=value;row.append(cell)});
     return row;
   }):[(()=>{const row=document.createElement("tr"),cell=document.createElement("td");cell.colSpan=5;cell.textContent="기록 없음";row.append(cell);return row})()]));
 }
@@ -117,7 +118,7 @@ async function runTest(){
   try{
     const {status,data}=await api("/v1/chat",{method:"POST",body:JSON.stringify({message})});
     setText("test-heading",`${decisionLabel(data.decision)} · HTTP ${status}`);
-    setText("test-summary",`${stageLabels[data.stopped_at]||data.stopped_at}에서 ${data.decision==="ERR"?"오류로 중단":data.decision==="block"?"차단":"완료"} · Main 호출 ${data.upstream_called?"예":"아니요"} · 정책 ${shortDigest(data.policy_digest)}`);
+    setText("test-summary",`${stageLabels[data.stopped_at]||data.stopped_at}에서 ${data.decision==="ERR"?"오류로 중단":data.decision==="block"?"차단":"완료"} · Main ${mainProgress(data)} · 정책 ${shortDigest(data.policy_digest)}`);
     byId("test-stages").replaceChildren(...(data.stages||[]).map(item=>{const line=document.createElement("p");line.textContent=`${stageLabels[item.name]||item.name}: ${item.result}${item.entities?.length?` · ${item.entities.join(", ")}`:""}`;return line}));
     if(data.decision==="allow"&&data.answer){const line=document.createElement("p");line.textContent=`응답: ${data.answer}`;byId("test-stages").append(line)}
     await refreshRecords();
@@ -212,7 +213,7 @@ async function testDraft(){
     draftTested=data.passed===true;
     byId("draft-results").replaceChildren(...data.results.map(item=>{
       const row=document.createElement("div"),name=document.createElement("span"),verdict=document.createElement("b");
-      row.className="draft-case";name.textContent=item.case+" · "+item.decision+" · Main "+(item.upstream_called?"호출":"미호출");
+      row.className="draft-case";name.textContent=item.case+" · "+item.decision+" · Main "+mainProgress(item);
       verdict.textContent=item.passed?"통과":"실패";if(!item.passed)verdict.className="failed";
       row.append(name,verdict);return row;
     }));

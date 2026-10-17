@@ -47,6 +47,8 @@ class FakeModel:
         assert self.role == "main"
         MODE["main_calls"] += 1
         self.tracker.main_attempted = True
+        if MODE.get("main_error"):
+            raise TimeoutError("fixture main peer")
         self.tracker.calls.append({"role": "main"})
         return SimpleNamespace(content="Contact sample@example.com")
 
@@ -67,13 +69,13 @@ async def check():
         MODE["input_block"] = True
         blocked = (await client.post("/v1/chat", headers=auth, json={"message": "risk"})).json()
         assert blocked["decision"] == "block" and blocked["answer"] is None
-        assert blocked["upstream_called"] is False and MODE["main_calls"] == 0
+        assert blocked["upstream_called"] is False and blocked["main_completed"] is False and MODE["main_calls"] == 0
         assert [stage["name"] for stage in blocked["stages"]] == ["presidio_input", "nemo_input"]
 
         MODE["input_block"] = False
         allowed = (await client.post("/v1/chat", headers=auth, json={"message": "sample@example.com"})).json()
         assert allowed["decision"] == "allow" and allowed["answer"] == "<EMAIL_ADDRESS>"
-        assert allowed["upstream_called"] is True and MODE["main_calls"] == 1
+        assert allowed["upstream_called"] is True and allowed["main_completed"] is True and MODE["main_calls"] == 1
         assert [stage["name"] for stage in allowed["stages"]] == [
             "presidio_input", "nemo_input", "main", "nemo_output", "presidio_output"]
 
@@ -81,24 +83,33 @@ async def check():
         before = MODE["privacy_output_calls"]
         output_block = (await client.post("/v1/chat", headers=auth, json={"message": "hello"})).json()
         assert output_block["decision"] == "block" and output_block["upstream_called"] is True
+        assert output_block["main_completed"] is True
         assert MODE["privacy_output_calls"] == before
 
         MODE["output_block"] = False
         MODE["privacy_error_stage"] = "input"
         error = await client.post("/v1/chat", headers=auth, json={"message": "hello"})
         assert error.status_code == 502 and error.json()["decision"] == "ERR"
-        assert error.json()["upstream_called"] is False
+        assert error.json()["upstream_called"] is False and error.json()["main_completed"] is False
         MODE["privacy_error_stage"] = "output"
         before = MODE["main_calls"]
         late_error = await client.post("/v1/chat", headers=auth, json={"message": "hello"})
         assert late_error.status_code == 502 and late_error.json()["decision"] == "ERR"
         assert late_error.json()["stopped_at"] == "presidio_output"
-        assert late_error.json()["upstream_called"] is True and MODE["main_calls"] == before + 1
+        assert late_error.json()["upstream_called"] is True and late_error.json()["main_completed"] is True
+        assert MODE["main_calls"] == before + 1
         assert "sample@example.com" not in late_error.text
         MODE["privacy_error_stage"] = None
+        MODE["main_error"] = True
+        main_error = await client.post("/v1/chat", headers=auth, json={"message": "hello"})
+        assert main_error.status_code == 502 and main_error.json()["stopped_at"] == "main"
+        assert main_error.json()["upstream_called"] is True
+        assert main_error.json()["main_completed"] is False
+        assert "answer" not in main_error.json()
+        MODE["main_error"] = False
 
         records = (await client.get("/v1/requests", headers=auth)).json()["requests"]
-        assert len(records) == 5 and "sample@example.com" not in str(records)
+        assert len(records) == 6 and "sample@example.com" not in str(records)
         assert all(item["policy_digest"] == server.POLICY_DIGEST for item in records)
 
         base = server.ACTIVE_BUNDLE

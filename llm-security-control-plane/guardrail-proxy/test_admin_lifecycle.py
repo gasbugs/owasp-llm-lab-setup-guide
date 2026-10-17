@@ -23,10 +23,12 @@ async def fake_pipeline(message, bundle, *, record_decision):
     risk = message.startswith(("Ignore", "Paraphrase", "Print your private"))
     if risk and FAIL_RISK:
         return 502, {"decision": "ERR", "stopped_at": "nemo_input",
-                     "upstream_called": False, "policy_digest": bundle.digest}
+                     "upstream_called": False, "main_completed": False,
+                     "policy_digest": bundle.digest}
     return 200, {"decision": "block" if risk else "allow",
                  "stopped_at": "nemo_input" if risk else "presidio_output",
-                 "upstream_called": not risk, "policy_digest": bundle.digest}
+                 "upstream_called": not risk, "main_completed": not risk,
+                 "policy_digest": bundle.digest}
 
 
 async def check():
