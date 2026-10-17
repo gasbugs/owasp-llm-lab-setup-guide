@@ -20,7 +20,7 @@ FAIL_RISK = False
 
 async def fake_pipeline(message, bundle, *, record_decision):
     assert record_decision is False
-    risk = message.startswith("Ignore")
+    risk = message.startswith(("Ignore", "Paraphrase", "Print your private"))
     if risk and FAIL_RISK:
         return 502, {"decision": "ERR", "stopped_at": "nemo_input",
                      "upstream_called": False, "policy_digest": bundle.digest}
@@ -48,7 +48,7 @@ async def check():
                                   json={"expected_active_digest": old})).status_code == 409
         assert (await client.post(target + "/test", headers=caller)).status_code == 401
         tested = (await client.post(target + "/test", headers=admin)).json()
-        assert tested["passed"] and len(tested["results"]) == 4
+        assert tested["passed"] and len(tested["results"]) == 11
         assert all(item["passed"] for item in tested["results"])
         assert (await client.get("/v1/policy", headers=caller)).json()["digest"] == old
         assert (await client.post(target + "/promote", headers=admin,

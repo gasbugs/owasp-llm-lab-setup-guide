@@ -217,7 +217,7 @@ async function testDraft(){
       row.append(name,verdict);return row;
     }));
     byId("draft-promote").disabled=!draftTested;
-    setText("draft-state",draftTested?"정상 1건·위험 3건 통과. 활성화할 수 있습니다.":"시험이 실패했습니다. 활성 정책은 유지됩니다.");
+    setText("draft-state",draftTested?"정상 2건·위험 9건 통과. 활성화할 수 있습니다.":"시험이 실패했습니다. 활성 정책은 유지됩니다.");
     await refreshAdminVersions();
   }catch(error){setText("draft-state","후보 시험을 완료하지 못했습니다: "+error.message)}
   finally{button.disabled=false}
