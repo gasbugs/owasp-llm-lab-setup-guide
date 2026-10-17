@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import yaml
 
-from policy_bundle import POLICY_FILES, load_bundle
+from policy_bundle import load_bundle, policy_files
 
 
 class PolicyStore:
@@ -32,7 +32,7 @@ class PolicyStore:
             if not destination.exists():
                 temporary = Path(tempfile.mkdtemp(prefix=".seed-", dir=self.bundles))
                 try:
-                    for filename in POLICY_FILES:
+                    for filename in policy_files(seed_root):
                         target = temporary / filename
                         target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(seed_root / filename, target)
@@ -104,7 +104,7 @@ class PolicyStore:
             source = self.bundles / base_digest
             temporary = Path(tempfile.mkdtemp(prefix=".draft-", dir=self.bundles))
             try:
-                for filename in POLICY_FILES:
+                for filename in policy_files(source):
                     target = temporary / filename
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source / filename, target)
@@ -132,7 +132,7 @@ class PolicyStore:
                     if load_bundle(destination).digest != bundle.digest:
                         raise ValueError("existing draft digest mismatch")
                 else:
-                    for filename in POLICY_FILES:
+                    for filename in policy_files(temporary):
                         (temporary / filename).chmod(0o444)
                     (temporary / "nemo-policy").chmod(0o555)
                     temporary.chmod(0o555)

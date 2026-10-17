@@ -1,9 +1,12 @@
 """Persistent bundle boot and tamper checks, without network peers."""
 
+import hashlib
 import json
+import shutil
 from pathlib import Path
 import tempfile
 
+from policy_bundle import POLICY_FILES, load_bundle
 from policy_store import PolicyStore
 
 
@@ -36,4 +39,57 @@ with tempfile.TemporaryDirectory() as temporary:
     else:
         raise AssertionError("invalid pointer was accepted")
 
-print("policy_store=PASS cases=seed,restart,tamper,pointer")
+with tempfile.TemporaryDirectory() as temporary:
+    root = Path(temporary)
+    seed = root / "seed"
+    for filename in POLICY_FILES:
+        target = seed / filename
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(Path("/app") / filename, target)
+    legacy = hashlib.sha256()
+    for filename in POLICY_FILES:
+        legacy.update(filename.encode() + b"\0" + (seed / filename).read_bytes())
+    assert load_bundle(seed).digest == legacy.hexdigest()
+
+    hidden = seed / "nemo-policy" / "untracked.co"
+    hidden.write_text('define flow hidden\n  bot say "unexpected"\n')
+    try:
+        load_bundle(seed)
+    except ValueError as error:
+        assert "unexpected NeMo policy file" in str(error)
+    else:
+        raise AssertionError("untracked Colang was accepted outside the digest")
+    hidden.unlink()
+
+    flow = seed / "nemo-policy" / "flows.co"
+    flow.write_text('''define user ask recovery
+  "Where is account recovery help?"
+
+define bot recovery guidance
+  "Use the official account support page."
+
+define flow
+  user ask recovery
+  bot recovery guidance
+''')
+    candidate = load_bundle(seed)
+    assert candidate.digest != legacy.hexdigest()
+    store = PolicyStore(root / "state", seed)
+    assert store.active.digest == candidate.digest
+    copied = root / "state" / "bundles" / candidate.digest / "nemo-policy" / "flows.co"
+    assert copied.read_text() == flow.read_text()
+    assert PolicyStore(root / "state", seed).active.digest == candidate.digest
+    draft = store.create_draft(candidate.digest, "0.2.0",
+                               store.active_input_prompt() + "\nExample: normal recovery is No.")
+    assert (root / "state" / "bundles" / draft["digest"] /
+            "nemo-policy" / "flows.co").read_text() == flow.read_text()
+    copied.chmod(0o644)
+    copied.write_text(copied.read_text() + "# tampered\n")
+    try:
+        PolicyStore(root / "state", seed)
+    except ValueError as error:
+        assert "digest mismatch" in str(error)
+    else:
+        raise AssertionError("modified Colang was accepted with an old digest")
+
+print("policy_store=PASS cases=seed,restart,tamper,pointer,legacy_digest,flow_inventory,flow_digest,draft_copy")
