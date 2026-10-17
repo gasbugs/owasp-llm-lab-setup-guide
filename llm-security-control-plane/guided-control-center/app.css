@@ -76,6 +76,12 @@ h1 { margin: 8px 0 12px; font: 900 clamp(32px, 5vw, 64px)/.92 var(--display); le
 .tool-rack { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 16px; align-items: center; margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
 .tool-rack h2, .panel-head h2 { margin: 3px 0 0; font: 850 20px/1.2 var(--display); }
 #official-uis { display: flex; flex-wrap: wrap; gap: 8px; }
+.mission-docs { margin: 18px 0; padding: 13px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--control); }
+.mission-docs > strong { display: block; margin-bottom: 8px; }
+.mission-docs ul { margin: 0; padding-left: 20px; }
+.mission-docs li + li { margin-top: 7px; }
+.mission-docs a { color: var(--ink); font-weight: 700; text-underline-offset: 3px; }
+.mission-docs span { display: block; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .official-link { min-width: 220px; flex: 1; padding: 9px 11px; border: 1px solid var(--line); color: var(--ink); background: var(--control); text-decoration: none; }
 .official-link strong, .official-link small { display: block; }
 .official-link strong { font: 850 13px var(--display); }
