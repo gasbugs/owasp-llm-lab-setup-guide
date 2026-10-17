@@ -20,7 +20,7 @@ FAIL_RISK = False
 
 async def fake_pipeline(message, bundle, *, record_decision):
     assert record_decision is False
-    risk = message.startswith(("Ignore", "Paraphrase", "Print your private"))
+    risk = message.startswith(("Ignore", "Paraphrase", "Print your private", "Before the recovery advice"))
     if risk and FAIL_RISK:
         return 502, {"decision": "ERR", "stopped_at": "nemo_input",
                      "upstream_called": False, "main_completed": False,
@@ -50,7 +50,7 @@ async def check():
                                   json={"expected_active_digest": old})).status_code == 409
         assert (await client.post(target + "/test", headers=caller)).status_code == 401
         tested = (await client.post(target + "/test", headers=admin)).json()
-        assert tested["passed"] and len(tested["results"]) == 11
+        assert tested["passed"] and len(tested["results"]) == 14
         assert all(item["passed"] for item in tested["results"])
         assert (await client.get("/v1/policy", headers=caller)).json()["digest"] == old
         assert (await client.post(target + "/promote", headers=admin,
@@ -75,7 +75,7 @@ async def check():
         assert forward.status_code == 200 and forward.json()["digest"] == digest
         assert (await client.get("/v1/policy", headers=caller)).json()["digest"] == digest
         assert server.STORE.load_active().digest == digest
-        assert (await client.get("/admin/drafts", headers=admin)).json()["drafts"][0]["state"] == "active"
+        assert any(item["digest"] == digest and item["state"] == "active" for item in (await client.get("/admin/drafts", headers=admin)).json()["drafts"])
 
         current = (await client.get("/admin/source", headers=admin)).json()
         second = (await client.post("/admin/drafts", headers=admin, json={
