@@ -125,7 +125,10 @@ def publish_notice(
     approval_token: str = "",
 ) -> dict:
     """Publish one local training notice after an exact-call approval."""
-    # TODO(H22): 모델의 Tool 제안을 권한으로 믿지 말고 exact-call 승인을 검사한다.
+    # TODO 1: approval_token을 verify_approval()로 검사하고 서명된 nonce를 받으세요.
+    # TODO 2: 승인된 suite·call·trace·requester·notice가 이 호출과 같은지 확인하세요.
+    # TODO 3: 새 임의 nonce를 만들지 말고 승인에서 받은 nonce를 consumed에 기록하세요.
+    # TODO 4: 같은 nonce의 재사용은 아래 IntegrityError 경로에서 ToolError로 거부하세요.
     nonce = secrets.token_hex(16)
 
     try:
