@@ -194,6 +194,11 @@ function saveThemeMode(mode) {
 function setText(id, value) {
   const node = byId(id);
   node.textContent = value === undefined || value === null ? "—" : String(value);
+  if (id === "tutorial-submit-command" && /^\s*curl\b/.test(node.textContent)) {
+    node.dataset.language = "bash";
+    delete node.dataset.highlighted;
+    highlightBashBlocks(node.parentElement || document);
+  }
   if (["raw", "tutorial-result", "resource-raw", "mission-experience-raw", "h23-chat-raw", "model-connection-raw"].includes(id)) {
     const disclosure = node.closest("details");
     if (disclosure) disclosure.open = false;
@@ -599,6 +604,8 @@ function renderAdminMarkdown(container, source) {
       if (index < lines.length) index += 1;
       const pre = document.createElement("pre");
       const code = document.createElement("code");
+      if (["python", "py"].includes(fence[1].toLowerCase())) pre.dataset.language = "python";
+      if (["bash", "sh", "shell"].includes(fence[1].toLowerCase())) pre.dataset.language = "bash";
       if (fence[1]) code.className = `language-${fence[1]}`;
       code.textContent = codeLines.join("\n");
       pre.append(code); container.append(pre); continue;
@@ -677,7 +684,78 @@ async function writeClipboard(text) {
 
 let copyableCodeBlocksEnabled = true;
 
+function highlightPythonBlocks(root = document) {
+  const keywords = new Set(["def", "if", "not", "raise", "try", "except", "as", "from", "return"]);
+  const builtins = new Set(["isinstance", "str", "ValueError", "RuntimeError", "BotoCoreError", "ClientError"]);
+  const tokens = /#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b\d+(?:\.\d+)?\b|\b[A-Za-z_]\w*\b/g;
+  for (const pre of root.querySelectorAll('pre[data-language="python"]')) {
+    if (pre.dataset.highlighted === "true") continue;
+    const source = pre.textContent;
+    const fragment = document.createDocumentFragment();
+    let position = 0;
+    for (const match of source.matchAll(tokens)) {
+      if (match.index > position) fragment.append(document.createTextNode(source.slice(position, match.index)));
+      const value = match[0];
+      const kind = value.startsWith("#") ? "comment"
+        : value.startsWith('"') || value.startsWith("'") ? "string"
+        : /^\d/.test(value) ? "number"
+        : keywords.has(value) ? "keyword"
+        : builtins.has(value) ? "builtin" : "";
+      if (kind) {
+        const span = document.createElement("span");
+        span.className = `syntax-${kind}`;
+        span.textContent = value;
+        fragment.append(span);
+      } else {
+        fragment.append(document.createTextNode(value));
+      }
+      position = match.index + value.length;
+    }
+    fragment.append(document.createTextNode(source.slice(position)));
+    pre.replaceChildren(fragment);
+    pre.dataset.highlighted = "true";
+  }
+}
+
+function highlightBashBlocks(root = document) {
+  const commands = new Set(["cd", "vi", "cat", "ls", "mkdir", "curl", "docker", "python", "python3", "aws", "git", "export", "cp", "sudo", "wsl", "jq"]);
+  for (const pre of root.querySelectorAll('pre[data-language="bash"]')) {
+    if (pre.dataset.highlighted === "true") continue;
+    const source = pre.textContent;
+    const fragment = document.createDocumentFragment();
+    const tokens = /#[^\n]*|"(?:\\.|[^"\\])*"|'(?:[^']*)'|\$\{?[A-Za-z_][A-Za-z_0-9]*\}?|--[A-Za-z][\w-]*|\b[A-Za-z][\w-]*\b/g;
+    let position = 0;
+    for (const match of source.matchAll(tokens)) {
+      if (match.index > position) fragment.append(document.createTextNode(source.slice(position, match.index)));
+      const value = match[0];
+      const kind = value.startsWith("#") ? "comment"
+        : value.startsWith('"') || value.startsWith("'") ? "string"
+        : value.startsWith("$") ? "variable"
+        : value.startsWith("--") ? "option"
+        : commands.has(value) && (match.index === 0 || /[\n;&|]\s*$/.test(source.slice(0, match.index))) ? "command" : "";
+      if (kind) {
+        const span = document.createElement("span");
+        span.className = `syntax-${kind}`;
+        span.textContent = value;
+        fragment.append(span);
+      } else fragment.append(document.createTextNode(value));
+      position = match.index + value.length;
+    }
+    fragment.append(document.createTextNode(source.slice(position)));
+    pre.replaceChildren(fragment);
+    pre.dataset.highlighted = "true";
+  }
+}
+
 function prepareCopyableBlocks(root = document) {
+  for (const pre of root.querySelectorAll("pre:not([id])")) {
+    if (pre.dataset.language || pre.closest(".admin-answer-content")) continue;
+    if (/^\s*(?:cd|vi|cat|ls|mkdir|curl|docker|python3?|aws|git|export|cp|sudo|wsl|jq)\b/.test(pre.textContent)) pre.dataset.language = "bash";
+  }
+  const tutorialCommand = root.querySelector("#tutorial-submit-command");
+  if (tutorialCommand && /^\s*curl\b/.test(tutorialCommand.textContent)) tutorialCommand.dataset.language = "bash";
+  highlightPythonBlocks(root);
+  highlightBashBlocks(root);
   if (!copyableCodeBlocksEnabled) return;
   for (const pre of root.querySelectorAll("pre:not([id]), pre#tutorial-submit-command")) {
     if (pre.parentElement?.classList.contains("copyable-block")) continue;

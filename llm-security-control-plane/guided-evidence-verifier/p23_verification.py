@@ -14,7 +14,12 @@ def check(receipt, current, expected_runner, execution_id):
     normal, blank, error=cases
     expected={"modelId":MODEL,"messages":[{"role":"user","content":[{"text":"계정 비밀번호를 바꾸는 이유를 한 문장으로 설명해 주세요."}]}],"inferenceConfig":{"maxTokens":64,"temperature":0}}
     response=normal.get("returned") or {}
-    valid_normal=(normal.get("sdk_clients")==[{"service":"bedrock-runtime","region":"us-east-1","native_sdk":True}] and normal.get("calls")==[expected] and normal.get("provider_attempts")==1
+    def client_region(case):
+        clients=case.get("sdk_clients")
+        return clients[0].get("region") if isinstance(clients,list) and len(clients)==1 and isinstance(clients[0],dict) else None
+    normal_region=client_region(normal)
+    error_region=client_region(error)
+    valid_normal=(bool(normal_region) and normal.get("sdk_clients")==[{"service":"bedrock-runtime","region":normal_region,"native_sdk":True}] and normal.get("calls")==[expected] and normal.get("provider_attempts")==1
         and normal.get("provider_results")==[response] and normal.get("error") is None
         and bool(response.get("ResponseMetadata",{}).get("RequestId"))
         and not str(response.get("ResponseMetadata",{}).get("RequestId","")).startswith("contract-")
@@ -23,7 +28,7 @@ def check(receipt, current, expected_runner, execution_id):
     valid_blank=(blank.get("sdk_clients")==[] and blank.get("calls")==[] and blank.get("provider_attempts")==0
         and blank.get("returned") is None and (blank.get("error") or {}).get("type")=="ValueError")
     error_call={**expected,"messages":[{"role":"user","content":[{"text":"연결 오류 처리 확인"}]}]}
-    valid_error=(error.get("sdk_clients")==[{"service":"bedrock-runtime","region":"us-east-1","native_sdk":True}] and error.get("calls")==[error_call] and error.get("fixture_errors")==1
+    valid_error=(error_region == normal_region and error.get("sdk_clients")==[{"service":"bedrock-runtime","region":normal_region,"native_sdk":True}] and error.get("calls")==[error_call] and error.get("fixture_errors")==1
         and error.get("provider_attempts")==0 and error.get("provider_results")==[]
         and error.get("returned") is None and error.get("error")=={"type":"RuntimeError","message":"model unavailable"})
     checks=[valid_normal,valid_blank,valid_error]

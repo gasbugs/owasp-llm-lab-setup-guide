@@ -3,6 +3,7 @@
 This supplements the existing HTTP exposure tests; it is not a general image audit.
 """
 from pathlib import Path
+import ast
 import re
 import shlex
 import unittest
@@ -26,10 +27,12 @@ class SolutionBoundaryTests(unittest.TestCase):
     def test_p01_01_repository_keeps_unsolved_starter(self):
         source = (ROOT / 'guided-labs/h23-model-call/learner.py').read_text()
         self.assertIn('TODO 1:', source)
-        self.assertIn('TODO 2, 3, 4:', source)
+        for number in (2, 3, 4):
+            self.assertIn(f'TODO {number}:', source)
         self.assertIn('raise NotImplementedError("Implement forward_question")', source)
-        self.assertNotIn('boto3.client("bedrock-runtime"', source)
-        self.assertNotIn('client.converse(', source)
+        calls = [node.func for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)]
+        self.assertFalse(any(isinstance(func, ast.Attribute) and func.attr in {'client', 'converse'}
+                             for func in calls))
 
     def test_p13_public_problem_includes_fixed_inputs_without_assertion_solution(self):
         html = (ROOT / 'guided-control-center/index.html').read_text()

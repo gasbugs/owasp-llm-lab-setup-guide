@@ -64,14 +64,14 @@ class SDKRecorder:
         def create(service_name, **kwargs):
             config = kwargs.get("config")
             if (service_name != "bedrock-runtime" or set(kwargs) != {"region_name", "config"}
-                or kwargs["region_name"] != "us-east-1" or not isinstance(config, Config)
+                or not kwargs["region_name"] or kwargs["region_name"] != boto3.session.Session().region_name or not isinstance(config, Config)
                 or config.connect_timeout != 5 or config.read_timeout != 90
                 or config.retries.get("total_max_attempts") != 1 or self.clients):
                 raise ValueError("create one bounded Bedrock SDK client")
             sdk = original_factory(service_name, **kwargs)
             if not isinstance(sdk, BaseClient):
                 raise ValueError("native Boto3 client required")
-            self.clients.append({"service":"bedrock-runtime", "region":"us-east-1", "native_sdk":True})
+            self.clients.append({"service":"bedrock-runtime", "region":kwargs["region_name"], "native_sdk":True})
             original_call = sdk._make_api_call
             def invoke(operation, arguments):
                 self.calls.append(deepcopy(arguments))

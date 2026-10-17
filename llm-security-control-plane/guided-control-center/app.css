@@ -736,6 +736,16 @@ details.admin-answer > summary { cursor: pointer; font-weight: 800; font-size: 1
 .copy-block-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 2.8rem; padding: .45rem .55rem .45rem .85rem; border-bottom: 1px solid var(--line-strong); background: var(--code-toolbar); }
 .copy-block-toolbar > span { color: var(--ink); font: 800 .72rem/1 var(--mono); letter-spacing: .05em; }
 .copyable-block > pre { margin: 0; padding: 1rem; border: 0; border-radius: 0; background: var(--code-bg); color: var(--code-ink); }
+pre[data-language="python"] .syntax-keyword { color: #c6b8ff; font-weight: 700; }
+pre[data-language="python"] .syntax-string { color: #ace6ae; }
+pre[data-language="python"] .syntax-number { color: #ffd18a; }
+pre[data-language="python"] .syntax-builtin { color: #91d9ff; }
+pre[data-language="python"] .syntax-comment { color: #a7bdc9; }
+pre[data-language="bash"] .syntax-command { color: #91d9ff; font-weight: 700; }
+pre[data-language="bash"] .syntax-string { color: #ace6ae; }
+pre[data-language="bash"] .syntax-variable { color: #ffd18a; }
+pre[data-language="bash"] .syntax-option { color: #c6b8ff; }
+pre[data-language="bash"] .syntax-comment { color: #a7bdc9; }
 .copy-block-button { flex: 0 0 auto; min-width: 4.3rem; padding: .35rem .65rem; border-color: var(--blue-action); color: var(--on-accent); background: var(--blue-action); font-size: .76rem; }
 .clipboard-fallback { position: fixed; left: -9999px; top: 0; }
 .admin-answer-content { width: 100%; min-width: 0; max-width: 100%; max-height: 65vh; overflow: auto; margin-top: 1rem; padding: 0 1rem 1rem; border-radius: .65rem; background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%); }

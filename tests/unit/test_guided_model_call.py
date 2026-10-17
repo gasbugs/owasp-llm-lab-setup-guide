@@ -17,6 +17,17 @@ class Checks(unittest.TestCase):
     def grade(self,r):
         return m.check(r,{"source_digest":"a"*64,"runner_digest":"b"*64},"b"*64,"fresh")
     def test_complete(self): self.assertTrue(self.grade(self.receipt())["task_completed"])
+    def test_configured_region_can_change(self):
+        r=self.receipt()
+        for case in (r["cases"][0], r["cases"][2]):
+            case["sdk_clients"][0]["region"]="us-west-2"
+        self.assertTrue(self.grade(r)["task_completed"])
+        r["cases"][2]["sdk_clients"][0]["region"]="us-east-1"
+        self.assertFalse(self.grade(r)["task_completed"])
+    def test_malformed_region_evidence_is_err(self):
+        r=self.receipt()
+        r["cases"][0]["sdk_clients"]="invalid"
+        self.assertFalse(self.grade(r)["task_completed"])
     def test_fake_answer(self):
         r=self.receipt();r["cases"][0]["returned"]["output"]["message"]["content"]=[{"text":"fake"}]
         self.assertFalse(self.grade(r)["task_completed"])
