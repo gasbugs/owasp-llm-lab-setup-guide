@@ -100,6 +100,14 @@ def main():
     try:
         stop_checked_container("llm-security-guided-control-center")
         stop_checked_container("llm-security-guided-evidence-verifier")
+        # A learner may create P00 after the ownership preview. Capture the
+        # final file only after the server is stopped, then remove it.
+        p00_path = Path.home() / "work/control-center-tutorial/request.json"
+        if p00_path.exists():
+            if p00_path.is_symlink() or not p00_path.is_file():
+                raise RuntimeError("P00 request path is not a regular file")
+            shutil.copy2(p00_path, backup / "P00-request.json")
+            p00_path.unlink()
         for container in report["mission_containers"]:
             run("docker", "rm", "-f", container)
         for volume in report["mission_volumes"]:
@@ -112,8 +120,6 @@ def main():
             temporary.write_bytes(data)
             temporary.chmod(0o644)
             os.replace(temporary, name)
-        if p00:
-            Path(p00).unlink()
         clear = ("import sqlite3,uuid; db=sqlite3.connect('/state/progress.sqlite3'); "
                  "db.execute('DELETE FROM progress'); "
                  "db.execute('DELETE FROM tutorial_completion'); "
