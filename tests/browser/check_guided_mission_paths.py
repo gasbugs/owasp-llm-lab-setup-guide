@@ -11,8 +11,8 @@ manifest = defaultdict(list)
 for line in (root / "tools/guided-practice-files.tsv").read_text().splitlines():
     if not line or line.startswith("#"):
         continue
-    display, source, workspace_name, _services = line.split("|")
-    manifest[display].append((source, workspace_name))
+    display, source, workspace_name, services = line.split("|")
+    manifest[display].append((source, workspace_name, services.split(",")))
 
 with sync_playwright() as p:
     browser = p.chromium.launch()
@@ -30,10 +30,20 @@ with sync_playwright() as p:
             assert expected, (mission, display)
             panel = page.locator("#h" + mission[1:] + "-work")
             text = panel.inner_text()
-            for source, workspace_name in expected:
+            apply = panel.locator('pre[data-code-title="코드 적용 · 파일 복사와 재생성"]')
+            assert apply.count() == 1, (mission, display)
+            command = apply.inner_text()
+            assert "cd ~/owasp-llm-lab-setup-guide" in command, (mission, display)
+            assert "up -d --no-deps --force-recreate" in command, (mission, display)
+            for source, workspace_name, services in expected:
                 assert (root / "llm-security-control-plane" / source).is_file(), (mission, source)
                 assert f"vi {workspace_prefix}{workspace_name}" in text, (mission, workspace_name)
-            assert f"./tools/apply-guided-practice.sh {display}" in text, (mission, display)
+                assert (
+                    f"install -m 0644 {workspace_prefix}{workspace_name} "
+                    f".state/guided-practice-build/{source}"
+                ) in command, (mission, workspace_name)
+                for service in services:
+                    assert service in command, (mission, service)
             gaps = panel.locator(".hands-on > div > :is(p:not(.label), ul, ol, pre, details) + h3").evaluate_all(
                 "(headings)=>headings.map(h=>({title:h.textContent,gap:h.getBoundingClientRect().top-h.previousElementSibling.getBoundingClientRect().bottom}))"
             )
