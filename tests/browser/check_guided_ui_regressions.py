@@ -10,6 +10,7 @@ from guided_ui_harness import display_server
 
 CHECKS = (
     "check_guided_copy_blocks.py",
+    "check_guided_admin_answer_layout.py",
     "check_guided_mission_paths.py",
     "check_guided_case_requests.py",
     "check_guided_case_diagnostics.py",

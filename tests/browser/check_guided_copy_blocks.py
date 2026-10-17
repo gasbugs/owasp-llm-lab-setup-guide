@@ -17,6 +17,19 @@ with sync_playwright() as playwright:
     block.locator(".copy-block-button").click()
     assert page.evaluate("navigator.clipboard.readText()") == command
     assert page.locator(".copy-block-toolbar span").filter(has_text="코드 블록").count() == 0
+    disabled = context.new_page()
+
+    def disabled_bootstrap(route):
+        response = route.fetch()
+        payload = response.json()
+        payload["copyable_code_blocks"] = False
+        route.fulfill(json=payload)
+
+    disabled.route("**/api/bootstrap", disabled_bootstrap)
+    disabled.goto(origin, wait_until="networkidle")
+    disabled.evaluate('selectWorkspace("tutorial")')
+    assert disabled.locator("#tutorial-submit-command").locator("..").get_attribute("class") != "copyable-block"
+    assert disabled.locator(".copy-block-toolbar").count() == 0
     context.close()
     browser.close()
-print("PASS: P00 curl command is titled and copied exactly; generic code-block title absent")
+print("PASS: P00 curl command copies exactly; server-disabled blocks have no copy UI")
