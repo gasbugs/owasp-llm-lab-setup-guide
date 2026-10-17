@@ -93,7 +93,7 @@
         <h3>미션 해결 조건</h3>
         <ul><li>JSON 객체에 <code>message</code>와 <code>max_tokens</code> 두 필드를 작성하세요.</li><li><code>message</code>에는 <code>계정 보안을 위한 조언을 한 문장으로 알려 주세요.</code>를 넣으세요.</li><li><code>max_tokens</code>는 문자열이 아닌 숫자 <code>64</code>로 작성하세요.</li></ul>
         <aside class="mission-docs" aria-label="P00 도움 문서">
-          <strong>막힐 때 보는 문서</strong>
+          <strong>참고 문서</strong>
           <ul>
             <li><a href="https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Objects/JSON" target="_blank" rel="noopener noreferrer">MDN · JSON 작성법</a><span>필드 이름·문자열의 큰따옴표와 숫자 표기를 확인하세요.</span></li>
             <li><a href="https://curl.se/docs/manpage.html#--data-binary" target="_blank" rel="noopener noreferrer">curl · --data-binary</a><span><code>@파일</code>로 저장한 요청 본문을 보내는 방법을 확인하세요.</span></li>
@@ -303,7 +303,7 @@ vi ~/work/control-center-tutorial/request.json</pre>
           <li>정상 질문은 한 번 호출합니다. 모델은 <code>us.amazon.nova-lite-v1:0</code>, 전달 형식은 <code>messages=[{"role":"user","content":[{"text":message}]}]</code>, 생성 설정은 <code>inferenceConfig={"maxTokens":64,"temperature":0}</code>입니다.</li>
           <li><code>client.converse()</code>가 반환한 dict를 그대로 반환합니다. 모델 연결 오류는 <code>RuntimeError("model unavailable")</code>로 전달합니다.</li></ul>
           <aside class="mission-docs" aria-label="P01-01 도움 문서">
-            <strong>막힐 때 보는 문서</strong>
+            <strong>참고 문서</strong>
             <ul>
               <li><a href="https://docs.aws.amazon.com/boto3/latest/reference/core/boto3.html" target="_blank" rel="noopener noreferrer">Boto3 · 클라이언트 생성</a><span><code>boto3.client()</code>의 서비스 이름과 인자 형식을 찾아보세요.</span></li>
               <li><a href="https://docs.aws.amazon.com/boto3/latest/reference/services/bedrock-runtime/client/converse.html" target="_blank" rel="noopener noreferrer">AWS · Converse 요청 문법</a><span><code>messages</code>와 <code>inferenceConfig</code>의 구조를 확인하세요.</span></li>
