@@ -12,11 +12,11 @@ STAGES = {
 CONFIG = RailsConfig.from_path("/app/nemo-policy")
 
 
-async def check_text(stage, text, model):
+async def check_text(stage, text, model, *, config=None):
     if stage not in STAGES or not isinstance(text, str) or not text.strip() or len(text) > 8000:
         raise ValueError("invalid rail input")
     kind, task, flow, role = STAGES[stage]
-    rails = LLMRails(CONFIG, llm=model)
+    rails = LLMRails(config if config is not None else CONFIG, llm=model)
     messages = [{"role": role, "content": text}]
     if kind == "output":
         messages.insert(0, {"role": "user", "content": ""})

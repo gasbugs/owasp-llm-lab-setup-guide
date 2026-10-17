@@ -5,6 +5,7 @@ import os
 from types import SimpleNamespace
 
 os.environ.setdefault("PROXY_CALLER_TOKEN", "c" * 64)
+os.environ.setdefault("PROXY_ADMIN_TOKEN", "a" * 64)
 os.environ.setdefault("PROXY_GATEWAY_TOKEN", "g" * 64)
 os.environ.setdefault("PROXY_PRIVACY_TOKEN", "p" * 64)
 os.environ.setdefault("GATEWAY_URL", "http://unused")

@@ -81,6 +81,21 @@ jobs:
             --entrypoint python \
             localhost/llm-security-guardrail-proxy-api:0.1.0 \
             /app/test_proxy.py
+          docker run --rm --network none \
+            --volume "$PWD/llm-security-control-plane/guardrail-proxy/test_policy_store.py:/app/test_policy_store.py:ro" \
+            --entrypoint python \
+            localhost/llm-security-guardrail-proxy-api:0.1.0 \
+            /app/test_policy_store.py
+          docker run --rm --network none \
+            --volume "$PWD/llm-security-control-plane/guardrail-proxy/test_admin_drafts.py:/app/test_admin_drafts.py:ro" \
+            --entrypoint python \
+            localhost/llm-security-guardrail-proxy-api:0.1.0 \
+            /app/test_admin_drafts.py
+          docker run --rm --network none \
+            --volume "$PWD/llm-security-control-plane/guardrail-proxy/test_admin_lifecycle.py:/app/test_admin_lifecycle.py:ro" \
+            --entrypoint python \
+            localhost/llm-security-guardrail-proxy-api:0.1.0 \
+            /app/test_admin_lifecycle.py
       - name: Validate the standalone Module 10 Compose model
         run: |
           install -d -m 0700 llm-security-control-plane/.state/application-auth

@@ -43,10 +43,13 @@ services:
       dockerfile: guardrail-proxy/Containerfile
     environment:
       PROXY_CALLER_TOKEN: ${PROXY_CALLER_TOKEN:?required}
+      PROXY_ADMIN_TOKEN: ${PROXY_ADMIN_TOKEN:?required}
       PROXY_GATEWAY_TOKEN: ${PROXY_GATEWAY_TOKEN:?required}
       PROXY_PRIVACY_TOKEN: ${PROXY_PRIVACY_TOKEN:?required}
       GATEWAY_URL: http://gateway:8080
       PRIVACY_URL: http://privacy:8013
+    volumes:
+      - policy_state:/state
     ports:
       - 127.0.0.1:28906:8000
     networks: [private, ingress]
@@ -63,3 +66,5 @@ networks:
   private: {internal: true}
   egress: {}
   ingress: {}
+volumes:
+  policy_state: {}

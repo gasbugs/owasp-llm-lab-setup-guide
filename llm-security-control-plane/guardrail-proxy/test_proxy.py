@@ -1,12 +1,14 @@
 """Deterministic API-boundary regression without Bedrock or Docker peers."""
 
 import asyncio
+from dataclasses import replace
 import os
 from types import SimpleNamespace
 
 import httpx
 
 os.environ.setdefault("PROXY_CALLER_TOKEN", "c" * 64)
+os.environ.setdefault("PROXY_ADMIN_TOKEN", "a" * 64)
 os.environ.setdefault("PROXY_GATEWAY_TOKEN", "g" * 64)
 os.environ.setdefault("PROXY_PRIVACY_TOKEN", "p" * 64)
 os.environ.setdefault("GATEWAY_URL", "http://unused")
@@ -20,6 +22,9 @@ MODE = {"input_block": False, "output_block": False, "privacy_error_stage": None
 
 
 async def fake_privacy(stage, text, request_id):
+    if stage == "input" and MODE.get("hold_input"):
+        MODE["input_entered"].set()
+        await MODE["release_input"].wait()
     if MODE["privacy_error_stage"] == stage:
         raise TimeoutError("fixture")
     if stage == "output":
@@ -28,7 +33,8 @@ async def fake_privacy(stage, text, request_id):
     return text.replace("sample@example.com", "<EMAIL_ADDRESS>"), ["EMAIL_ADDRESS"] if "@" in text else []
 
 
-async def fake_rail(stage, text, model):
+async def fake_rail(stage, text, model, *, config=None):
+    MODE.setdefault("seen_configs", []).append(config)
     blocked = MODE["input_block"] if stage == "input_rail" else MODE["output_block"]
     return {"allowed": not blocked, "evidence": {"rail": "self check input" if stage == "input_rail" else "self check output"}}
 
@@ -95,7 +101,31 @@ async def check():
         assert len(records) == 5 and "sample@example.com" not in str(records)
         assert all(item["policy_digest"] == server.POLICY_DIGEST for item in records)
 
+        base = server.ACTIVE_BUNDLE
+        alternate = replace(base, digest="f" * 64, rails_config=object(),
+                            limit=asyncio.Semaphore(2))
+        MODE["seen_configs"] = []
+        MODE["hold_input"] = True
+        MODE["input_entered"] = asyncio.Event()
+        MODE["release_input"] = asyncio.Event()
+        in_flight = asyncio.create_task(client.post("/v1/chat", headers=auth,
+                                                     json={"message": "hello"}))
+        await asyncio.wait_for(MODE["input_entered"].wait(), timeout=5)
+        server.ACTIVE_BUNDLE = alternate
+        MODE["release_input"].set()
+        pinned = (await in_flight).json()
+        assert pinned["policy_digest"] == base.digest
+        assert MODE["seen_configs"] == [base.rails_config, base.rails_config]
+        MODE["hold_input"] = False
+        MODE["seen_configs"] = []
+        latest = (await client.post("/v1/chat", headers=auth,
+                                     json={"message": "hello"})).json()
+        assert latest["policy_digest"] == alternate.digest
+        assert MODE["seen_configs"] == [alternate.rails_config, alternate.rails_config]
+        assert (await client.get("/v1/policy", headers=auth)).json()["digest"] == alternate.digest
+        server.ACTIVE_BUNDLE = base
+
 
 if __name__ == "__main__":
     asyncio.run(check())
-    print("proxy_api_contract=PASS cases=auth,validation,block,allow,output_block,input_error,output_timeout,records")
+    print("proxy_api_contract=PASS cases=auth,validation,block,allow,output_block,input_error,output_timeout,records,inflight_policy_pin")
