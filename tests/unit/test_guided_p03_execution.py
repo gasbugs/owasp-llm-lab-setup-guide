@@ -133,7 +133,10 @@ class ExecutionTests(unittest.TestCase):
 
     def test_starter_syntax_and_wrong_return_are_not_success(self):
         for source, status in (
-            ((LAB / "learner.py").read_text(), "not_implemented"),
+            # The current Starter expects NativeSDK.authenticate; this synthetic
+            # ServiceClient has no credential method and must fail before a call.
+            ((LAB / "learner.py").read_text(), "runtime_error"),
+            ("async def search_current(*args): raise NotImplementedError", "not_implemented"),
             ("def broken(:", "runtime_error"),
             ('async def search_current(*args): return {"status":"ready","result":None}', "invalid_return"),
         ):

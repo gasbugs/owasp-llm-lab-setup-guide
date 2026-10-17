@@ -58,7 +58,7 @@ class PreviewTransportTests(unittest.TestCase):
             recorder=module.SDKRecorder(preview_tokens=2048)
             with Stubber(client) as stub:
                 stub.add_response('converse',result,actual)
-                with patch.object(module.boto3,'client',return_value=client):
+                with patch.dict(os.environ, {'AWS_DEFAULT_REGION':'us-east-1'}), patch.object(module.boto3,'client',return_value=client):
                     with recorder.observe():
                         sdk=module.boto3.client('bedrock-runtime',region_name='us-east-1',config=config)
                         self.assertEqual(sdk.converse(**args),result)

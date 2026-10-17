@@ -39,7 +39,7 @@ class Experience(unittest.TestCase):
             return client.converse(modelId=self.m.MODEL,messages=[{"role":"user","content":[{"text":message}]}],inferenceConfig={"maxTokens":64,"temperature":0})
         self.m.learner.forward_question=forward
         native=boto3.client("bedrock-runtime",region_name="us-east-1",aws_access_key_id="fixture",aws_secret_access_key="fixture")
-        with patch.object(native,"_make_api_call",return_value=response), patch.object(self.m.boto3,"client",return_value=native):
+        with patch.dict(os.environ, {"AWS_DEFAULT_REGION": "us-east-1"}), patch.object(native,"_make_api_call",return_value=response), patch.object(self.m.boto3,"client",return_value=native):
             result=self.send({"message":"hi"}).json()
         self.assertEqual(result['reply'],'real answer');self.assertIs(result['graded'],False)
         self.assertNotIn('task_completed',result);self.assertNotIn('security_verdict',result)

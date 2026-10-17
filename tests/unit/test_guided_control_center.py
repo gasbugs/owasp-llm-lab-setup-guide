@@ -383,7 +383,8 @@ class GuidedControlCenterTests(unittest.TestCase):
                 self.assertIn('미션 해결 조건', section)
                 self.assertIn('코드 적용하기', section)
                 self.assertIn('~/owasp-llm-practice/', section)
-                self.assertRegex(section, r'\./tools/apply-guided-practice\.sh P\d{2}-\d{2}')
+                self.assertIn('install -m 0644 ~/owasp-llm-practice/', section)
+                self.assertIn('.state/guided-practice-build/', section)
                 self.assertIn('미션 채점', section)
 
     def test_problem_conditions_are_direct_and_include_required_values(self):
@@ -1359,7 +1360,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         page=self.client.get('/').text
         self.assertNotIn('EXPORT_TO_ALLOY',page)
         self.assertIn('미션 채점',page)
-        self.assertIn('./tools/apply-guided-practice.sh P06-01',page)
+        self.assertIn('install -m 0644 ~/owasp-llm-practice/P06-01_instrumentation.py',page)
         self.assertIn('aria-describedby="h17-help"',page)
 
     def test_p19_uses_dedicated_runtime_and_server_owned_verification(self):
@@ -1398,7 +1399,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         page=self.client.get('/').text
         self.assertIn('미션 채점',page);self.assertIn('aria-describedby="h20-help"',page)
         self.assertNotIn('guided_h20_risk_active',page);self.assertNotIn('dashboard-query.txt',page)
-        self.assertIn('./tools/apply-guided-practice.sh P06-04',page)
+        self.assertIn('install -m 0644 ~/owasp-llm-practice/P06-04_rules.yaml',page)
 
     def test_p20_missing_connection_does_not_call_shared_observability(self):
         with patch.object(self.server,'H20_TOKEN',''),patch.object(self.server.httpx,'AsyncClient',FakeAsyncClient):
@@ -1456,7 +1457,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertIn("handle_request(body, client)", html)
         self.assertNotIn("강사와 함께", html)
         self.assertNotIn("비용 안내", html)
-        self.assertIn("./tools/apply-guided-practice.sh P03-01", html)
+        self.assertIn("install -m 0644 ~/owasp-llm-practice/P03-01_learner.py", html)
         self.assertIn('data-theme-choice="light"', html)
         self.assertIn('data-theme-choice="dark"', html)
         self.assertIn('id="chat-form"', html)
@@ -1617,7 +1618,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         html = (CONTROL / "guided-control-center/index.html").read_text(encoding="utf-8")
         problem = html.split('<div id="h18-work"', 1)[1].split('<div id="h19-work"', 1)[0]
         for required in ('미션 채점', 'queries.yaml', 'request_id', 'Counter',
-                         './tools/apply-guided-practice.sh P06-02', 'aria-describedby="h18-help"'):
+                         'install -m 0644 ~/owasp-llm-practice/P06-02_queries.yaml', 'aria-describedby="h18-help"'):
             self.assertIn(required, problem)
         for solution in ('logql:', 'promql:', 'sum(', 'max by ('):
             self.assertNotIn(solution, problem)
@@ -1628,7 +1629,7 @@ class GuidedControlCenterTests(unittest.TestCase):
         problem = html.split('<div id="h19-work"', 1)[1].split('<div id="h20-work"', 1)[0]
         self.assertNotIn('JOIN_KEY', problem)
         for required in ('미션 채점', 'analyze_incident', 'downstream_calls', 'ValueError',
-                         './tools/apply-guided-practice.sh P06-03', '실제 저장소 호출',
+                         'install -m 0644 ~/owasp-llm-practice/P06-03_investigation.py', '실제 저장소 호출',
                          'aria-describedby="h19-help"', 'role="note"'):
             self.assertIn(required, problem)
 
