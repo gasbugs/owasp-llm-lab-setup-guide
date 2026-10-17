@@ -1,38 +1,18 @@
 #!/usr/bin/env python3
 """Loopback-only, fixed-command bridge for the Tenant 03 reset UI."""
-import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
-import os
 from pathlib import Path
-import secrets
 import subprocess
 import sys
 import time
 from threading import Lock, Thread
 
 ROOT = Path(__file__).resolve().parents[1]
-SECRET_PATH = ROOT / ".state/guided-reset-secret"
 ORIGIN = "http://127.0.0.1:28097"
 STATE = {"state": "idle", "detail": ""}
 LOCK = Lock()
 
-
-def secret():
-    SECRET_PATH.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    try:
-        descriptor = os.open(SECRET_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError:
-        pass
-    else:
-        with os.fdopen(descriptor, "w") as stream:
-            stream.write(secrets.token_urlsafe(32) + "\n")
-    if SECRET_PATH.is_symlink() or SECRET_PATH.stat().st_mode & 0o077:
-        raise RuntimeError("Reset secret must be a private regular file")
-    return SECRET_PATH.read_text().strip()
-
-
-SECRET = secret()
 
 
 def perform_reset():
@@ -81,9 +61,6 @@ class Handler(BaseHTTPRequestHandler):
     def allowed(self):
         return self.headers.get("Origin") == ORIGIN
 
-    def authenticated(self):
-        return hmac.compare_digest(self.headers.get("X-Guided-Reset-Secret", ""), SECRET)
-
     def do_OPTIONS(self):
         if not self.allowed():
             self.send_error(403)
@@ -91,12 +68,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", ORIGIN)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Guided-Reset-Secret")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
     def do_GET(self):
-        if not self.allowed() or not self.authenticated():
-            self.respond(403, {"error": "초기화 비밀값이 맞지 않습니다."})
+        if not self.allowed():
+            self.respond(403, {"error": "이 로컬 실습실 화면에서만 요청할 수 있습니다."})
             return
         if self.path == "/status":
             with LOCK:
@@ -120,7 +97,7 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(503, {"error": f"초기화 대상 감사 실패: {str(exc)[-300:]}"})
 
     def do_POST(self):
-        if self.path != "/reset" or not self.allowed() or not self.authenticated():
+        if self.path != "/reset" or not self.allowed():
             self.respond(403, {"error": "초기화 요청을 허용하지 않습니다."})
             return
         if self.headers.get("Content-Type") != "application/json":

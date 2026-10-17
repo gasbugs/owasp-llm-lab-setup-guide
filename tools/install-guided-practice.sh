@@ -104,7 +104,7 @@ if (( ${#stale_services[@]} > 0 )); then
   fail "최신 로컬 이미지를 사용하지 않는 서비스가 남았습니다: ${stale_services[*]}"
 fi
 
-# 관리자 초기화 버튼은 Docker socket을 UI에 노출하지 않고 호스트의 고정 명령만 호출합니다.
+# 로컬 초기화 버튼은 Docker socket을 UI에 노출하지 않고 호스트의 고정 명령만 호출합니다.
 if command -v systemctl >/dev/null 2>&1 && systemctl --user is-system-running >/dev/null 2>&1; then
   systemctl --user link "$SETUP_ROOT/tools/guided-reset-bridge.service"
   systemctl --user enable --now guided-reset-bridge.service
@@ -113,7 +113,6 @@ fi
 printf '\n설치가 완료되었습니다.\n'
 printf 'Control Center: http://127.0.0.1:28097\n'
 printf '관리자 답안:   http://127.0.0.1:28097/?mode=admin\n'
-printf '초기화 비밀값 파일: %s\n' "$SETUP_ROOT/.state/guided-reset-secret"
 printf 'NeMo Chat UI:  http://127.0.0.1:28192\n'
 printf 'P20 Grafana:    http://127.0.0.1:23002/d/guided-p20\n'
 printf 'Grafana 비밀번호 확인: grep -E '\''^(GUIDED_GRAFANA_PASSWORD|GUIDED_P20_GRAFANA_PASSWORD)='\'' %s\n' "$ENV_FILE"
