@@ -679,7 +679,9 @@ function prepareCopyableBlocks(root = document) {
 async function showAdminAnswer(problem) {
   if (!adminMode || !adminAnswerPanel) return;
   const requestNumber = ++adminAnswerRequest;
-  const host = problem === "P00" ? byId("tutorial-panel") : byId(`h${problem.slice(1)}-work`);
+  const host = problem === "P00"
+    ? byId("tutorial-panel").querySelector(".work-body")
+    : byId("practice-workbench").querySelector(".work-body");
   host.append(adminAnswerPanel);
   adminAnswerPanel.open = false;
   const output = adminAnswerPanel.querySelector(".admin-answer-content");

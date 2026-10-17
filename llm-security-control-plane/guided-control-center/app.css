@@ -714,7 +714,8 @@ html[data-theme="dark"] .aws-status-problem { color:#ff8585; }
 .case-id-row code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .8rem; }
 .case-copy-id { flex: 0 0 auto; padding: 3px 8px; font-size: .75rem; }
 details.admin-answer {
-  width: 100%;
+  box-sizing: border-box;
+  width: auto;
   min-width: 0;
   max-width: 100%;
   margin: 1.5rem 0 0;
@@ -722,7 +723,8 @@ details.admin-answer {
   border: 2px solid var(--accent, #6f5bd3);
   border-radius: 0.75rem;
 }
-.lab-workspace > details.admin-answer { grid-column: 1 / -1; }
+.work-body > details.admin-answer { grid-column: 1 / -1; margin: 0 20px 20px; }
+@media (max-width: 480px) { .work-body > details.admin-answer { margin-inline: 12px; } }
 details.admin-answer > summary { cursor: pointer; font-weight: 800; font-size: 1rem; color: var(--accent, #6f5bd3); }
 .copyable-block { min-width: 0; max-width: 100%; margin: 1.25rem 0; overflow: hidden; border: 2px solid var(--line-strong); border-radius: .65rem; background: var(--code-bg); box-shadow: 0 5px 0 rgb(19 43 58 / 9%); }
 .copy-block-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 2.8rem; padding: .45rem .55rem .45rem .85rem; border-bottom: 1px solid var(--line-strong); background: var(--code-toolbar); }
