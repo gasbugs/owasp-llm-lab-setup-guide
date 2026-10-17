@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guardrail Proxy · 운영 콘솔</title>
+  <link rel="stylesheet" href="/console/styles.css">
+  <script src="/console/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="주 탐색">
+      <a class="brand" href="#overview"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span><strong>Guardrail Proxy</strong><small>NeMo · Presidio</small></span></a>
+      <nav id="nav">
+        <div class="nav-group"><div class="nav-group-title">모니터링</div>
+          <a href="#overview" data-page="overview"><span aria-hidden="true">◫</span> 개요</a>
+          <a href="#requests" data-page="requests"><span aria-hidden="true">≡</span> 요청 기록</a>
+          <a href="#testing" data-page="testing"><span aria-hidden="true">▷</span> 정책 테스트</a>
+        </div>
+        <div class="nav-group"><div class="nav-group-title">정책</div>
+          <a href="#policies" data-page="policies"><span aria-hidden="true">▤</span> 적용 단계</a>
+          <a href="#versions" data-page="versions"><span aria-hidden="true">◷</span> 정책 버전</a>
+        </div>
+      </nav>
+      <section class="sidebar-policy"><span class="sidebar-policy-label">현재 활성 정책</span><strong id="sidebar-name">연결 대기</strong><code id="sidebar-digest">—</code><div class="sidebar-policy-row"><span>모델</span><b id="sidebar-model">—</b></div><div class="sidebar-policy-row"><span>상태</span><b>읽기 전용</b></div></section>
+      <div class="sidebar-foot"><span class="demo-dot"></span> 전용 API 연결 <span id="sidebar-connection">확인 중</span></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><div class="breadcrumb">가드레일 운영 콘솔 <span>/</span> <strong id="breadcrumb-current">개요</strong></div><div class="topbar-status"><span class="demo-pill" id="api-status">확인 중</span><span class="admin-pill">정책 변경 기능 준비 중</span></div></header>
+      <main id="main">
+        <div class="demo-banner" id="auth-panel" role="note"><strong>API 호출 권한</strong> <label for="caller-token">이 로컬 환경의 caller token</label> <input id="caller-token" type="password" autocomplete="off" spellcheck="false" placeholder="Bearer token"> <button class="button" id="connect">연결</button> <span id="auth-message">토큰은 이 화면의 메모리에만 보관합니다.</span></div>
+        <section class="page active" id="overview"><div class="page-heading"><div><p class="eyebrow">운영 개요</p><h1>요청이 어디서 멈췄는지 확인합니다</h1><p>실제 프록시 기록에서 선택한 요청의 처리 경로를 그립니다.</p></div><span class="version-badge" id="overview-policy">정책 연결 대기</span></div>
+          <div class="status-strip"><div><span>프록시</span><strong id="health-status">확인 중</strong></div><div><span>모델</span><strong id="model-status">—</strong></div><div><span>활성 정책</span><strong id="policy-status">—</strong></div><div><span>최근 기록</span><strong id="record-count">—</strong></div></div>
+          <div class="section-heading"><div><p class="eyebrow">요청 경로</p><h2>선택한 요청의 처리 단계</h2></div><label class="select-label">요청 선택 <select id="flow-request"><option value="">기록 없음</option></select></label></div>
+          <div class="flow-card"><div id="flow-stages" class="flow-stages" aria-live="polite"></div><div id="flow-explanation" class="flow-explanation">API에 연결하고 테스트 요청을 실행하면 경로가 표시됩니다.</div></div>
+          <div class="two-column"><section class="surface"><div class="section-heading compact"><h2>최근 정책 판단</h2><a href="#requests">요청 기록 보기 ↗</a></div><div id="recent-requests">기록 없음</div></section><section class="surface"><div class="section-heading compact"><h2>현재 범위</h2><span class="small-tag">파일 정책</span></div><p>텍스트 요청의 Presidio 입력·NeMo 입력·Main 모델·NeMo 출력·Presidio 출력이 실제로 실행됩니다.</p><p>검색·도구 경계와 정책 변경은 후속 단계입니다.</p></section></div>
+        </section>
+        <section class="page" id="policies"><div class="page-heading"><div><p class="eyebrow">정책</p><h1>현재 적용 단계</h1><p>실행 중인 정책이 반환한 단계 순서입니다.</p></div></div><div class="surface table-surface"><div class="table-scroll"><table><thead><tr><th>순서</th><th>단계</th><th>제품</th><th>동작</th></tr></thead><tbody id="policy-rows"></tbody></table></div></div></section>
+        <section class="page" id="testing"><div class="page-heading"><div><p class="eyebrow">실제 호출</p><h1>정상·위험 요청을 시험합니다</h1><p>이 버튼은 실제 NeMo·Presidio와 Bedrock을 호출하며 사용량이 발생합니다.</p></div></div><div class="two-column"><section class="surface test-surface"><label for="test-input">시험할 문장</label><textarea id="test-input">What is one safe account recovery tip?</textarea><div class="test-presets"><button class="button button-outline" data-preset="normal">정상 예시</button><button class="button button-outline" data-preset="risk">위험 예시</button></div><button class="button" id="run-test" disabled>실제 프록시로 시험</button></section><section class="surface test-result" aria-live="polite"><p class="eyebrow">시험 결과</p><h2 id="test-heading">아직 실행하지 않았습니다</h2><p id="test-summary">연결 뒤 요청을 실행하면 단계별 판정과 Main 호출 여부가 나타납니다.</p><div id="test-stages"></div></section></div></section>
+        <section class="page" id="requests"><div class="page-heading"><div><p class="eyebrow">요청 기록</p><h1>규칙이 적용된 위치 추적</h1><p>최근 200건까지 메모리에 유지합니다. 원문과 답변은 기록하지 않습니다.</p></div><button class="button button-outline" id="refresh-records">새로고침</button></div><div class="surface table-surface"><div class="table-scroll"><table><thead><tr><th>요청 ID</th><th>최종 단계</th><th>판정</th><th>정책 digest</th><th>Main 호출</th></tr></thead><tbody id="request-rows"><tr><td colspan="5">연결 대기</td></tr></tbody></table></div></div></section>
+        <section class="page" id="versions"><div class="page-heading"><div><p class="eyebrow">변경 관리</p><h1>활성 정책 버전</h1><p>현재는 파일 기반 정책을 시작 시 불러옵니다. 버전 편집·승격·되돌리기는 제공 전입니다.</p></div></div><div class="surface version-list"><h2>읽기 전용 활성 정책</h2><div><strong id="version-name">연결 대기</strong><code id="version-digest">—</code></div><p>정책 편집은 별도 관리자 권한과 회귀 검사를 구현한 뒤 활성화합니다.</p></div></section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

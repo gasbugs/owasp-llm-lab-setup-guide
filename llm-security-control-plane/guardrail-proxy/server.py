@@ -12,7 +12,8 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import yaml
@@ -47,6 +48,12 @@ if (len(CALLER_TOKEN) < 40 or len({CALLER_TOKEN, os.environ["PROXY_GATEWAY_TOKEN
 LIMIT = asyncio.Semaphore(POLICY["max_concurrent_requests"])
 REQUESTS = deque(maxlen=200)
 app = FastAPI(title="Guardrail Proxy", docs_url=None, redoc_url=None)
+app.mount("/console", StaticFiles(directory=ROOT / "ui", html=True), name="console")
+
+
+@app.get("/")
+def console_home():
+    return RedirectResponse("/console/")
 
 
 @app.middleware("http")
