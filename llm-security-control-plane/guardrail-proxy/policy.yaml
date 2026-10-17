@@ -1,0 +1,11 @@
+# CUSTOM FILE: product policy interpreted by this proxy, not an upstream NeMo schema.
+policy_id: customer-support-protection
+name: 고객지원 보호 정책
+version: 0.1.0
+model_id: us.amazon.nova-lite-v1:0
+max_input_chars: 4000
+max_output_chars: 8000
+pii_input_action: redact
+pii_output_action: redact
+default_error_action: deny
+max_concurrent_requests: 2
