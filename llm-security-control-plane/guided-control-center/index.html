@@ -72,6 +72,11 @@
         <div class="home-actions"><button id="home-next" class="primary" type="button">P01 시작하기</button><button id="home-tutorial" type="button">P00 사용법 살펴보기</button></div>
       </div>
     </section>
+    <section id="admin-reset" class="panel admin-reset" hidden aria-labelledby="admin-reset-title">
+      <div class="panel-head"><h2 id="admin-reset-title">실습 초기화</h2></div>
+      <div class="work-body"><p>24개 풀이 코드를 시작 상태로 돌리고 진행 기록, 미션 전용 Docker 상태와 미션 AWS 자원을 정리합니다. 공통 서비스와 다른 테넌트는 유지합니다.</p><p>비밀값은 WSL의 <code>~/owasp-llm-lab-setup-guide/.state/guided-reset-secret</code>에서 확인합니다.</p><label for="admin-reset-secret">초기화 비밀값</label> <input id="admin-reset-secret" type="password" autocomplete="off"><button id="admin-reset-button" type="button">초기 상태로 복원</button><p id="admin-reset-status" role="status" aria-live="polite">실행 전 대상을 확인합니다.</p></div>
+    </section>
+    <dialog id="admin-reset-confirm" aria-labelledby="admin-reset-confirm-title"><form method="dialog"><h2 id="admin-reset-confirm-title">초기 상태로 복원할까요?</h2><p id="admin-reset-confirm-scope"></p><menu><button value="cancel">취소</button><button value="yes" class="primary">Yes</button></menu></form></dialog>
     <section class="panel home-missions"><div class="panel-head"><h2>미션별 진행 현황</h2></div><div id="home-missions" class="home-mission-grid"></div></section>
   <section id="services-panel" class="tool-rack" aria-labelledby="tool-title">
     <div><p class="label">제품 화면</p><h2 id="tool-title">외부 서비스</h2><p>제품 화면을 새 창에서 엽니다. 필요한 서비스는 각 미션에서 안내합니다.</p></div>

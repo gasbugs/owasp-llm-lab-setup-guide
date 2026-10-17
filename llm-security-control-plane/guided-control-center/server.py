@@ -200,7 +200,7 @@ def require_csrf(
 def security_headers(response: Response) -> None:
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-        "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
+        "connect-src http://127.0.0.1:28198 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
         "frame-ancestors 'none'"
     )
     response.headers["Referrer-Policy"] = "no-referrer"

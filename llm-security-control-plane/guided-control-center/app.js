@@ -1906,6 +1906,7 @@ async function bootstrap() {
   copyableCodeBlocksEnabled = payload.copyable_code_blocks === true;
   adminMode = payload.admin_mode === true;
   if (adminMode) history.replaceState(history.state, "", "/?mode=admin");
+  byId("admin-reset").hidden = !adminMode;
   const catalogResponse = await fetch("/api/case-catalog");
   if (catalogResponse.ok) caseCatalog = await catalogResponse.json();
   resourceTotals = payload.resource_total_steps || {};
@@ -2070,6 +2071,51 @@ byId("breadcrumb-category").addEventListener("click", () => {
 });
 byId("breadcrumb-home").addEventListener("click", () => selectWorkspace("home"));
 byId("navigation-home").addEventListener("click", () => selectWorkspace("home"));
+byId("admin-reset-button").addEventListener("click", async () => {
+  if (!adminMode) return;
+  const button = byId("admin-reset-button");
+  const status = byId("admin-reset-status");
+  const secret = byId("admin-reset-secret").value;
+  if (!secret) { status.textContent = "초기화 비밀값을 입력하세요."; return; }
+  const endpoint = "http://127.0.0.1:28198";
+  const headers = {"X-Guided-Reset-Secret": secret};
+  button.disabled = true;
+  status.textContent = "초기화 대상과 보존 대상을 확인하는 중입니다.";
+  try {
+    const scopeResponse = await fetch(`${endpoint}/scope`, {headers, cache: "no-store"});
+    const scope = await scopeResponse.json();
+    if (!scopeResponse.ok) throw new Error(scope.error || "대상 확인 실패");
+    const awsCount = Object.values(scope.aws_resources).reduce((sum, count) => sum + count, 0);
+    byId("admin-reset-confirm-scope").textContent = `복원 대상: 풀이 코드 ${scope.practice_files}개, 미션 컨테이너 ${scope.mission_containers}개, 전용 볼륨 ${scope.mission_volumes}개, AWS 자원 ${awsCount}개, P00 요청 파일 ${scope.p00_request ? "있음" : "없음"}, 진행 기록. 유지 대상: 공통 Control Center·Gateway·관측 서비스, 다른 테넌트, 추적 중인 Starter와 사용자 수정.`;
+    const dialog = byId("admin-reset-confirm");
+    dialog.returnValue = "cancel";
+    dialog.showModal();
+    await new Promise(resolve => dialog.addEventListener("close", resolve, {once: true}));
+    if (dialog.returnValue !== "yes") { status.textContent = "초기화를 취소했습니다."; return; }
+    const response = await fetch(`${endpoint}/reset`, {method: "POST", headers: {...headers, "Content-Type": "application/json"}, body: JSON.stringify({confirm: "YES"})});
+    const started = await response.json();
+    if (!response.ok) throw new Error(started.error || "초기화 시작 실패");
+    status.textContent = "초기화 중입니다. 이 화면을 열어 두세요.";
+    for (;;) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const poll = await fetch(`${endpoint}/status`, {headers, cache: "no-store"});
+      const state = await poll.json();
+      if (!poll.ok) throw new Error(state.error || "진행 상태 조회 실패");
+      if (state.state === "running") continue;
+      if (state.state === "complete") {
+        status.textContent = "초기화가 끝났습니다. 화면을 새로고침합니다.";
+        byId("admin-reset-secret").value = "";
+        location.reload();
+        return;
+      }
+      throw new Error(state.detail || "초기화 결과를 확인하지 못했습니다.");
+    }
+  } catch (error) {
+    status.textContent = `초기화 실패: ${error.message}. 남은 상태를 확인한 뒤 다시 시도하세요.`;
+  } finally {
+    button.disabled = false;
+  }
+});
 byId("home-tutorial").addEventListener("click", () => selectWorkspace("tutorial"));
 byId("home-next").addEventListener("click", () => {
   const problem = byId("home-next").dataset.problem;

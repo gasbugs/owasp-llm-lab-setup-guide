@@ -29,7 +29,7 @@ def display_server():
             path = urlsplit(self.path).path
             if path == "/api/bootstrap":
                 self.send({"csrf_token": "ui-fixture-only", "p00_submission_token": "not-a-real-token",
-                           "copyable_code_blocks": True,
+                           "copyable_code_blocks": True, "reset_generation": "ui-fixture-generation",
                            "official_uis": []})
             elif path == "/api/progress":
                 self.send({"records": []})

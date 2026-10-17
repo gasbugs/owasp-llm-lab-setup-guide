@@ -1,0 +1,15 @@
+[Unit]
+Description=Tenant 03 practice reset bridge
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/owasp-llm-lab-setup-guide
+ExecStart=/usr/bin/python3 %h/owasp-llm-lab-setup-guide/tools/guided-reset-bridge.py
+Restart=on-failure
+RestartSec=2s
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target

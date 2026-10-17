@@ -54,8 +54,6 @@ def main():
         raise RuntimeError("Common state entered deletion set")
     actual = set(docker["volumes"])
     target_volumes = {f"{PROJECT}_{name}" for name in dedicated}
-    if target_volumes - actual:
-        raise RuntimeError("Expected mission volume is missing")
     inspect = json.loads(run("docker", "inspect", *docker["containers"]))
     live = {}
     for container in inspect:
@@ -67,15 +65,13 @@ def main():
         for mount in container["Mounts"]:
             if mount["Type"] == "volume" and mount["Name"] in target_volumes and service not in mission:
                 raise RuntimeError(f"Mission volume mounted by common service: {service}")
-    if mission - live.keys():
-        raise RuntimeError("Mission container is missing")
     p00 = Path.home() / "work/control-center-tutorial/request.json"
     if p00.exists() and (p00.is_symlink() or not p00.is_file()):
         raise RuntimeError("P00 request path is not a regular file")
     report = {
         "practice_files": len(practice), "mission_services": sorted(mission),
-        "mission_containers": sorted(c for s in mission for c in live[s]),
-        "mission_volumes": sorted(target_volumes),
+        "mission_containers": sorted(c for s in mission for c in live.get(s, [])),
+        "mission_volumes": sorted(target_volumes & actual),
         "preserved_services": sorted(PRESERVE),
         "preserved_volumes": sorted(actual - target_volumes),
         "p00_request": str(p00) if p00.is_file() else None,

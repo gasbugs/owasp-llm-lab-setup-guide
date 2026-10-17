@@ -8,6 +8,8 @@ PRACTICE_ROOT="${GUIDED_PRACTICE_DIR:-$HOME/owasp-llm-practice}"
 BUILD_ROOT="$SETUP_ROOT/.state/guided-practice-build"
 OVERRIDE_FILE="$CONTROL_ROOT/.state/guided-practice-build.override.yaml"
 
+# 빌드된 image의 non-root 사용자가 추적 중인 source를 읽을 수 있어야 합니다.
+umask 022
 rm -rf "$BUILD_ROOT"
 mkdir -p "$BUILD_ROOT" "$(dirname "$OVERRIDE_FILE")"
 git -C "$SETUP_ROOT" archive HEAD llm-security-control-plane |
