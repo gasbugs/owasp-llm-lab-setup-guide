@@ -1,5 +1,5 @@
 const names = {overview:"개요",policies:"적용 단계",testing:"정책 테스트",requests:"요청 기록",versions:"정책 버전"};
-const stageLabels = {presidio_input:"Presidio 입력",nemo_input:"NeMo 입력",main:"Main 모델",nemo_output:"NeMo 출력",presidio_output:"Presidio 출력"};
+const stageLabels = {presidio_input:"Presidio 입력",nemo_input:"NeMo 입력",retrieval:"검색 청크",main:"Main 모델",nemo_output:"NeMo 출력",presidio_output:"Presidio 출력"};
 const stageOrder = Object.keys(stageLabels);
 let callerToken = "";
 let adminToken = "";
@@ -39,6 +39,8 @@ async function adminApi(path,options={}){
 }
 function showPolicy(policy){
   activePolicy=policy;
+  for(const option of byId("test-path").options){if(option.value!=="chat")option.disabled=!policy.retrieval_fixture_available}
+  if(!policy.retrieval_fixture_available)byId("test-path").value="chat";
   setText("sidebar-name",policy.name);
   setText("sidebar-digest",`${policy.version} · ${shortDigest(policy.digest)}`);
   setText("sidebar-model",policy.model_id.includes("nova-lite")?"Nova Lite":policy.model_id);
@@ -113,13 +115,16 @@ async function connect(){
 async function runTest(){
   if(!callerToken||!activePolicy)return;
   const message=byId("test-input").value;
+  const fixtureId=byId("test-path").value;
   if(!message.trim()){setText("test-summary","문장을 입력하세요.");return}
   const button=byId("run-test");button.disabled=true;setText("test-heading","실제 요청 실행 중");setText("test-summary","NeMo·Presidio와 Bedrock 응답을 기다리고 있습니다.");byId("test-stages").replaceChildren();
   try{
-    const {status,data}=await api("/v1/chat",{method:"POST",body:JSON.stringify({message})});
+    const path=fixtureId==="chat"?"/v1/chat":"/v1/retrieval-chat";
+    const body=fixtureId==="chat"?{message}:{message,fixture_id:fixtureId};
+    const {status,data}=await api(path,{method:"POST",body:JSON.stringify(body)});
     setText("test-heading",`${decisionLabel(data.decision)} · HTTP ${status}`);
     setText("test-summary",`${stageLabels[data.stopped_at]||data.stopped_at}에서 ${data.decision==="ERR"?"오류로 중단":data.decision==="block"?"차단":"완료"} · Main ${mainProgress(data)} · 정책 ${shortDigest(data.policy_digest)}`);
-    byId("test-stages").replaceChildren(...(data.stages||[]).map(item=>{const line=document.createElement("p");line.textContent=`${stageLabels[item.name]||item.name}: ${item.result}${item.entities?.length?` · ${item.entities.join(", ")}`:""}`;return line}));
+    byId("test-stages").replaceChildren(...(data.stages||[]).map(item=>{const line=document.createElement("p");line.textContent=`${stageLabels[item.name]||item.name}: ${item.result}${item.fixture_id?` · ${item.fixture_id}`:""}${item.native_action_invoked?" · NeMo Action 확인":""}${item.entities?.length?` · ${item.entities.join(", ")}`:""}`;return line}));
     if(data.decision==="allow"&&data.answer){const line=document.createElement("p");line.textContent=`응답: ${data.answer}`;byId("test-stages").append(line)}
     await refreshRecords();
     byId("flow-request").value=data.request_id;renderFlow(records.find(item=>item.request_id===data.request_id));

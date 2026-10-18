@@ -79,6 +79,12 @@ def main():
         port = docker("port", PROXY, "8000/tcp").rsplit(":", 1)[-1]
         base = "http://127.0.0.1:" + port
         wait_for(base + "/healthz")
+        with urllib.request.urlopen(base + "/console/", timeout=10) as response:
+            console = response.read().decode()
+        with urllib.request.urlopen(base + "/console/app.js", timeout=10) as response:
+            app_js = response.read().decode()
+        assert "id=\"test-path\"" in console and "recovery-injected" in console
+        assert "/v1/retrieval-chat" in app_js
         policy_request = urllib.request.Request(
             base + "/v1/policy", headers={"Authorization": "Bearer " + CALLER_TOKEN})
         with urllib.request.urlopen(policy_request, timeout=10) as response:
