@@ -18,6 +18,7 @@ from policy_bundle import load_bundle, policy_files
 class PolicyStore:
     def __init__(self, state_dir: Path, seed_root: Path):
         self.root = state_dir
+        self.seed_root = seed_root
         self.bundles = state_dir / "bundles"
         self.bundles.mkdir(parents=True, exist_ok=True)
         self.pointer = state_dir / "active.json"
@@ -151,6 +152,46 @@ class PolicyStore:
             finally:
                 if temporary.exists():
                     shutil.rmtree(temporary)
+
+    def create_seed_draft(self, expected_active_digest: str):
+        """Stage the image's pinned policy through the ordinary test/promote gate."""
+        with self._lock:
+            if self.active.digest != expected_active_digest:
+                raise ValueError("active policy changed")
+            seed = load_bundle(self.seed_root)
+            if (seed.digest == self.active.digest or
+                    tuple(map(int, seed.policy["version"].split("."))) <=
+                    tuple(map(int, self.active.policy["version"].split(".")))):
+                raise ValueError("seed is not newer than active policy")
+            destination = self.bundles / seed.digest
+            if destination.exists():
+                if load_bundle(destination).digest != seed.digest:
+                    raise ValueError("existing seed digest mismatch")
+            else:
+                temporary = Path(tempfile.mkdtemp(prefix=".seed-draft-", dir=self.bundles))
+                try:
+                    for filename in policy_files(self.seed_root):
+                        target = temporary / filename
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(self.seed_root / filename, target)
+                        target.chmod(0o444)
+                    (temporary / "nemo-policy").chmod(0o555)
+                    temporary.chmod(0o555)
+                    os.replace(temporary, destination)
+                finally:
+                    if temporary.exists():
+                        shutil.rmtree(temporary)
+            metadata_path = self.drafts / f"{seed.digest}.json"
+            if metadata_path.exists():
+                previous = json.loads(metadata_path.read_text())
+                if previous["base_digest"] != expected_active_digest:
+                    raise ValueError("draft base conflict")
+                return previous
+            metadata = {"digest": seed.digest, "base_digest": expected_active_digest,
+                        "version": seed.policy["version"], "state": "draft",
+                        "created_at": int(time.time()), "source": "image_seed"}
+            self._write_draft_metadata(seed.digest, metadata)
+            return metadata
 
     def list_drafts(self):
         records = [json.loads(path.read_text()) for path in sorted(self.drafts.glob("*.json"))]

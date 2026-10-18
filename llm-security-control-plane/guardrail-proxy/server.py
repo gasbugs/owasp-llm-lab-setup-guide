@@ -199,6 +199,18 @@ def admin_versions(authorization: str | None = Header(default=None)):
     return {"active_digest": ACTIVE_BUNDLE.digest, "versions": STORE.list_versions()}
 
 
+@app.post("/admin/seed-draft", status_code=201)
+def admin_create_seed_draft(body: PromoteRequest,
+                            authorization: str | None = Header(default=None)):
+    require_admin(authorization)
+    try:
+        return STORE.create_seed_draft(body.expected_active_digest)
+    except ValueError as error:
+        if str(error) in {"active policy changed", "draft base conflict"}:
+            raise HTTPException(status_code=409, detail=str(error)) from None
+        raise HTTPException(status_code=422, detail="invalid seed policy") from None
+
+
 @app.post("/admin/drafts", status_code=201)
 def admin_create_draft(body: DraftRequest, authorization: str | None = Header(default=None)):
     require_admin(authorization)
@@ -232,6 +244,29 @@ async def admin_test_draft(digest: str, authorization: str | None = Header(defau
                         "main_completed": result["main_completed"], "passed": passed})
         if not passed:
             return {"digest": digest, "passed": False, "results": summary}
+    if candidate.retrieval_enabled:
+        for fixture_id, expected, main_expected in (
+                ("recovery-safe", "allow", True),
+                ("recovery-injected", "block", False)):
+            status, result = await run_pipeline(
+                "Where is account recovery help?", candidate,
+                record_decision=False, fixture_id=fixture_id)
+            retrieval = next((stage for stage in result["stages"]
+                              if stage["name"] == "retrieval"), None)
+            passed = (status == 200 and result["decision"] == expected
+                      and result["upstream_called"] is main_expected
+                      and result["main_completed"] is main_expected
+                      and result["policy_digest"] == digest
+                      and retrieval is not None
+                      and retrieval.get("native_action_invoked") is True)
+            summary.append({"case": fixture_id, "http": status,
+                            "decision": result["decision"],
+                            "stopped_at": result["stopped_at"],
+                            "upstream_called": result["upstream_called"],
+                            "main_completed": result["main_completed"],
+                            "passed": passed})
+            if not passed:
+                return {"digest": digest, "passed": False, "results": summary}
     try:
         STORE.mark_tested(digest, metadata["base_digest"], summary)
     except ValueError:

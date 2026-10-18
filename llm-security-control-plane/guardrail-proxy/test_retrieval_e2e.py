@@ -49,8 +49,11 @@ def post(base, fixture_id):
         data=json.dumps({"message": "Where is account recovery help?",
                          "fixture_id": fixture_id}).encode(),
     )
-    with urllib.request.urlopen(request, timeout=90) as response:
-        return response.status, json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:
+            return response.status, json.load(response)
+    except urllib.error.HTTPError as error:
+        return error.code, json.load(error)
 
 
 def main():
@@ -79,6 +82,18 @@ def main():
         port = docker("port", PROXY, "8000/tcp").rsplit(":", 1)[-1]
         base = "http://127.0.0.1:" + port
         wait_for(base + "/healthz")
+        deadline = time.monotonic() + 120
+        for peer_url in ("http://gateway:8080/healthz", "http://privacy:8013/healthz"):
+            while time.monotonic() < deadline:
+                peer = subprocess.run(
+                    ["docker", "exec", PROXY, "python", "-c",
+                     "import urllib.request; urllib.request.urlopen(" + repr(peer_url)
+                     + ", timeout=3).read()"], capture_output=True, text=True)
+                if peer.returncode == 0:
+                    break
+                time.sleep(1)
+            else:
+                raise RuntimeError("isolated peer did not become ready: " + peer_url)
         with urllib.request.urlopen(base + "/console/", timeout=10) as response:
             console = response.read().decode()
         with urllib.request.urlopen(base + "/console/app.js", timeout=10) as response:
