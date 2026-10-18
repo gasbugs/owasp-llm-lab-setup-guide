@@ -101,7 +101,7 @@
         </aside>
         <h3>JSON 문법 예시</h3>
         <p>아래는 문자열과 숫자의 표기만 보여 주는 예시입니다. 이 문제에서 요구한 필드 이름과 값으로 바꿔 작성하세요.</p>
-        <pre data-code-title="JSON 문법 예시">{
+        <pre data-copyable="false" data-code-title="JSON 문법 예시">{
   "example_text": "안녕하세요",
   "example_number": 7
 }</pre>
@@ -331,10 +331,10 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
           </aside>
           <h3>Python 문법 힌트</h3>
           <p>입력이 잘못됐으면 SDK를 호출하기 전에 조건문에서 직접 오류를 발생시킵니다.</p>
-          <pre data-code-title="Python · raise 문법" data-language="python">if not isinstance(message, str) or not message.strip():
+          <pre data-copyable="false" data-code-title="Python · raise 문법" data-language="python">if not isinstance(message, str) or not message.strip():
     raise ValueError("question required")</pre>
           <p>SDK가 오류를 냈을 때는 <code>try</code> 안의 호출을 <code>except</code>로 받습니다. 다음은 클라이언트를 만드는 부분의 구문 예시입니다. <code>client.converse()</code> 호출도 같은 <code>try</code> 안에 작성하세요.</p>
-          <pre data-code-title="Python · try/except 문법" data-language="python">try:
+          <pre data-copyable="false" data-code-title="Python · try/except 문법" data-language="python">try:
     client = boto3.client(
         "bedrock-runtime", region_name=region_name, config=config
     )
@@ -379,7 +379,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
               <p class="label">SERVER-OWNED AWS TEMPLATE</p>
               <h3 id="h02-resource-title">연결할 AWS 자원 원문 확인</h3>
               <p>Browser는 Bucket·Role·Knowledge Base 이름을 보내지 않습니다. 제공 Gateway가 현재 계정 번호를 붙인 고정 이름, <code>h02/knowledge/</code> 포함 경로와 1024차원 cosine Index만 생성합니다.</p>
-              <pre>{
+              <pre data-copyable="false" data-code-title="AWS 자원 설정 예시" data-language="json">{
   "embeddingModelId": "amazon.titan-embed-text-v2:0",
   "dimensions": 1024,
   "dataType": "float32",
@@ -486,7 +486,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
               <p class="label">SERVER-OWNED GUARDRAIL TEMPLATE</p>
               <h3 id="h04-resource-title">P04 전용 출력 검사 정책 확인</h3>
               <p>제공 Gateway는 현재 AWS 계정에 P04 전용 Guardrail을 준비합니다. <code>DRAFT</code>는 일반적인 “초안” 표시가 아니라 AWS에서 지금 편집 중인 Guardrail 설정을 가리키는 예약값입니다. 이 정책은 입력은 건드리지 않고 출력의 <code>EMAIL</code>만 <code>{EMAIL}</code>로 바꿉니다.</p>
-              <pre>{
+              <pre data-copyable="false" data-code-title="Guardrail 정책 설정 예시" data-language="json">{
   "piiType": "EMAIL",
   "inputEnabled": false,
   "outputEnabled": true,

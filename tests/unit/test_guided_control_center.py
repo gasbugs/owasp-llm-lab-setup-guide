@@ -1544,6 +1544,21 @@ class GuidedControlCenterTests(unittest.TestCase):
         self.assertEqual(browser.get("/?mode=admin").status_code, 200)
         self.assertTrue(browser.get("/api/bootstrap").json()["admin_mode"])
 
+    def test_code_block_titles_distinguish_examples_and_bash_comments(self):
+        javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
+        self.assertIn('pre.dataset.language === "json" ? "JSON 예시"', javascript)
+        self.assertIn('pre.dataset.language === "bash" ? "실행 명령" : "코드 예시"', javascript)
+        self.assertIn('(?:#[^\\n]*\\n\\s*)*', javascript)
+        self.assertIn('value.startsWith("#") ? "comment"', javascript)
+        self.assertIn('data-code-title="AWS 자원 설정 예시" data-language="json"', self.home.text)
+        self.assertIn('data-code-title="Guardrail 정책 설정 예시" data-language="json"', self.home.text)
+        self.assertIn('if (pre.dataset.copyable === "false") continue;', javascript)
+        for title in (
+            "JSON 문법 예시", "Python · raise 문법", "Python · try/except 문법",
+            "AWS 자원 설정 예시", "Guardrail 정책 설정 예시",
+        ):
+            self.assertIn(f'data-copyable="false" data-code-title="{title}"', self.home.text)
+
     def test_admin_answer_renderer_uses_text_content(self):
         javascript = (CONTROL / "guided-control-center/app.js").read_text(encoding="utf-8")
         self.assertIn("function renderAdminMarkdown(container, source)", javascript)
@@ -1592,7 +1607,10 @@ class GuidedControlCenterTests(unittest.TestCase):
             self.assertTrue(text.startswith("docker compose ") or text.startswith("cd ~/owasp-llm-lab-setup-guide") or text.startswith("vi ~/owasp-llm-practice/"), text[:120])
             self.assertNotIn("cat >", text)
             self.assertNotIn("python -c", text)
-        self.assertEqual(len(templates), 2)
+        self.assertEqual(templates, [])
+        examples = re.findall(r'<pre data-copyable="false" data-code-title="(?:AWS 자원 설정 예시|Guardrail 정책 설정 예시)" data-language="json">([\s\S]*?)</pre>', html)
+        self.assertEqual(len(examples), 2)
+        templates = [json.loads(html_module.unescape(example)) for example in examples]
         self.assertEqual(templates[0]["embeddingModelId"], "amazon.titan-embed-text-v2:0")
         self.assertEqual(templates[1]["piiType"], "EMAIL")
 

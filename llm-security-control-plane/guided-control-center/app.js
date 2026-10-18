@@ -750,7 +750,7 @@ function highlightBashBlocks(root = document) {
 function prepareCopyableBlocks(root = document) {
   for (const pre of root.querySelectorAll("pre:not([id])")) {
     if (pre.dataset.language || pre.closest(".admin-answer-content")) continue;
-    if (/^\s*(?:cd|vi|cat|ls|mkdir|curl|docker|python3?|aws|git|export|cp|sudo|wsl|jq)\b/.test(pre.textContent)) pre.dataset.language = "bash";
+    if (/^\s*(?:#[^\n]*\n\s*)*(?:cd|vi|cat|ls|mkdir|curl|docker|python3?|aws|git|export|cp|sudo|wsl|jq)\b/.test(pre.textContent)) pre.dataset.language = "bash";
   }
   const tutorialCommand = root.querySelector("#tutorial-submit-command");
   if (tutorialCommand && /^\s*curl\b/.test(tutorialCommand.textContent)) tutorialCommand.dataset.language = "bash";
@@ -758,11 +758,12 @@ function prepareCopyableBlocks(root = document) {
   highlightBashBlocks(root);
   if (!copyableCodeBlocksEnabled) return;
   for (const pre of root.querySelectorAll("pre:not([id]), pre#tutorial-submit-command")) {
+    if (pre.dataset.copyable === "false") continue;
     if (pre.parentElement?.classList.contains("copyable-block")) continue;
     const wrapper = document.createElement("div"); wrapper.className = "copyable-block";
     const toolbar = document.createElement("div"); toolbar.className = "copy-block-toolbar";
     const label = document.createElement("span");
-    label.textContent = pre.dataset.codeTitle || (pre.closest(".admin-answer-content") ? "정답 코드" : /^\s*curl\b/.test(pre.textContent) ? "curl 요청" : "실행 명령");
+    label.textContent = pre.dataset.codeTitle || (pre.closest(".admin-answer-content") ? "정답 코드" : pre.dataset.language === "json" ? "JSON 예시" : /^\s*curl\b/.test(pre.textContent) ? "curl 요청" : pre.dataset.language === "bash" ? "실행 명령" : "코드 예시");
     const button = document.createElement("button");
     button.type = "button"; button.className = "secondary copy-block-button";
     button.textContent = "복사"; button.setAttribute("aria-label", "이 블록 복사");
