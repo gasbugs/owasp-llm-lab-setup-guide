@@ -101,6 +101,13 @@ jobs:
             --entrypoint python \
             localhost/llm-security-guardrail-proxy-api:0.1.0 \
             /app/test_retrieval_native.py
+          docker run --rm --network none \
+            --volume "$PWD/llm-security-control-plane/guardrail-proxy/test_retrieval_product.py:/app/test_retrieval_product.py:ro" \
+            --entrypoint python \
+            localhost/llm-security-guardrail-proxy-api:0.1.0 \
+            /app/test_retrieval_product.py
+      - name: Verify server-owned retrieval with real Privacy peer
+        run: python3 llm-security-control-plane/guardrail-proxy/test_retrieval_e2e.py
       - name: Validate the standalone Module 10 Compose model
         run: |
           install -d -m 0700 llm-security-control-plane/.state/application-auth

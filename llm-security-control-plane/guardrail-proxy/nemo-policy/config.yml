@@ -3,6 +3,9 @@
 # Upstream format license: Apache-2.0
 models: []
 lowest_temperature: 0.0
+core:
+  embedding_search_provider:
+    name: fixture
 rails:
   input:
     flows:
@@ -10,3 +13,6 @@ rails:
   output:
     flows:
       - self check output
+  retrieval:
+    flows:
+      - check retrieval instruction

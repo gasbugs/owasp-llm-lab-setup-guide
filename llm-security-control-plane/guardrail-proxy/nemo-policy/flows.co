@@ -1,0 +1,18 @@
+# The fixed dialog only drives the retrieval rail; the product Main call is separate.
+define subflow check retrieval instruction
+  $response = execute check_retrieval_instruction(text=$relevant_chunks)
+  if $response.is_blocked
+    $block_message = "Retrieved content is not safe to use."
+    $skip_output_rails = True
+    create event BotMessage(text=$block_message)
+    stop
+
+define user ask recovery
+  "Where is account recovery help?"
+
+define bot recovery guidance
+  "Use the official account support page."
+
+define flow
+  user ask recovery
+  bot recovery guidance

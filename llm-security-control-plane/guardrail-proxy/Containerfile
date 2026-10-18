@@ -17,9 +17,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --chmod=0444 guardrail-proxy/server.py guardrail-proxy/gateway_model.py guardrail-proxy/native_rails.py guardrail-proxy/policy_bundle.py guardrail-proxy/policy_store.py guardrail-proxy/policy_cases.py /app/
+COPY --chmod=0444 guardrail-proxy/server.py guardrail-proxy/gateway_model.py guardrail-proxy/native_rails.py guardrail-proxy/retrieval_rails.py guardrail-proxy/policy_bundle.py guardrail-proxy/policy_store.py guardrail-proxy/policy_cases.py /app/
 COPY --chmod=0444 guardrail-proxy/policy.yaml /app/policy.yaml
-COPY --chmod=0444 guardrail-proxy/nemo-policy/config.yml guardrail-proxy/nemo-policy/prompts.yml /app/nemo-policy/
+COPY --chmod=0444 guardrail-proxy/nemo-policy/config.yml guardrail-proxy/nemo-policy/prompts.yml guardrail-proxy/nemo-policy/flows.co /app/nemo-policy/
 COPY --chmod=0444 guardrail-proxy/ui/index.html guardrail-proxy/ui/app.js guardrail-proxy/ui/styles.css /app/ui/
 RUN chmod 0755 /app/nemo-policy /app/ui && mkdir /state && chown 65532:65532 /state
 

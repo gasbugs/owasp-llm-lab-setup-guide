@@ -40,12 +40,14 @@ class PolicyBundle:
     digest: str
     policy: Mapping[str, object]
     rails_config: RailsConfig
+    retrieval_enabled: bool
     limit: asyncio.Semaphore
 
 
 def load_bundle(root: Path) -> PolicyBundle:
     digest = hashlib.sha256()
-    for filename in policy_files(root):
+    files = policy_files(root)
+    for filename in files:
         digest.update(filename.encode() + b"\0" + (root / filename).read_bytes())
     policy = yaml.safe_load((root / "policy.yaml").read_text())
     if (not isinstance(policy, dict) or policy.get("model_id") != MODEL_ID
@@ -61,9 +63,15 @@ def load_bundle(root: Path) -> PolicyBundle:
             or type(policy.get("max_concurrent_requests")) is not int
             or not 1 <= policy["max_concurrent_requests"] <= 8):
         raise ValueError("invalid active policy")
+    native_config = RailsConfig.from_path(str(root / "nemo-policy"))
+    retrieval = yaml.safe_load((root / "nemo-policy/config.yml").read_text())
+    retrieval_enabled = ("nemo-policy/flows.co" in files and
+                         retrieval.get("rails", {}).get("retrieval", {}).get("flows")
+                         == ["check retrieval instruction"])
     return PolicyBundle(
         digest=digest.hexdigest(),
         policy=MappingProxyType(policy),
-        rails_config=RailsConfig.from_path(str(root / "nemo-policy")),
+        rails_config=native_config,
+        retrieval_enabled=retrieval_enabled,
         limit=asyncio.Semaphore(policy["max_concurrent_requests"]),
     )
