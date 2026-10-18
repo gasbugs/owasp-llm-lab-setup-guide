@@ -25,6 +25,7 @@ from policy_bundle import load_bundle, policy_files
 from policy_store import PolicyStore
 from policy_cases import CANDIDATE_CASES
 from retrieval_rails import FIXTURES, check_retrieval
+from tool_boundary import fixture_call, validate_call, execute_fixture, validate_result, digest as tool_digest
 
 
 ROOT = Path("/app")
@@ -73,6 +74,11 @@ class ChatRequest(BaseModel):
 
 class RetrievalRequest(ChatRequest):
     fixture_id: Literal["recovery-safe", "recovery-injected"]
+
+
+class ToolRequest(ChatRequest):
+    fixture_id: Literal["status-safe", "status-injected", "status-unknown-tool",
+                        "status-invalid-args", "status-forged-result"]
 
 
 class DraftRequest(BaseModel):
@@ -153,6 +159,8 @@ def record(result):
     summary = {key: result[key] for key in (
         "request_id", "policy_digest", "decision", "stopped_at", "upstream_called", "main_completed", "stages")}
     summary["model_roles"] = [item["role"] for item in result["model_calls"]]
+    if "tool_executed" in result:
+        summary["tool_executed"] = result["tool_executed"]
     REQUESTS.appendleft(summary)
     print(json.dumps({"event": "proxy_decision", **summary}, ensure_ascii=False,
                      separators=(",", ":")), flush=True)
@@ -172,7 +180,10 @@ def active_policy(authorization: str | None = Header(default=None)):
             "model_id": MODEL_ID, "stages": ["presidio_input", "nemo_input", "main",
                                             "nemo_output", "presidio_output"],
             "read_only": True,
-            "retrieval_fixture_available": bundle.retrieval_enabled}
+            "retrieval_fixture_available": bundle.retrieval_enabled,
+            "tool_fixture_available": bundle.retrieval_enabled
+            and bundle.policy.get("tool_fixture_enabled") is True,
+            "native_tool_rail": False}
 
 
 @app.get("/v1/requests")
@@ -297,6 +308,37 @@ async def admin_test_draft(digest: str, authorization: str | None = Header(defau
                             "passed": passed})
             if not passed:
                 return {"digest": digest, "passed": False, "results": summary}
+    if candidate.policy.get("tool_fixture_enabled") is True:
+        if not candidate.retrieval_enabled:
+            return {"digest": digest, "passed": False, "results": summary}
+        for fixture_id, expected, tool_expected, main_expected in (
+                ("status-safe", "allow", True, True),
+                ("status-injected", "block", True, False),
+                ("status-unknown-tool", "block", False, False),
+                ("status-invalid-args", "block", False, False),
+                ("status-forged-result", "block", True, False)):
+            status, result = await run_pipeline(
+                "Where is account recovery help?", candidate,
+                record_decision=False, tool_fixture_id=fixture_id)
+            tool_stage = next((stage for stage in result["stages"]
+                               if stage["name"] == "tool_result"), None)
+            passed = (status == 200 and result["decision"] == expected
+                      and result["tool_executed"] is tool_expected
+                      and result["upstream_called"] is main_expected
+                      and result["main_completed"] is main_expected
+                      and result["policy_digest"] == digest
+                      and ((tool_stage is not None) is tool_expected)
+                      and (fixture_id not in {"status-safe", "status-injected"}
+                           or tool_stage.get("native_action_invoked") is True))
+            summary.append({"case": fixture_id, "http": status,
+                            "decision": result["decision"],
+                            "stopped_at": result["stopped_at"],
+                            "tool_executed": result["tool_executed"],
+                            "upstream_called": result["upstream_called"],
+                            "main_completed": result["main_completed"],
+                            "passed": passed})
+            if not passed:
+                return {"digest": digest, "passed": False, "results": summary}
     try:
         STORE.mark_tested(digest, metadata["base_digest"], summary)
     except ValueError:
@@ -333,7 +375,8 @@ def admin_rollback(body: RollbackRequest, authorization: str | None = Header(def
     return {"state": "active", "digest": bundle.digest, "previous_digest": previous}
 
 
-async def run_pipeline(message, bundle, *, record_decision, fixture_id=None):
+async def run_pipeline(message, bundle, *, record_decision, fixture_id=None,
+                       tool_fixture_id=None):
     try:
         await asyncio.wait_for(bundle.limit.acquire(), timeout=2)
     except asyncio.TimeoutError:
@@ -341,11 +384,12 @@ async def run_pipeline(message, bundle, *, record_decision, fixture_id=None):
     request_id = str(uuid4())
     tracker = CallTracker()
     stages = []
+    tool_executed = False
     current = "presidio_input"
     started = time.perf_counter()
 
     async def execute():
-        nonlocal current
+        nonlocal current, tool_executed
         text, entities = await privacy_scan("input", message, request_id)
         stages.append({"name": current, "result": "redacted" if entities else "passed",
                        "entities": entities})
@@ -375,6 +419,38 @@ async def run_pipeline(message, bundle, *, record_decision, fixture_id=None):
                            "local_dialog_calls": evidence["local_dialog_calls"],
                            "chunk_digest": evidence["chunk_digest"]})
             if not retrieval["allowed"]:
+                return "block", None
+        if tool_fixture_id is not None:
+            current = "tool_input"
+            if (bundle.policy.get("tool_fixture_enabled") is not True
+                    or not bundle.retrieval_enabled):
+                raise ValueError("tool boundary missing from active policy")
+            call = fixture_call(tool_fixture_id)
+            permitted = validate_call(call)
+            stages.append({"name": current, "result": "passed" if permitted else "blocked",
+                           "tool_name": call["name"], "tool_executed": False})
+            if not permitted:
+                return "block", None
+            result = execute_fixture(tool_fixture_id, call)
+            tool_executed = True
+            current = "tool_result"
+            if not validate_result(call, result):
+                stages.append({"name": current, "result": "blocked", "tool_executed": True,
+                               "reason": "result_not_linked"})
+                return "block", None
+            source, entities = await privacy_scan("tool_result", result["content"], request_id)
+            inspection = await check_retrieval(source, config=bundle.rails_config)
+            evidence = inspection["evidence"]
+            if (evidence.get("native_action_invoked") is not True
+                    or evidence.get("rail") != "check retrieval instruction"):
+                raise ValueError("tool content rail evidence missing")
+            stages.append({"name": current,
+                           "result": "passed" if inspection["allowed"] else "blocked",
+                           "tool_executed": True, "entities": entities,
+                           "content_digest": tool_digest(source),
+                           "content_rail": evidence["rail"],
+                           "native_action_invoked": True})
+            if not inspection["allowed"]:
                 return "block", None
         current = "main"
         prompt = "Give one short, safe account-recovery guidance answer to this request: " + text
@@ -408,6 +484,8 @@ async def run_pipeline(message, bundle, *, record_decision, fixture_id=None):
                   "stages": stages,
                   "model_calls": tracker.calls,
                   "elapsed_ms": round((time.perf_counter() - started) * 1000)}
+        if tool_fixture_id is not None:
+            result["tool_executed"] = tool_executed
         if record_decision:
             record(result)
         return 200, result
@@ -419,6 +497,8 @@ async def run_pipeline(message, bundle, *, record_decision, fixture_id=None):
                   "stages": stages,
                   "model_calls": tracker.calls,
                   "elapsed_ms": round((time.perf_counter() - started) * 1000)}
+        if tool_fixture_id is not None:
+            result["tool_executed"] = tool_executed
         if record_decision:
             record(result)
         return 502, {**result, "error_type": type(exc).__name__}
@@ -445,4 +525,16 @@ async def retrieval_chat(body: RetrievalRequest,
         return JSONResponse(status_code=422, content={"error": "invalid request shape or length"})
     status, result = await run_pipeline(body.message, bundle, record_decision=True,
                                         fixture_id=body.fixture_id)
+    return result if status == 200 else JSONResponse(status_code=status, content=result)
+
+
+@app.post("/v1/tool-chat")
+async def tool_chat(body: ToolRequest,
+                    authorization: str | None = Header(default=None)):
+    require_caller(authorization)
+    bundle = ACTIVE_BUNDLE
+    if len(body.message) > bundle.policy["max_input_chars"]:
+        return JSONResponse(status_code=422, content={"error": "invalid request shape or length"})
+    status, result = await run_pipeline(body.message, bundle, record_decision=True,
+                                        tool_fixture_id=body.fixture_id)
     return result if status == 200 else JSONResponse(status_code=status, content=result)

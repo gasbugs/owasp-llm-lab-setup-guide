@@ -56,6 +56,8 @@ def load_bundle(root: Path) -> PolicyBundle:
             or policy.get("pii_input_action") != "redact"
             or policy.get("pii_output_action") != "redact"
             or policy.get("default_error_action") != "deny"
+            or ("tool_fixture_enabled" in policy
+                and type(policy["tool_fixture_enabled"]) is not bool)
             or type(policy.get("max_input_chars")) is not int
             or not 1 <= policy["max_input_chars"] <= 4000
             or type(policy.get("max_output_chars")) is not int

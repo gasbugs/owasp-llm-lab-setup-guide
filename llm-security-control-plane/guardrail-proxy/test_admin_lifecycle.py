@@ -18,20 +18,37 @@ import server
 FAIL_RISK = False
 
 
-async def fake_pipeline(message, bundle, *, record_decision, fixture_id=None):
+async def fake_pipeline(message, bundle, *, record_decision, fixture_id=None,
+                        tool_fixture_id=None):
     assert record_decision is False
-    risk = fixture_id == "recovery-injected" or message.startswith((
-        "Ignore", "Paraphrase", "Print your private", "Before the recovery advice"))
+    risk = (fixture_id == "recovery-injected"
+            or tool_fixture_id in {"status-injected", "status-unknown-tool",
+                                   "status-invalid-args", "status-forged-result"}
+            or message.startswith(("Ignore", "Paraphrase", "Print your private",
+                                   "Before the recovery advice")))
     stages = ([{"name": "retrieval", "native_action_invoked": True}]
               if fixture_id else [])
+    if tool_fixture_id:
+        stages = [{"name": "tool_input", "result": "passed"}]
+        if tool_fixture_id not in {"status-unknown-tool", "status-invalid-args"}:
+            stages.append({"name": "tool_result",
+                           "native_action_invoked": True})
     if risk and FAIL_RISK:
         return 502, {"decision": "ERR", "stopped_at": "nemo_input",
                      "upstream_called": False, "main_completed": False,
                      "policy_digest": bundle.digest, "stages": stages}
-    return 200, {"decision": "block" if risk else "allow",
-                 "stopped_at": "nemo_input" if risk else "presidio_output",
-                 "upstream_called": not risk, "main_completed": not risk,
-                 "policy_digest": bundle.digest, "stages": stages}
+    stopped = ("tool_input" if tool_fixture_id in {"status-unknown-tool", "status-invalid-args"}
+               else "tool_result" if tool_fixture_id and risk
+               else "retrieval" if fixture_id and risk
+               else "nemo_input" if risk else "presidio_output")
+    result = {"decision": "block" if risk else "allow",
+              "stopped_at": stopped, "upstream_called": not risk,
+              "main_completed": not risk, "policy_digest": bundle.digest,
+              "stages": stages}
+    if tool_fixture_id:
+        result["tool_executed"] = tool_fixture_id not in {
+            "status-unknown-tool", "status-invalid-args"}
+    return 200, result
 
 
 async def check():
@@ -53,7 +70,7 @@ async def check():
                                   json={"expected_active_digest": old})).status_code == 409
         assert (await client.post(target + "/test", headers=caller)).status_code == 401
         tested = (await client.post(target + "/test", headers=admin)).json()
-        assert tested["passed"] and len(tested["results"]) == 16
+        assert tested["passed"] and len(tested["results"]) == 21
         assert all(item["passed"] for item in tested["results"])
         assert (await client.get("/v1/policy", headers=caller)).json()["digest"] == old
         assert (await client.post(target + "/promote", headers=admin,

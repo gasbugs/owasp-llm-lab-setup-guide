@@ -1,0 +1,50 @@
+name: Guardrail Proxy boundary E2E
+
+on:
+  push:
+    paths:
+      - "llm-security-control-plane/guardrail-proxy/**"
+      - "llm-security-control-plane/spokes/presidio-privacy/**"
+      - ".github/workflows/guardrail-proxy-boundary.yml"
+  pull_request:
+    paths:
+      - "llm-security-control-plane/guardrail-proxy/**"
+      - "llm-security-control-plane/spokes/presidio-privacy/**"
+      - ".github/workflows/guardrail-proxy-boundary.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build isolated proxy and Privacy images
+        run: |
+          cd llm-security-control-plane
+          docker build -f guardrail-proxy/Containerfile -t localhost/guardrail-proxy-boundary:ci .
+          docker build -f spokes/presidio-privacy/Containerfile -t localhost/guardrail-proxy-privacy-boundary:ci .
+      - name: Run API, policy and Privacy contracts
+        run: |
+          cd llm-security-control-plane
+          for script in test_proxy.py test_privacy_response.py test_retrieval_product.py test_tool_product.py test_policy_store.py test_admin_drafts.py test_admin_lifecycle.py test_seed_upgrade.py; do
+            docker run --rm --network none -v "$PWD/guardrail-proxy/$script:/app/$script:ro" localhost/guardrail-proxy-boundary:ci python "/app/$script"
+          done
+          docker run --rm --network none -v "$PWD/spokes/presidio-privacy/test_proxy_privacy.py:/app/test_proxy_privacy.py:ro" localhost/guardrail-proxy-privacy-boundary:ci python /app/test_proxy_privacy.py
+      - name: Run actual peer and native content Action
+        env:
+          PROXY_TEST_IMAGE: localhost/guardrail-proxy-boundary:ci
+          PRIVACY_TEST_IMAGE: localhost/guardrail-proxy-privacy-boundary:ci
+        run: |
+          python3 llm-security-control-plane/guardrail-proxy/test_retrieval_e2e.py
+          python3 llm-security-control-plane/guardrail-proxy/test_tool_e2e.py
+      - name: Check console fixture navigation
+        run: |
+          python -m pip install -r tests/browser/requirements.txt
+          python -m playwright install --with-deps chromium
+          python llm-security-control-plane/guardrail-proxy/test_tool_console.py

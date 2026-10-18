@@ -25,7 +25,7 @@ configure_telemetry(app, "llm-security-presidio-spoke")
 
 class AnalyzeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    stage: str = Field(pattern="^(input|retrieval|output)$")
+    stage: str = Field(pattern="^(input|retrieval|tool_result|output)$")
     text: str = Field(min_length=1, max_length=50000)
     request_id: str = Field(min_length=8, max_length=128)
 

@@ -12,7 +12,7 @@ import urllib.request
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 PROXY_IMAGE = os.getenv("PROXY_TEST_IMAGE", "localhost/llm-security-guardrail-proxy-api:0.1.0")
-PRIVACY_IMAGE = "localhost/llm-security-presidio-privacy-spoke:1.0.0"
+PRIVACY_IMAGE = os.getenv("PRIVACY_TEST_IMAGE", "localhost/llm-security-presidio-privacy-spoke:1.0.0")
 PYTHON_IMAGE = "docker.io/library/python:3.12-slim"
 SUFFIX = str(os.getpid())
 NETWORK = "guardrail-retrieval-e2e-" + SUFFIX

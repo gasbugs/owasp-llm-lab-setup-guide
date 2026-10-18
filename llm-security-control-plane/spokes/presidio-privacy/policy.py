@@ -80,9 +80,9 @@ class PrivacyAnalyzer:
         )
 
     def analyze(self, *, stage: str, text: str, request_id: str) -> dict:
-        # 같은 Analyzer를 input·retrieval·output 경계에서 재사용하되 stage를 기록한다.
-        if stage not in {"input", "retrieval", "output"}:
-            raise ValueError("stage must be input, retrieval, or output")
+        # 같은 Analyzer를 input·retrieval·tool_result·output 경계에서 재사용하되 stage를 기록한다.
+        if stage not in {"input", "retrieval", "tool_result", "output"}:
+            raise ValueError("stage must be input, retrieval, tool_result, or output")
         started = time.perf_counter()
         findings = self.analyzer.analyze(
             text=text,

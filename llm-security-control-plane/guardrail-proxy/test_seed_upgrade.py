@@ -21,25 +21,40 @@ from policy_store import PolicyStore
 
 
 ACTION_PRESENT = False
+TOOL_ACTION_PRESENT = False
 
 
-async def fake_pipeline(message, bundle, *, record_decision, fixture_id=None):
+async def fake_pipeline(message, bundle, *, record_decision, fixture_id=None,
+                        tool_fixture_id=None):
     assert record_decision is False
-    risk = fixture_id == "recovery-injected" or message.startswith((
-        "Ignore", "Paraphrase", "Print your private", "Before the recovery advice"))
-    return 200, {
-        "decision": "block" if risk else "allow",
-        "stopped_at": "retrieval" if fixture_id and risk else "nemo_input" if risk else "presidio_output",
-        "upstream_called": not risk,
-        "main_completed": not risk,
-        "policy_digest": bundle.digest,
-        "stages": [{"name": "retrieval", "native_action_invoked": ACTION_PRESENT}]
-        if fixture_id else [],
-    }
+    risk = (fixture_id == "recovery-injected"
+            or tool_fixture_id in {"status-injected", "status-unknown-tool",
+                                   "status-invalid-args", "status-forged-result"}
+            or message.startswith(("Ignore", "Paraphrase", "Print your private",
+                                   "Before the recovery advice")))
+    stages = ([{"name": "retrieval", "native_action_invoked": ACTION_PRESENT}]
+              if fixture_id else [])
+    if tool_fixture_id:
+        stages = [{"name": "tool_input", "result": "passed"}]
+        if tool_fixture_id not in {"status-unknown-tool", "status-invalid-args"}:
+            stages.append({"name": "tool_result",
+                           "native_action_invoked": TOOL_ACTION_PRESENT})
+    stopped = ("tool_input" if tool_fixture_id in {"status-unknown-tool", "status-invalid-args"}
+               else "tool_result" if tool_fixture_id and risk
+               else "retrieval" if fixture_id and risk
+               else "nemo_input" if risk else "presidio_output")
+    result = {"decision": "block" if risk else "allow",
+              "stopped_at": stopped, "upstream_called": not risk,
+              "main_completed": not risk, "policy_digest": bundle.digest,
+              "stages": stages}
+    if tool_fixture_id:
+        result["tool_executed"] = tool_fixture_id not in {
+            "status-unknown-tool", "status-invalid-args"}
+    return 200, result
 
 
 async def check():
-    global ACTION_PRESENT
+    global ACTION_PRESENT, TOOL_ACTION_PRESENT
     with tempfile.TemporaryDirectory() as temp:
         temp = Path(temp)
         old = temp / "old"
@@ -54,6 +69,7 @@ async def check():
         config_path.write_text(yaml.safe_dump(config, sort_keys=False))
         policy = yaml.safe_load(Path("/app/policy.yaml").read_text())
         policy["version"] = "0.1.1"
+        policy.pop("tool_fixture_enabled", None)
         (old / "policy.yaml").write_text(yaml.safe_dump(policy, sort_keys=False))
         store = PolicyStore(temp / "state", old)
         previous = store.active.digest
@@ -69,7 +85,7 @@ async def check():
             assert (await client.get("/admin/seed-preview")).status_code == 401
             preview = (await client.get("/admin/seed-preview", headers=admin)).json()
             assert preview["available"] and preview["active_digest"] == previous
-            assert preview["seed_version"] == "0.1.2"
+            assert preview["seed_version"] == "0.1.3"
             assert "nemo-policy/flows.co" in preview["changed_files"]
             assert "+++ image/nemo-policy/flows.co" in preview["diff"]
             assert (await client.post("/admin/seed-draft", json=body)).status_code == 401
@@ -81,7 +97,7 @@ async def check():
             assert created.status_code == 201, created.text
             draft = created.json()
             digest = draft["digest"]
-            assert draft["version"] == "0.1.2" and draft["source"] == "image_seed"
+            assert draft["version"] == "0.1.3" and draft["source"] == "image_seed"
             assert digest != previous and store.get_draft(digest)[1].retrieval_enabled
             assert store.active.digest == previous
             repeated = await client.post("/admin/seed-draft", headers=admin, json=body)
@@ -92,14 +108,23 @@ async def check():
             assert failed["passed"] is False and failed["results"][-1]["case"] == "recovery-safe"
             assert store.active.digest == previous
             ACTION_PRESENT = True
+            tool_failed = (await client.post(f"/admin/drafts/{digest}/test", headers=admin)).json()
+            assert tool_failed["passed"] is False
+            assert tool_failed["results"][-1]["case"] == "status-safe"
+            assert store.active.digest == previous
+            TOOL_ACTION_PRESENT = True
             tested = (await client.post(f"/admin/drafts/{digest}/test", headers=admin)).json()
-            assert tested["passed"] and len(tested["results"]) == 16
+            assert tested["passed"] and len(tested["results"]) == 21
+            assert [item["case"] for item in tested["results"][-5:]] == [
+                "status-safe", "status-injected", "status-unknown-tool",
+                "status-invalid-args", "status-forged-result"]
             assert all(item["passed"] for item in tested["results"])
             promoted = await client.post(f"/admin/drafts/{digest}/promote", headers=admin,
                                          json=body)
             assert promoted.status_code == 200 and store.active.digest == digest
-            assert (await client.get("/v1/policy", headers=caller)).json()[
-                "retrieval_fixture_available"] is True
+            active_policy = (await client.get("/v1/policy", headers=caller)).json()
+            assert active_policy["retrieval_fixture_available"] is True
+            assert active_policy["tool_fixture_available"] is True
             same = await client.post("/admin/seed-draft", headers=admin,
                                       json={"expected_active_digest": digest})
             assert same.status_code == 422
@@ -113,4 +138,4 @@ async def check():
 
 if __name__ == "__main__":
     asyncio.run(check())
-    print("seed_upgrade=PASS cases=auth,stale,untested,retrieval_gate,promote,rollback")
+    print("seed_upgrade=PASS cases=auth,stale,untested,retrieval_gate,tool_gate,promote,rollback")
