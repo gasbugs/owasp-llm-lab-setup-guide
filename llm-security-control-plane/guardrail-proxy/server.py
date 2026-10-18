@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import deque
+import difflib
 import hmac
 import json
 import os
@@ -20,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 import yaml
 from gateway_model import CallTracker, GatewayModel, MODEL_ID
 from native_rails import check_text
+from policy_bundle import load_bundle, policy_files
 from policy_store import PolicyStore
 from policy_cases import CANDIDATE_CASES
 from retrieval_rails import FIXTURES, check_retrieval
@@ -187,6 +189,32 @@ def admin_source(authorization: str | None = Header(default=None)):
             "input_prompt": STORE.active_input_prompt()}
 
 
+@app.get("/admin/seed-preview")
+def admin_seed_preview(authorization: str | None = Header(default=None)):
+    require_admin(authorization)
+    seed = load_bundle(STORE.seed_root)
+    active = STORE.active
+    active_root = STORE.bundles / active.digest
+    paths = sorted(set(policy_files(active_root)) | set(policy_files(STORE.seed_root)))
+    changes = []
+    changed_files = []
+    for filename in paths:
+        old_file = active_root / filename
+        new_file = STORE.seed_root / filename
+        before = old_file.read_text().splitlines(keepends=True) if old_file.exists() else []
+        after = new_file.read_text().splitlines(keepends=True) if new_file.exists() else []
+        if before != after:
+            changed_files.append(filename)
+            changes.extend(difflib.unified_diff(before, after,
+                fromfile="active/" + filename, tofile="image/" + filename))
+    newer = (tuple(map(int, seed.policy["version"].split("."))) >
+             tuple(map(int, active.policy["version"].split("."))))
+    return {"active_digest": active.digest, "active_version": active.policy["version"],
+            "seed_digest": seed.digest, "seed_version": seed.policy["version"],
+            "available": newer and seed.digest != active.digest,
+            "changed_files": changed_files, "diff": "".join(changes)}
+
+
 @app.get("/admin/drafts")
 def admin_drafts(authorization: str | None = Header(default=None)):
     require_admin(authorization)
@@ -208,6 +236,8 @@ def admin_create_seed_draft(body: PromoteRequest,
     except ValueError as error:
         if str(error) in {"active policy changed", "draft base conflict"}:
             raise HTTPException(status_code=409, detail=str(error)) from None
+        if str(error) == "seed is not newer than active policy":
+            raise HTTPException(status_code=422, detail=str(error)) from None
         raise HTTPException(status_code=422, detail="invalid seed policy") from None
 
 

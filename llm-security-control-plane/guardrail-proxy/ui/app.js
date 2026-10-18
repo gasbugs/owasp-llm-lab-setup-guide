@@ -174,6 +174,14 @@ async function refreshAdminVersions(){
   }));
   byId("rollback").disabled=true;
 }
+async function refreshSeedPreview(){
+  const preview=await adminApi("/admin/seed-preview");
+  byId("seed-create").disabled=!preview.available;
+  setText("seed-summary",preview.available
+    ?`현재 ${preview.active_version} → 이미지 ${preview.seed_version} · 변경 파일 ${preview.changed_files.length}개`
+    :`이미지 기본 정책 ${preview.seed_version}은 현재 정책 ${preview.active_version}보다 새 버전이 아닙니다.`);
+  setText("seed-diff",preview.diff||"변경된 정책 파일이 없습니다.");
+}
 async function connectAdmin(){
   if(!callerToken){setText("admin-message","위에서 API 호출 권한을 먼저 연결하세요.");return}
   const candidate=byId("admin-token").value.trim();
@@ -186,6 +194,7 @@ async function connectAdmin(){
     byId("draft-prompt").value=adminSource.input_prompt;
     renderDraftDiff();
     await refreshAdminVersions();
+    await refreshSeedPreview();
     setText("admin-message","관리자 연결이 완료됐습니다. 초안은 시험 전까지 적용되지 않습니다.");
   }catch{
     adminToken="";adminSource=null;byId("admin-workspace").hidden=true;
@@ -209,6 +218,24 @@ async function createDraft(){
   }catch(error){setText("draft-message","초안을 저장하지 못했습니다: "+error.message)}
   finally{button.disabled=false}
 }
+async function createSeedDraft(){
+  if(!adminToken||!adminSource)return;
+  const button=byId("seed-create");button.disabled=true;
+  try{
+    const data=await adminApi("/admin/seed-draft",{method:"POST",body:JSON.stringify({
+      expected_active_digest:adminSource.base_digest
+    })});
+    draftDigest=data.digest;draftTested=false;
+    byId("draft-test").disabled=false;byId("draft-promote").disabled=true;
+    setText("draft-state","이미지 기본 정책 "+data.version+" · "+shortDigest(draftDigest)+" · 시험 전");
+    setText("seed-message","비활성 초안을 가져왔습니다. 후보 실제 시험을 실행하세요.");
+    byId("draft-results").replaceChildren();
+    await refreshAdminVersions();
+    await refreshSeedPreview();
+  }catch(error){setText("seed-message",error.message==="seed is not newer than active policy"
+    ?"현재 정책보다 새 이미지 기본 정책이 없습니다.":"가져오지 못했습니다: "+error.message)}
+  finally{button.disabled=false}
+}
 async function testDraft(){
   if(!draftDigest)return;
   const button=byId("draft-test");button.disabled=true;
@@ -223,7 +250,7 @@ async function testDraft(){
       row.append(name,verdict);return row;
     }));
     byId("draft-promote").disabled=!draftTested;
-    setText("draft-state",draftTested?"정상 2건·위험 9건 통과. 활성화할 수 있습니다.":"시험이 실패했습니다. 활성 정책은 유지됩니다.");
+    setText("draft-state",draftTested?`${data.results.length}건 모두 통과. 활성화할 수 있습니다.`:"시험이 실패했습니다. 활성 정책은 유지됩니다.");
     await refreshAdminVersions();
   }catch(error){setText("draft-state","후보 시험을 완료하지 못했습니다: "+error.message)}
   finally{button.disabled=false}
@@ -236,7 +263,7 @@ async function refreshAfterPolicyChange(){
   draftDigest="";draftTested=false;
   byId("draft-test").disabled=true;byId("draft-promote").disabled=true;
   byId("draft-results").replaceChildren();renderDraftDiff();
-  await refreshAdminVersions();await refreshRecords();
+  await refreshAdminVersions();await refreshSeedPreview();await refreshRecords();
 }
 async function promoteDraft(){
   if(!draftTested||!draftDigest||!adminSource)return;
@@ -275,6 +302,7 @@ document.addEventListener("DOMContentLoaded",async()=>{
   byId("draft-version").addEventListener("input",invalidateDraft);
   byId("draft-prompt").addEventListener("input",invalidateDraft);
   byId("draft-create").addEventListener("click",createDraft);
+  byId("seed-create").addEventListener("click",createSeedDraft);
   byId("draft-test").addEventListener("click",testDraft);
   byId("draft-promote").addEventListener("click",promoteDraft);
   byId("rollback-target").addEventListener("change",event=>{byId("rollback").disabled=!event.target.value});

@@ -66,6 +66,12 @@ async def check():
         body = {"expected_active_digest": previous}
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app),
                                      base_url="http://test") as client:
+            assert (await client.get("/admin/seed-preview")).status_code == 401
+            preview = (await client.get("/admin/seed-preview", headers=admin)).json()
+            assert preview["available"] and preview["active_digest"] == previous
+            assert preview["seed_version"] == "0.1.2"
+            assert "nemo-policy/flows.co" in preview["changed_files"]
+            assert "+++ image/nemo-policy/flows.co" in preview["diff"]
             assert (await client.post("/admin/seed-draft", json=body)).status_code == 401
             assert (await client.post("/admin/seed-draft", headers=caller,
                                       json=body)).status_code == 401
@@ -94,8 +100,11 @@ async def check():
             assert promoted.status_code == 200 and store.active.digest == digest
             assert (await client.get("/v1/policy", headers=caller)).json()[
                 "retrieval_fixture_available"] is True
-            assert (await client.post("/admin/seed-draft", headers=admin,
-                                      json={"expected_active_digest": digest})).status_code == 422
+            same = await client.post("/admin/seed-draft", headers=admin,
+                                      json={"expected_active_digest": digest})
+            assert same.status_code == 422
+            assert same.json()["detail"] == "seed is not newer than active policy"
+            assert (await client.get("/admin/seed-preview", headers=admin)).json()["available"] is False
             rolled = await client.post("/admin/rollback", headers=admin,
                                        json={"expected_active_digest": digest,
                                              "target_digest": previous})
