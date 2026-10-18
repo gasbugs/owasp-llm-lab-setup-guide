@@ -1,12 +1,41 @@
-"""Learner-owned P12 orchestration. The Starter deliberately performs no calls."""
+"""P12: 제공된 단계 순서에 실제 서비스 호출을 연결하세요."""
+
+import json
 
 
 async def handle_request(request, services):
-    """Connect the provided services using their actual return values."""
-    # TODO 1: authenticate와 authorize를 차례로 await하고 실패하면 즉시 401·403을 반환하세요.
-    # TODO 2: 입력 privacy의 결과를 input_rail과 검색에 넘기고 거부되면 중단하세요.
-    # TODO 3: 검색 결과가 빈 문자열이면 404로 중단한 뒤 문서를 retrieval_rail로 검사하세요.
-    # TODO 4: 허용된 질문·문서를 JSON prompt로 묶어 Main을 호출하세요.
-    # TODO 5: 답변을 output_rail로 검사한 뒤 output_privacy 결과를 200으로 반환하세요.
-    # 401·403·404의 text는 빈 문자열이며 서비스 오류는 잡지 말고 전달하세요.
-    raise NotImplementedError("P12 pipeline is not implemented")
+    """각 단계가 거부되면 즉시 멈추고 뒤 서비스를 호출하지 않습니다."""
+    # TODO 1: authenticate(request["credential"])의 결과를 authenticated에 받으세요.
+    raise NotImplementedError("P12 authentication call required")
+    if not authenticated:
+        return {"status": 401, "text": ""}
+
+    # TODO 2: authorize(request["tenant"])의 결과를 authorized에 받으세요.
+    raise NotImplementedError("P12 authorization call required")
+    if not authorized:
+        return {"status": 403, "text": ""}
+
+    # TODO 3: input_privacy 결과를 message에 받고 input_rail의 판정을 input_allowed에 받으세요.
+    raise NotImplementedError("P12 input protection calls required")
+    if not input_allowed:
+        return {"status": 403, "text": ""}
+
+    # TODO 4: message로 검색하고 원문을 context에 받으세요.
+    raise NotImplementedError("P12 retrieval call required")
+    if not context:
+        return {"status": 404, "text": ""}
+
+    # TODO 5: retrieval_rail의 판정을 retrieval_allowed에 받으세요.
+    raise NotImplementedError("P12 retrieval rail call required")
+    if not retrieval_allowed:
+        return {"status": 403, "text": ""}
+
+    prompt = json.dumps({"question": message, "context": context}, ensure_ascii=False, separators=(",", ":"))
+    # TODO 6: Main 호출 결과를 answer에, output_rail 판정을 output_allowed에 받으세요.
+    raise NotImplementedError("P12 model and output rail calls required")
+    if not output_allowed:
+        return {"status": 403, "text": ""}
+
+    # TODO 7: output_privacy 결과를 safe_answer에 받으세요.
+    raise NotImplementedError("P12 output privacy call required")
+    return {"status": 200, "text": safe_answer}

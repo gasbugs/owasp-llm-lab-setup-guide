@@ -125,11 +125,10 @@ def publish_notice(
     approval_token: str = "",
 ) -> dict:
     """Publish one local training notice after an exact-call approval."""
-    # TODO 1: approval_token을 verify_approval()로 검사하고 서명된 nonce를 받으세요.
-    # TODO 2: 승인된 suite·call·trace·requester·notice가 이 호출과 같은지 확인하세요.
-    # TODO 3: 새 임의 nonce를 만들지 말고 승인에서 받은 nonce를 consumed에 기록하세요.
-    # TODO 4: 같은 nonce의 재사용은 아래 IntegrityError 경로에서 ToolError로 거부하세요.
-    nonce = secrets.token_hex(16)
+    # TODO: verify_approval()에 현재 호출의 다섯 식별값과 approval_token을
+    # 전달하고, 서명·정확한 호출을 확인한 뒤 받은 nonce를 사용하세요.
+    # 아래 try/except와 중복 사용 차단 흐름은 제공됩니다.
+    nonce = secrets.token_hex(16)  # 이 핵심 줄을 승인에서 받은 nonce로 바꾸세요.
 
     try:
         with connect() as database:

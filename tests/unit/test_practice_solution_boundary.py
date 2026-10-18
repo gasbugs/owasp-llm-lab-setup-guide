@@ -6,6 +6,9 @@ from pathlib import Path
 import ast
 import re
 import shlex
+import sys
+from types import ModuleType, SimpleNamespace
+from unittest.mock import Mock, patch
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2] / 'llm-security-control-plane'
@@ -26,13 +29,35 @@ def unsafe_copies(text):
 class SolutionBoundaryTests(unittest.TestCase):
     def test_p01_01_repository_keeps_unsolved_starter(self):
         source = (ROOT / 'guided-labs/h23-model-call/learner.py').read_text()
-        self.assertIn('TODO 1:', source)
-        for number in (2, 3, 4):
+        self.assertIn('if not isinstance(message, str) or not message.strip():', source)
+        self.assertIn('except (BotoCoreError, ClientError) as exc:', source)
+        for number in (2, 3):
             self.assertIn(f'TODO {number}:', source)
         self.assertIn('raise NotImplementedError("Implement forward_question")', source)
         calls = [node.func for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)]
         self.assertFalse(any(isinstance(func, ast.Attribute) and func.attr in {'client', 'converse'}
                              for func in calls))
+
+    def test_p01_01_starter_rejects_blank_without_sdk_and_stays_unimplemented(self):
+        source = (ROOT / 'guided-labs/h23-model-call/learner.py').read_text()
+        boto3 = ModuleType('boto3')
+        boto3.session = SimpleNamespace(Session=lambda: SimpleNamespace(region_name='us-east-1'))
+        boto3.client = Mock()
+        botocore = ModuleType('botocore')
+        config = ModuleType('botocore.config')
+        config.Config = lambda **kwargs: kwargs
+        exceptions = ModuleType('botocore.exceptions')
+        exceptions.BotoCoreError = type('BotoCoreError', (Exception,), {})
+        exceptions.ClientError = type('ClientError', (Exception,), {})
+        with patch.dict(sys.modules, {'boto3': boto3, 'botocore': botocore,
+                                      'botocore.config': config, 'botocore.exceptions': exceptions}):
+            namespace = {}
+            exec(compile(source, 'learner.py', 'exec'), namespace)
+            with self.assertRaises(ValueError):
+                namespace['forward_question']('   ')
+            with self.assertRaises(NotImplementedError):
+                namespace['forward_question']('실제 질문')
+        boto3.client.assert_not_called()
 
     def test_p13_public_problem_includes_fixed_inputs_without_assertion_solution(self):
         html = (ROOT / 'guided-control-center/index.html').read_text()

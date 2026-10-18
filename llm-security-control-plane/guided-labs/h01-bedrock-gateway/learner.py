@@ -2,16 +2,32 @@
 
 
 def handle_request(body: dict, client) -> dict:
-    """Return the raw Converse response; raise ValueError for an invalid body.
+    """Return the raw Converse response; reject invalid input before model calls."""
+    # 제공 흐름: 요청 형식을 먼저 확인합니다.
+    if not isinstance(body, dict) or set(body) != {"message", "max_output_tokens"}:
+        raise ValueError("invalid request fields")
+    message = body["message"]
+    requested = body["max_output_tokens"]
+    if not isinstance(message, str) or not message.strip() or len(message) > 4000:
+        raise ValueError("invalid message")
+    if type(requested) is not int or not 1 <= requested <= 512:
+        raise ValueError("invalid output limit")
+    limit = requested
+    if requested > 128:
+        # TODO 2: 출력 상한을 서버 허용값으로 낮추세요.
+        raise NotImplementedError("P01 output limit is not implemented")
 
-    body contains only the client request, not grading metadata or credentials.
-    client.converse(**kwargs) has the Boto3 Converse interface.
-    Implement validation, request limits, and the actual invocation here.
-    """
-    # TODO 1: body의 두 필드와 각 타입·범위를 모델 호출 전에 검사하세요.
-    # TODO 2: 요청한 출력 상한을 128 이하로 제한하고 그 양을 예약하세요.
-    # TODO 3: 원문 질문과 제한한 상한으로 Converse를 한 번 호출하세요.
-    # 호출 실패 시 예약을 취소하고 같은 오류를 다시 전달하세요.
-    # TODO 4: 성공한 응답의 실제 outputTokens로 예산을 정산하세요.
-    # Converse가 돌려준 응답 dict 전체를 바꾸지 말고 반환하세요.
+    # TODO 2: client.reserve_budget(limit)으로 호출 전에 예산을 예약하고
+    # 예약 ID를 reservation에 받으세요.
     raise NotImplementedError("P01 request handling is not implemented")
+    try:
+        # TODO 3: client.converse()에 원문 message·limit·정해진 모델과
+        # temperature를 전달하고 응답 전체를 response에 받으세요.
+        raise NotImplementedError("P01 Converse is not implemented")
+    except Exception:
+        # 제공 흐름: 모델 실패 시 예약을 취소하고 같은 오류를 전달합니다.
+        client.cancel_budget(reservation)
+        raise
+    # TODO 4: response의 usage.outputTokens로 예약을 정산하세요.
+    raise NotImplementedError("P01 settlement is not implemented")
+    return response

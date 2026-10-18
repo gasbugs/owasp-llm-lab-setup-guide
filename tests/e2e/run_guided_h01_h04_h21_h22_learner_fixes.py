@@ -31,10 +31,17 @@ ACTIVITIES = {
         "replacements": [
             (
                 '''    configured = POLICIES.get(principal)
-    # TODO 1: 설정이 없는 principal은 PolicyDenied로 호출 전에 거부하세요.
-    # TODO 2: model·server·tool 허용 목록과 state_owner를 검사하세요.
-    # TODO 3: 요청한 Tool 횟수·결과 bytes·timeout이 정책 상한을 넘으면 거부하세요.
-    # TODO 4: 허용되면 요청값 대신 configured의 상한으로 Admission을 만드세요.
+    if configured is None:
+        raise PolicyDenied("principal not configured")
+    # TODO 2: 아래 False를 model·server·tool 허용 목록 및 state_owner의
+    # 정책 위반 조건으로 바꾸세요. if/raise 구조는 그대로 사용합니다.
+    if False:
+        raise PolicyDenied("agent boundary denied")
+    # TODO 3: 아래 False를 요청 횟수·결과 bytes·timeout의 한도 초과
+    # 조건으로 바꾸세요.
+    if False:
+        raise PolicyDenied("agent limit exceeded")
+    # TODO 4: 요청값 대신 configured의 세 상한을 Admission에 넣으세요.
     return Admission(
         principal=principal,
         model=model,
@@ -83,7 +90,7 @@ ACTIVITIES = {
         "path": CONTROL / "guided-labs/h22-mcp-approval/server.py",
         "replacements": [
             (
-                "    nonce = secrets.token_hex(16)",
+                "    nonce = secrets.token_hex(16)  # 이 핵심 줄을 승인에서 받은 nonce로 바꾸세요.",
                 '''    nonce = verify_approval(
         approval_token, suite_id, call_id, trace_id, requester, notice
     )''',

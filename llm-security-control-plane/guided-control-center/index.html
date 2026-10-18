@@ -155,7 +155,7 @@ vi ~/work/control-center-tutorial/request.json</pre>
         <section class="mission-brief" aria-labelledby="p01-mission-title">
           <p class="label">P01 · Gateway 만들기</p>
           <h3 id="p01-mission-title">정상 상담은 통과! 과도한 호출은 정지!</h3>
-          <p>당신은 고객 상담 서비스의 Gateway 개발자입니다. <code>handle_request()</code>를 완성해 잘못된 입력을 거부하고, 답변 길이와 사용 예산을 제한하세요.</p>
+          <p>당신은 고객 상담 서비스의 Gateway 개발자입니다. Starter의 입력 검사·분기·예외 처리 흐름을 따라 예산 예약·모델 호출·정산의 핵심 줄을 완성하세요.</p>
           <ol class="mission-steps">
             <li><strong>01 · 입력 검사</strong><span>필수 필드, 메시지 길이, 숫자 타입을 검사해 잘못된 요청을 모델 호출 전에 거부하세요.</span></li>
             <li><strong>02 · 답변 길이 제한</strong><span>요청한 출력 상한이 128 이하면 그대로 전달하고, 더 크면 128로 낮추세요.</span></li>
@@ -170,7 +170,7 @@ vi ~/work/control-center-tutorial/request.json</pre>
           <div>
             <p class="label">직접 작성할 함수</p>
             <h3 id="hands-on-title">미션 해결 조건 — 이 조건을 만족하는 함수를 작성하세요</h3>
-            <p><code>~/owasp-llm-practice/P03-01_learner.py</code>의 <code>handle_request(body, client)</code>를 작성합니다. <code>body</code>는 사용자가 보낸 JSON이고, <code>client.converse()</code>는 AWS Python 라이브러리 Boto3와 같은 방식으로 모델을 호출하는 제공 함수입니다. 인증 Token과 실행 기록은 수정하지 않습니다.</p>
+            <p><code>~/owasp-llm-practice/P03-01_learner.py</code>의 <code>handle_request(body, client)</code>에서 TODO 2~4의 핵심 호출을 작성합니다. 입력 검사와 <code>if</code>·<code>try/except</code> 구조는 Starter에 있습니다. <code>body</code>는 사용자가 보낸 JSON이고, <code>client.converse()</code>는 AWS Python 라이브러리 Boto3와 같은 방식으로 모델을 호출하는 제공 함수입니다. 인증 Token과 실행 기록은 수정하지 않습니다.</p>
             <ul>
               <li><code>message</code>와 <code>max_output_tokens</code>만 받습니다. 누락되거나 다른 필드가 있으면 거부합니다.</li>
               <li>메시지는 1~4,000자 문자열이어야 하며 공백만 있으면 거부합니다. 출력 상한은 1~512 정수만 받습니다. 문자열·실수·참/거짓 값은 허용하지 않습니다.</li>
@@ -259,11 +259,8 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
         </div>
         <section id="mission-experience" hidden>
           <details id="resource-raw-details" class="raw" hidden><summary>AWS 자원 작업 RAW 응답</summary><pre id="resource-raw"></pre></details>
-          <div class="document-console-links">
-            <span class="disabled-action" tabindex="0" aria-label="S3 문서 바로가기 ↗" aria-describedby="document-s3-disabled-help"><button id="document-s3-link" type="button" class="secondary" disabled>S3 문서 바로가기 ↗</button><span id="document-s3-disabled-help" class="disabled-action-help" role="tooltip">자원 상태를 먼저 확인하세요</span></span>
-            <span class="disabled-action" tabindex="0" aria-label="Titan Embeddings 바로가기 ↗" aria-describedby="document-titan-disabled-help"><button id="document-titan-link" type="button" class="secondary" disabled>Titan Embeddings 바로가기 ↗</button><span id="document-titan-disabled-help" class="disabled-action-help" role="tooltip">자원 상태를 먼저 확인하세요</span></span>
-          </div>
-          <p id="document-console-help">AWS 자원을 준비하거나 자원 상태를 확인하면 바로가기가 활성화됩니다.</p>
+          <div id="aws-console-links" class="aws-console-links" aria-label="AWS 콘솔 바로가기" hidden></div>
+          <p id="aws-console-help" hidden>자원 상태를 확인하면 바로가기가 활성화됩니다.</p>
           <form id="document-upload-form" class="chat-compose" hidden>
             <label for="document-upload-title">문서 제목</label>
             <input id="document-upload-title" type="text" maxlength="120" required value="업무 안내">
@@ -272,7 +269,6 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
             <button id="document-upload-submit" type="submit" class="primary">문서 업로드</button>
             <p class="action-tooltip"><strong class="action-help-summary">입력한 문서 한 건을 현재 구현한 코드로 처리합니다.</strong><span class="action-help-detail">제목은 1~120자, 내용은 10~4000자입니다. 코드가 구현되어 있으면 S3 원문 저장과 임베딩 결과를 확인할 수 있습니다. Knowledge Base 동기화·검색은 다음 미션에서 수행하며 미션 완료는 별도로 채점합니다.</span></p>
           </form>
-          <div id="knowledge-console-links" class="document-console-links" aria-label="준비한 AWS 자원 바로가기" hidden></div>
           <form id="guardrail-chat-form" class="chat-compose" hidden>
             <label for="guardrail-chat-message">모델에 보낼 문장</label>
             <textarea id="guardrail-chat-message" maxlength="1000" required>담당자 이메일은 learner@example.com 입니다.</textarea>
@@ -317,9 +313,9 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
         <div id="h23-work" class="lab-workspace" hidden>
           <section class="mission-brief"><p class="label">P23 · 미션</p><p>고객지원 앱에 첫 모델 연결을 만듭니다. 질문을 Amazon Bedrock의 Nova Lite에 보내고, 실제로 받은 응답을 그대로 반환하세요. Converse는 질문을 보내고 답변을 받는 Bedrock API입니다.</p></section>
           <section class="hands-on"><div class="hand-body"><h3>미션 해결 조건</h3>
-          <ul><li><code>forward_question(message)</code>를 구현합니다. 문자열이 아니거나 빈 문자열·공백뿐인 질문은 SDK 호출 전에 <code>raise ValueError("question required")</code>로 거부하세요. 이 입력 검사는 <code>try</code> 블록 밖에 둡니다.</li>
+          <ul><li><code>forward_question(message)</code>를 구현합니다. Starter가 문자열이 아니거나 공백뿐인 질문을 SDK 호출 전에 <code>ValueError</code>로 거부합니다. 이 입력 검사와 <code>try/except</code>는 수정하지 않습니다.</li>
           <li>정상 질문은 한 번 호출합니다. 모델은 <code>us.amazon.nova-lite-v1:0</code>, 전달 형식은 <code>messages=[{"role":"user","content":[{"text":message}]}]</code>, 생성 설정은 <code>inferenceConfig={"maxTokens":64,"temperature":0}</code>입니다.</li>
-          <li><code>boto3.client()</code>로 클라이언트를 만들고 <code>client.converse()</code>를 호출하는 부분은 <code>try</code>로 감싸세요. Starter가 가져온 <code>BotoCoreError</code> 또는 <code>ClientError</code>가 나면 <code>except</code>에서 <code>raise RuntimeError("model unavailable") from exc</code>로 변환합니다. 입력 오류인 <code>ValueError</code>는 여기서 잡지 않습니다.</li>
+          <li>제공된 <code>try</code> 안에 클라이언트 생성과 <code>client.converse()</code> 호출 두 줄을 작성하세요. SDK 오류 변환은 Starter의 <code>except</code>가 처리하고 입력 오류는 그대로 전달합니다.</li>
           <li>호출에 성공하면 <code>client.converse()</code>의 반환값을 변수에 받고, 그 변수에 담긴 응답 dict 전체를 <code>return</code>하세요. 답변 텍스트만 꺼내거나 새 dict를 만들지 않습니다.</li></ul>
           <aside class="mission-docs" aria-label="P01-01 도움 문서">
             <strong>참고 문서</strong>
@@ -333,18 +329,17 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
           <p>입력이 잘못됐으면 SDK를 호출하기 전에 조건문에서 직접 오류를 발생시킵니다.</p>
           <pre data-copyable="false" data-code-title="Python · raise 문법" data-language="python">if not isinstance(message, str) or not message.strip():
     raise ValueError("question required")</pre>
-          <p>SDK가 오류를 냈을 때는 <code>try</code> 안의 호출을 <code>except</code>로 받습니다. 다음은 클라이언트를 만드는 부분의 구문 예시입니다. <code>client.converse()</code> 호출도 같은 <code>try</code> 안에 작성하세요.</p>
+          <p>Starter에 이미 있는 <code>try/except</code>는 SDK 오류를 처리합니다. 아래 문법은 구조를 이해할 때만 참고하고, 실제로는 TODO 2·3의 핵심 호출을 채우세요.</p>
           <pre data-copyable="false" data-code-title="Python · try/except 문법" data-language="python">try:
     client = boto3.client(
         "bedrock-runtime", region_name=region_name, config=config
     )
 except (BotoCoreError, ClientError) as exc:
     raise RuntimeError("model unavailable") from exc</pre>
-          <p>Starter는 연결된 AWS 프로필의 기본 리전을 <code>region_name</code>에 담습니다. 프로필에 리전이 없거나 이 모델을 지원하지 않으면 AWS 설정을 확인하세요. Access Key를 코드에 적지 않습니다. <code>config</code>는 그대로 사용합니다. 아래 세 TODO를 순서대로 완성하세요.</p>
+          <p>Starter는 연결된 AWS 프로필의 기본 리전을 <code>region_name</code>에 담습니다. 프로필에 리전이 없거나 이 모델을 지원하지 않으면 AWS 설정을 확인하세요. Access Key를 코드에 적지 않습니다. <code>config</code>는 그대로 사용합니다. 아래 두 TODO의 핵심 호출을 순서대로 완성하세요.</p>
           <ol class="mission-todo-list">
             <li><strong>TODO 2 · 클라이언트 만들기</strong> — <code>boto3.client("bedrock-runtime", region_name=region_name, config=config)</code>로 Bedrock Runtime 클라이언트를 만들고 <code>client</code>에 저장합니다. Access Key는 코드에 적지 않습니다.</li>
             <li><strong>TODO 3 · 질문 보내고 응답 반환하기</strong> — <code>client.converse()</code>를 한 번 호출합니다. <code>modelId</code>에는 <code>us.amazon.nova-lite-v1:0</code>, <code>messages</code>에는 <code>[{"role":"user","content":[{"text":message}]}]</code>, <code>inferenceConfig</code>에는 <code>{"maxTokens":64,"temperature":0}</code>을 전달합니다. 호출의 반환값을 변수에 저장하고, 그 변수를 <code>return</code>합니다. 응답에서 답변 텍스트만 꺼내지 마세요.</li>
-            <li><strong>TODO 4 · SDK 오류 처리하기</strong> — TODO 2의 클라이언트 생성과 TODO 3의 호출을 같은 <code>try</code> 안에 둡니다. <code>except (BotoCoreError, ClientError) as exc:</code>로 오류를 받은 뒤 <code>raise RuntimeError("model unavailable") from exc</code>로 전달합니다. TODO 1의 입력 검사는 <code>try</code> 밖에 두어 <code>ValueError</code>를 바꾸지 않습니다.</li>
           </ol>
           <p>수정할 파일은 <code>~/owasp-llm-practice/P01-01_learner.py</code> 하나입니다. 제공 서버는 실제 호출 기록을 관리합니다.</p>
           <pre data-code-title="코드 수정 바로가기">vi ~/owasp-llm-practice/P01-01_learner.py</pre>
@@ -395,10 +390,10 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
             <div>
               <p class="label">LEARNER-OWNED DOCUMENT APP</p>
               <h3 id="h02-code-title">문서 검사·원문 저장·임베딩 함수 작성</h3>
-              <p><code>~/owasp-llm-practice/P01-02_learner.py</code>의 <code>async prepare_document(body, document_id, aws)</code>를 작성합니다. <code>raise NotImplementedError(...)</code>를 삭제하고 TODO에 입력 검사·S3 저장·임베딩 호출을 구현하세요.</p>
+              <p><code>~/owasp-llm-practice/P01-02_learner.py</code>의 <code>async prepare_document(body, document_id, aws)</code>에서 TODO 2·3의 S3 저장과 임베딩 호출을 작성합니다. 입력 검사와 반환 형태는 Starter에 제공됩니다. 해당 TODO의 <code>raise NotImplementedError(...)</code>를 핵심 호출로 바꾸세요.</p>
               <ul>
                 <li><strong>준비:</strong> <code>session, bucket = load_aws_session(aws)</code>로 인증과 저장소를 불러오고 <code>Config(connect_timeout=5, read_timeout=20, retries={"total_max_attempts":1})</code>를 만드세요.</li>
-                <li><strong>입력:</strong> <code>body</code>에는 <code>title</code>과 <code>body</code>만 허용합니다. 제목은 줄바꿈 없는 1~120자 문자열, 본문은 10~4,000자 문자열입니다. 공백뿐인 값·잘못된 타입·누락·추가 필드는 AWS 호출 전에 <code>ValueError</code>로 거부하세요.</li>
+                <li><strong>입력:</strong> <code>body</code>에는 <code>title</code>과 <code>body</code>만 허용합니다. 제목은 줄바꿈 없는 1~120자 문자열, 본문은 10~4,000자 문자열입니다. 공백뿐인 값·잘못된 타입·누락·추가 필드는 Starter가 AWS 호출 전에 <code>ValueError</code>로 거부합니다.</li>
                 <li><strong>S3 저장:</strong> key는 <code>h02/knowledge/&lt;document_id&gt;.md</code>, UTF-8 원문은 <code># &lt;제목&gt;\n\n&lt;본문&gt;\n</code>입니다. <code>put_object()</code>에 <code>Bucket=bucket</code>, 이 key와 원문, <code>ContentType="text/markdown; charset=utf-8"</code>, <code>Metadata={"course":"tenant-03","activity":"h02"}</code>를 넣으세요.</li>
                 <li><strong>임베딩:</strong> S3 저장이 성공한 뒤 <code>amazon.titan-embed-text-v2:0</code>을 한 번 호출하세요. JSON body는 원래 본문을 담은 <code>inputText</code>, <code>dimensions=1024</code>, <code>normalize=true</code>이고 <code>contentType</code>·<code>accept</code>는 <code>application/json</code>입니다.</li>
                 <li><strong>반환:</strong> <code>source</code>에는 S3 응답, <code>embedding</code>에는 응답 stream을 JSON으로 변환한 사전을 넣으세요. Boto3 메서드에는 <code>await</code>를 붙이지 말고 오류는 그대로 전달하세요.</li>
@@ -440,8 +435,8 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
               <p class="label">P03 · LEARNER-OWNED SYNC APP</p>
               <h3 id="h03-code-title">현재 동기화가 끝난 뒤에만 검색하기</h3>
               <p>고객지원 문서를 고쳤지만 검색용 정리는 아직 진행 중입니다. 정리가 끝나기 전에 검색하면 최신 문서를 확인했다고 믿기 어렵습니다. 동기화(ingestion)는 S3 원문을 Knowledge Base의 검색 저장소에 반영하는 작업입니다.</p>
-              <p><code>~/owasp-llm-practice/P01-03_learner.py</code>의 <code>async search_current(current_job_id, aws)</code>를 작성하세요. 제공된 <code>load_aws_session(aws)</code>가 조회·검색 전용 15분 인증과 <code>binding</code>을 불러옵니다. 미구현 표시를 제거하고 그 아래 TODO를 구현하세요.</p>
-              <p>Starter에는 <code>load_aws_session</code>과 <code>Config</code> import가 있습니다. 제공 골격은 <code>session, binding = load_aws_session(aws)</code>와 <code>Config(connect_timeout=5, read_timeout=20, retries={"total_max_attempts":1})</code>입니다. <code>binding</code>의 <code>knowledgeBaseId</code>·<code>dataSourceId</code>·<code>ingestionJobId</code> 중 하나라도 없으면 <code>ValueError</code>로 거부하세요.</p>
+              <p><code>~/owasp-llm-practice/P01-03_learner.py</code>의 <code>async search_current(current_job_id, aws)</code>에서 상태 조회와 검색 호출을 작성하세요. ID 검사와 <code>for</code>·<code>if</code> 흐름은 Starter에 있습니다. 제공된 <code>load_aws_session(aws)</code>가 조회·검색 전용 15분 인증과 <code>binding</code>을 불러옵니다. 각 TODO의 미구현 표시를 핵심 SDK 호출로 바꾸세요.</p>
+              <p>Starter에는 <code>load_aws_session</code>과 <code>Config</code> import가 있습니다. 제공 골격은 <code>session, binding = load_aws_session(aws)</code>와 <code>Config(connect_timeout=5, read_timeout=20, retries={"total_max_attempts":1})</code>입니다. <code>binding</code>의 <code>knowledgeBaseId</code>·<code>dataSourceId</code>·<code>ingestionJobId</code> 중 하나라도 없으면 Starter가 <code>ValueError</code>로 거부합니다.</p>
               <p><code>session.client("bedrock-agent", region_name=session.region_name, config=config)</code>와 같은 리전의 <code>bedrock-agent-runtime</code> 객체를 직접 만드세요. 이 리전은 서버가 발급한 AWS 연결에서 온 값입니다. <code>agent.get_ingestion_job(**binding)</code> 응답의 <code>ingestionJob.ingestionJobId</code>가 <code>binding["ingestionJobId"]</code>와 같은지 확인합니다. 서버가 전달한 <code>current_job_id</code>는 채점용 작업 번호이며 AWS 작업 ID는 binding에 있습니다.</p>
               <p>상태 <code>QUEUED</code>·<code>STARTING</code>·<code>IN_PROGRESS</code>는 검색 없이 <code>{"status":"waiting","result":None}</code>를 반환하세요. <code>COMPLETE</code>일 때만 <code>runtime.retrieve()</code>를 한 번 호출하고 SDK 응답 전체를 <code>{"status":"ready","result":검색 응답}</code>에 담습니다.</p>
               <p>검색 인자는 <code>knowledgeBaseId=binding["knowledgeBaseId"]</code>, <code>retrievalQuery={"text":aws.query}</code>, <code>retrievalConfiguration={"vectorSearchConfiguration":{"numberOfResults":3}}</code>입니다. 화면의 검색어는 <code>aws.query</code>에 전달됩니다. 채점에서는 기본 검색어를 사용하며 결과 개수 3은 검색 상한입니다.</p>
@@ -465,7 +460,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
 
           <div class="actions">
             <span class="action-control">
-              <button id="h03-provision" class="secondary" aria-describedby="h03-provision-help">P03 AWS 자원 준비</button>
+              <button id="h03-provision" class="secondary" aria-describedby="h03-provision-help">AWS 자원 준비</button>
               <span id="h03-provision-help" class="action-tooltip" role="note"><strong class="action-help-summary">P03 전용 검색 환경을 준비하고 누락된 자원을 연결합니다.</strong><span class="action-help-detail">Gateway가 P03 전용 S3·검색 저장소·권한을 확인하고 없어진 자원만 다시 만듭니다. 제공 안내 문서가 없으면 다시 저장하고 이번 동기화를 확인합니다. 남은 설정이나 문서가 다르면 덮어쓰지 않고 멈춥니다. 준비 완료는 과제 통과가 아닙니다.</span></span>
             </span>
           <span class="action-control"><button id="h03-delete" class="secondary" type="button" aria-describedby="h03-delete-help">AWS 자원 삭제</button><span id="h03-delete-help" class="action-tooltip" role="note"><strong class="action-help-summary">이 미션의 전용 AWS 자원을 삭제합니다.</strong><span class="action-help-detail">S3 원문·벡터 인덱스·Knowledge Base·전용 IAM 역할을 삭제합니다. 버튼을 누르면 삭제 대상을 확인하는 창이 열립니다. 다른 미션 자원과 작성한 코드는 유지됩니다.</span></span></span>
@@ -501,8 +496,8 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
             <div>
               <p class="label">LEARNER-OWNED GUARDRAIL APP</p>
               <h3 id="h04-code-title">단독 검사에 사용한 Guardrail을 모델 호출에도 연결하기</h3>
-              <p><code>~/owasp-llm-practice/P02-01_learner.py</code>의 <code>async invoke_guarded(body, guardrail, services)</code>를 완성하세요. Starter는 아직 처리 방법이 없어 오류를 냅니다. 정책을 켜는 상수를 바꾸는 문제가 아니라, 요청을 검사하고 필요한 AWS 호출을 구성하는 문제입니다.</p>
-              <p><code>body</code>에는 <code>operation</code>과 <code>text</code> 두 필드만 허용합니다. operation은 <code>apply_guardrail</code> 또는 <code>converse</code>, text는 공백만으로 이루어지지 않은 1~1000자 문자열이어야 합니다. 빠진 필드·추가 필드·잘못된 타입이나 값은 서비스를 호출하기 전에 <code>ValueError</code>로 거부하세요. 올바른 문장의 앞뒤 공백은 지우지 않습니다.</p>
+              <p><code>~/owasp-llm-practice/P02-01_learner.py</code>의 <code>async invoke_guarded(body, guardrail, services)</code>에서 두 서비스 호출을 완성하세요. 입력 검사와 <code>if/else</code>·응답 반환은 Starter에 있습니다. 정책을 켜는 상수를 바꾸는 문제가 아니라, 필요한 AWS 호출의 인자를 구성하는 문제입니다.</p>
+              <p><code>body</code>에는 <code>operation</code>과 <code>text</code> 두 필드만 허용합니다. operation은 <code>apply_guardrail</code> 또는 <code>converse</code>, text는 공백만으로 이루어지지 않은 1~1000자 문자열이어야 합니다. 빠진 필드·추가 필드·잘못된 타입이나 값은 Starter가 서비스 호출 전에 <code>ValueError</code>로 거부합니다. 올바른 문장의 앞뒤 공백은 지우지 않습니다.</p>
               <p><code>guardrail</code>은 서버가 제공한 <code>guardrailIdentifier</code>와 <code>guardrailVersion</code>입니다. body에서 정책을 선택하지 않습니다. <code>services</code>는 호출을 Gateway에 전달하는 제공 객체이며 AWS 비밀 키를 함수에 주지 않습니다.</p>
               <p>단독 검사는 <code>await services.apply_guardrail(...)</code>을 한 번 호출합니다. 같은 정책에 <code>source="OUTPUT"</code>, 원문을 담은 <code>content</code>, <code>outputScope="FULL"</code>을 전달하세요. 모델은 호출하지 않습니다.</p>
               <p>모델 요청은 <code>await services.converse(...)</code>를 한 번 호출합니다. 모델은 <code>us.amazon.nova-lite-v1:0</code>, system 문장은 <code>사용자 문장을 그대로 한 번만 출력하세요. 다른 설명을 덧붙이지 마세요.</code>, user 메시지는 원문입니다. <code>inferenceConfig</code>는 maxTokens 128·temperature 0, <code>guardrailConfig</code>는 같은 정책과 <code>trace="enabled"</code>를 사용합니다. EMAIL 변환은 직접 문자열을 치환하지 않고 Guardrail에 맡깁니다.</p>
@@ -527,7 +522,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
 
           <div class="actions">
             <span class="action-control">
-              <button id="h04-provision" class="secondary" aria-describedby="h04-provision-help">P04 Guardrail 준비</button>
+              <button id="h04-provision" class="secondary" aria-describedby="h04-provision-help">AWS 자원 준비</button>
               <span id="h04-provision-help" class="action-tooltip" role="note"><strong class="action-help-summary">P04 전용 이메일 보호 정책을 준비합니다.</strong><span class="action-help-detail">Gateway에 P04 전용 출력 이메일 정책의 준비를 요청합니다. 기존 자원은 소유권과 설정이 맞을 때만 재사용합니다. 준비 완료는 작성한 함수의 과제 통과가 아닙니다.</span></span>
             </span>
           <span class="action-control"><button id="h04-delete" class="secondary" type="button" aria-describedby="h04-delete-help">AWS 자원 삭제</button><span id="h04-delete-help" class="action-tooltip" role="note"><strong class="action-help-summary">이 미션의 전용 AWS 자원을 삭제합니다.</strong><span class="action-help-detail">전용 AWS Guardrail의 DRAFT 설정을 삭제합니다. 버튼을 누르면 삭제 대상을 확인하는 창이 열립니다. 다른 미션 자원과 작성한 코드는 유지됩니다.</span></span></span>
@@ -821,7 +816,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
             <div>
               <p class="label">P12 · LEARNER-OWNED APPLICATION PIPELINE</p>
               <h3 id="h12-code-title">인증부터 출력 보호까지 한 경로로 조립하기</h3>
-              <p><code>~/owasp-llm-practice/P04-08_pipeline.py</code>의 <code>async handle_request(request, services)</code>를 완성하세요. Starter는 아직 이 함수를 구현하지 않아 검증하면 미완료입니다. <code>request</code>에는 사용자 자격 증명인 <code>credential</code>, 요청한 자료의 소속인 <code>tenant</code>, 질문인 <code>message</code>가 들어옵니다.</p>
+              <p><code>~/owasp-llm-practice/P04-08_pipeline.py</code>의 <code>async handle_request(request, services)</code>에서 TODO 1~7의 서비스 호출을 채우세요. 단계 순서와 <code>if</code> 분기는 Starter에 있으며, 호출 전에는 미완료입니다. <code>request</code>에는 사용자 자격 증명인 <code>credential</code>, 요청한 자료의 소속인 <code>tenant</code>, 질문인 <code>message</code>가 들어옵니다.</p>
               <p>인증·인가보다 먼저 검색하거나 모델을 호출하면 안 됩니다. 입력과 출력을 각각 보호하고, 앞 단계가 거부하거나 실패하면 뒤 호출을 중단하세요. 정상 요청은 마지막까지 진행해야 하므로 무조건 중단하는 구현은 통과하지 않습니다.</p>
               <p>제공된 <code>services.authenticate(credential)</code>와 <code>authorize(tenant)</code>는 사용자·접근 권한 확인 결과를 bool로 반환합니다. <code>privacy(stage, text)</code>는 개인정보를 가린 문자열, <code>rail(stage, text)</code>는 허용 여부를 반환합니다. <code>retrieve(query)</code>는 검색한 문서 문자열이며 결과가 없으면 빈 문자열입니다. 문서를 검사한 뒤 <code>main(prompt)</code>으로 답변 문자열을 요청합니다. 이 메서드는 모두 <code>await</code>로 실행합니다.</p>
               <p>단계 이름은 <code>input_privacy</code>·<code>input_rail</code>·<code>retrieval_rail</code>·<code>output_rail</code>·<code>output_privacy</code>입니다. 앞 단계에서 처리한 값을 다음 단계에 넘기세요. Main 입력은 <code>question</code>과 <code>context</code> 두 문자열을 담은 JSON입니다. 검색은 P12 전용 합성 문서를 SQLite에서 찾으며 AWS Knowledge Base를 사용하지 않습니다.</p>
@@ -943,7 +938,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
           <p>공지 조회는 성공했지만 게시 요청과 미인증 요청은 거부됐습니다. 응답만 보고 끝내지 않고, 각 요청이 어디까지 진행됐는지 나중에도 찾을 수 있도록 기록을 남겨보세요.</p>
           <section class="hands-on"><div>
             <p class="label">P17 · TELEMETRY</p><h3>실제로 실행한 요청의 Log·Trace·Counter 만들기</h3>
-            <p><code>~/owasp-llm-practice/P06-01_instrumentation.py</code>의 <code>observe_request(request_id, run_business, tracer, logger, counter)</code>를 작성합니다. 업무 처리·수집기·SDK 연결은 제공됩니다.</p>
+            <p><code>~/owasp-llm-practice/P06-01_instrumentation.py</code>의 <code>observe_request(request_id, run_business, tracer, logger, counter)</code>에서 실제 Span·Log·Counter 호출을 채웁니다. <code>with</code>·<code>yield</code>·단계 순서 골격과 업무 처리·수집기·SDK 연결은 제공됩니다.</p>
             <p><code>tracer.start_as_current_span(name, attributes={...})</code>은 <code>with</code>로 열고 닫는 기록 구간입니다. 열린 Span 안에 새 Span을 만들면 자식이 됩니다. 나중에 정해진 값은 <code>span.set_attribute(key, value)</code>로 기록하고, 실제 Trace ID는 <code>span.get_span_context().trace_id</code>에서 얻습니다. 정수를 32자리 소문자 16진수로 표시할 때는 <code>format(value, "032x")</code>를 사용할 수 있습니다.</p>
             <p><code>contextlib.contextmanager</code>는 <code>yield</code>가 한 번 있는 함수를 <code>with</code>에서 쓰게 해 줍니다. <code>yield</code> 앞뒤가 실제 단계의 시작·끝을 감쌉니다. 단계마다 업무 함수를 다시 호출하지 마세요. 안쪽 함수에서 바깥의 순번 변수를 갱신할 때는 <code>nonlocal</code>을 사용할 수 있습니다. JSON Log는 <code>json.dumps()</code>로 문자열을 만들어 <code>logger.info(message)</code>로 보내고, 건수는 <code>counter.labels(decision=value).inc()</code>로 늘립니다. 어떤 값과 순서로 연결할지는 직접 구현하세요.</p>
             <ul>
@@ -1019,7 +1014,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
           <h3 class="mission-requirements-title">미션 해결 조건</h3>
           <p>공지 조회와 거부 요청의 기록에서 같은 <code>request_id</code>와 <code>trace_id</code>를 가진 행만 골라 처리 순서와 중단 지점을 계산하세요.</p>
           <section class="hands-on"><div><p class="label">P19 · INCIDENT ANALYSIS</p><h3>같은 요청의 기록을 연결하는 함수 작성</h3>
-            <p><code>~/owasp-llm-practice/P06-03_investigation.py</code>의 <code>analyze_incident(bundle, request_id)</code>를 작성합니다. 설정 상수만 바꾸는 문제가 아닙니다.</p><p>원시 Log와 root Span에는 서버가 정한 교육용 <code>client_ip</code>·인증된 <code>user_id</code>·허용 또는 거부 규칙 <code>policy_rule</code>이 기록됩니다. 인증 실패의 계정은 null입니다. IP와 규칙으로 사건을 찾은 뒤 같은 request_id·trace_id의 실행 순서를 분석합니다. analyze_incident의 반환 여섯 필드는 유지합니다.</p>
+            <p><code>~/owasp-llm-practice/P06-03_investigation.py</code>의 <code>analyze_incident(bundle, request_id)</code>에서 Span·Log의 실제 대조와 반환 필드를 완성합니다. 다른 요청을 고르는 <code>for</code>와 순서 검사 골격은 제공되며 설정 상수만 바꾸는 문제가 아닙니다.</p><p>원시 Log와 root Span에는 서버가 정한 교육용 <code>client_ip</code>·인증된 <code>user_id</code>·허용 또는 거부 규칙 <code>policy_rule</code>이 기록됩니다. 인증 실패의 계정은 null입니다. IP와 규칙으로 사건을 찾은 뒤 같은 request_id·trace_id의 실행 순서를 분석합니다. analyze_incident의 반환 여섯 필드는 유지합니다.</p>
             <p><code>bundle</code>의 <code>logs</code>는 결정 기록, <code>spans</code>는 처리 단계, <code>closures</code>는 처리가 끝났다는 기록, <code>downstream_calls</code>는 실제 저장소 호출 목록입니다. 모두 <code>request_id</code>·<code>trace_id</code>로 연결합니다.</p>
               <p>서버 수집기는 원시 Log의 <code>client_ip</code>·<code>user_id</code>·<code>policy_rule</code>과 <code>security.request</code> root Span을 먼저 대조한 뒤, 학습자 함수에는 정규화한 <code>bundle</code>만 전달합니다. 따라서 <code>spans</code>에는 root가 없고 분석할 단계 Span만 있습니다. 각 행은 사전이며, 대상 요청과 무관한 행은 내용이 불완전해도 제외합니다. 대상 <code>trace_id</code>는 비어 있지 않은 문자열이어야 하고, 같은 단계 이름이 반복되는지는 별도 오류가 아닙니다. 순서의 유일성과 연속성은 <code>sequence</code>로 판단하며, 거부 요청의 <code>stop_stage</code>는 sequence상 마지막 <code>stage</code>와 정확히 같아야 합니다.</p>
             <p>각 collection은 사전의 목록입니다. 대상 요청에는 결정 Log와 closure가 각각 정확히 한 건 있어야 합니다. Log는 <code>decision</code>·<code>stop_stage</code>, Span은 <code>stage</code>·정수 <code>sequence</code>, closure는 <code>closed</code>·<code>downstream_count</code>를 같은 level의 key로 가집니다. <code>downstream_calls</code>는 실제 호출 한 건당 한 사전이며 대상 <code>request_id</code>의 행 수를 셉니다. <code>stages</code> 반환값은 sequence 순서의 stage 문자열 목록입니다.</p>
@@ -1087,7 +1082,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
             <div>
               <p class="label">LEARNER-OWNED AGENT POLICY</p>
               <h3 id="h21-code-title">Agent의 연결 대상과 실행 예산 제한하기</h3>
-              <p><code>~/owasp-llm-practice/P07-01_policy.py</code>의 Starter는 요청이 제시한 model·server·Tool·한도를 그대로 사용합니다. 허용목록과 state owner를 검사하고 서버가 정한 실행 상한만 반환하도록 <code>authorize()</code>를 완성합니다.</p>
+              <p><code>~/owasp-llm-practice/P07-01_policy.py</code>의 Starter는 요청이 제시한 model·server·Tool·한도를 그대로 사용합니다. 제공된 <code>if/raise</code>의 정책 판단식과 <code>Admission</code>의 서버 상한만 채워 <code>authorize()</code>를 완성합니다.</p>
               <p>아래 값을 기준으로 <code>authorize()</code>를 완성하세요.</p>
               <ul>
                 <li>허용 주체: <code>support-agent</code></li>
@@ -1132,7 +1127,7 @@ docker compose --env-file llm-security-control-plane/.state/guided-course.env \
             <div>
               <p class="label">LEARNER-OWNED MCP SERVER</p>
               <h3 id="h22-code-title">Tool 제안과 실행 권한 분리하기</h3>
-              <p><code>~/owasp-llm-practice/P07-02_server.py</code>는 공식 SDK의 Streamable HTTP Server입니다. Starter는 요청마다 임의 nonce를 새로 만들어 승인 없는 호출도 실행합니다. <code>publish_notice()</code>에서 서버의 승인 검사를 연결합니다.</p>
+              <p><code>~/owasp-llm-practice/P07-02_server.py</code>는 공식 SDK의 Streamable HTTP Server입니다. Starter는 요청마다 임의 nonce를 새로 만들어 승인 없는 호출도 실행합니다. <code>publish_notice()</code>의 제공된 <code>try/except</code>·transaction은 유지하고, 승인 검증 호출과 서명된 nonce 연결 줄만 고칩니다.</p>
               <p>서명된 승인과 실제 요청의 주체·Tool·인자·실행 및 Trace를 대조하고 만료 여부를 확인하세요. 승인 없이 호출하거나 다른 인자로 바꾸면 공지가 생성되면 안 됩니다. 정확한 승인 한 번만 실행되고 같은 승인은 다시 사용할 수 없어야 합니다.</p>
               <p>검사 뒤 SQLite transaction이 nonce 소비와 훈련 공지 기록을 함께 처리합니다. 그래서 다른 인자, 만료 Token과 같은 nonce 재사용은 공지를 만들기 전에 멈춥니다. Host의 승인과 실제 공지는 같은 <code>trace_id</code>에 묶입니다.</p>
               <h3>파일 수정하기</h3><p>아래 명령은 어느 폴더에서든 실행할 수 있습니다. <code>~</code>는 현재 사용자 홈 폴더입니다. 파일을 수정하고 저장한 뒤 아래 적용 명령을 실행하세요.</p><pre>vi ~/owasp-llm-practice/P07-02_server.py</pre><h3>코드 적용하기</h3><pre data-code-title="코드 적용 · 파일 복사와 재생성"># 이번 미션의 작업 파일만 빌드 폴더에 복사합니다.

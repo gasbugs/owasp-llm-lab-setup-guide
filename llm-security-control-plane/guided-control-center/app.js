@@ -883,8 +883,9 @@ function prepareMissionPanes() {
       resourceControls.after(statusOutput); resourceGroup.append(help);
 
       statusButton.addEventListener("click", async () => {
+        if (number === "02") updateDocumentLinks({resources: []});
         if (number === "03") updateKnowledgeLinks({resources: []});
-        if (number === "04") updateGuardrailChat({});
+        if (number === "04") updateGuardrailChat({resources: []});
         statusButton.disabled = true; statusOutput.classList.remove("aws-status-problem"); statusOutput.textContent = "AWS 자원과 저장·연결·동기화 정보를 확인하고 있습니다…";
         const checking = document.createElement("progress"); checking.setAttribute("aria-label", "AWS 자원 상태 확인 중");
         statusOutput.prepend(checking);
@@ -1269,16 +1270,16 @@ function renderEnvelope(payload) {
   setText("raw", rawResponses.get(payload) ?? JSON.stringify(payload, null, 2));
   if (payload.resource_ready === true || payload.resource_deleted === true) {
     if (payload.activity_id === "P02") {
-      const resources = payload.preparation?.resources;
-      updateDocumentLinks(payload.resource_deleted ? {state:"absent",resources:[]} : {state:"present",resources:resources?.provider_mode === "aws" ? [{type:"S3 source bucket",name:resources.source_bucket,state:"present"}] : [], prepared: resources?.provider_mode === "aws"});
+      updateDocumentLinks({resources: []});
+      document.querySelector('[data-resource-status="P02"]')?.click?.();
     }
     if (payload.activity_id === "P04") {
       updateGuardrailChat({});
-      if (payload.resource_ready) document.querySelector('[data-resource-status="P04"]')?.click?.();
+      document.querySelector('[data-resource-status="P04"]')?.click?.();
     }
     if (payload.activity_id === "P03") {
       updateKnowledgeLinks({resources: []});
-      if (payload.resource_ready) document.querySelector('[data-resource-status="P03"]')?.click?.();
+      document.querySelector('[data-resource-status="P03"]')?.click?.();
     }
     byId("resource-operation").hidden = false;
     renderResourceProgress(payload.resource_progress);
@@ -2335,9 +2336,9 @@ function selectModelCallPane(name, restore = true) {
   byId("guardrail-chat-form").hidden = !experience || activeProblem !== "P04";
   byId("knowledge-search-form").hidden = !experience || activeProblem !== "P03";
   byId("document-upload-form").hidden = !experience || activeProblem !== "P02";
-  byId("document-s3-link").closest(".document-console-links").hidden = activeProblem !== "P02";
-  byId("document-console-help").hidden = activeProblem !== "P02";
-  byId("knowledge-console-links").hidden = activeProblem !== "P03";
+  byId("aws-console-links").hidden = !["P02", "P03", "P04"].includes(activeProblem);
+  byId("aws-console-help").hidden = !["P02", "P03", "P04"].includes(activeProblem);
+  renderAwsConsoleLinks(activeProblem);
   byId("mission-experience-run").hidden = ["P02", "P03", "P04"].includes(activeProblem);
   byId("mission-experience-intro").hidden = ["P02", "P03", "P04"].includes(activeProblem);
   byId("mission-experience-run").nextElementSibling.hidden = ["P02", "P03", "P04"].includes(activeProblem);
@@ -2438,45 +2439,48 @@ byId("document-upload-form").addEventListener("submit", async event => {
 });
 
 
+const awsConsoleLabels = {
+  P02: [["S3 source bucket", "S3 원문"], ["model-catalog", "Titan Embeddings"]],
+  P03: [["S3 source bucket", "S3 원문"], ["S3 vector bucket", "S3 벡터"], ["Vector index", "벡터 인덱스"], ["IAM role", "IAM 역할"], ["Knowledge Base", "Knowledge Base"], ["Data source", "Data source"]],
+  P04: [["AWS Guardrail", "AWS Guardrail"]]
+};
+const awsResourceStatus = {P02:{resources:[]}, P03:{resources:[]}, P04:{resources:[]}};
+
+function renderAwsConsoleLinks(problem) {
+  const container = byId("aws-console-links");
+  container.replaceChildren();
+  const status = awsResourceStatus[problem] || {resources:[]};
+  for (const [type, label] of awsConsoleLabels[problem] || []) {
+    const resource = status.resources?.find(item => item.type === type && item.state === "present");
+    const modelCatalog = type === "model-catalog" && status.state === "present";
+    const url = modelCatalog ? "https://us-east-1.console.aws.amazon.com/bedrock/home?region=us-east-1#/model-catalog" : resource?.console_url;
+    const valid = url?.startsWith("https://us-east-1.console.aws.amazon.com/");
+    const control = document.createElement(valid ? "a" : "span");
+    control.className = "aws-console-link";
+    control.textContent = `${label} ↗`;
+    control.title = valid ? `${resource?.name || label}${resource?.console_hint ? ` · ${resource.console_hint}` : ""}` : "자원 상태를 먼저 확인하세요";
+    if (valid) { control.href = url; control.target = "_blank"; control.rel = "noopener noreferrer"; }
+    else { control.setAttribute("aria-disabled", "true"); control.tabIndex = 0; }
+    container.append(control);
+  }
+  setText("aws-console-help", status.state === "present" ? "현재 확인된 AWS 자원만 열 수 있습니다." : "AWS 자원 상태를 확인하면 준비된 자원의 바로가기가 활성화됩니다.");
+}
+
 function updateKnowledgeLinks(status) {
+  awsResourceStatus.P03 = status;
+  if (activeProblem === "P03") renderAwsConsoleLinks("P03");
   const search = byId("knowledge-search-submit");
   const ready = status.state === "present" && status.search_ready === true;
   search.dataset.resourceReady = String(ready);
   search.disabled = !ready || executionPending;
   search.title = ready ? "입력한 검색어로 문서를 검색합니다" : "AWS 자원 준비 또는 상태 확인으로 검색 준비를 확인하세요";
   setText("knowledge-search-help", ready ? "검색 준비 완료. 검색어를 입력하고 검색하세요." : "AWS 자원을 준비하거나 상태를 확인하세요. 검색 준비가 완료되면 검색 버튼이 활성화됩니다.");
-  const container = byId("knowledge-console-links");
-  container.replaceChildren();
-  const names = {"S3 source bucket":"S3 원문", "S3 vector bucket":"S3 벡터", "Vector index":"벡터 인덱스", "IAM role":"IAM 역할", "Knowledge Base":"Knowledge Base", "Data source":"Data source"};
-  for (const [type, label] of Object.entries(names)) {
-    const resource = status.resources?.find(item => item.type === type && item.state === "present");
-    const valid = resource?.console_url?.startsWith("https://us-east-1.console.aws.amazon.com/");
-    const control = document.createElement(valid ? "a" : "span");
-    control.textContent = `${label} ↗`;
-    control.title = valid ? `${resource.name}${resource.console_hint ? ` · ${resource.console_hint}` : ""}` : "자원 상태를 먼저 확인하세요";
-    if (valid) { control.href = resource.console_url; control.target = "_blank"; control.rel = "noopener noreferrer"; }
-    else { control.setAttribute("aria-disabled", "true"); control.tabIndex = 0; }
-    container.append(control);
-  }
 }
 updateKnowledgeLinks({resources: []});
 
 function updateDocumentLinks(status) {
-  const source = status.resources?.find(resource => resource.type === "S3 source bucket" && resource.state === "present");
-  const bucket = source?.name;
-  const s3 = byId("document-s3-link"); const titan = byId("document-titan-link");
-  s3.disabled = !bucket;
-  s3.dataset.url = bucket ? `https://us-east-1.console.aws.amazon.com/s3/buckets/${encodeURIComponent(bucket)}?region=us-east-1&prefix=h02%2Fknowledge%2F&showversions=false` : "";
-  titan.disabled = !(status.state === "present" && (bucket || status.prepared));
-  for (const button of [s3, titan]) button.parentElement.tabIndex = button.disabled ? 0 : -1;
-  titan.dataset.url = titan.disabled ? "" : "https://us-east-1.console.aws.amazon.com/bedrock/home?region=us-east-1#/model-catalog";
-  setText("document-console-help", bucket ? "S3에서 저장된 원문을 확인하세요. Titan은 모델 카탈로그에서 Amazon Titan Text Embeddings V2를 선택하세요." : "AWS 자원을 준비하거나 자원 상태를 확인하면 바로가기가 활성화됩니다.");
-}
-for (const id of ["document-s3-link", "document-titan-link"]) {
-  byId(id).addEventListener("click", () => {
-    const button = byId(id);
-    if (!button.disabled && button.dataset.url) window.open(button.dataset.url, "_blank", "noopener,noreferrer");
-  });
+  awsResourceStatus.P02 = status;
+  if (activeProblem === "P02") renderAwsConsoleLinks("P02");
 }
 
 byId("knowledge-search-form").addEventListener("submit", async event => {
@@ -2515,6 +2519,8 @@ byId("knowledge-search-form").addEventListener("submit", async event => {
 });
 
 function updateGuardrailChat(status) {
+  awsResourceStatus.P04 = status;
+  if (activeProblem === "P04") renderAwsConsoleLinks("P04");
   const button = byId("guardrail-chat-submit");
   const ready = status.state === "present" && status.model_ready === true;
   button.dataset.resourceReady = String(ready);

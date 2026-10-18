@@ -8,20 +8,22 @@ with sync_playwright() as p:
  page.evaluate('selectTab(1,"P03"); selectModelCallPane("experience")')
  expect(page.locator('#knowledge-search-form')).to_be_visible()
  expect(page.locator('#knowledge-search-submit')).to_be_disabled()
- expect(page.locator('#knowledge-console-links [aria-disabled="true"]')).to_have_count(6)
+ expect(page.locator('#aws-console-links [aria-disabled="true"]')).to_have_count(6)
  types=['S3 source bucket','S3 vector bucket','Vector index','IAM role','Knowledge Base','Data source']
  resources=[{'type':kind,'name':f'fixture-{i}','state':'present','console_url':f'https://us-east-1.console.aws.amazon.com/bedrock/home?resource={i}'} for i,kind in enumerate(types)]
- page.route('**/api/resource-status/P03',lambda route:route.fulfill(json={'state':'present','search_ready':True,'checked_at':'2026-10-10T00:00:00Z','resources':resources}))
+ status=[{'state':'present','search_ready':True,'checked_at':'2026-10-10T00:00:00Z','resources':resources}]
+ page.route('**/api/resource-status/P03',lambda route:route.fulfill(json=status[0]))
  page.evaluate('renderEnvelope({activity_id:"P03",resource_ready:true})')
- expect(page.locator('#knowledge-console-links a')).to_have_count(6)
+ expect(page.locator('#aws-console-links a')).to_have_count(6)
  expect(page.locator('#knowledge-search-submit')).to_be_enabled()
- assert page.locator('#knowledge-console-links a').first.get_attribute('target')=='_blank'
+ assert page.locator('#aws-console-links a').first.get_attribute('target')=='_blank'
+ status[0]={'state':'absent','search_ready':False,'checked_at':'2026-10-10T00:01:00Z','resources':[]}
  page.evaluate('renderEnvelope({activity_id:"P03",resource_deleted:true})')
- expect(page.locator('#knowledge-console-links a')).to_have_count(0)
+ expect(page.locator('#aws-console-links a')).to_have_count(0)
  expect(page.locator('#knowledge-search-submit')).to_be_disabled()
- expect(page.locator('#knowledge-console-links [aria-disabled="true"]')).to_have_count(6)
+ expect(page.locator('#aws-console-links [aria-disabled="true"]')).to_have_count(6)
  page.evaluate('updateKnowledgeLinks({resources:[{type:"Knowledge Base",state:"present",name:"invalid",console_url:"https://example.com/"}]})')
- expect(page.locator('#knowledge-console-links a')).to_have_count(0)
+ expect(page.locator('#aws-console-links a')).to_have_count(0)
 
  expect(page.locator('#mission-experience-run')).to_be_hidden()
  expect(page.locator('#h03-work')).to_contain_text('~/owasp-llm-practice/P01-03_learner.py')
@@ -30,6 +32,9 @@ with sync_playwright() as p:
  page.evaluate('updateKnowledgeLinks({state:"present", search_ready:true, resources:[]})')
  expect(page.locator('#knowledge-search-submit')).to_be_enabled()
  page.evaluate('selectTab(2,"P04"); selectModelCallPane("experience")')
+ expect(page.locator('#aws-console-links [aria-disabled="true"]')).to_have_count(1)
+ page.evaluate('updateGuardrailChat({state:"present",model_ready:true,resources:[{type:"AWS Guardrail",state:"present",name:"fixture-guardrail",console_url:"https://us-east-1.console.aws.amazon.com/bedrock/home?region=us-east-1#/guardrails"}]})')
+ expect(page.locator('#aws-console-links a')).to_have_count(1)
  expect(page.locator('#knowledge-search-form')).to_be_hidden()
  expect(page.locator('#document-upload-form')).to_be_hidden()
  expect(page.locator('#mission-experience-run')).to_be_hidden()

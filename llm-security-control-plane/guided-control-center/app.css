@@ -649,8 +649,12 @@ pre { margin: 0; max-height: 360px; overflow: auto; padding: 14px; white-space: 
 .aws-resource-help summary { cursor:pointer; font-size:12px; color:var(--muted); }
 .aws-resource-help .action-tooltip { display:block; margin-top:8px; }
 #document-upload-form[hidden] { display:none; }
-.document-console-links { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
-.document-console-links[hidden] { display:none; }
+.aws-console-links { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.aws-console-links[hidden] { display:none; }
+.aws-console-link { display:inline-flex; align-items:center; min-height:36px; padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--blue); font-size:13px; text-decoration:none; }
+.aws-console-link:hover { background:var(--blue-soft); }
+.aws-console-link:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.aws-console-link[aria-disabled="true"] { color:var(--muted); opacity:.65; cursor:not-allowed; }
 
 
 .aws-status-details { margin:10px 0; }
