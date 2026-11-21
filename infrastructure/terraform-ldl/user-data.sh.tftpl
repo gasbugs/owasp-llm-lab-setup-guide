@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+export DEBIAN_FRONTEND=noninteractive
+trap 'echo "LDL_BOOTSTRAP_FAILED line=$LINENO"' ERR
+
+apt-get update
+apt-get install -y ca-certificates curl unzip git openssl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+. /etc/os-release
+printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
+  "$(dpkg --print-architecture)" "$VERSION_CODENAME" > /etc/apt/sources.list.d/docker.list
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable --now docker.service
+
+aws_cli_dir=$(mktemp -d)
+curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o "$aws_cli_dir/aws.zip"
+unzip -q "$aws_cli_dir/aws.zip" -d "$aws_cli_dir"
+"$aws_cli_dir/aws/install" --update
+rm -rf -- "$aws_cli_dir"
+
+# The encrypted root disk also holds swap for short image-build memory peaks.
+if [[ ! -e /swapfile ]]; then
+  install -m 0600 /dev/null /swapfile
+  fallocate -l 4G /swapfile
+  mkswap /swapfile
+  printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+  swapon /swapfile
+fi
+
+usermod -aG docker ubuntu
+ubuntu_uid=$(id -u ubuntu)
+loginctl enable-linger ubuntu
+systemctl start "user@$ubuntu_uid.service"
+
+as_ubuntu() {
+  runuser -l ubuntu -c "$1"
+}
+
+as_ubuntu 'git init "$HOME/owasp-llm-lab-setup-guide"'
+as_ubuntu 'cd "$HOME/owasp-llm-lab-setup-guide" &&
+  git remote add origin https://github.com/gasbugs/owasp-llm-lab-setup-guide.git &&
+  git fetch --depth 1 origin ${setup_revision} &&
+  git switch -c main FETCH_HEAD'
+
+# A lingering user manager can be active before its D-Bus socket is available.
+for attempt in $(seq 1 24); do
+  [[ -S "/run/user/$ubuntu_uid/bus" ]] && break
+  sleep 5
+done
+test -S "/run/user/$ubuntu_uid/bus"
+
+# Wait for instance-profile credentials to reach STS before the installer checks them.
+for attempt in $(seq 1 24); do
+  if as_ubuntu 'aws sts get-caller-identity --region us-east-1 --query Arn --output text' |
+    grep -q ':assumed-role/owasp-llm-ldl-ec2/'; then
+    break
+  fi
+  sleep 5
+done
+as_ubuntu 'aws sts get-caller-identity --region us-east-1 --query Arn --output text' |
+  grep -q ':assumed-role/owasp-llm-ldl-ec2/'
+
+runuser -u ubuntu -- env \
+  XDG_RUNTIME_DIR="/run/user/$ubuntu_uid" \
+  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$ubuntu_uid/bus" \
+  COMPOSE_PARALLEL_LIMIT=1 \
+  bash /home/ubuntu/owasp-llm-lab-setup-guide/tools/install-guided-practice.sh --ec2 </dev/null
+public_ip=$(cut -d= -f2 /home/ubuntu/owasp-llm-lab-setup-guide/llm-security-control-plane/.state/guided-ec2/public-ip.env)
+for endpoint in 9010/proxy-healthz 9011/ 9012/api/health 9013/api/health 9014/ 9015/; do
+  port=$(echo "$endpoint" | cut -d/ -f1)
+  # Check the published listener using the same Host header as the learner's browser.
+  for attempt in $(seq 1 30); do
+    if curl -fsSL --connect-timeout 3 --max-time 5 -H "Host: $public_ip:$port" \
+      "http://127.0.0.1:$endpoint" >/dev/null 2>&1; then
+      echo "LDL_BOOTSTRAP_ENDPOINT_READY $endpoint"
+      break
+    fi
+    test "$attempt" -lt 30
+    sleep 3
+  done
+done
+# Deliver auxiliary Grafana logins to the operator without printing them.
+login_file=$(mktemp)
+chmod 0600 "$login_file"
+trap 'rm -f -- "$login_file"' EXIT
+python3 - "$login_file" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+env_file = Path("/home/ubuntu/owasp-llm-lab-setup-guide/llm-security-control-plane/.state/guided-course.env")
+values = dict(line.split("=", 1) for line in env_file.read_text().splitlines() if "=" in line)
+logins = {
+    "grafana_explore": {"username": "admin", "password": values["GUIDED_GRAFANA_PASSWORD"]},
+    "grafana_missions": {"username": "p20-reader", "password": values["GUIDED_P20_GRAFANA_PASSWORD"]},
+}
+Path(sys.argv[1]).write_text(json.dumps(logins))
+PY
+aws secretsmanager put-secret-value --region us-east-1 \
+  --secret-id '${grafana_secret}' --secret-string "file://$login_file" >/dev/null
+echo LDL_BOOTSTRAP_READY
