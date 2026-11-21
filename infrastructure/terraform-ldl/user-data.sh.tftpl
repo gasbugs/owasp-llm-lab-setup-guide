@@ -73,8 +73,8 @@ for endpoint in 9010/proxy-healthz 9011/ 9012/api/health 9013/api/health 9014/ 9
   port=$(echo "$endpoint" | cut -d/ -f1)
   # Check the published listener using the same Host header as the learner's browser.
   for attempt in $(seq 1 30); do
-    if curl -fsSL --connect-timeout 3 --max-time 5 -H "Host: $public_ip:$port" \
-      "http://127.0.0.1:$endpoint" >/dev/null 2>&1; then
+    if curl -fsSL --noproxy '*' --connect-timeout 3 --max-time 5 \
+      --connect-to "$public_ip:$port:127.0.0.1:$port" "http://$public_ip:$endpoint" >/dev/null 2>&1; then
       echo "LDL_BOOTSTRAP_ENDPOINT_READY $endpoint"
       break
     fi
